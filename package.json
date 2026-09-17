@@ -1,0 +1,74 @@
+{
+  "name": "ts-template",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "ts-template": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/bin.ts",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "prepare": "simple-git-hooks",
+    "rename": "node scripts/rename.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "types": "tsc --noEmit",
+    "unused": "knip",
+    "update": "taze --interactive"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint && pnpm test",
+    "commit-msg": "pnpm commitlint --edit $1"
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.11",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.13",
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "@types/node": "^25.9.7",
+    "knip": "^5.88.1",
+    "semantic-release": "^25.0.9",
+    "simple-git-hooks": "^2.14.0",
+    "taze": "^19.17.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "ultracite": "^7.12.0",
+    "vitest": "^4.1.11"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "simple-git-hooks"
+    ]
+  },
+  "knip": {
+    "project": [
+      "src/**/*.ts"
+    ],
+    "ignoreDependencies": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/github"
+    ]
+  }
+}
