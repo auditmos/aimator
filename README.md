@@ -46,6 +46,11 @@ Najprościej poprowadzić ją skillem, który zbierze decyzje i sam wywoła poni
 /prepare-project
 ```
 
+Jeśli masz dopiero mglisty pomysł i nie umiesz odpowiedzieć, o czym to ma być ani jak ma
+wyglądać, zacznij o krok wcześniej — `/develop-series` doprowadzi Cię do tych odpowiedzi
+i przekaże je dalej. Fabuła odcinka **nie** powstaje w żadnym z nich: opracowuje ją etap 1
+ze wskazanego pliku źródłowego.
+
 Ręcznie wygląda to tak:
 
 ```bash
@@ -149,5 +154,6 @@ Pełne zasady — granice, ścieżka wzrostu, egzekwowanie — w [AGENTS.md](AGE
 4. Hook pre-commit uruchamia lint i testy
 5. Push na `main` uruchamia CI i semantic-release
 
-Skille: `/prepare-project` (etap 0), `/environment-variables` (zmienne środowiskowe),
+Skille: `/develop-series` (rozwinięcie pomysłu), `/prepare-project` (etap 0),
+`/environment-variables` (zmienne środowiskowe),
 `/bugfix` (najpierw test odtwarzający błąd). Szczegóły w [HOWTO.md](HOWTO.md).

@@ -128,6 +128,11 @@ Jedyny etap, który legalnie wciąga materiał spoza katalogu roboczego. Właśn
 kopiuje te bajty do środka i zapisuje ich hash: od tego miejsca każdy etap konsumuje
 artefakt wytworzony przez poprzedni.
 
+Przed etapem 0 może odbyć się sesja rozwinięcia pomysłu (skill `develop-series`). **Nie
+jest etapem i nie ma własnego pliku stanu**, bo nie wytwarza artefaktu — kończy się
+przekazaniem decyzji do etapu 0, który jako jedyny je zapisuje. Nie dodawaj
+`develop.stage.json`.
+
 Pięć decyzji odcinka — wszystkie jawne, żadna z domyślną wartością:
 
 | Pole | Wartość |

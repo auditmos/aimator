@@ -172,7 +172,9 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
 3. Implement with TDD in vertical slices (red → green → refactor, one test at a time)
 4. Use the `environment-variables` skill when adding or changing env vars
 5. Use the `bugfix` skill when something is reported broken — failing test first, then the fix
-6. Use the `prepare-project` skill to run stage 0 with a user — it owns the interview
+6. Use the `develop-series` skill when a user has an idea but cannot yet answer stage 0,
+   then `prepare-project` to run stage 0 itself — those two own every creative interview,
+   and neither develops an episode's plot, which belongs to stage 1
 7. Commit with a conventional commit message; the pre-commit hook runs lint + tests
 
 ## Formatting Rules

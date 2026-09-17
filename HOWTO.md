@@ -6,9 +6,37 @@ This repo ships Claude Code skills in `.claude/skills/` for the parts of the wor
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
+| Develop Series | `/develop-series` | Take a vague idea to the point where stage 0 can be answered |
 | Prepare Project | `/prepare-project` | Run stage 0 — collect the creative decisions and save the artifacts stage 1 consumes |
 | Environment Variables | `/environment-variables` | Add and validate environment variables |
 | Bugfix | `/bugfix` | Reproduce a reported bug in a failing test before fixing it |
+
+## Develop Series
+
+```
+/develop-series
+```
+
+Stage 0 assumes you already know what the series is. This session is the bridge from
+"mam pomysł" to answers — premise, world, tone, audience, protagonist, visual style,
+aspect ratio. One question at a time, guiding rather than interrogating, because this is
+your own creative material and taste does not need defending.
+
+It writes nothing. It ends by handing the decisions to `/prepare-project`, which owns
+every write — two places where creative decisions live is one place too many.
+
+Two boundaries make it useful rather than chatty:
+
+- **It does not develop the episode's plot.** Stage 1 does that, from the source file. If
+  the plot came out of this conversation instead, the pipeline's core rule — every stage
+  consumes an artifact, never a chat — would be broken on the first step.
+- **It is gently insistent about exactly two things**: the visual style and the
+  protagonist's fixed appearance, because those become image prompts and a model reads
+  "ładny, klimatyczny" as nothing and fills the gap differently every run; and the aspect
+  ratio, which has no default and cannot change after images exist.
+
+Skip it if you can already answer those questions. An interview with someone who has
+decided invites them to second-guess good instincts.
 
 ## Prepare Project
 
