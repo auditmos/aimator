@@ -18,7 +18,6 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "prepare": "simple-git-hooks",
-    "rename": "node scripts/rename.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "types": "tsc --noEmit",
