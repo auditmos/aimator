@@ -1,13 +1,33 @@
 # How to Use Claude Code Skills
 
-This template ships Claude Code skills in `.claude/skills/` for the parts of the workflow with rules worth encoding. They travel with any project generated from the template.
+This repo ships Claude Code skills in `.claude/skills/` for the parts of the workflow with rules worth encoding.
 
 ## Available Skills
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
+| Prepare Project | `/prepare-project` | Run stage 0 — collect the creative decisions and save the artifacts stage 1 consumes |
 | Environment Variables | `/environment-variables` | Add and validate environment variables |
 | Bugfix | `/bugfix` | Reproduce a reported bug in a failing test before fixing it |
+
+## Prepare Project
+
+```
+/prepare-project
+```
+
+Stage 0 of the pipeline is a conversation, not a generation step, and it is the one place
+creative decisions enter the system. The skill owns that interview: it summarises what is
+already approved, asks only about what is missing, labels its own ideas as proposals, and
+refuses to write a decision the user never made.
+
+The split it enforces is the point. You author exactly one file by hand — `project.md`,
+the shared creative rules. Everything mechanical is a CLI call: directories, the byte-exact
+copy of your episode source, the digests, the schema, the uniqueness of the episode number,
+and the readiness gate. That is why `aimator check` can be trusted: nothing it verifies was
+typed by hand.
+
+No command in stage 0 calls a paid API.
 
 ## Environment Variables
 

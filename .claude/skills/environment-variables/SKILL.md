@@ -48,15 +48,18 @@ Server = secrets, DB strings, internal URLs.
 
 | File | Purpose | Git |
 |------|---------|-----|
-| `.env` | Development defaults (local URLs, non-sensitive) | Committed |
+| `.env.example` | Reference listing every variable, with safe placeholder values | Committed |
+| `.env` | Your local values | Ignored |
 | `.env.local` | Secrets, API keys, overrides | Ignored |
 
-Load order: `.env.local` overrides `.env`.
+Load order: `.env.local` overrides `.env`. In this repo `src/lib/env.ts` achieves that by
+calling `process.loadEnvFile(".env.local")` **before** `.env`, because `loadEnvFile` never
+overwrites an already-set key — the file read first wins.
 
 ## Adding a Variable
 
 1. Add Zod schema to `src/lib/env.ts` in `client`, `server`, or `shared`
-2. Development default → `.env`; secret → `.env.local`
+2. Add it to `.env.example` with a safe placeholder; put your value in `.env`, secrets in `.env.local`
 3. Configure in deployment environment
 4. Add validation test to `src/lib/env.test.ts`
 
@@ -81,5 +84,5 @@ import { env } from "@/lib/env";
 - [ ] `src/lib/env.ts` exists with t3-env + Zod config
 - [ ] `src/lib/env.test.ts` exists with validation tests
 - [ ] New variables added to correct section (`client`, `server`, `shared`)
-- [ ] Defaults in `.env`, secrets in `.env.local`
+- [ ] Variable listed in `.env.example`; local value in `.env`, secrets in `.env.local`
 - [ ] Deployment environment configured

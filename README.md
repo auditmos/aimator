@@ -1,159 +1,153 @@
 # aimator
 
-TypeScript template for building tool and service projects with modern tooling, strict type-checking, and automated releases.
+CLI, które prowadzi przez produkcję krótkiej animacji: od pomysłu, przez scenariusz
+i assety, po gotowy film sklejony z klipów.
 
-## Prerequisites
+Artefakty są grupowane **per projekt i per model obrazu**. Jeden projekt może mieć
+komplet assetów w `gpt-image` i w `seedream` — to dwa niezależne byty dające dwie różne
+animacje z tej samej historii. Ujęcia i klipy w obu torach robi Seedance 2.5.
+
+**Stan: zaimplementowany jest etap 0 (przygotowanie projektu i odcinka).** Etapy 1–8 mają
+zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md), ale nie mają jeszcze kodu.
+
+## Wymagania
 
 - [Node.js](https://nodejs.org/) >= 22
 - [pnpm](https://pnpm.io/)
 
-## Setup
+## Instalacja
 
 ```bash
 pnpm install
 ```
 
-This installs dependencies and configures git hooks automatically via the `prepare` script.
-
-## After generating from this template
-
-Nothing is broken on arrival — `pnpm install` is enough to lint, type-check, test, build, and run the CLI. What follows is the part that is still the template's rather than yours.
-
-**Rename** — one command covers everything that is genuinely wrong until you change it:
+Ustaw katalog na artefakty. Leży **poza repozytorium**, bo jeden projekt to setki
+megabajtów obrazów i wideo:
 
 ```bash
-pnpm rename my-project
+cp .env.example .env
 ```
 
-It rewrites `name` and the `bin` command in `package.json`, the CLI usage text, and this README's title, then reports what it changed. A scoped name like `@acme/my-project` still gets a plain `my-project` command on the PATH.
+```dotenv
+# .env — Twoje lokalne wartości, poza gitem
+AIMATOR_WORKSPACE=~/Documents/Video/aimator-workspace
+```
 
-**Replace the demo code.** It is working reference material for the deep-module folder form, `Result<T>`, and the CLI wiring, so keep it until the example stops being useful:
+Wiodące `~/` jest rozwijane. Kolejność ma znaczenie: `.env.local` wygrywa z `.env`,
+a zmienna z powłoki wygrywa z obydwoma. Commitowany jest wyłącznie `.env.example`.
 
-- [ ] `src/lib/example/` — the `greet` / `normalize` module
-- [ ] the `greet` command in `src/cli.ts` (the usage text is handled by `pnpm rename`)
-- [ ] the `greet` export in `src/index.ts`
-- [ ] the matching `*.test.ts` files
+## Etap 0 — przygotowanie projektu i odcinka
 
-**Rewrite the docs** — these still describe the template itself:
+To rozmowa, nie generacja. Żadne polecenie tego etapu nie woła płatnego API.
 
-- [ ] this README
-- [ ] the project overview and structure tree in `AGENTS.md` (`CLAUDE.md` is a symlink to it)
+Najprościej poprowadzić ją skillem, który zbierze decyzje i sam wywoła poniższe polecenia:
 
-**Decide:**
+```
+/prepare-project
+```
 
-- [ ] `private: true` stays unless you publish. To publish, drop it and add `@semantic-release/npm` plus a `files` field — the current config only creates GitHub Releases, with no artifact attached.
-
-### Two things that surprise people
-
-**Your first commit must be conventional.** commitlint is active the moment `pnpm install` finishes:
+Ręcznie wygląda to tak:
 
 ```bash
-$ git commit -m "my first commit"
-✖ type may not be empty [type-empty]
+pnpm dev project init 48-praw-wladzy --title "48 praw władzy" --aspect-ratio 16:9
+# uzupełnij każdy TODO(etap-0) w project.md — to jedyny plik pisany ręcznie
+pnpm dev character add 48-praw-wladzy --source ~/Zdjecia/portret.jpg
+pnpm dev episode add 48-praw-wladzy --source '~/48/01-NEVER OUTSHINE THE MASTER.md'
+pnpm dev episode set 48-praw-wladzy 01-never-outshine-the-master \
+  --duration 60 --audio music-and-effects --language pl --subtitles pl --nature law-or-idea
+pnpm dev check 48-praw-wladzy
 ```
 
-Use something like `chore: initial commit`.
+Każde polecenie zapisujące przyjmuje `--dry-run`: pokazuje, co powstanie, i nie zapisuje
+niczego. `--workspace <ścieżka>` nadpisuje `AIMATOR_WORKSPACE` dla jednego wywołania.
 
-**Releases turn themselves on.** Your repo is not a GitHub template, so the release job that is skipped upstream runs here: the first push to `main` containing a `feat:` commit cuts v1.0.0. There is no setup step, and equally no opt-in.
+Powstaje:
 
-## Scripts
+```
+$AIMATOR_WORKSPACE/projects/48-praw-wladzy/
+├── project.json        identyfikator, tytuł, proporcje, materiały postaci
+├── project.md          zasady wspólne — pisane ręcznie
+├── prepare.stage.json  pochodzenie i ocena
+├── character/sources/  zdjęcia, skopiowane i zahashowane
+└── episodes/01-never-outshine-the-master/
+    ├── source.md       kopia bajtowa Twojego opisu
+    ├── episode.json    pięć decyzji odcinka
+    └── prepare.stage.json
+```
 
-| Command | Description |
+### Pięć decyzji odcinka
+
+| Pole | Wartość |
+|---|---|
+| `--duration` | długość w sekundach, liczba całkowita 1–3600 |
+| `--audio` | `music-and-effects`, `dialogue`, `narration`, `dialogue-and-narration` — wszystkie zawierają muzykę i efekty |
+| `--language` | kod języka scenariusza i wypowiedzi; wymagany także w filmie bez mowy |
+| `--subtitles` | kod języka albo `none`; ustalany niezależnie od `--language` |
+| `--nature` | `law-or-idea`, `synopsis`, `screenplay` — czym jest Twój plik źródłowy |
+
+Świeży `episode.json` ma wszystkie pięć jako `null` i jest celowo niegotowy. Nie ma
+wartości domyślnych: `--duration` nie ma „zwykle 60", a `--language` nie dziedziczy się
+z zasad projektu.
+
+`check` przepuszcza, gdy zasady nie zawierają już żadnego `TODO(etap-0)`, proporcje są
+ustalone, źródło zgadza się z zapisanym hashem i żadna z pięciu decyzji nie jest pusta.
+To kontrola **plików**. Nie potwierdza, że zasady mają sens ani że pomysł jest dobry.
+
+## Zasady, na których stoi całe narzędzie
+
+- Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy — nigdy
+  kontekstu rozmowy. Etap 0 jest jedynym, który legalnie wciąga materiał z zewnątrz, i
+  właśnie dlatego kopiuje bajty do środka i zapisuje ich hash.
+- Ocena kreatywna jest osobna od walidacji. Plik, który powstał, nie jest plikiem
+  przyjętym.
+- Akceptacja jest związana z bajtami. Zmiana pliku poza narzędziem unieważnia ją i `check`
+  to zgłasza.
+- Nic nie ponawia się automatycznie, a stan `submitted` zapisuje się przed płatnym
+  wywołaniem — przerwana generacja wznawia się przez odpytanie zadania, nie przez drugą
+  opłatę.
+
+Pełny kontrakt: [docs/pipeline.md](docs/pipeline.md).
+
+## Polecenia
+
+| Polecenie | Opis |
 |---------|-------------|
-| `pnpm build` | Build with tsup (ESM + declarations) |
-| `pnpm dev` | Run the CLI from source with tsx (no build step) |
-| `pnpm lint` | Check code with Biome |
-| `pnpm lint:fix` | Auto-fix lint/format issues |
-| `pnpm types` | Type-check with tsc --noEmit |
-| `pnpm test` | Run tests with Vitest |
-| `pnpm test:watch` | Run tests in watch mode |
-| `pnpm unused` | Detect unused code with Knip |
-| `pnpm update` | Interactive dependency updates with Taze |
-| `pnpm rename <name>` | Rename the package, CLI command, usage text, and README title |
+| `pnpm build` | Build tsup (ESM + deklaracje) |
+| `pnpm dev` | Uruchom CLI ze źródeł przez tsx, bez budowania |
+| `pnpm lint` | Sprawdź kod Biome |
+| `pnpm lint:fix` | Napraw lint i formatowanie |
+| `pnpm types` | Sprawdź typy przez tsc --noEmit |
+| `pnpm test` | Testy Vitest |
+| `pnpm test:watch` | Testy w trybie watch |
+| `pnpm unused` | Nieużywany kod (Knip) |
+| `pnpm update` | Interaktywna aktualizacja zależności (Taze) |
 
-## CLI
+`pnpm dev` używa `tsx`, a nie natywnego strippingu typów w Node, bo rozdzielczość
+`Node16` w TypeScripcie zapisuje specyfikatory `.js`, których Node nie zmapuje z powrotem
+na pliki `.ts`.
 
-During development, run the CLI straight from source — no build step:
+## Architektura
 
-```bash
-pnpm dev greet Ada          # Hello, Ada!
-pnpm dev --help             # usage
-```
+Kod trzyma się **głębokich modułów** (Ousterhout): wąski interfejs nad dużą implementacją.
 
-The build produces the same thing as a standalone executable:
+- Domena zaczyna jako jeden plik `src/lib/{domena}.ts`
+- Gdy urośnie o wewnętrzne części, staje się katalogiem z `index.ts` jako jedynym wejściem
+- Eksportuj tylko to, czego potrzebuje wołający — `pnpm unused` wywala CI na eksportach,
+  których nikt nie importuje
 
-```bash
-pnpm build
+`src/bin.ts` jest celowo cienką nakładką: trzyma shebang, strumienie i kod wyjścia. Całe
+zachowanie siedzi w `src/cli.ts` jako `run(argv): Promise<Result<string>>`, dzięki czemu
+CLI testuje się wywołaniem funkcji, a nie uruchamianiem procesu.
 
-./dist/bin.js greet Ada     # Hello, Ada!
-./dist/bin.js nope          # stderr + exit 1
-```
+Pełne zasady — granice, ścieżka wzrostu, egzekwowanie — w [AGENTS.md](AGENTS.md).
 
-`pnpm dev` uses `tsx` rather than Node's native type stripping, because TypeScript's `Node16` resolution writes `.js` specifiers that Node will not map back to `.ts` files.
+## Praca nad kodem
 
-`bin` maps the command `ts-template` to `dist/bin.js`, so installing the package exposes it on the PATH. Note the package is `private: true`, so that happens via a local install or `pnpm link`, not from a registry.
+1. Testy leżą obok źródeł (`*.test.ts`)
+2. TDD: najpierw czerwony test, potem minimalny kod, potem refaktor
+3. Commity w formacie [Conventional Commits](https://www.conventionalcommits.org/)
+4. Hook pre-commit uruchamia lint i testy
+5. Push na `main` uruchamia CI i semantic-release
 
-`src/bin.ts` is a deliberately thin shim owning the shebang, streams, and exit code. All behaviour lives in `src/cli.ts` as `run(argv): Result<string>`, which is why the CLI is tested by calling a function rather than spawning a process.
-
-## Architecture
-
-Code here follows **deep modules** (Ousterhout): a small interface over a large implementation. A module hides complexity behind one entry point rather than scattering it across many tiny files.
-
-- A domain starts as a single file — `src/lib/{domain}.ts`
-- Once it grows internals, it becomes `src/lib/{domain}/` with `index.ts` as its only entry
-- Export only what a caller needs; `pnpm unused` fails CI on exports nobody imports
-
-Full rules — boundaries, growth path, enforcement — are in [AGENTS.md](AGENTS.md).
-
-## Development Workflow
-
-1. Write tests co-located with source files (`*.test.ts`)
-2. Use TDD: write a failing test, make it pass, refactor
-3. Commit using [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, etc.)
-4. Pre-commit hooks automatically run linting and tests
-5. Push to `main` triggers CI checks (and semantic-release, in projects generated from this template)
-
-### Skills
-
-The template ships two Claude Code skills — `/environment-variables` for adding a validated env var, and `/bugfix` for the failing-test-first bug fix workflow. See **[HOWTO.md](HOWTO.md)**.
-
-### Committing
-
-When you're done implementing, just ask Claude Code to commit:
-
-```
-commit this
-```
-
-Claude Code will stage the relevant files, write a conventional commit message based on the changes, and run the pre-commit hook (lint + tests) automatically. If the hook fails, it will fix the issues and retry.
-
-You can also use the built-in shortcut:
-
-```
-/commit
-```
-
-## Environment Variables
-
-Environment configuration uses `@t3-oss/env-core` with Zod validation:
-
-- `.env` — Development defaults (committed)
-- `.env.local` — Secrets and overrides (gitignored)
-
-Define schemas in `src/lib/env.ts`.
-
-## CI/CD
-
-GitHub Actions runs on push to `main`:
-
-1. Lint, type-check, test, and unused code detection
-2. If all checks pass, semantic-release creates a GitHub Release with tag
-
-The release job is skipped on this repository because it is a GitHub template — a template has no consumers, so tagging it would version an artifact nobody fetches. Repos generated from it are not templates, so releases run there automatically with no setup step.
-
-## Contributing
-
-1. Create a feature branch
-2. Make changes following the existing patterns
-3. Ensure `pnpm lint && pnpm types && pnpm test && pnpm unused` all pass
-4. Open a PR against `main`
+Skille: `/prepare-project` (etap 0), `/environment-variables` (zmienne środowiskowe),
+`/bugfix` (najpierw test odtwarzający błąd). Szczegóły w [HOWTO.md](HOWTO.md).

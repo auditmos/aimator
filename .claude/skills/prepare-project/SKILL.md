@@ -1,0 +1,98 @@
+---
+name: prepare-project
+description: Run stage 0 of the animation pipeline — establish a project's shared creative rules and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
+---
+
+# Stage 0 — prepare a project and an episode
+
+A guided preparation step, not a generation step. You ask for creative decisions and
+save the approved ones. **Nothing here calls a paid API.** Talk to the user in their
+language; these instructions stay in English.
+
+The mechanical work belongs to the CLI, the conversation belongs to you. Never
+hand-write `project.json`, `episode.json` or `prepare.stage.json` — those carry digests
+and provenance the tool computes. You author exactly one file by hand: `project.md`.
+
+## 1. Read before you ask
+
+Read `docs/pipeline.md` for the stage contract, then run `aimator check <project-id>`
+for an existing project. Inspect the actual files under `$AIMATOR_WORKSPACE`.
+
+Do not infer facts from other conversations, and do not borrow another project's story,
+character, setting or runtime. If the user has not named the project or the episode
+source, ask.
+
+## 2. Collect decisions
+
+First summarise what is **already** approved in the existing files and in this
+conversation. Then ask only about what is missing or contradictory, in small groups.
+
+Label every suggestion of yours as a proposal. A proposal the user has not answered is
+not a decision, and writing it into `project.md` as though it were is the one failure
+this stage exists to prevent.
+
+For a new project establish:
+
+1. the premise, and what a single episode tells relative to the others;
+2. the shared world, period, tone and audience;
+3. the protagonist's role and recurring appearance, any recurring cast, and the visual
+   style. Ask whether existing character material belongs to this project. Record real
+   paths and the **actual** review status — never claim an approval or an inspection
+   that did not happen;
+4. the aspect ratio, and any binding opening-composition or continuity requirement;
+5. any other binding creative constraint.
+
+For each episode establish:
+
+1. the source file and its nature — `law-or-idea`, `synopsis` or `screenplay`. An idea
+   alone is enough; developing the story is stage 1's job, not the user's;
+2. `durationSeconds` — a whole number from 1 to 3600;
+3. `audio` — `music-and-effects`, `dialogue`, `narration` or `dialogue-and-narration`.
+   All four include music and effects. If the user asks for something none of these
+   covers, say so; **never silently map it onto the nearest mode**;
+4. `language` — the code for the screenplay and any spoken lines. Required even for a
+   film with no speech, because the screenplay document still has a language;
+5. `subtitles` — a language code, or `none`. Decided **independently** of `language`.
+   Explain that in a speechless film on-screen text means short captions, and that
+   `none` also excludes title cards and any text the plot needs to be understood.
+
+## 3. Save
+
+```sh
+aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9
+aimator character add <project-id> --source <zdjęcie> [--source <zdjęcie>...]
+aimator episode add <project-id> --source <NN-tytul.md>
+aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-effects \
+  --language pl --subtitles pl --nature law-or-idea
+```
+
+Add `--dry-run` to any of these to see what would be written without writing it.
+
+`project init` scaffolds `project.md` with `TODO(etap-0)` markers. **Replace every marker
+with the approved decisions** and delete the leading quote block. Keep unresolved,
+non-blocking matters in their own section and clearly marked as open.
+
+The episode source keeps its bytes. `episode add` copies it and records its digest, so
+the file name must start with the episode number and a separator — `01-tytul.md`. The
+number decides the output directory and must be unique within the project.
+
+For an existing project, reuse its rules and create only the new episode. Do not replace
+approved material with a fresh template. If the user changes an input that a later stage
+already consumed, say which results now need re-checking — do not regenerate them.
+
+Model choice and API keys are not part of these decisions and never belong in
+`project.md`, in a prompt or in any artifact.
+
+## 4. Hand off
+
+```sh
+aimator check <project-id>
+```
+
+It passes when the rules carry no markers, the aspect ratio is set, the source is intact
+and every episode has all five decisions. A pass is a **file** check: it does not confirm
+that the rules make sense or that the ideas are good. Confirm that yourself, with the
+user, before moving on.
+
+Report what was created, what was reused, what is still open, and the exact next command.
+Stage 0 ends there.

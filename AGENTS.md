@@ -2,7 +2,17 @@
 
 ## Project Overview
 
-TypeScript template for building tool/service projects. Uses ESM-only modules with strict TypeScript, Biome for linting/formatting, Vitest for testing, and semantic-release for automated releases.
+CLI that walks a solo creator through producing a short animated episode: idea → project
+and episode preparation → screenplay → character → shot list → prompt package → reference
+images → opening frame → clips → final cut. ESM-only modules with strict TypeScript,
+Biome for linting/formatting, Vitest for testing, semantic-release for releases.
+
+Generated artifacts live **outside the repo**, under `AIMATOR_WORKSPACE`, grouped per
+project and per image model. The stage contract — directory layout, the `*.stage.json`
+shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
+Read it before touching anything that writes an artifact.
+
+Stage 0 is implemented. Stages 1–8 are a declared contract, not working code.
 
 ## Project Structure
 
@@ -10,20 +20,40 @@ TypeScript template for building tool/service projects. Uses ESM-only modules wi
 src/
 ├── index.ts          # Package API — re-exports what consumers need
 ├── bin.ts            # Executable — shebang, streams, exit code
-├── cli.ts            # Single-file form — run(argv): Result<string>
+├── cli.ts            # Single-file form — run(argv): Promise<Result<string>>
 ├── cli.test.ts
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 └── lib/
-    ├── env.ts        # Single-file form — no internals to hide yet
+    ├── env.ts        # Single-file form — loads .env files, validates with Zod
     ├── env.test.ts   # Co-located test for env validation
-    ├── example/      # Folder form — index.ts is the only entry
-    │   ├── index.ts      # Public: greet()
-    │   ├── normalize.ts  # Internal — never re-exported
+    ├── workspace.ts  # Single-file form — the ONLY module that knows the layout
+    ├── workspace.test.ts
+    ├── project/      # Folder form — index.ts is the only entry (stage 0)
+    │   ├── index.ts      # Public: initProject, addEpisode, setEpisodeSettings,
+    │   │                 #         addCharacterSources, checkStage0
+    │   ├── schema.ts     # Internal — Zod schemas for the artifacts
+    │   ├── template.ts   # Internal — the project.md scaffold
+    │   ├── store.ts      # Internal — bytes, digests, the single dry-run gate
     │   └── index.test.ts # Tests through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
+
+## Pipeline rules
+
+Five rules that stop an agent from re-creating the mess this tool was built to replace.
+Full contract in [docs/pipeline.md](docs/pipeline.md).
+
+1. **One state filename: `<stage>.stage.json`.** One shape for every stage. Never invent
+   `screenplay-state.json`, `references-state.json` or `downstream-status.json`.
+2. **The image-model track is a directory level** (`gpt-image/`, `seedream/`), never a
+   filename prefix and never a parallel tree.
+3. **Paths come from `src/lib/workspace.ts` only.** No other module joins path segments.
+4. **A run archive never copies an input.** Inputs are referenced by path + sha256.
+5. **No document in this repo records project state or progress.** State is a file read
+   in the workspace; history is `git log`. `docs/pipeline.md` describes the current
+   contract in the present tense and is edited in place, never appended to.
 
 ## Deep Modules
 
@@ -43,11 +73,12 @@ Small interface, large implementation (Ousterhout). A module absorbs complexity 
 | Package API | `src/index.ts` | Only what consumers import | Everything else under `src/` |
 | Domain | `src/lib/{domain}/index.ts` | Exported functions + types | Helpers, adapters, I/O, third-party types |
 | Config | `src/config/index.ts` | Typed `config` object | Env wiring, defaults, coercion |
-| Env | `src/lib/env.ts` | `env` | Zod schemas, `process.env` access |
-| CLI | `src/cli.ts` | `run(argv): Result<string>` | Argument parsing, usage text, command dispatch |
+| Env | `src/lib/env.ts` | `env` | Zod schemas, `.env` loading, `process.env` access |
+| Layout | `src/lib/workspace.ts` | Path builders + id rules | Every directory and file name in the workspace |
+| CLI | `src/cli.ts` | `run(argv): Promise<Result<string>>` | Argument parsing, usage text, command dispatch |
 | Executable | `src/bin.ts` | none — a process entry | `process.argv`, stdout/stderr, exit code |
 
-`bin.ts` stays a shim on purpose: keeping streams and exit codes out of `run()` is what lets the CLI be tested by calling a function instead of spawning a process.
+`bin.ts` stays a shim on purpose: keeping streams and exit codes out of `run()` is what lets the CLI be tested by calling a function instead of spawning a process. `run` is async because stages write files and later stages call HTTP — but it still never touches `process`, a stream or an exit code, which is the invariant that matters.
 
 ### Growth path
 
@@ -126,9 +157,14 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
 ## Environment Variables
 
 - Define schemas in `src/lib/env.ts` using `@t3-oss/env-core` + Zod
-- Non-sensitive defaults go in `.env` (committed)
-- Secrets go in `.env.local` (gitignored)
+- `.env.example` is the committed reference — add every new variable to it
+- `.env` and `.env.local` are both gitignored; `.env` holds your local values
 - Access via: `import { env } from "./lib/env.js"`
+- `env.ts` loads `.env.local` **before** `.env`, because `process.loadEnvFile` never
+  overwrites a key that is already set — so the file read first wins. Precedence ends up
+  shell > `.env.local` > `.env`. Do not "fix" the order.
+- `AIMATOR_WORKSPACE` is optional in the schema on purpose: a missing workspace is a
+  recoverable condition `run()` reports as a `Result`, not an exception at import time.
 
 ## Development Workflow
 
@@ -137,7 +173,8 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
 3. Implement with TDD in vertical slices (red → green → refactor, one test at a time)
 4. Use the `environment-variables` skill when adding or changing env vars
 5. Use the `bugfix` skill when something is reported broken — failing test first, then the fix
-6. Commit with a conventional commit message; the pre-commit hook runs lint + tests
+6. Use the `prepare-project` skill to run stage 0 with a user — it owns the interview
+7. Commit with a conventional commit message; the pre-commit hook runs lint + tests
 
 ## Formatting Rules
 
