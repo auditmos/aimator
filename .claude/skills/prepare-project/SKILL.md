@@ -36,9 +36,20 @@ For a new project establish:
 1. the premise, and what a single episode tells relative to the others;
 2. the shared world, period, tone and audience;
 3. the protagonist's role and recurring appearance, any recurring cast, and the visual
-   style. Ask whether existing character material belongs to this project. Record real
-   paths and the **actual** review status — never claim an approval or an inspection
-   that did not happen;
+   style. Ask where the character's look comes from — **photographs of a real person**, or
+   **the description in `project.md`**. There is no third answer and no default, and the
+   readiness gate blocks until one is recorded. Record real paths and the **actual**
+   review status: never claim an approval or an inspection that did not happen;
+
+   When the answer is the description, this prose is the only input the character stage
+   will ever receive, so finish it here rather than leaving it to a later stage that has
+   nowhere to look. Keep asking until each of these names something a renderer can act on:
+   the protagonist's face and body, the recurring wardrobe, every recurring character, the
+   recurring props, the recurring setting, and the visual style. What recurs across
+   episodes belongs in the rules; this episode's own locations, one-off props and shots do
+   not — those are derived from the screenplay several stages later. If something stays
+   open, write it in the open section and say out loud that the character stage will
+   otherwise invent it differently on every run;
 4. the aspect ratio, and any binding opening-composition or continuity requirement;
 5. any other binding creative constraint.
 
@@ -59,14 +70,21 @@ For each episode establish:
 ## 3. Save
 
 ```sh
-aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9
+aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9 \
+  --character photographs|description
 aimator character add <project-id> --source <zdjęcie> [--source <zdjęcie>...]
+aimator character describe <project-id>
 aimator episode add <project-id> --source <NN-tytul.md>
 aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-effects \
   --language pl --subtitles pl --nature law-or-idea
 ```
 
 Add `--dry-run` to any of these to see what would be written without writing it.
+
+`character add` and `character describe` are the two ways to answer the same question, and
+supplying a photograph counts as the answer. `character describe` is not a formality: it
+records that no photograph is coming, which is what lets the gate distinguish a decision
+from an omission.
 
 `project init` scaffolds `project.md` with `TODO(etap-0)` markers. **Replace every marker
 with the approved decisions** and delete the leading quote block. Keep unresolved,
@@ -87,12 +105,18 @@ Model choice and API keys are not part of these decisions and never belong in
 
 ```sh
 aimator check <project-id>
+aimator approve <project-id> [--note "<co zostało przeczytane>"]
 ```
 
-It passes when the rules carry no markers, the aspect ratio is set, the source is intact
-and every episode has all five decisions. A pass is a **file** check: it does not confirm
-that the rules make sense or that the ideas are good. Confirm that yourself, with the
-user, before moving on.
+`check` passes when the rules carry no markers, the aspect ratio and the character basis
+are set, the recorded digests still match and every episode has all five decisions. That is
+a **file** check: it does not confirm that the rules make sense or that the ideas are good.
+
+`approve` is where somebody says they do. Run it only after the user has read the rules and
+said yes — never on your own initiative, and never to make a report look finished. It
+refuses anything `check` rejects, and it binds the approval to the bytes as they stand,
+including `project.md`, which acquires its digest at this moment and at no earlier one.
+Editing an approved artifact afterwards revokes the approval, and `check` will say so.
 
 Report what was created, what was reused, what is still open, and the exact next command.
 Stage 0 ends there.

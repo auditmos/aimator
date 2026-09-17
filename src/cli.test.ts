@@ -146,3 +146,85 @@ describe("check", () => {
     expect(result.text).toContain("TODO(etap-0)");
   });
 });
+
+describe("character describe", () => {
+  beforeEach(async () => {
+    await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
+  });
+
+  it("should record that the character comes from the description", async () => {
+    const result = await cli("character", "describe", "demo");
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("project.md");
+  });
+
+  it("should reject an unknown character basis at init", async () => {
+    const result = await cli(
+      "project",
+      "init",
+      "inny",
+      "--title",
+      "Inny",
+      "--character",
+      "zdjecia"
+    );
+    expect(result.text).toContain("photographs, description");
+  });
+});
+
+describe("approve", () => {
+  async function readyProject(): Promise<void> {
+    const path = join(scratch, "01-prawo.md");
+    await writeFile(path, "Nigdy nie przyćmiewaj mistrza.\n", "utf8");
+    await cli(
+      "project",
+      "init",
+      "demo",
+      "--title",
+      "Demo",
+      "--aspect-ratio",
+      "16:9",
+      "--character",
+      "description"
+    );
+    await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nUstalone.\n", "utf8");
+    await cli(
+      "episode",
+      "add",
+      "demo",
+      "--source",
+      path,
+      "--duration",
+      "60",
+      "--audio",
+      "narration",
+      "--language",
+      "pl",
+      "--subtitles",
+      "none",
+      "--nature",
+      "law-or-idea"
+    );
+  }
+
+  it("should say validation is not acceptance", async () => {
+    await readyProject();
+    const result = await cli("check", "demo");
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("to nie to samo co przyjęcie");
+  });
+
+  it("should approve and then hand off to stage 1", async () => {
+    await readyProject();
+    const approved = await cli("approve", "demo");
+    expect(approved.ok).toBe(true);
+    const result = await cli("check", "demo");
+    expect(result.text).toContain("Etap 1");
+  });
+
+  it("should refuse to approve an incomplete stage 0", async () => {
+    await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
+    const result = await cli("approve", "demo");
+    expect(result.ok).toBe(false);
+  });
+});

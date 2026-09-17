@@ -57,10 +57,13 @@ Ręcznie wygląda to tak:
 pnpm dev project init 48-praw-wladzy --title "48 praw władzy" --aspect-ratio 16:9
 # uzupełnij każdy TODO(etap-0) w project.md — to jedyny plik pisany ręcznie
 pnpm dev character add 48-praw-wladzy --source ~/Zdjecia/portret.jpg
+# albo, jeśli zdjęć nie będzie i postać powstaje z opisu:
+pnpm dev character describe 48-praw-wladzy
 pnpm dev episode add 48-praw-wladzy --source '~/48/01-NEVER OUTSHINE THE MASTER.md'
 pnpm dev episode set 48-praw-wladzy 01-never-outshine-the-master \
   --duration 60 --audio music-and-effects --language pl --subtitles pl --nature law-or-idea
 pnpm dev check 48-praw-wladzy
+pnpm dev approve 48-praw-wladzy --note "przeczytane i przyjęte"
 ```
 
 Każde polecenie zapisujące przyjmuje `--dry-run`: pokazuje, co powstanie, i nie zapisuje
@@ -70,15 +73,31 @@ Powstaje:
 
 ```
 $AIMATOR_WORKSPACE/projects/48-praw-wladzy/
-├── project.json        identyfikator, tytuł, proporcje, materiały postaci
+├── project.json        identyfikator, tytuł, proporcje, podstawa postaci
 ├── project.md          zasady wspólne — pisane ręcznie
 ├── prepare.stage.json  pochodzenie i ocena
-├── character/sources/  zdjęcia, skopiowane i zahashowane
+├── character/sources/  zdjęcia, skopiowane i zahashowane (tylko jeśli są)
 └── episodes/01-never-outshine-the-master/
     ├── source.md       kopia bajtowa Twojego opisu
     ├── episode.json    pięć decyzji odcinka
     └── prepare.stage.json
 ```
+
+Katalog powstaje dopiero wtedy, gdy coś do niego pisze — pusty folder byłby obietnicą,
+której narzędzie nie dotrzymuje.
+
+### Dwie decyzje projektu
+
+| Flaga | Wartość |
+|---|---|
+| `--aspect-ratio` | np. `16:9`; po powstaniu obrazów nie da się zmienić bez ich unieważnienia |
+| `--character` | `photographs` albo `description` — skąd etap postaci bierze wygląd |
+
+`--character` istnieje, bo pusty katalog na zdjęcia nie odróżnia „świadomie bez zdjęć" od
+„jeszcze nie dodałem". Przy `photographs` bramka blokuje, dopóki nie ma ani jednego zdjęcia.
+Przy `description` **jedynym** wejściem etapu postaci jest opis wyglądu w `project.md` — i
+wtedy to on musi być konkretny, bo nic dalej go nie uzupełni. `character add` samo w sobie
+jest deklaracją i przestawia pole na `photographs`.
 
 ### Pięć decyzji odcinka
 
@@ -94,9 +113,22 @@ $AIMATOR_WORKSPACE/projects/48-praw-wladzy/
 wartości domyślnych: `--duration` nie ma „zwykle 60", a `--language` nie dziedziczy się
 z zasad projektu.
 
-`check` przepuszcza, gdy zasady nie zawierają już żadnego `TODO(etap-0)`, proporcje są
-ustalone, źródło zgadza się z zapisanym hashem i żadna z pięciu decyzji nie jest pusta.
-To kontrola **plików**. Nie potwierdza, że zasady mają sens ani że pomysł jest dobry.
+`check` przepuszcza, gdy zasady nie zawierają już żadnego `TODO(etap-0)`, obie decyzje
+projektu są ustalone, wyniki zgadzają się z zapisanymi hashami i żadna z pięciu decyzji
+odcinka nie jest pusta. To kontrola **plików**. Nie potwierdza, że zasady mają sens ani że
+pomysł jest dobry — i mówi to wprost zamiast udawać, że przeszło znaczy przyjęte.
+
+Przyjęcie zapisuje osobne polecenie:
+
+```bash
+pnpm dev approve 48-praw-wladzy --note "przeczytane i przyjęte"
+```
+
+`approve` powtarza całą walidację i odmawia, jeśli cokolwiek nie gra — akceptacja zapisana
+na zepsutym pochodzeniu byłaby kłamstwem, któremu zaufałyby kolejne etapy. Przy okazji
+`project.md` dostaje wreszcie swój hash: do tej chwili pisze go człowiek, więc hash z
+momentu `init` opisywałby pusty szkielet. Każda późniejsza edycja unieważnia akceptację,
+a `check` to zgłasza.
 
 ## Zasady, na których stoi całe narzędzie
 

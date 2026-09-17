@@ -6,8 +6,10 @@ import { resolveWorkspace, type Workspace } from "../workspace.js";
 import {
   addCharacterSources,
   addEpisode,
+  approveStage0,
   checkStage0,
   initProject,
+  setCharacterBasis,
   setEpisodeSettings,
 } from "./index.js";
 
@@ -33,9 +35,13 @@ async function tree(path: string): Promise<string[]> {
   return out.sort();
 }
 
-async function makeProject(aspectRatio: string | null = "16:9"): Promise<void> {
+async function makeProject(
+  aspectRatio: string | null = "16:9",
+  characterBasis: "description" | "photographs" | null = "description"
+): Promise<void> {
   const result = await initProject({
     aspectRatio,
+    characterBasis,
     mode: "apply",
     projectId: "demo",
     title: "Demo",
@@ -78,18 +84,24 @@ describe("initProject", () => {
     expect(await tree(root)).toEqual([
       "projects",
       "projects/demo",
-      "projects/demo/character",
-      "projects/demo/character/sources",
-      "projects/demo/episodes",
       "projects/demo/prepare.stage.json",
       "projects/demo/project.json",
       "projects/demo/project.md",
     ]);
   });
 
-  it("should not create empty model-track directories", async () => {
+  it("should not promise directories nothing has written to yet", async () => {
     await makeProject();
-    expect(await tree(root)).not.toContain("projects/demo/character/gpt-image");
+    const entries = await tree(root);
+    expect(entries).not.toContain("projects/demo/character/sources");
+    expect(entries).not.toContain("projects/demo/episodes");
+    expect(entries).not.toContain("projects/demo/character/gpt-image");
+  });
+
+  it("should report an undecided character basis", async () => {
+    await makeProject("16:9", null);
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("characterBasis");
   });
 
   it("should scaffold rules that still carry placeholders", async () => {
@@ -112,6 +124,7 @@ describe("initProject", () => {
   it("should write nothing in dry-run mode", async () => {
     const result = await initProject({
       aspectRatio: "16:9",
+      characterBasis: "description",
       mode: "dry-run",
       projectId: "demo",
       title: "Demo",
@@ -126,6 +139,7 @@ describe("initProject", () => {
     await fillRules();
     const again = await initProject({
       aspectRatio: "16:9",
+      characterBasis: "description",
       mode: "apply",
       projectId: "demo",
       title: "Inny",
@@ -140,6 +154,7 @@ describe("initProject", () => {
   it("should reject an invalid project id", async () => {
     const result = await initProject({
       aspectRatio: null,
+      characterBasis: "description",
       mode: "apply",
       projectId: "../escape",
       title: "Demo",
@@ -151,6 +166,7 @@ describe("initProject", () => {
   it("should reject a malformed aspect ratio", async () => {
     const result = await initProject({
       aspectRatio: "szeroki",
+      characterBasis: "description",
       mode: "apply",
       projectId: "demo",
       title: "Demo",
@@ -466,11 +482,33 @@ describe("checkStage0", () => {
     expect(result.ok ? null : result.error.message).toContain("brak decyzji");
   });
 
-  it("should pass a complete stage 0 and hand off to stage 1", async () => {
+  it("should pass a complete stage 0 but withhold approval", async () => {
     await readyProject();
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? result.data.ready : null).toBe(true);
-    expect(result.ok ? result.data.nextStep : null).toContain("Etap 1");
+    expect(result.ok ? result.data.approved : null).toBe(false);
+    expect(result.ok ? result.data.nextStep : null).toContain("approve");
+  });
+
+  it("should block photographs declared with no photograph supplied", async () => {
+    await makeProject("16:9", "photographs");
+    await fillRules();
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("ani jednego zdjęcia");
+  });
+
+  it("should detect project.json edited outside the tool", async () => {
+    await readyProject();
+    const path = join(root, "projects/demo/project.json");
+    const file = JSON.parse(await readFile(path, "utf8"));
+    // Still schema-valid, so only the digest can catch it.
+    await writeFile(
+      path,
+      `${JSON.stringify({ ...file, title: "Podmieniony" }, null, 2)}\n`,
+      "utf8"
+    );
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("zmieniony poza narzędziem");
   });
 
   it("should detect a source edited outside the tool", async () => {
@@ -487,5 +525,170 @@ describe("checkStage0", () => {
   it("should refuse for an unknown project", async () => {
     const result = await checkStage0({ projectId: "nieznany", workspace });
     expect(result.ok ? null : result.error.message).toContain("nie istnieje");
+  });
+});
+
+describe("setCharacterBasis", () => {
+  it("should record that the character comes from the description", async () => {
+    await makeProject("16:9", null);
+    const result = await setCharacterBasis({
+      basis: "description",
+      mode: "apply",
+      projectId: "demo",
+      workspace,
+    });
+
+    expect(result.ok).toBe(true);
+    const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
+    expect(project.characterBasis).toBe("description");
+  });
+
+  it("should refuse to declare photographs without any photograph", async () => {
+    await makeProject("16:9", null);
+    const result = await setCharacterBasis({
+      basis: "photographs",
+      mode: "apply",
+      projectId: "demo",
+      workspace,
+    });
+
+    expect(result.ok ? null : result.error.message).toContain("pustą ręką");
+  });
+
+  it("should flip to photographs when a photo is added", async () => {
+    await makeProject("16:9", "description");
+    const photo = join(scratch, "portret.png");
+    await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const result = await addCharacterSources({
+      mode: "apply",
+      projectId: "demo",
+      sourcePaths: [photo],
+      workspace,
+    });
+
+    const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
+    expect(project.characterBasis).toBe("photographs");
+    expect(result.ok ? result.data.problems.join(" ") : null).toContain("z opisu na zdjęcia");
+  });
+});
+
+describe("approveStage0", () => {
+  async function readyProject(): Promise<void> {
+    await makeProject();
+    await fillRules();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+  }
+
+  function approve(): ReturnType<typeof approveStage0> {
+    return approveStage0({
+      mode: "apply",
+      note: "przeczytane",
+      projectId: "demo",
+      reviewer: "tkow",
+      workspace,
+    });
+  }
+
+  it("should refuse to approve what does not validate", async () => {
+    await makeProject();
+    const result = await approve();
+    expect(result.ok ? null : result.error.message).toContain("TODO(etap-0)");
+  });
+
+  it("should mark every stage record as approved", async () => {
+    await readyProject();
+    const result = await approve();
+
+    expect(result.ok ? result.data.approved : null).toBe(true);
+    const project = JSON.parse(
+      await readFile(join(root, "projects/demo/prepare.stage.json"), "utf8")
+    );
+    const episode = JSON.parse(
+      await readFile(
+        join(root, "projects/demo/episodes/01-never-outshine-the-master/prepare.stage.json"),
+        "utf8"
+      )
+    );
+    expect(project.artifacts.project.review.status).toBe("approved");
+    expect(project.artifacts.project.review.reviewer).toBe("tkow");
+    expect(episode.artifacts.episode.review.status).toBe("approved");
+  });
+
+  it("should bind the approval to the rules as they stand", async () => {
+    await readyProject();
+    await approve();
+    const stage = JSON.parse(
+      await readFile(join(root, "projects/demo/prepare.stage.json"), "utf8")
+    );
+    const paths = stage.artifacts.project.outputs.map((output: { path: string }) => output.path);
+    expect(paths).toContain("projects/demo/project.md");
+  });
+
+  it("should revoke the approval when the rules are rewritten", async () => {
+    await readyProject();
+    await approve();
+    await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nCo innego.\n", "utf8");
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("zmieniony poza narzędziem");
+  });
+
+  it("should report an approval lapsed by a later decision", async () => {
+    await readyProject();
+    await approve();
+    const result = await setEpisodeSettings({
+      episodeId: "01-never-outshine-the-master",
+      mode: "apply",
+      projectId: "demo",
+      settings: { durationSeconds: 90 },
+      workspace,
+    });
+
+    expect(result.ok ? result.data.problems.join(" ") : null).toContain("wygasła");
+    const after = await checkStage0({ projectId: "demo", workspace });
+    expect(after.ok ? after.data.approved : null).toBe(false);
+  });
+
+  it("should hand off to stage 1 once approved", async () => {
+    await readyProject();
+    await approve();
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? result.data.approved : null).toBe(true);
+    expect(result.ok ? result.data.nextStep : null).toContain("Etap 1");
+  });
+
+  it("should write nothing in dry-run mode", async () => {
+    await readyProject();
+    const result = await approveStage0({
+      mode: "dry-run",
+      note: null,
+      projectId: "demo",
+      reviewer: "tkow",
+      workspace,
+    });
+
+    expect(result.ok).toBe(true);
+    const stage = JSON.parse(
+      await readFile(join(root, "projects/demo/prepare.stage.json"), "utf8")
+    );
+    expect(stage.artifacts.project.review.status).toBe("pending");
+  });
+});
+
+describe("project.json written before characterBasis existed", () => {
+  it("should read as undecided rather than as a default", async () => {
+    await makeProject();
+    await fillRules();
+    const path = join(root, "projects/demo/project.json");
+    const { characterBasis, ...older } = JSON.parse(await readFile(path, "utf8"));
+    await writeFile(path, `${JSON.stringify(older, null, 2)}\n`, "utf8");
+
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("characterBasis nie jest ustalony");
   });
 });

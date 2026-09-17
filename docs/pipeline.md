@@ -12,7 +12,7 @@ Artefakty leżą poza repozytorium, w katalogu z `AIMATOR_WORKSPACE`.
 ```
 $AIMATOR_WORKSPACE/
 └── projects/<project-id>/
-    ├── project.json                  identyfikator, tytuł, proporcje, materiały postaci
+    ├── project.json                  identyfikator, tytuł, proporcje, podstawa postaci
     ├── project.md                    zasady wspólne — jedyny plik pisany ręcznie
     ├── prepare.stage.json
     ├── character/
@@ -41,8 +41,14 @@ Trzy reguły, które ten układ egzekwuje:
    obrazie i kończy dwiema niezależnymi animacjami z tej samej historii.
 3. **Ścieżki zna wyłącznie `src/lib/workspace.ts`.** Żaden inny moduł nie składa ścieżek.
 
-Katalogi torów powstają dopiero wtedy, gdy jakiś etap do nich pisze. Pusty katalog jest
-obietnicą, której narzędzie nie dotrzymuje.
+Katalog powstaje dopiero wtedy, gdy jakiś etap do niego pisze — dotyczy to zarówno torów
+modelowych, jak i `character/sources/` czy `episodes/`. Pusty katalog jest obietnicą,
+której narzędzie nie dotrzymuje.
+
+**Zasady projektu są wejściem każdego etapu.** `project.json` i `project.md` leżą poza
+tabelą poniżej, bo czyta je wszystko: proporcje obrazu, podstawa postaci i zasady wspólne
+nie mają innej drogi do etapów, które ich potrzebują. Oba są artefaktami etapu 0, więc
+reguła „każdy etap konsumuje wyłącznie artefakty wcześniejszych etapów" pozostaje spełniona.
 
 ## Plik etapu
 
@@ -76,19 +82,25 @@ przenieść. `originPath` w `project.json` i `episode.json` jest bezwzględny, b
 plik spoza katalogu roboczego — jedyne miejsce, gdzie to ma sens.
 
 `project.json` i `episode.json` trzymają wyłącznie treść; pochodzenie i ocena są w pliku
-etapu. `project.md` celowo **nie ma** zapisanego hasha: pisze go człowiek po `init`, więc
-hash z chwili utworzenia byłby z założenia nieaktualny. Każdy etap zapisuje hashe swoich
-własnych wejść w chwili, gdy je konsumuje.
+etapu. `project.md` nie ma hasha od chwili `init`, bo pisze go wtedy człowiek i hash pustego
+szkieletu byłby z założenia nieaktualny — dostaje go dopiero przy `aimator approve`, czyli
+w momencie, w którym ktoś przyjmuje zasady w takim kształcie, w jakim leżą. Od tej chwili
+każda edycja `project.md` unieważnia akceptację i `check` to zgłasza. Każdy etap zapisuje
+hashe swoich własnych wejść w chwili, gdy je konsumuje.
 
 ## Niezmienniki
 
 Obowiązują we wszystkich etapach.
 
 - **Ocena kreatywna jest osobna od walidacji.** Plik, który powstał, nie jest plikiem
-  przyjętym. Przejście walidacji nie jest akceptacją.
+  przyjętym. Przejście walidacji nie jest akceptacją — akceptację zapisuje wyłącznie jawne
+  polecenie (`aimator approve` dla etapu 0), nigdy polecenie kontrolne.
 - **Akceptacja jest związana z bajtami.** `review.status` dotyczy konkretnych
   `outputs[].sha256`. Zmiana pliku unieważnia akceptację; nie ma sposobu, by przeniosła
-  się na inny wynik.
+  się na inny wynik. Ponowny zapis pliku etapu przywraca `pending` i mówi o tym wprost.
+- **Nie akceptuje się tego, co nie przechodzi walidacji.** `approve` odmawia, dopóki hashe
+  się nie zgadzają albo brakuje decyzji: akceptacja zapisana na zepsutym pochodzeniu byłaby
+  kłamstwem, któremu kolejne etapy zaufałyby.
 - **`needsReview` nigdy nie czyści się samo.** Wpisuje go etap zależny w chwili
   uruchomienia. `check` tylko raportuje rozjazd — polecenie kontrolne niczego nie zapisuje.
 - **Stan `submitted` zapisuje się przed płatnym POST-em**, więc przerwane wywołanie
@@ -109,9 +121,9 @@ Obowiązują we wszystkich etapach.
 
 | Etap | Konsumuje | Produkuje | Bramka | Stan |
 |---|---|---|---|---|
-| 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci | `project.md`, `project.json`, `source.md`, `episode.json`, `character/sources/` | `aimator check` | **zaimplementowany** |
-| 1 scenariusz | `project.md`, `source.md`, `episode.json` | `screenplay.md` | ocena użytkownika | niezaimplementowany |
-| 2 postać | `character/sources/`, zasady projektu | `card.png` → 8 widoków → `hero.png`, per tor | ocena każdego obrazu | niezaimplementowany |
+| 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci | `project.md`, `project.json`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
+| 1 scenariusz | `source.md`, `episode.json` | `screenplay.md` | ocena użytkownika | niezaimplementowany |
+| 2 postać | `characterBasis`: `character/sources/` albo opis wyglądu z `project.md` | `card.png` → 8 widoków → `hero.png`, per tor | ocena każdego obrazu | niezaimplementowany |
 | 3 lista ujęć | `screenplay.md` | `shot-list.md` | ocena użytkownika | niezaimplementowany |
 | 4 pakiet promptów | `shot-list.md`, zatwierdzony `hero.png` | `prompt-package.json`, `prompts/**` | ocena pakietu | niezaimplementowany |
 | 5 obrazy referencyjne | pakiet, zatwierdzone zależności `dependsOn` | `<tor>/references/Rxx.png` | ocena każdego obrazu | niezaimplementowany |
@@ -133,6 +145,19 @@ jest etapem i nie ma własnego pliku stanu**, bo nie wytwarza artefaktu — koń
 przekazaniem decyzji do etapu 0, który jako jedyny je zapisuje. Nie dodawaj
 `develop.stage.json`.
 
+Dwie decyzje projektu — obie jawne, obie bez wartości domyślnej:
+
+| Pole | Wartość |
+|---|---|
+| `aspectRatio` | np. `16:9`; po powstaniu obrazów nie da się zmienić bez ich unieważnienia |
+| `characterBasis` | `photographs` albo `description` — skąd etap postaci bierze wygląd |
+
+`characterBasis` istnieje, bo pusty `character/sources/` nie odróżnia „świadomie bez zdjęć"
+od „jeszcze nie dodane". Przy `photographs` bramka blokuje, dopóki nie ma ani jednego
+zdjęcia. Przy `description` jedynym wejściem etapu postaci jest opis wyglądu w `project.md`
+— i wtedy to on musi być konkretny, bo nic dalej go nie uzupełni. Dodanie zdjęcia przez
+`character add` samo w sobie jest deklaracją i przestawia pole na `photographs`.
+
 Pięć decyzji odcinka — wszystkie jawne, żadna z domyślną wartością:
 
 | Pole | Wartość |
@@ -146,5 +171,10 @@ Pięć decyzji odcinka — wszystkie jawne, żadna z domyślną wartością:
 Świeży `episode.json` ma wszystkie pięć jako `null` i jest celowo niegotowy do generacji.
 Gotowość jest **wyliczana**, nie deklarowana: nie ma pola `status`, które plik mógłby
 podać niezgodnie z prawdą. `check` przepuszcza, gdy `project.md` nie zawiera już żadnego
-`TODO(etap-0)`, `aspectRatio` jest ustalone, hashe wyników się zgadzają i żadne z pięciu
-pól nie jest `null`.
+`TODO(etap-0)`, obie decyzje projektu są ustalone, hashe wyników — projektu i odcinków —
+zgadzają się, i żadne z pięciu pól nie jest `null`.
+
+`check` niczego nie zapisuje i niczego nie przyjmuje. Etap 0 kończy `aimator approve
+<project-id>`, które powtarza całą weryfikację, dopisuje hash `project.md` i ustawia
+`review.status` na `approved` we wszystkich plikach etapu — projektu i każdego odcinka —
+razem z tym, kto i kiedy to zrobił. Dopiero wtedy `check` odsyła do etapu 1.

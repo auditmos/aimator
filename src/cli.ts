@@ -1,11 +1,14 @@
+import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import { env } from "./lib/env.js";
 import {
   addCharacterSources,
   addEpisode,
+  approveStage0,
   checkStage0,
   initProject,
   type Stage0Report,
+  setCharacterBasis,
   setEpisodeSettings,
 } from "./lib/project/index.js";
 import { err, ok, type Result } from "./lib/result.js";
@@ -14,15 +17,18 @@ import { resolveWorkspace, type Workspace } from "./lib/workspace.js";
 const USAGE = `Usage: aimator <command>
 
 Etap 0 — przygotowanie projektu i odcinka:
-  project init <id> --title <tytuł> [--aspect-ratio <w:h>]
+  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--character <podstawa>]
   character add <id> --source <plik> [--source <plik>...]
+  character describe <id>
   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
   episode set <id> <episode-id> [te same flagi decyzji]
   check <id>
+  approve <id> [--note <uzasadnienie>] [--reviewer <kto>]
 
-  --audio    music-and-effects | dialogue | narration | dialogue-and-narration
-  --nature   law-or-idea | synopsis | screenplay
+  --audio      music-and-effects | dialogue | narration | dialogue-and-narration
+  --nature     law-or-idea | synopsis | screenplay
+  --character  photographs | description — skąd etap postaci bierze wygląd
 
 Globalne:
   --workspace <ścieżka>  katalog artefaktów (domyślnie AIMATOR_WORKSPACE)
@@ -93,6 +99,23 @@ function modeOf(parsed: Parsed): "apply" | "dry-run" {
   return parsed.values["dry-run"] === true ? "dry-run" : "apply";
 }
 
+function basisOf(raw: unknown): Result<"description" | "photographs" | null> {
+  if (raw === undefined) {
+    return ok(null);
+  }
+
+  return raw === "description" || raw === "photographs"
+    ? ok(raw)
+    : err(new UsageError(`--character "${String(raw)}" — dozwolone: photographs, description`));
+}
+
+/** Who ran the command. An approval with no name attached is worth nothing. */
+function reviewerOf(parsed: Parsed): string {
+  const flag = parsed.values.reviewer;
+
+  return typeof flag === "string" && flag !== "" ? flag : userInfo().username;
+}
+
 /** Only the flags the user actually passed become decisions; the rest stay undecided. */
 function settingsOf(parsed: Parsed): Record<string, number | string> {
   const patch: Record<string, number | string> = {};
@@ -132,6 +155,10 @@ function render(headline: string, report: Stage0Report, mode: "apply" | "dry-run
     lines.push(`  ! ${problem}`);
   }
 
+  if (report.ready && !report.approved) {
+    lines.push("  ! pliki przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+  }
+
   lines.push(`Dalej: ${report.nextStep}`);
 
   return lines.join("\n");
@@ -144,6 +171,7 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
 
   const parsed = parse(argv.slice(1), {
     "aspect-ratio": { type: "string" },
+    character: { type: "string" },
     title: { type: "string" },
   });
 
@@ -166,9 +194,16 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
   }
 
   const ratio = parsed.data.values["aspect-ratio"];
+  const basis = basisOf(parsed.data.values.character);
+
+  if (!basis.ok) {
+    return basis;
+  }
+
   const mode = modeOf(parsed.data);
   const result = await initProject({
     aspectRatio: typeof ratio === "string" ? ratio : null,
+    characterBasis: basis.data,
     mode,
     projectId: projectId.data,
     title: title.data,
@@ -180,20 +215,10 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
     : result;
 }
 
-async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
-  if (argv[0] !== "add") {
-    return err(new UsageError(`nieznane polecenie: character ${argv[0] ?? ""}`.trim()));
-  }
-
-  const parsed = parse(argv.slice(1), { source: { multiple: true, type: "string" } });
-
-  if (!parsed.ok) {
-    return parsed;
-  }
-
-  const projectId = requirePositional(parsed.data, 0, "project-id");
-  const workspace = workspaceOf(parsed.data);
-  const sources = parsed.data.values.source;
+async function runCharacterAdd(parsed: Parsed): Promise<Result<string>> {
+  const projectId = requirePositional(parsed, 0, "project-id");
+  const workspace = workspaceOf(parsed);
+  const sources = parsed.values.source;
 
   if (!projectId.ok) {
     return projectId;
@@ -205,7 +230,7 @@ async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
     return err(new UsageError("brakuje wymaganej flagi --source"));
   }
 
-  const mode = modeOf(parsed.data);
+  const mode = modeOf(parsed);
   const result = await addCharacterSources({
     mode,
     projectId: projectId.data,
@@ -214,6 +239,83 @@ async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
   });
 
   return result.ok ? ok(render("Materiały postaci", result.data, mode)) : result;
+}
+
+async function runCharacterDescribe(parsed: Parsed): Promise<Result<string>> {
+  const projectId = requirePositional(parsed, 0, "project-id");
+  const workspace = workspaceOf(parsed);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const mode = modeOf(parsed);
+  const result = await setCharacterBasis({
+    basis: "description",
+    mode,
+    projectId: projectId.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(render("Postać powstaje z opisu w project.md, bez zdjęć", result.data, mode))
+    : result;
+}
+
+async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
+  const [action] = argv;
+
+  if (action !== "add" && action !== "describe") {
+    return err(new UsageError(`nieznane polecenie: character ${action ?? ""}`.trim()));
+  }
+
+  const parsed = parse(
+    argv.slice(1),
+    action === "add" ? { source: { multiple: true, type: "string" } } : {}
+  );
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  return action === "add"
+    ? await runCharacterAdd(parsed.data)
+    : await runCharacterDescribe(parsed.data);
+}
+
+async function runApprove(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, { note: { type: "string" }, reviewer: { type: "string" } });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const { note } = parsed.data.values;
+  const mode = modeOf(parsed.data);
+  const result = await approveStage0({
+    mode,
+    note: typeof note === "string" ? note : null,
+    projectId: projectId.data,
+    reviewer: reviewerOf(parsed.data),
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(render(`Etap 0 projektu "${projectId.data}" zatwierdzony`, result.data, mode))
+    : result;
 }
 
 async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
@@ -341,6 +443,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "check") {
     return await runCheck(rest);
+  }
+
+  if (command === "approve") {
+    return await runApprove(rest);
   }
 
   return err(new UsageError(`unknown command: ${command}`));

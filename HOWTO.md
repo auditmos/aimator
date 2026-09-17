@@ -30,10 +30,19 @@ Two boundaries make it useful rather than chatty:
 - **It does not develop the episode's plot.** Stage 1 does that, from the source file. If
   the plot came out of this conversation instead, the pipeline's core rule — every stage
   consumes an artifact, never a chat — would be broken on the first step.
-- **It is gently insistent about exactly two things**: the visual style and the
-  protagonist's fixed appearance, because those become image prompts and a model reads
-  "ładny, klimatyczny" as nothing and fills the gap differently every run; and the aspect
-  ratio, which has no default and cannot change after images exist.
+- **It is gently insistent about three things**: the visual style and the protagonist's
+  fixed appearance, because those become image prompts and a model reads "ładny,
+  klimatyczny" as nothing and fills the gap differently every run; the aspect ratio, which
+  has no default and cannot change after images exist; and where the character's look comes
+  from at all.
+
+That last one decides how long the session runs. Answer "photographs" and the character
+stage starts from those files. Answer "description" and no photograph exists anywhere in
+the pipeline — so the skill keeps going until the prose covers the protagonist's face and
+body, the recurring wardrobe, every recurring character, the recurring props, the recurring
+setting and the style. The boundary is recurrence: what has to look identical in episode
+seven belongs in the rules, while this episode's own locations, one-off props and shots
+stay with the later stages that derive them from the screenplay.
 
 Skip it if you can already answer those questions. An interview with someone who has
 decided invites them to second-guess good instincts.
@@ -54,6 +63,12 @@ the shared creative rules. Everything mechanical is a CLI call: directories, the
 copy of your episode source, the digests, the schema, the uniqueness of the episode number,
 and the readiness gate. That is why `aimator check` can be trusted: nothing it verifies was
 typed by hand.
+
+It ends with `aimator approve`, which is deliberately not the same thing as `aimator check`.
+`check` asks whether the files hold together; `approve` is where a person says they accept
+them. It refuses anything `check` rejects, and it binds the decision to the bytes as they
+stand — including `project.md`, which gets its digest at that moment and at no earlier one.
+Edit an approved artifact afterwards and the approval is gone, with `check` saying so.
 
 No command in stage 0 calls a paid API.
 

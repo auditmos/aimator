@@ -52,9 +52,18 @@ These are exactly the five project-level decisions stage 0 records — nothing m
    tells. This is the question that makes a series a series rather than a pile of films.
 2. **World, period, tone, audience.**
 3. **Protagonist and look.** Their role — participant, observer, narrator — recurring
-   appearance and wardrobe, any recurring cast, and the visual style. Ask whether they
-   have photographs of a real person to build the character from, because the character
-   stage starts from real photos. Do not record any approval of that material here.
+   appearance and wardrobe, any recurring cast, and the visual style. Ask early whether
+   they have photographs of a real person to build the character from, because that single
+   answer decides how much work is left in this session:
+
+   - **Photographs.** The character stage starts from those files. Settle the style and the
+     recurring wardrobe; the face arrives with the photos.
+   - **Description.** No photograph exists anywhere later in the pipeline. Everything the
+     character stage will have is the prose written now — so finish the visual brief below
+     before this session ends.
+
+   Record neither as approved material. Stage 0 writes the decision itself; the photographs
+   are only ever inspected in the character stage.
 4. **Aspect ratio, opening composition, continuity.** What must stay constant between
    scenes and episodes.
 5. **Any other binding constraint** they consider non-negotiable.
@@ -64,6 +73,36 @@ audio mode; screenplay language; subtitles language or `none`; and what their so
 actually is — an idea, a synopsis or a finished screenplay. If they can, the session is
 done. If a settings answer is genuinely undecided, that is fine too — `prepare-project`
 will ask again and `aimator check` will hold the line.
+
+## When the character comes from a description
+
+Choosing "no photographs" moves work into this conversation that a file would otherwise
+have done. Nothing downstream invents it: the image model receives this prose and nothing
+else, and whatever the prose leaves open it fills in differently on every single run.
+
+So when they choose description, keep going — still one question at a time, still offering
+options — until each of these is something a renderer could act on:
+
+- **The protagonist's face and body.** Age read, build, skin tone, hair colour, hair shape
+  and length, eyes, distinguishing features. "Dziewczynka około czterech lat" is a casting
+  note, not an appearance.
+- **The recurring wardrobe.** The exact outfit that returns every episode: garments, cut,
+  colours. In flat or stylised 2D the outfit carries recognition more reliably than the
+  face, so this one is not optional.
+- **Every recurring character.** The same treatment, shorter. A parent who appears in every
+  episode needs an appearance; a neighbour who appears once does not.
+- **Recurring props.** The objects that must look identical each time they appear — the
+  toy, the lamp, the mug. Only the ones that recur.
+- **The recurring setting.** The places the series keeps returning to, and what is fixed in
+  them: palette, light, the furniture that may not move between episodes.
+- **The visual style**, below. That one applies whichever basis they chose.
+
+The boundary is recurrence, not subject matter. Ask yourself: would this have to look the
+same in episode seven? Then it belongs here. The episode's own locations, its one-off props
+and every shot still belong to later stages, derived from the screenplay.
+
+If they truly cannot answer one of these yet, that is allowed — but say plainly that the
+character stage will then have to invent it, and will invent it differently each run.
 
 ## Where to be gently insistent
 
@@ -79,8 +118,14 @@ treated, palette, lighting, how much realism, what is explicitly unwanted.
 **The aspect ratio is a hard requirement.** It has no default, it cannot be changed after
 images exist without invalidating them, and stage 0 will not pass without it.
 
-Everything else — the plot, the locations, the props — is deliberately **not** settled
-here. Those are derived from the story by later stages, not invented up front.
+**Where the character comes from is a hard requirement too.** Photographs or description —
+stage 0 will not pass while it is undecided, because an empty photo directory cannot tell
+"deliberately none" apart from "not supplied yet". And when the answer is description, the
+whole brief above becomes as binding as the style, for the same reason: it is the only
+input the character stage will ever get.
+
+Everything else — the plot, the episode's own locations, its one-off props — is deliberately
+**not** settled here. Those are derived from the story by later stages, not invented up front.
 
 ## What this session must not do
 
@@ -88,18 +133,24 @@ here. Those are derived from the story by later stages, not invented up front.
   and note it, but do not turn it into a synopsis or a scene list. Stage 1 develops the
   story from the source file, and it must do so from an artifact, not from this
   conversation. An idea alone is a legitimate source.
-- **Do not describe locations, props or shots.** Those become reference images derived
-  from the shot list, several stages later.
+- **Do not describe the episode's own locations, props or shots.** Those become reference
+  images derived from the shot list, several stages later. What recurs across every episode
+  is a different matter and belongs here — that distinction is the whole of the section
+  above, not a loophole around this rule.
 - Do not choose a model, mention an API key, or promise what a generator will produce.
 
 ## Hand off
 
-End with three things:
+End with four things:
 
-1. **The decisions**, restated as a short list, marked as theirs to confirm.
+1. **The decisions**, restated as a short list, marked as theirs to confirm — including
+   whether the character comes from photographs or from the description, and, when it is
+   the description, the visual brief in full.
 2. **What is still open**, listed separately and honestly — an open matter is not a failure
    of this session, it is information stage 0 needs.
-3. **The next step**: run `prepare-project`, which will save these as `project.md` and the
+3. **What nothing downstream will fill in**, if anything in the brief stayed open. Say it
+   once, plainly, without nagging.
+4. **The next step**: run `prepare-project`, which will save these as `project.md` and the
    episode configuration. Offer to continue straight into it.
 
 Do not summarise a decision the user never made. If this session ends with three answers

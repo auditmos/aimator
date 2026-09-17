@@ -8,8 +8,10 @@ import {
   projectPaths,
   type Workspace,
 } from "../workspace.js";
+import { approveAll, isApproved, verifyOutputs, withOutputs } from "./review.js";
 import {
   audioModes,
+  characterBases,
   type DraftSettings,
   draftSettingsSchema,
   type EpisodeFile,
@@ -49,6 +51,8 @@ import { PLACEHOLDER, renderRules } from "./template.js";
 
 const TOOL = "aimator";
 const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+const READY_NEXT =
+  "etap 0 zatwierdzony. Etap 1 (scenariusz) nie jest jeszcze zaimplementowany — to zakres kroku 2 migracji.";
 const EMPTY_SETTINGS: DraftSettings = {
   audio: null,
   durationSeconds: null,
@@ -58,6 +62,8 @@ const EMPTY_SETTINGS: DraftSettings = {
 };
 
 export interface Stage0Report {
+  /** Creative acceptance, which validation never implies on its own. */
+  readonly approved: boolean;
   readonly created: readonly string[];
   readonly nextStep: string;
   readonly problems: readonly string[];
@@ -72,8 +78,11 @@ interface ProjectInput {
 }
 type InitProjectInput = ProjectInput & {
   readonly aspectRatio: string | null;
+  readonly characterBasis: ProjectFile["characterBasis"];
   readonly title: string;
 };
+type SetBasisInput = ProjectInput & { readonly basis: NonNullable<ProjectFile["characterBasis"]> };
+type ApproveInput = ProjectInput & { readonly note: string | null; readonly reviewer: string };
 type AddEpisodeInput = ProjectInput & {
   readonly settings: Partial<DraftSettings>;
   readonly sourcePath: string;
@@ -174,14 +183,23 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
 
   const file: ProjectFile = {
     aspectRatio: input.aspectRatio,
+    characterBasis: input.characterBasis,
     characterSources: [],
     id: input.projectId,
     schemaVersion: 1,
     title: input.title,
   };
-  const parsed = projectFileSchema.safeParse(file);
 
-  if (!parsed.success) {
+  if (input.characterBasis !== null && !characterBases.includes(input.characterBasis)) {
+    return err(
+      new InvalidInputError(
+        "characterBasis",
+        `nieznana podstawa postaci "${input.characterBasis}" — dozwolone: ${characterBases.join(", ")}`
+      )
+    );
+  }
+
+  if (!projectFileSchema.safeParse(file).success) {
     return err(
       new InvalidInputError(
         "aspectRatio",
@@ -191,9 +209,9 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
   }
 
   const text = serialize(file);
+  // No empty directories: `character/sources/` and `episodes/` appear when a
+  // command first writes into them, so the tree never promises more than it holds.
   const ops: WriteOp[] = [
-    { kind: "directory", to: paths.data.characterSources },
-    { kind: "directory", to: paths.data.episodes },
     { kind: "text", text: renderRules(input.title), to: paths.data.rules },
     { kind: "text", text, to: paths.data.file },
     {
@@ -220,9 +238,15 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
 
   return written.ok
     ? ok({
+        approved: false,
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
         nextStep: `uzupełnij każdy ${PLACEHOLDER} w project.md, a potem: aimator episode add ${input.projectId} --source <plik.md>`,
-        problems: [],
+        problems:
+          input.characterBasis === null
+            ? [
+                "project.json: characterBasis nie jest ustalony — postać powstaje ze zdjęć (character add) albo z opisu (character describe)",
+              ]
+            : [],
         ready: false,
         reused: [],
       })
@@ -308,6 +332,7 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
 
   return written.ok
     ? ok({
+        approved: false,
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
         nextStep:
           missingSettings(settings.data).length === 0
@@ -465,21 +490,40 @@ export async function setEpisodeSettings(input: SetSettingsInput): Promise<Resul
     paths.data.source
   ).filter((op) => op.kind !== "copy");
 
+  const lapsed = await approvalLapses(paths.data.stage);
   const written = await applyWrites(ops, input.mode);
   const missing = missingSettings(settings.data);
+  const problems = missing.map((field) => `${field}: brak decyzji`);
+
+  if (lapsed) {
+    problems.push(
+      `akceptacja odcinka "${input.episodeId}" wygasła — zmiana decyzji unieważnia ją; zatwierdź ponownie przez: aimator approve ${input.projectId}`
+    );
+  }
 
   return written.ok
     ? ok({
+        approved: false,
         created: [],
         nextStep:
           missing.length === 0
             ? `aimator check ${input.projectId}`
             : `pozostałe decyzje: ${missing.join(", ")}`,
-        problems: missing.map((field) => `${field}: brak decyzji`),
+        problems,
         ready: missing.length === 0,
         reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
       })
     : written;
+}
+
+/**
+ * Rewriting a stage file resets its review to pending. Saying so out loud is
+ * the difference between an approval that expired and one that vanished.
+ */
+async function approvalLapses(stagePath: string): Promise<boolean> {
+  const stage = await readJson(stagePath, stageFileSchema);
+
+  return stage.ok && isApproved(stage.data);
 }
 
 export async function addCharacterSources(input: AddSourcesInput): Promise<Result<Stage0Report>> {
@@ -524,7 +568,13 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
     }
   }
 
-  const file: ProjectFile = { ...current.data, characterSources: recorded };
+  // Supplying a photograph *is* the declaration that the character is built
+  // from photographs; it is never inferred from an empty directory.
+  const file: ProjectFile = {
+    ...current.data,
+    characterBasis: "photographs",
+    characterSources: recorded,
+  };
   const text = serialize(file);
 
   ops.push({ kind: "text", text, to: project.data.file });
@@ -547,16 +597,109 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
     to: project.data.stage,
   });
 
+  const lapsed = await approvalLapses(project.data.stage);
   const written = await applyWrites(ops, input.mode);
+  const problems: string[] = [];
+
+  if (current.data.characterBasis === "description") {
+    problems.push(
+      "podstawa postaci zmieniona z opisu na zdjęcia — opis wyglądu w project.md przestaje być wejściem etapu postaci"
+    );
+  }
+
+  if (lapsed) {
+    problems.push(
+      `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`
+    );
+  }
 
   return written.ok
     ? ok({
+        approved: false,
         created,
         nextStep:
           "materiały postaci mają status pending — oceny dokonasz w etapie postaci, nie tutaj",
-        problems: [],
+        problems,
         ready: false,
         reused,
+      })
+    : written;
+}
+
+/**
+ * The counterpart to `addCharacterSources`: declares that this project builds
+ * its character from the written description instead of photographs. Without
+ * it an empty `character/sources/` would be indistinguishable from one that is
+ * merely still waiting for files.
+ */
+export async function setCharacterBasis(input: SetBasisInput): Promise<Result<Stage0Report>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const current = await readJson(project.data.file, projectFileSchema);
+
+  if (!current.ok) {
+    return current;
+  }
+
+  if (input.basis === "photographs" && current.data.characterSources.length === 0) {
+    return err(
+      new InvalidInputError(
+        "characterBasis",
+        `podstawy "photographs" nie deklaruje się pustą ręką — dodaj zdjęcia przez: aimator character add ${input.projectId} --source <plik>`
+      )
+    );
+  }
+
+  const file: ProjectFile = { ...current.data, characterBasis: input.basis };
+  const text = serialize(file);
+  const lapsed = await approvalLapses(project.data.stage);
+  const written = await applyWrites(
+    [
+      { kind: "text", text, to: project.data.file },
+      {
+        kind: "text",
+        text: serialize({
+          ...emptyStage(),
+          artifacts: {
+            project: record(
+              current.data.characterSources.map((asset) => ({
+                path: asset.path,
+                sha256: asset.sha256,
+              })),
+              [
+                {
+                  path: toWorkspacePath(input.workspace.root, project.data.file),
+                  sha256: sha256Of(Buffer.from(text)),
+                },
+              ]
+            ),
+          },
+        }),
+        to: project.data.stage,
+      },
+    ],
+    input.mode
+  );
+
+  return written.ok
+    ? ok({
+        approved: false,
+        created: [],
+        nextStep:
+          input.basis === "description"
+            ? "opis wyglądu w project.md jest jedynym wejściem etapu postaci — musi być konkretny"
+            : `aimator check ${input.projectId}`,
+        problems: lapsed
+          ? [
+              `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+            ]
+          : [],
+        ready: false,
+        reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
       })
     : written;
 }
@@ -568,53 +711,187 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
     return project;
   }
 
-  const file = await readJson(project.data.file, projectFileSchema);
+  const verdict = await inspectStage0(input.workspace, project.data);
+
+  if (verdict.problems.length > 0) {
+    return err(new NotReadyError(verdict.problems));
+  }
+
+  return ok({
+    approved: verdict.approved,
+    created: [],
+    nextStep: verdict.approved
+      ? READY_NEXT
+      : `pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve ${input.projectId}`,
+    problems: [],
+    ready: true,
+    reused: verdict.checked,
+  });
+}
+
+/**
+ * Creative acceptance, kept separate from validation on purpose: `check` asks
+ * whether the files hold together, `approve` asks whether a human wants them.
+ * Approving what does not validate is refused, because an approval recorded
+ * against broken provenance would be a lie the later stages would trust.
+ */
+export async function approveStage0(input: ApproveInput): Promise<Result<Stage0Report>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const verdict = await inspectStage0(input.workspace, project.data);
+
+  if (verdict.problems.length > 0) {
+    return err(new NotReadyError(verdict.problems));
+  }
+
+  const ops = await approvalWrites(input, project.data, verdict.checked);
+
+  if (!ops.ok) {
+    return ops;
+  }
+
+  const written = await applyWrites(ops.data, input.mode);
+
+  return written.ok
+    ? ok({
+        approved: true,
+        created: [],
+        nextStep: READY_NEXT,
+        problems: [],
+        ready: true,
+        reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+      })
+    : written;
+}
+
+/**
+ * Approval is the moment `project.md` first acquires a digest. Recording one
+ * at `init` would describe the empty scaffold; recording one here describes
+ * the rules somebody actually accepted, and any later edit breaks it.
+ */
+async function approvalWrites(
+  input: ApproveInput,
+  project: ProjectPaths,
+  episodeIds: readonly string[]
+): Promise<Result<readonly WriteOp[]>> {
+  const rules = await readDigest(project.rules);
+
+  if (!rules.ok) {
+    return rules;
+  }
+
+  const stage = await readJson(project.stage, stageFileSchema);
+
+  if (!stage.ok) {
+    return stage;
+  }
+
+  const approval = { note: input.note, reviewer: input.reviewer };
+  const bound = withOutputs(stage.data, "project", [
+    { path: toWorkspacePath(input.workspace.root, project.rules), sha256: rules.data.sha256 },
+  ]);
+  const ops: WriteOp[] = [
+    { kind: "text", text: serialize(approveAll(bound, approval)), to: project.stage },
+  ];
+  const stages = await Promise.all(episodeIds.map((id) => readEpisodeStage(project, id)));
+
+  for (const [index, entry] of stages.entries()) {
+    if (entry === null) {
+      return err(
+        new ProjectStateError(
+          "missing-episode",
+          `brak zapisu etapu odcinka "${episodeIds[index] ?? ""}"`
+        )
+      );
+    }
+
+    ops.push({ kind: "text", text: serialize(approveAll(entry.stage, approval)), to: entry.path });
+  }
+
+  return ok(ops);
+}
+
+async function readEpisodeStage(
+  project: ProjectPaths,
+  episodeId: string
+): Promise<{ path: string; stage: StageFile } | null> {
+  const paths = episodePaths(project, episodeId);
+
+  if (!paths.ok) {
+    return null;
+  }
+
+  const stage = await readJson(paths.data.stage, stageFileSchema);
+
+  return stage.ok ? { path: paths.data.stage, stage: stage.data } : null;
+}
+
+async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promise<Stage0Verdict> {
+  const file = await readJson(project.file, projectFileSchema);
 
   if (!file.ok) {
-    return file;
+    return { approved: false, checked: [], problems: [file.error.message] };
   }
 
   const problems: string[] = [];
   const checked: string[] = [];
+  const stage = await readJson(project.stage, stageFileSchema);
+  let approved = false;
 
-  await checkRules(project.data, problems);
+  await checkRules(project, problems);
+  checkDecisions(file.data, problems);
 
-  if (file.data.aspectRatio === null) {
-    problems.push("project.json: aspectRatio nie jest ustalony");
+  if (stage.ok) {
+    await verifyOutputs(workspace, stage.data, "projekt", problems);
+    approved = isApproved(stage.data);
+  } else {
+    problems.push("projekt: brak zapisu etapu (prepare.stage.json)");
   }
 
-  const episodes = (await listEntries(project.data.episodes)).filter(
-    (entry) => !entry.startsWith(".")
-  );
+  const episodes = (await listEntries(project.episodes)).filter((entry) => !entry.startsWith("."));
 
   if (episodes.length === 0) {
     problems.push("projekt nie ma jeszcze żadnego odcinka");
   }
 
   const verdicts = await Promise.all(
-    episodes.map((episodeId) => checkEpisode(input.workspace, project.data, episodeId))
+    episodes.map((episodeId) => checkEpisode(workspace, project, episodeId))
   );
 
   for (const verdict of verdicts) {
     problems.push(...verdict.problems);
+    approved = approved && verdict.approved;
 
     if (verdict.verified) {
       checked.push(verdict.id);
     }
   }
 
-  if (problems.length > 0) {
-    return err(new NotReadyError(problems));
+  return { approved, checked, problems };
+}
+
+/** The project-level decisions that have no default and no later owner. */
+function checkDecisions(file: ProjectFile, problems: string[]): void {
+  if (file.aspectRatio === null) {
+    problems.push("project.json: aspectRatio nie jest ustalony");
   }
 
-  return ok({
-    created: [],
-    nextStep:
-      "etap 0 gotowy. Etap 1 (scenariusz) nie jest jeszcze zaimplementowany — to zakres kroku 2 migracji.",
-    problems: [],
-    ready: true,
-    reused: checked,
-  });
+  if (file.characterBasis === null) {
+    problems.push(
+      "project.json: characterBasis nie jest ustalony — zdecyduj, czy postać powstaje ze zdjęć (aimator character add) czy z opisu w project.md (aimator character describe)"
+    );
+    return;
+  }
+
+  if (file.characterBasis === "photographs" && file.characterSources.length === 0) {
+    problems.push(
+      "project.json: characterBasis to photographs, ale nie ma ani jednego zdjęcia — etap postaci nie miałby od czego zacząć"
+    );
+  }
 }
 
 async function checkRules(project: ProjectPaths, problems: string[]): Promise<void> {
@@ -633,7 +910,14 @@ async function checkRules(project: ProjectPaths, problems: string[]): Promise<vo
   }
 }
 
+interface Stage0Verdict {
+  readonly approved: boolean;
+  readonly checked: readonly string[];
+  readonly problems: readonly string[];
+}
+
 interface EpisodeVerdict {
+  readonly approved: boolean;
   readonly id: string;
   readonly problems: string[];
   readonly verified: boolean;
@@ -649,14 +933,14 @@ async function checkEpisode(
 
   if (!paths.ok) {
     problems.push(`odcinek "${episodeId}": nieprawidłowy identyfikator katalogu`);
-    return { id: episodeId, problems, verified: false };
+    return { approved: false, id: episodeId, problems, verified: false };
   }
 
   const episode = await readJson(paths.data.file, episodeFileSchema);
 
   if (!episode.ok) {
     problems.push(`odcinek "${episodeId}": ${episode.error.message}`);
-    return { id: episodeId, problems, verified: false };
+    return { approved: false, id: episodeId, problems, verified: false };
   }
 
   const missing = missingSettings(episode.data.settings);
@@ -671,41 +955,10 @@ async function checkEpisode(
 
   if (!stage.ok) {
     problems.push(`odcinek "${episodeId}": brak zapisu etapu (prepare.stage.json)`);
-    return { id: episodeId, problems, verified: false };
+    return { approved: false, id: episodeId, problems, verified: false };
   }
 
-  await verifyOutputs(workspace, stage.data, episodeId, problems);
+  await verifyOutputs(workspace, stage.data, `odcinek "${episodeId}"`, problems);
 
-  return { id: episodeId, problems, verified: true };
-}
-
-/**
- * The honesty gate: an artifact is only what stage 0 recorded if its bytes
- * still hash to the digest written beside it. Editing a result outside the
- * tool is allowed — silently carrying its old provenance forward is not.
- */
-async function verifyOutputs(
-  workspace: Workspace,
-  stage: StageFile,
-  episodeId: string,
-  problems: string[]
-): Promise<void> {
-  const outputs = Object.values(stage.artifacts).flatMap((artifact) => artifact.outputs);
-  // Hashed in parallel, reported in declaration order: the verdict a user
-  // reads must not depend on which read happened to finish first.
-  const digests = await Promise.all(
-    outputs.map((output) => readDigest(join(workspace.root, output.path)))
-  );
-
-  for (const [index, output] of outputs.entries()) {
-    const digest = digests[index];
-
-    if (digest === undefined || !digest.ok) {
-      problems.push(`odcinek "${episodeId}": brakuje ${output.path}`);
-    } else if (digest.data.sha256 !== output.sha256) {
-      problems.push(
-        `odcinek "${episodeId}": ${output.path} nie zgadza się z hashem zapisanym w etapie 0 — wynik został zmieniony poza narzędziem`
-      );
-    }
-  }
+  return { approved: isApproved(stage.data), id: episodeId, problems, verified: true };
 }

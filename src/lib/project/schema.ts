@@ -23,6 +23,13 @@ export const audioModes = [
 
 export const sourceNatures = ["law-or-idea", "screenplay", "synopsis"] as const;
 
+/**
+ * Where the character stage starts from. Recorded as a decision because an
+ * empty `character/sources/` is otherwise ambiguous: "deliberately none" and
+ * "not supplied yet" are different states and only one of them may pass stage 0.
+ */
+export const characterBases = ["description", "photographs"] as const;
+
 const audioSchema = z.enum(audioModes);
 const sourceNatureSchema = z.enum(sourceNatures);
 // "none" cannot collide with the language pattern: it is four letters long.
@@ -56,6 +63,9 @@ export const draftSettingsSchema = z.strictObject({
 
 export const projectFileSchema = z.strictObject({
   aspectRatio: z.string().regex(ASPECT_RATIO, "expected an aspect ratio such as 16:9").nullable(),
+  // Absent in files written before the decision existed. They read as
+  // undecided, which the readiness gate refuses — never as a silent default.
+  characterBasis: z.enum(characterBases).nullable().default(null),
   characterSources: z.array(assetSchema),
   id: z.string().min(1),
   schemaVersion: z.literal(1),

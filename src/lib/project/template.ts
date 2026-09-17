@@ -25,11 +25,13 @@ export function renderRules(title: string): string {
 ## Bohaterowie i wygląd
 
 - Główny bohater i jego rola: ${PLACEHOLDER} uczestnik wydarzeń, obserwator, narrator.
-- Stałe cechy wyglądu i stroju: ${PLACEHOLDER} albo informacja, że wymagają przygotowania postaci.
+- Stałe cechy wyglądu i stroju: ${PLACEHOLDER} kolor i kształt włosów, krój i barwa stroju,
+  cechy szczególne. Przy \`characterBasis: "description"\` **to jest jedyne wejście etapu
+  postaci** — czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.
 - Stała obsada drugoplanowa: ${PLACEHOLDER} albo jawne „brak stałej obsady".
 - Styl wizualny: ${PLACEHOLDER} zatwierdzony kierunek.
-- Materiały postaci: ${PLACEHOLDER} status wynika z \`project.json\`; nie wpisuj tu akceptacji,
-  która nie nastąpiła.
+- Materiały postaci: podstawa i zdjęcia wynikają z \`project.json\` (\`characterBasis\`,
+  \`characterSources\`); nie wpisuj tu akceptacji, która nie nastąpiła.
 
 ## Obraz i ciągłość
 

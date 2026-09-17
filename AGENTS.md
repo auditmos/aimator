@@ -31,10 +31,12 @@ src/
     ├── workspace.test.ts
     ├── project/      # Folder form — index.ts is the only entry (stage 0)
     │   ├── index.ts      # Public: initProject, addEpisode, setEpisodeSettings,
-    │   │                 #         addCharacterSources, checkStage0
+    │   │                 #         addCharacterSources, setCharacterBasis,
+    │   │                 #         checkStage0, approveStage0
     │   ├── schema.ts     # Internal — Zod schemas for the artifacts
     │   ├── template.ts   # Internal — the project.md scaffold
     │   ├── store.ts      # Internal — bytes, digests, the single dry-run gate
+    │   ├── review.ts     # Internal — digest verification and creative approval
     │   └── index.test.ts # Tests through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
@@ -42,7 +44,7 @@ src/
 
 ## Pipeline rules
 
-Five rules that stop an agent from re-creating the mess this tool was built to replace.
+Seven rules that stop an agent from re-creating the mess this tool was built to replace.
 Full contract in [docs/pipeline.md](docs/pipeline.md).
 
 1. **One state filename: `<stage>.stage.json`.** One shape for every stage. Never invent
@@ -54,6 +56,12 @@ Full contract in [docs/pipeline.md](docs/pipeline.md).
 5. **No document in this repo records project state or progress.** State is a file read
    in the workspace; history is `git log`. `docs/pipeline.md` describes the current
    contract in the present tense and is edited in place, never appended to.
+6. **Validation is not approval.** A `check` command verifies and writes nothing; only an
+   explicit `approve` records acceptance, only over artifacts that already validate, and
+   only bound to their current digests. Never let a passing check imply a human said yes.
+7. **A decision with no default is stored, never inferred.** An absent file, an empty
+   directory or a missing flag means undecided, and the gate blocks — it never stands in
+   for an answer the user did not give.
 
 ## Deep Modules
 
