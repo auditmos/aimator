@@ -1,5 +1,5 @@
 {
-  "name": "ts-template",
+  "name": "aimator",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     }
   },
   "bin": {
-    "ts-template": "./dist/bin.js"
+    "aimator": "./dist/bin.js"
   },
   "scripts": {
     "build": "tsup",

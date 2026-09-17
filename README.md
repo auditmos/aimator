@@ -1,4 +1,4 @@
-# ts-template
+# aimator
 
 TypeScript template for building tool and service projects with modern tooling, strict type-checking, and automated releases.
 

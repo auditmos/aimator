@@ -1,7 +1,7 @@
 import { greet } from "./lib/example/index.js";
 import { err, ok, type Result } from "./lib/result.js";
 
-const USAGE = `Usage: ts-template <command>
+const USAGE = `Usage: aimator <command>
 
 Commands:
   greet <name>   Print a greeting
