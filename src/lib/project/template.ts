@@ -25,10 +25,14 @@ export function renderRules(title: string): string {
 ## Bohaterowie i wygląd
 
 - Główny bohater i jego rola: ${PLACEHOLDER} uczestnik wydarzeń, obserwator, narrator.
+- Proporcje i stylizacja postaci: ${PLACEHOLDER} stosunek głowy do ciała i stopień
+  deformacji. To co innego niż proporcje obrazu i trzeba ustalić jedno i drugie.
 - Stałe cechy wyglądu i stroju: ${PLACEHOLDER} kolor i kształt włosów, krój i barwa stroju,
   cechy szczególne. Przy \`characterBasis: "description"\` **to jest jedyne wejście etapu
   postaci** — czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.
 - Stała obsada drugoplanowa: ${PLACEHOLDER} albo jawne „brak stałej obsady".
+- Powracające rekwizyty: ${PLACEHOLDER} albo jawne „brak". Każdy wymieniony opisz: kształt,
+  wielkość względem postaci, materiał, barwa, zużycie. Sama nazwa to nie opis.
 - Styl wizualny: ${PLACEHOLDER} zatwierdzony kierunek.
 - Materiały postaci: podstawa i zdjęcia wynikają z \`project.json\` (\`characterBasis\`,
   \`characterSources\`); nie wpisuj tu akceptacji, która nie nastąpiła.
@@ -37,6 +41,8 @@ export function renderRules(title: string): string {
 
 - Proporcje obrazu: zapisane w \`project.json\` jako \`aspectRatio\`.
 - Otwarcie: ${PLACEHOLDER} wymagana kompozycja albo jawny brak dodatkowych ograniczeń.
+- Powracająca sceneria: ${PLACEHOLDER} miejsca, do których seria wraca, i co jest w nich
+  stałe: paleta, światło, sprzęty, które nie mogą się przesuwać. Albo jawne „brak".
 - Ciągłość i ograniczenia: ${PLACEHOLDER} co ma pozostać stałe między scenami i odcinkami.
 
 ## Źródła i ustawienia odcinków

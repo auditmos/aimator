@@ -44,12 +44,22 @@ For a new project establish:
    When the answer is the description, this prose is the only input the character stage
    will ever receive, so finish it here rather than leaving it to a later stage that has
    nowhere to look. Keep asking until each of these names something a renderer can act on:
-   the protagonist's face and body, the recurring wardrobe, every recurring character, the
-   recurring props, the recurring setting, and the visual style. What recurs across
-   episodes belongs in the rules; this episode's own locations, one-off props and shots do
-   not — those are derived from the screenplay several stages later. If something stays
-   open, write it in the open section and say out loud that the character stage will
-   otherwise invent it differently on every run;
+   the protagonist's proportions — head-to-body ratio and how deformed the figure is, asked
+   separately from the aspect ratio because in Polish both are "proporcje" — their face and
+   body, the recurring wardrobe, every recurring character, each recurring prop, the
+   recurring setting, and the visual style.
+
+   **Naming a recurring element is not describing it.** "Ma przytulankę" is inventory; the
+   toy still needs its shape, size against the character, material, colour and wear, and a
+   prop the story leans on earns as much detail as a supporting character because it will
+   be in as many frames. Before you write anything, re-read your own summary and check
+   every noun in it: a recurring person, prop or place that is named but not described is
+   an unasked question.
+
+   What recurs across episodes belongs in the rules; this episode's own locations, one-off
+   props and shots do not — those are derived from the screenplay several stages later. If
+   something stays open, write it in the open section and say out loud that the character
+   stage will otherwise invent it differently on every run;
 4. the aspect ratio, and any binding opening-composition or continuity requirement;
 5. any other binding creative constraint.
 

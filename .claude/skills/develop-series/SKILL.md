@@ -83,16 +83,31 @@ else, and whatever the prose leaves open it fills in differently on every single
 So when they choose description, keep going — still one question at a time, still offering
 options — until each of these is something a renderer could act on:
 
+**Naming a thing is not describing it, and the difference is the whole point.** "Ma
+przytulankę" and "nosi ten sam strój" are inventory, not appearance; a renderer given only
+those draws something new each time. So whenever an answer introduces a recurring element,
+that element becomes its own question before you move on. Two exchanges, not one.
+
+Work through these until each is something a renderer could act on:
+
+- **The protagonist's proportions.** Head-to-body ratio and how deformed the figure is —
+  three heads tall and round, or seven and naturalistic. This is the single strongest
+  stylistic tell and the easiest to forget, because people describe colours first. Ask it
+  separately from the aspect ratio; in Polish both are "proporcje" and the two get confused.
 - **The protagonist's face and body.** Age read, build, skin tone, hair colour, hair shape
   and length, eyes, distinguishing features. "Dziewczynka około czterech lat" is a casting
   note, not an appearance.
 - **The recurring wardrobe.** The exact outfit that returns every episode: garments, cut,
   colours. In flat or stylised 2D the outfit carries recognition more reliably than the
   face, so this one is not optional.
-- **Every recurring character.** The same treatment, shorter. A parent who appears in every
-  episode needs an appearance; a neighbour who appears once does not.
-- **Recurring props.** The objects that must look identical each time they appear — the
-  toy, the lamp, the mug. Only the ones that recur.
+- **Every recurring character.** Proportions, face, wardrobe — the same treatment, shorter.
+  A parent who appears in every episode needs an appearance; a neighbour who appears once
+  does not.
+- **Recurring props.** First ask which objects recur at all; a series may have none. Then
+  take each one they name and describe it: what it is, its size relative to the character,
+  its shape, material, colour, wear and any detail that makes it *that* one rather than a
+  generic one. A prop the story leans on — the toy that gets held in every episode — earns
+  as much detail as a supporting character, because it will be in as many frames.
 - **The recurring setting.** The places the series keeps returning to, and what is fixed in
   them: palette, light, the furniture that may not move between episodes.
 - **The visual style**, below. That one applies whichever basis they chose.
@@ -100,6 +115,10 @@ options — until each of these is something a renderer could act on:
 The boundary is recurrence, not subject matter. Ask yourself: would this have to look the
 same in episode seven? Then it belongs here. The episode's own locations, its one-off props
 and every shot still belong to later stages, derived from the screenplay.
+
+Before handing off, re-read your own list of what they decided and check every noun in it.
+If any recurring person, prop or place is named but not described, that is an unasked
+question, not a finished session.
 
 If they truly cannot answer one of these yet, that is allowed — but say plainly that the
 character stage will then have to invent it, and will invent it differently each run.
@@ -112,8 +131,11 @@ saying out loud to the user:
 **The visual style and the protagonist's fixed appearance become image prompts.** An image
 model reads "ładny, klimatyczny" as nothing at all and fills the gap itself — differently
 every run, which is exactly the drift people call hallucination. So keep asking, kindly,
-until the answer names things a renderer can act on: stylised 3D or 2D, how faces are
-treated, palette, lighting, how much realism, what is explicitly unwanted.
+until the answer names things a renderer can act on: stylised 3D or 2D, figure proportions,
+how faces are treated, palette, lighting, how much realism, what is explicitly unwanted.
+
+Figure proportions belong here even when photographs exist: a photograph fixes who the
+character is, never how stylised the drawing of them should be.
 
 **The aspect ratio is a hard requirement.** It has no default, it cannot be changed after
 images exist without invalidating them, and stage 0 will not pass without it.
