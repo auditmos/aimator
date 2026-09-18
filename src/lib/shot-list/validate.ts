@@ -67,6 +67,8 @@ export interface ShotListClip {
   /** The shot ids the clip declares, in order. */
   readonly shots: readonly string[];
   readonly start: number;
+  /** This entry exactly as the document wrote it; see `ShotListShot.text`. */
+  readonly text: string;
 }
 
 /** One shot: a camera view inside exactly one scene and exactly one clip. */
@@ -79,6 +81,16 @@ export interface ShotListShot {
   readonly id: string;
   readonly scene: string;
   readonly start: number;
+  /**
+   * This entry exactly as the document wrote it, heading included.
+   *
+   * Every stage from 5 on attaches these entries verbatim beside its prompt,
+   * and the contract says it reads them through this function. Returning the
+   * block that was already parsed is what stops a second Markdown parser from
+   * appearing downstream — which would be the same "two versions of one truth"
+   * that keeps `shot-list.json` from existing.
+   */
+  readonly text: string;
 }
 
 /**
@@ -124,6 +136,11 @@ function fail(rule: string, message: string): Result<never> {
 interface Item {
   readonly body: string;
   readonly head: RegExpExecArray;
+}
+
+/** One `### ` entry exactly as the document wrote it, heading included. */
+function verbatim(item: Item): string {
+  return `${item.head[0] ?? ""}${item.body}`.trimEnd();
 }
 
 /** The bodies of the four required sections, in order. */
@@ -276,7 +293,7 @@ function readClips(body: string, maxClipSeconds: number): Result<readonly ShotLi
       );
     }
 
-    clips.push({ end, id, reference, shots: shots.split(COMMA), start });
+    clips.push({ end, id, reference, shots: shots.split(COMMA), start, text: verbatim(item) });
   }
 
   return ok(clips);
@@ -442,6 +459,7 @@ function readShotBody(
     id: head.id,
     scene: head.sceneId,
     start: head.start,
+    text: verbatim(item),
   });
 }
 

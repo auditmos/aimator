@@ -11,6 +11,7 @@ import {
   isCharacterArtifact,
 } from "./lib/character/index.js";
 import { env } from "./lib/env.js";
+import { type Attachment, readSendPlan, type SendPlan } from "./lib/media-prompt/index.js";
 import {
   addCharacter,
   addCharacterSources,
@@ -29,6 +30,13 @@ import {
   type PromptPackageReport,
   type PromptPackageStatus,
 } from "./lib/prompt-package/index.js";
+import {
+  approveReferences,
+  checkReferences,
+  generateReferences,
+  type ReferencesReport,
+  type ReferencesStatus,
+} from "./lib/references/index.js";
 import { err, ok, type Result } from "./lib/result.js";
 import {
   approveScreenplay,
@@ -75,14 +83,28 @@ Etap 4 — pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba)
   prompt-package generate <id> <episode-id> [--model <id>]
                           [--max-output-tokens <n>] [--dry-run] [--regenerate]
                           [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
+  prompt-package show <id> <episode-id> --track <tor>
+                      [--artifact R02|opening-frame|C03|entry:C03,...]
+    Darmowe. Drukuje dokładnie to, co poleci do modelu obrazu albo wideo:
+    numerowany blok załączników w kolejności bajtów, treść pliku z prompts/,
+    blok o medium, kadr, dosłowne ujęcia z listy i project.md. Bez --artifact
+    wypisuje sam plan: co pakiet planuje, ile referencji i czy są zatwierdzone.
+
+Etap 5 — obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
+  reference generate <id> <episode-id> --track <gpt-image|seedream>
+                     [--artifact R01,R02] [--model <id>] [--dry-run] [--regenerate]
+    Bez --artifact rysuje wszystkie referencje, których zależności są już
+    zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.
 
 Wspólne:
   check <id> [<episode-id>]
   check <id> <character-id> --stage character --track <tor>
+  check <id> <episode-id> --stage references --track <tor>
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>]
   approve <id> <character-id> --stage character --track <tor>
                --artifact <klucz>[,<klucz>...]
+  approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
@@ -686,6 +708,42 @@ async function checkCharacterStage(
     : result;
 }
 
+/**
+ * `check --stage references` reports one episode on one track. It writes
+ * nothing, like every other check: drift is reported, never recorded.
+ */
+async function checkReferencesStage(
+  parsed: Parsed,
+  projectId: string,
+  workspace: Workspace
+): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const track = trackOf(parsed);
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const result = await checkReferences({
+    episodeId: episodeId.data,
+    projectId,
+    track: track.data,
+    workspace,
+  });
+
+  return result.ok
+    ? ok(
+        renderReferencesStatus(
+          `Odcinek "${episodeId.data}", tor ${track.data} — etap 5${result.data.approved ? ", zatwierdzony w całości" : ""}`,
+          result.data
+        )
+      )
+    : result;
+}
+
 /** Who is accepting what, and where. The stage decides the rest. */
 interface Approval {
   readonly mode: "apply" | "dry-run";
@@ -721,6 +779,42 @@ async function approveCharacterStage(parsed: Parsed, approval: Approval): Promis
     ? ok(
         renderCharacterStatus(
           `Postać "${characterId.data}" na torze ${track.data} — zatwierdzono: ${artifacts.data.join(", ")}`,
+          result.data
+        )
+      )
+    : result;
+}
+
+/**
+ * Stage 5 accepts one reference at a time, bound to its bytes.
+ *
+ * There is no "approve everything" here, for the reason stage 2 gives about the
+ * card: accepting R03 is what lets R04 be bought, so it has to be a thing
+ * somebody typed rather than a side effect of accepting something else.
+ */
+async function approveReferencesStage(parsed: Parsed, approval: Approval): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const track = trackOf(parsed);
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const artifacts = referenceIdsOf(parsed);
+  const result = await approveReferences({
+    ...approval,
+    artifacts,
+    episodeId: episodeId.data,
+    track: track.data,
+  });
+
+  return result.ok
+    ? ok(
+        renderReferencesStatus(
+          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono: ${artifacts.join(", ")}`,
           result.data
         )
       )
@@ -837,10 +931,14 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
     return await approveCharacterStage(parsed.data, approval);
   }
 
+  if (stage === "references") {
+    return await approveReferencesStage(parsed.data, approval);
+  }
+
   if (stage !== "screenplay" && stage !== "shot-list" && stage !== "prompt-package") {
     return err(
       new UsageError(
-        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package`
+        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package, references`
       )
     );
   }
@@ -1172,7 +1270,99 @@ function promptsModelOf(parsed: Parsed): Result<string | null> {
   return ok(value);
 }
 
+/**
+ * `prompt-package show`: exactly what a later stage would send, for free.
+ *
+ * Stage 4 publishes half a prompt — the direction for one frame — so a person
+ * approving the package is approving something they cannot see in the shape it
+ * will be sent in. This closes that gap, and it is the same composer stages 5
+ * to 7 send with: one implementation, two readers.
+ */
+async function runPromptPackageShow(parsed: Parsed): Promise<Result<string>> {
+  const projectId = requirePositional(parsed, 0, "project-id");
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const workspace = workspaceOf(parsed);
+  const track = trackOf(parsed);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const flag = parsed.values.artifact;
+  const result = await readSendPlan({
+    episodeId: episodeId.data,
+    projectId: projectId.data,
+    targets: typeof flag === "string" ? flag.split(",").map((name) => name.trim()) : [],
+    track: track.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok ? ok(renderSendPlan(result.data, projectId.data, episodeId.data)) : result;
+}
+
+/** The state of one attachment, in the word a person reads. */
+const ATTACHMENT_STATE: Record<Attachment["state"], string> = {
+  absent: "jeszcze nie istnieje",
+  approved: "zatwierdzony",
+  changed: "zmieniony poza narzędziem",
+  pending: "czeka na ocenę",
+};
+
+function renderSendPlan(plan: SendPlan, projectId: string, episodeId: string): string {
+  const lines = [
+    `Pakiet promptów ${projectId}/${episodeId}, tor ${plan.track} — nic nie wysłano, nic nie zapisano`,
+    `  kadr ${plan.size} (${plan.aspectRatio}); tor przyjmuje najwyżej ${plan.limit} referencji; składacz w wersji ${plan.promptVersion}`,
+  ];
+  // Naming an artifact narrows the summary to it: somebody who asked to read
+  // one prompt did not ask for the state of the other twenty.
+  const composed = plan.artifacts.filter((one) => one.text !== null);
+  const listed = composed.length > 0 ? composed : plan.artifacts;
+
+  for (const one of listed) {
+    const ready = one.blockers.length === 0 ? "gotowy" : "zablokowany";
+    lines.push(`  ${one.name} (${one.kind}): ${ready}, ${one.attachments.length} referencji`);
+
+    for (const [index, attachment] of one.attachments.entries()) {
+      lines.push(
+        `      Image ${index + 1} = ${attachment.id} → ${attachment.path} — ${ATTACHMENT_STATE[attachment.state]}`
+      );
+    }
+
+    for (const blocker of one.blockers) {
+      lines.push(`    ! ${blocker}`);
+    }
+  }
+
+  for (const problem of plan.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  for (const one of composed) {
+    lines.push("", `--- prompt dla ${one.name} (dokładnie ten tekst) ---`, one.text ?? "");
+  }
+
+  return lines.join("\n");
+}
+
 async function runPromptPackage(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] === "show") {
+    const parsed = parse(argv.slice(1), {
+      artifact: { type: "string" },
+      track: { type: "string" },
+    });
+
+    return parsed.ok ? await runPromptPackageShow(parsed.data) : parsed;
+  }
+
   if (argv[0] !== "generate") {
     return err(new UsageError(`nieznane polecenie: prompt-package ${argv[0] ?? ""}`.trim()));
   }
@@ -1237,6 +1427,147 @@ async function runPromptPackage(argv: readonly string[]): Promise<Result<string>
 
   return result.ok
     ? ok(renderPackageGenerate(result.data, projectId.data, episodeId.data, mode))
+    : result;
+}
+
+/** Reference ids, as `--artifact` writes them: `R01` or `R01,R02`. */
+function referenceIdsOf(parsed: Parsed): readonly string[] {
+  const flag = parsed.values.artifact;
+
+  return typeof flag === "string"
+    ? flag
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id !== "")
+    : [];
+}
+
+/**
+ * `--dry-run` prints every prompt in full and the number of paid calls.
+ *
+ * Stage 5 is the first where one command can buy several images, so the count
+ * is printed before anything is sent rather than discovered from an invoice.
+ */
+function renderReferences(
+  report: ReferencesReport,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const headline = `Obrazy referencyjne ${projectId}/${episodeId}, tor ${report.track}, kadr ${report.size}`;
+  const lines = [
+    mode === "dry-run"
+      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      : headline,
+    mode === "dry-run"
+      ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
+      : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+  ];
+
+  for (const one of report.artifacts) {
+    lines.push(`  ${one.id}: ${one.state} — ${one.note}`);
+
+    for (const attachment of one.attachments) {
+      lines.push(`      ← ${attachment.path}  ${attachment.sha256.slice(0, 12)}`);
+    }
+  }
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (report.created.length > 0) {
+    lines.push("  ! obrazy przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  for (const one of report.artifacts) {
+    if (one.prompt !== null) {
+      lines.push("", `--- prompt dla ${one.id} (dokładnie ten tekst) ---`, one.prompt);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function renderReferencesStatus(headline: string, status: ReferencesStatus): string {
+  const lines = [headline];
+
+  for (const one of status.artifacts) {
+    lines.push(`  ${one.id}: ${one.approved ? "zatwierdzona" : one.state} — ${one.note}`);
+  }
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${status.nextStep}`);
+
+  return lines.join("\n");
+}
+
+async function runReference(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] !== "generate") {
+    return err(new UsageError(`nieznane polecenie: reference ${argv[0] ?? ""}`.trim()));
+  }
+
+  const parsed = parse(argv.slice(1), {
+    artifact: { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+    track: { type: "string" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+  const track = trackOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const model = imageModelOf(parsed.data, track.data);
+
+  if (!model.ok) {
+    return model;
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generateReferences({
+    apiKey: mode === "dry-run" ? null : (keyFor(track.data) ?? null),
+    artifacts: referenceIdsOf(parsed.data),
+    episodeId: episodeId.data,
+    fetch,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    track: track.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(renderReferences(result.data, projectId.data, episodeId.data, mode))
     : result;
 }
 
@@ -1334,6 +1665,10 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
   if (parsed.data.values.stage === "character") {
     return await checkCharacterStage(parsed.data, projectId.data, workspace.data);
+  }
+
+  if (parsed.data.values.stage === "references") {
+    return await checkReferencesStage(parsed.data, projectId.data, workspace.data);
   }
 
   const result = await checkStage0({ projectId: projectId.data, workspace: workspace.data });
@@ -1438,6 +1773,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "prompt-package") {
     return await runPromptPackage(rest);
+  }
+
+  if (command === "reference") {
+    return await runReference(rest);
   }
 
   if (command === "check") {

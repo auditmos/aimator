@@ -6,8 +6,10 @@ import {
   characterViewImage,
   episodeIdFromSource,
   episodePaths,
+  episodeTrackPaths,
   imageRunPaths,
   projectPaths,
+  referenceImage,
   resolveWorkspace,
   runPaths,
 } from "./workspace.js";
@@ -165,6 +167,45 @@ describe("episodePaths", () => {
     expect(run?.root).toBe(`${episode}/runs/20260918T090000Z-abcd1234`);
     expect(run?.prompt).toBe(`${run?.root}/prompt.md`);
     expect(run?.run).toBe(`${run?.root}/run.json`);
+  });
+});
+
+describe("episodeTrackPaths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const paths = project.ok ? episodePaths(project.data, "01-arrival") : null;
+  const track = paths?.ok ? episodeTrackPaths(paths.data, "seedream") : null;
+  const root = "/srv/aimator/projects/demo/episodes/01-arrival/seedream";
+
+  it("should place every stage-5 artifact under the track directory", () => {
+    expect(track).toEqual({
+      lock: `${root}/references.lock`,
+      references: `${root}/references`,
+      root,
+      runs: `${root}/runs`,
+      stage: `${root}/references.stage.json`,
+    });
+  });
+
+  /** Rule 2: the track is a directory level, never a filename prefix. */
+  it("should name the two tracks identically inside their own directories", () => {
+    const other = paths?.ok ? episodeTrackPaths(paths.data, "gpt-image") : null;
+    expect(other?.stage.endsWith("/gpt-image/references.stage.json")).toBe(true);
+    expect(track?.stage.endsWith("/seedream/references.stage.json")).toBe(true);
+  });
+
+  it("should give a reference its own file inside the track", () => {
+    const image = track === null ? null : referenceImage(track, "R07");
+    expect(image?.ok ? image.data : null).toBe(`${root}/references/R07.png`);
+  });
+
+  it("should reject a reference id that is not a numbered artifact", () => {
+    expect(track === null ? null : referenceImage(track, "../hero").ok).toBe(false);
+  });
+
+  it("should archive an attempt under the track's own runs directory", () => {
+    const run = track === null ? null : imageRunPaths(track, "20260918T110000Z-abcd1234");
+    expect(run?.root).toBe(`${root}/runs/20260918T110000Z-abcd1234`);
+    expect(run?.response).toBe(`${run?.root}/response.json`);
   });
 });
 

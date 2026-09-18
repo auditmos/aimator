@@ -1,4 +1,13 @@
-import { nowIso, removeFile, serialize, type WriteMode, writeNew } from "../artifact/index.js";
+import {
+  nowIso,
+  type RecordedFile,
+  removeFile,
+  type StageFile,
+  serialize,
+  type WriteMode,
+  writeNew,
+} from "../artifact/index.js";
+import { type ImageVerdict, runImageStage } from "../image-model/index.js";
 import { readStage0Character, type Stage0Character } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
@@ -8,17 +17,35 @@ import {
   projectPaths,
   type Workspace,
 } from "../workspace.js";
-import { type ArtifactOutcome, attempt, type OneResult, resume } from "./attempt.js";
 import {
   accepted,
   buildPlan,
   nextGroup,
+  outputPath,
   readStage,
   type Scope,
   Stage2BlockedError,
   sequenceGate,
 } from "./plan.js";
-import { CHARACTER_ARTIFACTS, type CharacterArtifact } from "./prompt.js";
+import { CHARACTER_ARTIFACTS, type CharacterArtifact, PROMPT_VERSION, sizeOf } from "./prompt.js";
+
+/** What happened to one of the ten, in the words a person reads. */
+export interface ArtifactOutcome {
+  readonly artifact: CharacterArtifact;
+  readonly note: string;
+  /** `--dry-run` only: the exact text a paid call would send. */
+  readonly prompt: string | null;
+  readonly references: readonly RecordedFile[];
+  readonly runId: string | null;
+  readonly state: "blocked" | "planned" | "published" | "resumed" | "skipped";
+  readonly verdict: ImageVerdict | null;
+}
+
+interface OneResult {
+  readonly created: readonly string[];
+  readonly outcome: ArtifactOutcome;
+  readonly stage: StageFile;
+}
 
 /**
  * Internal to the character module: the command that spends money.
@@ -34,6 +61,9 @@ import { CHARACTER_ARTIFACTS, type CharacterArtifact } from "./prompt.js";
  * absence you never looked for is the same lie as claiming a success you
  * never had.
  */
+
+/** The one stage name this module writes. */
+const STAGE = "character";
 
 export interface CharacterReport {
   /** Whether stage 0 is approved for this project. */
@@ -345,48 +375,95 @@ async function runOne(
   const gate = sequenceGate(scope.stage, artifact);
 
   if (gate.length > 0) {
-    return ok({
-      created: [],
-      outcome: {
-        artifact,
-        note: gate.join("; "),
-        prompt: null,
-        references: [],
-        runId: null,
-        state: "blocked",
-        verdict: null,
-      },
-      stage: scope.stage,
-    });
+    return ok(idleOutcome(scope, artifact, gate.join("; "), "blocked", null));
   }
 
   const record = scope.stage.artifacts[artifact];
 
-  if (record !== undefined && !input.regenerate) {
-    if (record.status === "completed") {
-      return ok({
-        created: [],
-        outcome: {
-          artifact,
-          note: "wynik już istnieje; nową płatną próbę zaczyna wyłącznie --regenerate",
-          prompt: null,
-          references: [],
-          runId: record.runId,
-          state: "skipped",
-          verdict: null,
-        },
-        stage: scope.stage,
-      });
-    }
-
-    // `null` means the archived attempt was refused rather than billed, so
-    // there is nothing to finish and starting over costs nothing.
-    const resumed = await resume(input, scope, artifact, record);
-
-    if (resumed !== null) {
-      return resumed;
-    }
+  if (record?.status === "completed" && !input.regenerate) {
+    return ok(
+      idleOutcome(
+        scope,
+        artifact,
+        "wynik już istnieje; nową płatną próbę zaczyna wyłącznie --regenerate",
+        "skipped",
+        record.runId
+      )
+    );
   }
 
-  return await attempt(input, scope, artifact);
+  // Built before the attempt rather than inside it: the references are re-read
+  // and re-hashed here, so a card edited outside the tool cannot silently
+  // become the authority for the eight views drawn from it — and the same list
+  // is what a resume compares its recorded inputs against.
+  const plan = await buildPlan(input, scope, artifact);
+
+  if (!plan.ok) {
+    return plan;
+  }
+
+  const target = outputPath(scope.paths, artifact);
+
+  if (!target.ok) {
+    return target;
+  }
+
+  const { background, size } = sizeOf(artifact);
+  const attempt = await runImageStage(
+    {
+      apiKey: input.apiKey ?? "",
+      fetch: input.fetch,
+      model: input.model ?? "",
+      regenerate: input.regenerate,
+      runs: scope.paths.runs,
+      track: input.track,
+      workspace: input.workspace,
+    },
+    {
+      attachments: plan.data.attachments,
+      background,
+      blocked: (problems) => new Stage2BlockedError(problems),
+      inputs: plan.data.inputs,
+      key: artifact,
+      prompt: plan.data.prompt,
+      promptVersion: PROMPT_VERSION,
+      size,
+      stage: STAGE,
+      stagePath: scope.paths.stage,
+      target: target.data,
+    }
+  );
+
+  if (!attempt.ok) {
+    return attempt;
+  }
+
+  return ok({
+    created: attempt.data.created,
+    outcome: {
+      artifact,
+      note: attempt.data.note,
+      prompt: null,
+      references: plan.data.references,
+      runId: attempt.data.runId,
+      state: attempt.data.state,
+      verdict: attempt.data.verdict,
+    },
+    stage: attempt.data.stage,
+  });
+}
+
+/** An artifact this invocation did not draw, and why. Nothing was written. */
+function idleOutcome(
+  scope: Scope,
+  artifact: CharacterArtifact,
+  note: string,
+  state: ArtifactOutcome["state"],
+  runId: string | null
+): OneResult {
+  return {
+    created: [],
+    outcome: { artifact, note, prompt: null, references: [], runId, state, verdict: null },
+    stage: scope.stage,
+  };
 }

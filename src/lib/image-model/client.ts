@@ -1,10 +1,9 @@
 import { sha256Of } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import type { ImageTrack } from "../workspace.js";
-import type { CharacterArtifact } from "./prompt.js";
 
 /**
- * Internal to the character module: the paid call, per track, and nothing else.
+ * Internal to the image-model module: the paid call, per track, and nothing else.
  *
  * `fetch` is injected so every rule around the call — no retry, the key never
  * reaching disk, a refusal being an error rather than a blank image — is
@@ -26,22 +25,6 @@ const REDACTED = "[UKRYTY KLUCZ]";
 const TIMEOUT_MS = 10 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 2 * 60_000;
 const MAX_DOWNLOAD_BYTES = 50_000_000;
-
-/**
- * The frame each artifact is rendered in. A per-track constant, not a user
- * decision: the card is square because it holds a 3 × 3 grid, a view is square
- * because it is a head, and the hero is portrait because it is a standing
- * figure. All three sit inside seedream's pixel and ratio limits.
- *
- * None of them is the project's `aspectRatio`. That governs the film frame from
- * stage 5 onward; a character sheet framed 16:9 would waste most of itself.
- */
-const SIZES = {
-  card: { background: "opaque", size: "1920x1920" },
-  hero: { background: "opaque", size: "1536x2304" },
-  /** Views composite onto later frames, so they ask for an alpha channel. */
-  view: { background: "transparent", size: "1536x1536" },
-} as const;
 
 export interface ImageAttachment {
   readonly bytes: Buffer;
@@ -78,31 +61,30 @@ class ImageCallError extends Error {
   }
 }
 
-/** The frame an artifact is rendered in. */
-export function sizeOf(artifact: CharacterArtifact): (typeof SIZES)[keyof typeof SIZES] {
-  if (artifact === "card") {
-    return SIZES.card;
-  }
-
-  return artifact === "hero" ? SIZES.hero : SIZES.view;
-}
-
+/**
+ * The request, assembled from what the stage decided.
+ *
+ * The frame and the background come from the stage rather than from here: a
+ * character sheet is square because it holds a 3 × 3 grid, while a reference is
+ * drawn in the film frame of its episode. Those are facts about the artifact,
+ * and the artifact belongs to its stage. What this module decides is the part
+ * that is true of any image: which endpoint, and how the bytes travel.
+ */
 export function buildRequest(input: {
-  readonly artifact: CharacterArtifact;
   readonly attachments: readonly ImageAttachment[];
+  readonly background: string;
   readonly model: string;
   readonly prompt: string;
+  readonly size: string;
   readonly track: ImageTrack;
 }): ImageRequest {
-  const { background, size } = sizeOf(input.artifact);
-
   return {
     attachments: input.attachments,
-    background,
+    background: input.background,
     endpoint: endpointOf(input.track, input.attachments.length),
     model: input.model,
     prompt: input.prompt,
-    size,
+    size: input.size,
     track: input.track,
   };
 }

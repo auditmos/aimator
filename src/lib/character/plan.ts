@@ -7,6 +7,7 @@ import {
   stageFileSchema,
   toWorkspacePath,
 } from "../artifact/index.js";
+import { attach, type ImageAttachment } from "../image-model/index.js";
 import type { Stage0Character } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
@@ -15,7 +16,6 @@ import {
   type ImageTrack,
   type Workspace,
 } from "../workspace.js";
-import { attach, type ImageAttachment } from "./client.js";
 import {
   buildPrompt,
   CHARACTER_VIEWS,
@@ -130,14 +130,6 @@ export async function readStage(path: string): Promise<StageFile> {
   const stage = await readJson(path, stageFileSchema);
 
   return stage.ok ? stage.data : emptyStage(STAGE);
-}
-
-export function withRecord(
-  stage: StageFile,
-  key: CharacterArtifact,
-  record: StageFile["artifacts"][string]
-): StageFile {
-  return { ...stage, artifacts: { ...stage.artifacts, [key]: record } };
 }
 
 /** What one artifact is drawn from: the ordered bytes, and what they are. */

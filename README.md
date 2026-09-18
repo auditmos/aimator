@@ -7,9 +7,9 @@ Artefakty są grupowane **per projekt i per model obrazu**. Jeden projekt może 
 komplet assetów w `gpt-image` i w `seedream` — to dwa niezależne byty dające dwie różne
 animacje z tej samej historii. Ujęcia i klipy w obu torach robi Seedance 2.5.
 
-**Stan: zaimplementowane są etapy 0–4** — przygotowanie, scenariusz, postać, lista ujęć
-i pakiet promptów. Etapy 5–8 mają zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md),
-ale nie mają jeszcze kodu.
+**Stan: zaimplementowane są etapy 0–5** — przygotowanie, scenariusz, postać, lista ujęć,
+pakiet promptów i obrazy referencyjne. Etapy 6–8 mają zapisany kontrakt
+w [docs/pipeline.md](docs/pipeline.md), ale nie mają jeszcze kodu.
 
 ## Wymagania
 
@@ -182,6 +182,37 @@ seedream adres ważny 24 h.
 Akceptacja dotyczy jednego obrazu naraz i jest związana z jego sha256. `approve` odmawia
 bez `--artifact`: przyjęcie karty uruchamia osiem płatnych wywołań, więc musi być czymś,
 co ktoś napisał.
+
+## Etap 5 — obrazy referencyjne
+
+Pierwszy etap, w którym tory naprawdę się rozchodzą: jeden pakiet promptów, dwa niezależne
+zestawy obrazów, dwie osobne oceny.
+
+```bash
+pnpm dev prompt-package show dzielna-ewa 01-burza --track gpt-image --artifact R02
+pnpm dev reference generate dzielna-ewa 01-burza --track gpt-image --dry-run
+pnpm dev reference generate dzielna-ewa 01-burza --track gpt-image
+pnpm dev approve dzielna-ewa 01-burza --stage references --track gpt-image \
+  --artifact R01 --note "wieczorny komplet się zgadza"
+```
+
+`prompt-package show` jest **darmowe** i drukuje dokładnie to, co poleci do modelu:
+numerowany blok `Image N = <identyfikator> — <rola>` w kolejności, w jakiej żądanie
+poniesie bajty, treść pliku z `prompts/`, blok o medium, kadr, przy kadrach filmu dosłowne
+ujęcia z listy, i `project.md`. Istnieje, bo etap 4 publikuje **połowę** promptu — resztę
+dokleja etap wysyłający, więc inaczej zatwierdzałbyś tekst, którego nie widzisz w formie,
+w jakiej poleci. Bez `--artifact` wypisuje sam plan: co pakiet planuje i czy załączniki są
+zatwierdzone.
+
+**Bez flag polecenie rysuje wszystkie referencje, których zależności są już zatwierdzone na
+tym torze** — i mówi, ile płatnych wywołań wykona, zanim je wykona. To pierwszy etap,
+w którym jedno polecenie może kupić kilka obrazów: graf `dependsOn` ma zwykle kilka
+niezależnych korzeni. Bramka jest wewnątrz własnego zestawu wyników, więc R04 czeka na
+**zatwierdzoną** R03, a narysowanie R03 niczego nie otwiera.
+
+Kadr wynika z `aspectRatio` projektu i jest ten sam na obu torach — dla `16:9` to
+2816×1584, czyli największa ramka o dokładnie tej proporcji, którą przyjmują oba tory.
+Obraz w innym rozmiarze nie jest publikowany ani skalowany.
 
 ## Zasady, na których stoi całe narzędzie
 

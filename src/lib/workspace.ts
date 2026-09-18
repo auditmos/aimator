@@ -73,6 +73,30 @@ export interface CharacterTrackPaths {
 }
 
 /**
+ * One episode as one model track draws it — stage 5 and, by contract, stages 6
+ * to 8. The track is a directory level here for the same reason it is one under
+ * a character: the two productions hold identically named files and neither
+ * needs a prefix to stay out of the other's way.
+ *
+ * The text stages have no counterpart to this, and that is the whole shape of
+ * the pipeline: screenplay, shot list and prompt package describe the story and
+ * sit directly under the episode, while everything below is drawn twice.
+ */
+export interface EpisodeTrackPaths {
+  /**
+   * A file, not an empty directory, for the reason `screenplayLock` gives: the
+   * layout check reports empty directories, so a lock held as one would trip
+   * the very check it sits beside.
+   */
+  readonly lock: string;
+  readonly references: string;
+  readonly root: string;
+  /** This track's own archive, distinct from the episode's text-stage `runs/`. */
+  readonly runs: string;
+  readonly stage: string;
+}
+
+/**
  * What one image attempt archives. `request.json` carries the prompt and the
  * settings but never the reference bytes: those are inputs, and an archive that
  * copied them would duplicate every photograph on every attempt.
@@ -299,8 +323,14 @@ export function characterViewImage(paths: CharacterTrackPaths, view: string): Re
     : err(new IdentifierError(view, `invalid view name "${view}"`));
 }
 
-/** The archive of one image attempt. Run ids are minted by `lib/artifact`. */
-export function imageRunPaths(paths: CharacterTrackPaths, runId: string): ImageRunPaths {
+/**
+ * The archive of one image attempt. Run ids are minted by `lib/artifact`.
+ *
+ * It takes the archive directory rather than a particular track's paths,
+ * because a character and an episode archive the same thing in the same shape
+ * and only differ in where their `runs/` sits.
+ */
+export function imageRunPaths(paths: { readonly runs: string }, runId: string): ImageRunPaths {
   const root = join(paths.runs, runId);
 
   return {
@@ -345,6 +375,36 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
     shotListStage: join(root, "shot-list.stage.json"),
     source: join(root, "source.md"),
   });
+}
+
+/**
+ * The per-track half of an episode, where the two productions diverge.
+ *
+ * Stage 5 is the first to write here. It needs no validation of its own: the
+ * episode id was already checked by `episodePaths` and the track is a closed
+ * set, so there is nothing left that could escape the directory.
+ */
+export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): EpisodeTrackPaths {
+  const root = join(episode.root, track);
+
+  return {
+    lock: join(root, "references.lock"),
+    references: join(root, "references"),
+    root,
+    runs: join(root, "runs"),
+    stage: join(root, "references.stage.json"),
+  };
+}
+
+/**
+ * One reference image. The identifier is the artifact key, the manifest entry
+ * and the file name at once, so it is checked here rather than trusted into a
+ * path — the same reason `characterViewImage` checks a view name.
+ */
+export function referenceImage(paths: EpisodeTrackPaths, id: string): Result<string> {
+  return ARTIFACT_ID.test(id)
+    ? ok(join(paths.references, `${id}.png`))
+    : err(new IdentifierError(id, `invalid reference id "${id}": expected a form like R01`));
 }
 
 /** The archive of one attempt. Run ids are minted by `lib/artifact`. */

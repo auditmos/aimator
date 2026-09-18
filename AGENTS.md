@@ -12,7 +12,7 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 4 are implemented. Stages 5–8 are a declared contract, not working code.
+Stages 0 through 5 are implemented. Stages 6–8 are a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -21,6 +21,10 @@ it refuses to spend until the screenplay is approved, and does not depend on sta
 Stage 4 is the first to join the text side to the image side: it is shared by both tracks
 and names none of them, and it refuses to spend until the shot list is approved **and**
 every character that list puts on screen has an accepted `hero.png` on both tracks.
+Stage 5 is the first where the two tracks really part company — one package, two
+independent sets of images, two separate reviews — and the first whose gate sits inside its
+own results: R04 waits for an accepted R03 *on that track*. It is therefore also the first
+where one command can buy several images, so it states how many before it sends any.
 
 ## Project Structure
 
@@ -41,6 +45,17 @@ src/
     │   ├── index.ts       # Public: runTextStage and what a stage brings to it
     │   ├── client.ts      # Internal — transport, redaction, refusal classification
     │   └── attempt.ts     # Internal — lock, submitted, archive, resume, publish
+    ├── image-model/   # Folder form — one billed image call, shared by stages 2 and 5
+    │   ├── index.ts       # Public: runImageStage, attach, frameSize, referenceLimit,
+    │   │                  #         validateImage, readImageResponse
+    │   ├── track.ts       # Internal — what a track accepts: the frame, the limit
+    │   ├── client.ts      # Internal — both endpoints, redaction, the 24 h download
+    │   ├── validate.ts    # Internal — the PNG and response verdicts, pure and offline
+    │   └── attempt.ts     # Internal — submitted, archive, resume, publish
+    ├── media-prompt/  # Folder form — the prompt a model receives: text + attachments
+    │   ├── index.ts       # Public: readSendPlan — what a future paid call carries
+    │   ├── prompt.ts      # Internal — the blocks around a published direction
+    │   └── plan.ts        # Internal — ids resolved per track, and the gate that follows
     ├── artifact/     # Folder form — provenance shared by every stage
     │   ├── index.ts      # Public: the stage-file shape, digests, writes, review
     │   ├── schema.ts     # Internal — <stage>.stage.json, one shape for all stages
@@ -65,17 +80,14 @@ src/
     │   └── generate.test.ts # Generate/check/approve, through the entry
     ├── character/    # Folder form — index.ts is the only entry (stage 2)
     │   ├── index.ts      # Public: generateCharacter, checkCharacter,
-    │   │                 #         approveCharacter, validateImage,
-    │   │                 #         readImageResponse, buildPrompt, referencePlan
+    │   │                 #         approveCharacter, buildPrompt, referencePlan
     │   ├── prompt.ts     # Internal — the three prompts, the view order, the
-    │   │                 #            reference plan, and the declared version
-    │   ├── validate.ts   # Internal — the PNG and response verdicts, pure and offline
-    │   ├── client.ts     # Internal — both paid calls, fetch injected
+    │   │                 #            reference plan, the frame of each artifact,
+    │   │                 #            and the declared version
     │   ├── plan.ts       # Internal — the gates, and what an artifact is drawn from
-    │   ├── attempt.ts    # Internal — one billed call: submit, archive, resume, publish
     │   ├── generate.ts   # Internal — the command: targets, lock, preview, series
     │   ├── review.ts     # Internal — per-image verification and approval
-    │   ├── index.test.ts    # Validator, response reader and prompts, through the entry
+    │   ├── index.test.ts    # Prompts and the reference plan, through the entry
     │   └── generate.test.ts # Gates/resume/approve, through the entry
     ├── shot-list/    # Folder form — index.ts is the only entry (stage 3)
     │   ├── index.ts      # Public: generateShotList, checkShotList,
@@ -98,6 +110,14 @@ src/
     │   ├── generate.ts   # Internal — the command: publish, preserve, sweep
     │   ├── index.test.ts    # Wiring verdict and prompt, through the entry
     │   └── generate.test.ts # Gates/resume/approve, through the entry
+    ├── references/   # Folder form — index.ts is the only entry (stage 5)
+    │   ├── index.ts      # Public: generateReferences, checkReferences,
+    │   │                 #         approveReferences
+    │   ├── plan.ts       # Internal — which references are ready, and the three
+    │   │                 #            obstacles that belong to the command
+    │   ├── generate.ts   # Internal — the command: targets, lock, preview, series
+    │   ├── review.ts     # Internal — per-image verification and approval
+    │   └── index.test.ts    # Graph gate/series/resume/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
@@ -110,6 +130,26 @@ lock, `submitted` before the POST, archive, resume from a saved answer, publish 
 validates — because that order *is* the contract and three copies of it would have made an
 invariant into a coincidence. A stage now brings its prompt, its verdict and its files;
 the sequence is not its business. Do the same with the next thing two stages copy.
+
+`lib/image-model` was promoted at the **second** caller, not the third, and the difference
+is deliberate. With `text-model` the third stage was a discovery; here stage 6 is a
+contracted certainty that draws one image exactly the way stage 5 does, so waiting would
+have been choosing to repeat a mistake already paid for — the two copies of the text
+lifecycle had drifted in their comments before anyone merged them. Stage 7 is **not** a
+fourth caller: a video clip is an asynchronous job with an id to poll, which is a different
+order of operations and earns its own module rather than a flag in this one. The promotion
+also settled where a frame belongs: `1920x1920` is a fact about a character sheet, so it
+stays in `lib/character`, while "which endpoint, and how the bytes travel" is true of any
+image and moved out.
+
+`lib/media-prompt` exists because a prompt to an image or video model is only half written
+when stage 4 publishes it. It cannot live inside `lib/prompt-package`, which is the one
+artifact forbidden to name a track, and it cannot live inside stage 5, which stages 6 and 7
+would then have to reach into. Resolving `hero:ewa` to a file per track is also what answers
+the gate — an attachment nobody accepted is not one this pipeline sends — so the list and
+the verdict on it are one question asked once. Stage 2 keeps its own numbering: rule 8 fixes
+the *position*, and what follows the equals sign is each stage's vocabulary, which for stage
+2 is file names because its references never had manifest ids.
 
 ## Pipeline rules
 

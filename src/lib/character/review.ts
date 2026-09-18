@@ -7,6 +7,7 @@ import {
   serialize,
   type WriteMode,
 } from "../artifact/index.js";
+import { type ImageVerdict, validateImage } from "../image-model/index.js";
 import { readStage0Character, type Stage0Character } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
@@ -18,10 +19,8 @@ import {
   type Workspace,
   workspacePath,
 } from "../workspace.js";
-import { sizeOf } from "./client.js";
 import { accepted, nextGroup, outputPath, readStage, sequenceGate } from "./plan.js";
-import { CHARACTER_ARTIFACTS, type CharacterArtifact } from "./prompt.js";
-import { type ImageVerdict, validateImage } from "./validate.js";
+import { CHARACTER_ARTIFACTS, type CharacterArtifact, sizeOf } from "./prompt.js";
 
 /**
  * Internal to the character module: verification, and the approval that sits on

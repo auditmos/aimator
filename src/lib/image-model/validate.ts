@@ -2,7 +2,7 @@ import { err, ok, type Result } from "../result.js";
 import type { ImageTrack } from "../workspace.js";
 
 /**
- * Internal to the character module: the verdict on bytes and on a provider's
+ * Internal to the image-model module: the verdict on bytes and on a provider's
  * answer. Pure and offline, for the same reason stage 1's validator is — this
  * is the half that decides whether an image that has already been paid for may
  * be published, so it must never need a network of its own.

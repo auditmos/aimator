@@ -446,6 +446,35 @@ describe("generateCharacter resume", () => {
     expect(resumed.ok ? resumed.data.artifacts[0]?.note : "").toContain("bez drugiej opłaty");
     expect((await readStageFile()).artifacts.card.status).toBe("completed");
   });
+
+  /**
+   * The card is the one artifact whose inputs are exactly stage 0's, so a
+   * resume that compared a record against stage 0 alone passed for it and
+   * refused for every other image — a view carries `card.png` among its inputs,
+   * and the comparison read that as drift. The effect was a second charge for
+   * an image already bought, on nine artifacts out of ten.
+   */
+  it("should resume a view, whose inputs include an image stage 2 drew itself", async () => {
+    await makeStage0();
+    await generate({ fetch: recorder().fetch });
+    await accept(["card"]);
+
+    const views = recorder({ order: [...CHARACTER_VIEWS] });
+    await generate({ artifacts: ["front"], fetch: views.fetch });
+
+    const stage = await readStageFile();
+    const dir = join(root, "projects", PROJECT, "characters", CHARACTER, "gpt-image");
+    stage.artifacts.front = { ...stage.artifacts.front, outputs: [], status: "submitted" };
+    await writeFile(stagePath(), `${JSON.stringify(stage, null, 2)}\n`, "utf8");
+    await rm(join(dir, "views", "front.png"));
+
+    const second = recorder();
+    const resumed = await generate({ artifacts: ["front"], fetch: second.fetch });
+
+    expect(second.calls).toHaveLength(0);
+    expect(resumed.ok ? resumed.data.artifacts[0]?.state : resumed.error.message).toBe("resumed");
+    expect((await readStageFile()).artifacts.front.status).toBe("completed");
+  });
 });
 
 describe("generateCharacter seedream", () => {

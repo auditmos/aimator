@@ -158,7 +158,24 @@ describe("validateShotList", () => {
       id: "U01",
       scene: "S01",
       start: 0,
+      text: expect.stringContaining("### U01 | S01 | C01 | 0-10s"),
     });
+  });
+
+  /**
+   * Stage 5 onward attaches these entries verbatim, and the contract says it
+   * reads them through this function. Returning the block it already parsed is
+   * what keeps a second Markdown parser from appearing downstream.
+   */
+  it("should return each shot and clip as the document wrote it", () => {
+    const result = validate(shotList());
+    const shot = result.ok ? result.data.shots[0]?.text : reason(result);
+    const clip = result.ok ? result.data.clips[0]?.text : null;
+
+    expect(shot).toContain("- Purpose: Pokazuje, że Ewa zostaje sama z burzą.");
+    expect(shot?.endsWith("- End state: Ewa siedzi, dłonie na blacie.")).toBe(true);
+    expect(clip).toContain("### C01 | 0-15s");
+    expect(clip).toContain("- Shots: U01,U02");
   });
 
   it("should refuse a document wrapped in a code fence", () => {

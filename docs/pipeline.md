@@ -33,8 +33,10 @@ $AIMATOR_WORKSPACE/
         ├── prompts/                  ┘ opening-frame.md, references/, clips/, entry-frames/
         ├── runs/<runId>/             archiwum prób etapów tekstowych;
         │                             previous/ tylko przy --regenerate
-        ├── gpt-image/                ┐ references/, opening-frame.png, clips/, frames/,
-        └── seedream/                 ┘ edit-plan.json, episode.mp4, runs/
+        ├── gpt-image/                ┐ references/Rxx.png, references.stage.json,
+        └── seedream/                 ┘ references.lock, runs/ — a dalej, per kontrakt:
+                                        opening-frame.png, clips/, frames/,
+                                        edit-plan.json, episode.mp4
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -195,12 +197,12 @@ Obowiązują we wszystkich etapach.
 | 2 postać | `project.json`, `project.md` i — przy podstawie `photographs` — `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 3 lista ujęć | `project.json`, `project.md`, `episode.json`, zatwierdzony `screenplay.md` | `shot-list.md`, `shot-list.stage.json`, `runs/<runId>/` | zatwierdzony etap 1 przed wywołaniem; potem `aimator check`, `aimator approve … --stage shot-list` | **zaimplementowany** |
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
-| 5 obrazy referencyjne | pakiet, zatwierdzone zależności `dependsOn` | `<tor>/references/Rxx.png` | ocena każdego obrazu | niezaimplementowany |
+| 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 6 pierwsza klatka | pakiet, zatwierdzone referencje otwarcia | `<tor>/opening-frame.png` | ocena kadru | niezaimplementowany |
 | 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 5–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
+Etapy 6–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
 żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
@@ -709,3 +711,105 @@ darmo — inaczej błąd walidatora byłby płatny. Ta zasada działała wyłąc
 rozciągnięta na pomyłki, które widać o krok później. Flagę niosą wyłącznie etapy z własnym
 rendererem: etapy 1 i 3 publikują dokładnie to, co zwrócił model, więc nie mają czego
 naprawiać po stronie publikacji.
+
+## Etap 5 — szczegóły
+
+Pierwszy etap, w którym tory naprawdę się rozchodzą: jeden pakiet, dwa niezależne zestawy
+obrazów, dwie osobne oceny. Konsumuje zatwierdzony `prompt-package.json` razem z plikiem
+`prompts/references/Rxx.md` tej referencji, zasady i proporcje z `project.json`
+i `project.md`, oraz zatwierdzone obrazy, od których dana referencja zależy — **na tym
+torze**. Nie konsumuje `shot-list.md`: referencja nie jest kadrem filmu, więc nie ma
+ujęcia, które można by do niej dołączyć, a zapisanie hasha bajtów, których nikt nie wysłał,
+opisywałoby pytanie, którego nie zadano.
+
+**Bramka jest wewnątrz własnego zestawu wyników** i to jest nowe. Płatne wywołanie odmawia,
+dopóki `prompt-package.stage.json` nie ma `review.status = "approved"`, a każda pozycja
+`dependsOn` danej referencji nie jest zatwierdzona na tym torze: `hero:<id>`
+w `character.stage.json` tej postaci, `Rnn` w pliku etapu tego odcinka i toru. R04 czeka
+więc na R03, a R06 na R01 i R02. Narysowanie referencji nie otwiera nic — otwiera dopiero
+jej przyjęcie przez człowieka. `--dry-run` bramki nie omija: raportuje ją jako przeszkodę
+i i tak pokazuje prompt w całości.
+
+**Jedno polecenie rysuje wszystkie gotowe referencje**, w kolejności manifestu, jedno
+płatne wywołanie naraz, a seria zatrzymuje się na pierwszym błędzie z zachowaniem
+wcześniejszych wyników. Etap 2 robił jeden krok na uruchomienie, ale to był **skutek**, nie
+zasada: jego bramki zostawiały dokładnie jeden wykonalny artefakt. Tutaj graf ma kilka
+niezależnych korzeni, więc skopiowanie skutku zamiast powodu znaczyłoby odmowę wykonania
+pracy, o której narzędzie wie, że jest dozwolona, i zmuszałoby do wpisywania tego samego
+polecenia kilka razy. Bezpieczeństwo niosą inne rzeczy: osobny rekord i osobne `submitted`
+na każdy obraz, oraz raport, który **podaje liczbę płatnych wywołań, zanim je wykona**.
+`--artifact R01,R02` zawęża przebieg, a `--regenerate` **wymaga** jawnego `--artifact`.
+
+**Plik etapu to `references.stage.json`, jeden na tor**, na poziomie katalogu toru, z jednym
+rekordem na referencję pod kluczem `R01`…`Rnn`. Klucz `artifacts` istnieje właśnie po to,
+żeby objąć zbiór wyników bez mnożenia plików — dokładnie tak, jak etap 2 trzyma dziesięć
+obrazów postaci. Nie ma tu `references-state.json` ani `downstream-status.json`.
+
+**Ramka jest wyliczana z `aspectRatio` i jest ta sama na obu torach.** Nie wynika z `kind`:
+`kind` opisuje krawędź grafu, a nie płótno, więc człowiek przyjmujący „prop" nie
+przyjmował proporcji obrazu. Nie jest też osobną decyzją, bo `aspectRatio` już nią jest —
+brakuje do niej wyłącznie arytmetyki, a arytmetyka nie jest decyzją. Narzędzie bierze
+**największy** kadr o dokładnie tej proporcji, którego oba boki są wielokrotnością 16
+i który mieści się w limitach **obu** torów; dla `16:9` wychodzi 2816×1584. Największy,
+bo referencję rysuje się raz, a czyta ją każde późniejsze wywołanie, które ją dołącza:
+rozdzielczości oddanej tutaj nie da się odzyskać niżej, a modelowi, który chce mniej
+pikseli, zawsze można dać mniej. Proporcję, której żaden tor nie renderuje, narzędzie
+odrzuca, zamiast zaokrąglić ją do takiej, którą renderuje. Jedna ramka na oba tory jest
+tym, co sprawia, że dwa wyniki dają się porównać. Referencje są nieprzezroczyste: żaden
+późniejszy etap nie kompozytuje referencji, tylko dołącza ją do generacji.
+
+**Przekroczenie limitu referencji toru jest odmową przy generacji na tym torze**, nie przy
+walidacji pakietu i nie cichym obcięciem. Odmowa w etapie 4 zmuszałaby wspólny artefakt do
+znajomości torów — ten sam błąd co prefiks nazwy zamiast poziomu katalogu — i sprawiałaby,
+że surowszy tor po cichu rządzi luźniejszym. Zapisany krótszy plan działa w etapie 2, bo
+tam plan napisał kod; tutaj listę napisał model, a przyjął ją człowiek, więc obcięcie
+znaczyłoby, że proza promptu adresuje załącznik, którego żądanie nie niesie — czyli
+dokładnie to, przed czym broni niezmiennik o prompcie z załącznikami. Kontrola siedzi
+u składającego, więc jedna reguła obsługuje referencje, klatkę otwarcia, klipy i klatki
+wejściowe naraz.
+
+**Prompt powstaje przy wywołaniu i jest tym samym tekstem, który pokazuje podgląd.**
+`aimator prompt-package show <project-id> <episode-id> --track <tor>
+[--artifact R02|opening-frame|C03|entry:C03]` jest darmowe, nie sięga po sieć ani po
+sekrety i drukuje dokładnie to, co poleci do modelu: numerowany blok
+`Image N = <identyfikator> — <rola>` w kolejności, w jakiej żądanie poniesie bajty, potem
+treść pliku z `prompts/`, potem blok o medium, potem kadr, potem — przy kadrach filmu, nie
+przy referencjach — dosłowne ujęcia z listy, i na końcu `project.md`. Istnieje, bo etap 4
+publikuje **połowę** promptu, a człowiek zatwierdza coś, czego inaczej nie widzi w formie,
+w jakiej to poleci. Jest to zarazem ten sam składacz, którego używa wysyłka: jedna
+implementacja, dwóch odbiorców, więc podgląd nie może się rozjechać z żądaniem.
+
+Blok załączników idzie **przed** zadaniem, nie po nim: plik z `prompts/` adresuje
+identyfikatory w pierwszym zdaniu, więc czytający musi je już znać. Prompt etapu 4 obiecuje
+modelowi dokładnie ten układ, a to ta obietnica czyni identyfikator w prozie rozwiązywalnym.
+
+**Archiwum próby** trafia do `episodes/<id>/<tor>/runs/<runId>/` — osobnego od
+`episodes/<id>/runs/`, w którym archiwizują etapy tekstowe — i trzyma `prompt.md`,
+`request.json`, `response.json`, `transport.json`, `run.json`, `validation.json` oraz, na
+torze seedream, `original.png`. `request.json` niesie prompt i ustawienia, ale **nigdy
+bajtów referencji**: te są wejściami, identyfikowanymi ścieżką i sha256. Poprzedni obraz
+trafia do `previous.png` wyłącznie przy `--regenerate`.
+
+**Wznowienie bez drugiej opłaty** działa tak jak w etapie 2: rekord `submitted` bez
+zapisanej odpowiedzi to ślepy zaułek, który otwiera tylko `--regenerate`, ale odpowiedź,
+która zdążyła trafić na dysk, jest już opłacona — gpt-image niesie bajty w treści, seedream
+adres ważny 24 h — i powtórzenie tego samego polecenia dokańcza próbę bez wysyłania
+czegokolwiek. Obraz w złym rozmiarze nie jest publikowany ani skalowany: rekord zostaje
+`submitted`, odpowiedź zostaje w archiwum, a poprawka walidatora jest darmowa.
+
+**Nie ma `--republish`.** Flagę niosą wyłącznie etapy z własnym rendererem, a ten publikuje
+dokładnie te bajty, które zwrócił dostawca — nie ma tu czego naprawiać po stronie
+publikacji, a błąd walidatora i tak otwiera darmowe wznowienie opisane wyżej.
+
+**Akceptacja dotyczy jednego obrazu naraz.** `aimator approve <project-id> <episode-id>
+--stage references --track <tor> --artifact R01[,R02]` odmawia bez jawnego wskazania, co
+jest przyjmowane: przyjęcie R03 uruchamia płatne wywołanie R04, więc musi być czymś, co
+ktoś napisał, a nie skutkiem ubocznym przyjęcia czegoś innego. `aimator check <project-id>
+<episode-id> --stage references --track <tor>` sprawdza to samo i nie zapisuje niczego.
+
+Rozjazd wejścia unieważnia akceptację i `check` to zgłasza — a `approve` przepisuje hashe
+wejść i zapisuje nową zgodę, jak wszędzie indziej. Zabezpieczeniem nie jest tu ponowna
+walidacja strukturalna, bo żaden parser nie orzeknie, czy R04 nadal pasuje do przerysowanej
+R03; zabezpieczeniem jest to, że **oceną obrazu jest człowiek, który na niego patrzy** —
+a komunikat mówi wprost, żeby obejrzeć obraz obok nowej wersji jego wejścia albo przerysować
+go jawnym `--regenerate --artifact`.

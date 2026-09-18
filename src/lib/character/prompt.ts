@@ -1,3 +1,4 @@
+import { referenceLimit } from "../image-model/index.js";
 import type { CharacterBasis } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import type { ImageTrack } from "../workspace.js";
@@ -71,11 +72,31 @@ const VIEW_DIRECTIONS: Record<CharacterView, string> = {
 };
 
 /**
- * How many reference images a track accepts in one request. Exceeding it is
- * refused rather than trimmed: a user who supplied twelve photographs did not
- * ask the tool to choose ten of them.
+ * The frame each artifact is rendered in, and whether it asks for an alpha
+ * channel. A constant of the artifact, not a user decision: the card is square
+ * because it holds a 3 × 3 grid, a view is square because it is a head, and the
+ * hero is portrait because it is a standing figure.
+ *
+ * None of them is the project's `aspectRatio`. That governs the film frame from
+ * stage 5 onward; a character sheet framed 16:9 would waste most of itself —
+ * which is exactly why the frame belongs to the stage and not to the module
+ * that makes the call.
  */
-const MAX_REFERENCES: Record<ImageTrack, number> = { "gpt-image": 16, seedream: 10 };
+const SIZES = {
+  card: { background: "opaque", size: "1920x1920" },
+  hero: { background: "opaque", size: "1536x2304" },
+  /** Views composite onto later frames, so they ask for an alpha channel. */
+  view: { background: "transparent", size: "1536x1536" },
+} as const;
+
+/** The frame an artifact is rendered in. */
+export function sizeOf(artifact: CharacterArtifact): (typeof SIZES)[keyof typeof SIZES] {
+  if (artifact === "card") {
+    return SIZES.card;
+  }
+
+  return artifact === "hero" ? SIZES.hero : SIZES.view;
+}
 
 export interface ReferenceSlot {
   readonly kind: "card" | "photograph" | "view";
@@ -135,7 +156,7 @@ export function referencePlan(input: {
   const card = { kind: "card", name: "card" } as const;
   const views = CHARACTER_VIEWS.map((name) => ({ kind: "view", name }) as const);
   const slots = plan(input.artifact, input.track, { card, primary, supporting, views });
-  const limit = MAX_REFERENCES[input.track];
+  const limit = referenceLimit(input.track);
 
   return slots.length > limit
     ? err(
