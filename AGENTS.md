@@ -12,7 +12,9 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stage 0 is implemented. Stages 1–8 are a declared contract, not working code.
+Stages 0 and 1 are implemented. Stages 2–8 are a declared contract, not working code.
+Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
+approved for that project and episode.
 
 ## Project Structure
 
@@ -29,18 +31,34 @@ src/
     ├── env.test.ts   # Co-located test for env validation
     ├── workspace.ts  # Single-file form — the ONLY module that knows the layout
     ├── workspace.test.ts
+    ├── artifact/     # Folder form — provenance shared by every stage
+    │   ├── index.ts      # Public: the stage-file shape, digests, writes, review
+    │   ├── schema.ts     # Internal — <stage>.stage.json, one shape for all stages
+    │   ├── store.ts      # Internal — bytes, digests, the single dry-run gate
+    │   └── review.ts     # Internal — digest verification and creative approval
     ├── project/      # Folder form — index.ts is the only entry (stage 0)
     │   ├── index.ts      # Public: initProject, addEpisode, setEpisodeSettings,
     │   │                 #         addCharacterSources, setCharacterBasis,
-    │   │                 #         checkStage0, approveStage0
+    │   │                 #         checkStage0, approveStage0, readStage0Inputs
     │   ├── schema.ts     # Internal — Zod schemas for the artifacts
     │   ├── template.ts   # Internal — the project.md scaffold
-    │   ├── store.ts      # Internal — bytes, digests, the single dry-run gate
-    │   ├── review.ts     # Internal — digest verification and creative approval
     │   └── index.test.ts # Tests through the entry
+    ├── screenplay/   # Folder form — index.ts is the only entry (stage 1)
+    │   ├── index.ts      # Public: generateScreenplay, checkScreenplay,
+    │   │                 #         approveScreenplay, validateScreenplay, buildPrompt
+    │   ├── prompt.ts     # Internal — the prompt constant and its declared version
+    │   ├── validate.ts   # Internal — the structural verdict, pure and offline
+    │   ├── client.ts     # Internal — the paid call, fetch injected
+    │   ├── review.ts     # Internal — verification and approval bound to digests
+    │   ├── generate.ts   # Internal — order of operations around the paid call
+    │   ├── index.test.ts    # Validator and prompt, through the entry
+    │   └── generate.test.ts # Generate/check/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
+
+`lib/artifact` exists because two stages now write the same state file. A stage never
+reaches into another stage's internals: shared pieces are promoted here instead.
 
 ## Pipeline rules
 
