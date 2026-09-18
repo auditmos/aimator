@@ -1354,3 +1354,120 @@ async function checkEpisode(
 
   return { approved: isApproved(stage.data), id: episodeId, problems, verified: true };
 }
+
+/** Where one character's appearance comes from, decided and never defaulted. */
+export type CharacterBasis = NonNullable<CharacterEntry["basis"]>;
+
+/** Everything stage 2 may read from stage 0, for one character, in one call. */
+export interface Stage0Character {
+  /** Whether a human accepted stage 0 for this project. */
+  readonly approved: boolean;
+  readonly basis: CharacterBasis;
+  readonly inputs: readonly RecordedFile[];
+  readonly name: string;
+  /** Why the approval does not hold, when it does not. */
+  readonly problems: readonly string[];
+  /** `project.md`, verbatim. The whole document: the shared rules bind too. */
+  readonly rules: string;
+  /** This character's photographs, absolute, in a stable order. */
+  readonly sources: readonly { readonly path: string; readonly sha256: string }[];
+}
+
+/**
+ * The stage-2 counterpart to `readStage0Inputs`. It reads no episode, because
+ * the character stage does not depend on one and may run beside stage 1.
+ *
+ * An undecided basis is an error: without it there is nothing to draw from.
+ * A missing *approval* is not — it comes back as `approved: false` with the
+ * reasons, so a dry run can still show what would be sent while the paid path
+ * refuses.
+ */
+export async function readStage0Character(
+  input: CheckInput & { readonly characterId: string }
+): Promise<Result<Stage0Character>> {
+  const resolved = await resolveCharacter({ ...input, mode: "dry-run" });
+
+  if (!resolved.ok) {
+    return resolved;
+  }
+
+  const { entry, project } = resolved.data;
+
+  if (entry.basis === null) {
+    return err(
+      new NotReadyError([
+        `postać "${input.characterId}" nie ma ustalonej podstawy — aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
+      ])
+    );
+  }
+
+  if (entry.basis === "photographs" && entry.sources.length === 0) {
+    return err(
+      new NotReadyError([
+        `postać "${input.characterId}" ma podstawę photographs, ale nie ma ani jednego zdjęcia`,
+      ])
+    );
+  }
+
+  const rules = await readDigest(project.rules);
+  const projectJson = await readDigest(project.file);
+
+  if (!rules.ok) {
+    return rules;
+  }
+
+  if (!projectJson.ok) {
+    return projectJson;
+  }
+
+  const relative = (path: string): string => toWorkspacePath(input.workspace.root, path);
+  const approval = await projectApproval(input.workspace, project);
+  // Sorted by recorded path so two runs build the same reference order.
+  const sources = [...entry.sources]
+    .sort((left, right) => left.path.localeCompare(right.path))
+    .map((asset) => ({
+      path: join(input.workspace.root, asset.path),
+      sha256: asset.sha256,
+    }));
+
+  return ok({
+    approved: approval.approved,
+    basis: entry.basis,
+    inputs: [
+      { path: relative(project.file), sha256: projectJson.data.sha256 },
+      { path: relative(project.rules), sha256: rules.data.sha256 },
+      ...entry.sources.map((asset) => ({ path: asset.path, sha256: asset.sha256 })),
+    ],
+    name: entry.name,
+    problems: approval.problems,
+    rules: rules.data.bytes.toString("utf8"),
+    sources,
+  });
+}
+
+/**
+ * Stage 0 counts as approved for a character when the project record carries an
+ * explicit approval and every digest still matches. No episode is consulted:
+ * the cast belongs to the project, and a project with one unfinished episode
+ * must not block work on a character that episode does not own.
+ */
+async function projectApproval(
+  workspace: Workspace,
+  project: ProjectPaths
+): Promise<{ approved: boolean; problems: readonly string[] }> {
+  const stage = await readJson(project.prepareStage, stageFileSchema);
+
+  if (!stage.ok) {
+    return { approved: false, problems: ["projekt: brak zapisu etapu 0 (prepare.stage.json)"] };
+  }
+
+  const problems: string[] = [];
+
+  await verifyOutputs(workspace, stage.data, "projekt", problems);
+
+  if (!isApproved(stage.data)) {
+    problems.push("projekt: etap 0 nie ma akceptacji (review.status ≠ approved)");
+  }
+
+  return { approved: problems.length === 0, problems };
+}

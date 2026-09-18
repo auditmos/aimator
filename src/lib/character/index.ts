@@ -16,10 +16,14 @@
  * It does not depend on stage 1 and may run alongside it.
  */
 
+export { type CharacterReport, generateCharacter } from "./generate.js";
 export {
+  buildPrompt,
   CHARACTER_ARTIFACTS,
   CHARACTER_VIEWS,
   type CharacterArtifact,
-  type CharacterView,
+  isCharacterArtifact,
+  referencePlan,
 } from "./prompt.js";
-export { type ImageVerdict, readImageResponse, validateImage } from "./validate.js";
+export { approveCharacter, type CharacterStatus, checkCharacter } from "./review.js";
+export { readImageResponse, validateImage } from "./validate.js";

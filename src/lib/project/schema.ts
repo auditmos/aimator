@@ -32,7 +32,7 @@ export const sourceNatures = ["law-or-idea", "screenplay", "synopsis"] as const;
  * all because an empty `sources/` is otherwise ambiguous: "deliberately none"
  * and "not supplied yet" are different states and only one may pass stage 0.
  */
-export const characterBases = ["description", "photographs"] as const;
+const characterBases = ["description", "photographs"] as const;
 
 const audioSchema = z.enum(audioModes);
 const sourceNatureSchema = z.enum(sourceNatures);

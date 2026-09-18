@@ -12,7 +12,13 @@ import { newRunId, nowIso } from "./store.js";
  * Nothing here calls a paid API or knows what any particular stage produces.
  */
 
-export { approveAll, isApproved, verifyOutputs, withOutputs } from "./review.js";
+export {
+  approveAll,
+  approveArtifacts,
+  isApproved,
+  verifyOutputs,
+  withOutputs,
+} from "./review.js";
 export { type RecordedFile, type StageFile, sha256Schema, stageFileSchema } from "./schema.js";
 export {
   applyWrites,
@@ -30,6 +36,7 @@ export {
   type WriteMode,
   type WriteOp,
   writeNew,
+  writeNewBytes,
 } from "./store.js";
 
 import type { ArtifactRecord, Producer, RecordedFile, StageFile, StageName } from "./schema.js";

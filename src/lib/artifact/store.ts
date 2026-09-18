@@ -17,6 +17,8 @@ import { err, ok, type Result } from "../result.js";
 export type WriteMode = "apply" | "dry-run";
 
 export type WriteOp =
+  /** An image a stage produced. Stage 2 is the first to write anything binary. */
+  | { readonly bytes: Buffer; readonly kind: "bytes"; readonly to: string }
   | { readonly from: string; readonly kind: "copy"; readonly to: string }
   | { readonly kind: "directory"; readonly to: string }
   | { readonly kind: "text"; readonly text: string; readonly to: string };
@@ -199,6 +201,9 @@ async function runOp(op: WriteOp): Promise<Result<true>> {
     } else if (op.kind === "text") {
       await mkdir(dirOf(op.to), { recursive: true });
       await writeFile(op.to, op.text, "utf8");
+    } else if (op.kind === "bytes") {
+      await mkdir(dirOf(op.to), { recursive: true });
+      await writeFile(op.to, op.bytes);
     } else {
       await mkdir(dirOf(op.to), { recursive: true });
       await copyFile(op.from, op.to);
@@ -226,6 +231,20 @@ export async function writeNew(path: string, text: string): Promise<Result<true>
   try {
     await mkdir(dirOf(path), { recursive: true });
     await writeFile(path, text, { encoding: "utf8", flag: "wx" });
+    return ok(true);
+  } catch (cause) {
+    return err(new FileError(path, `nie można zapisać ${path}`, { cause }));
+  }
+}
+
+/**
+ * `writeNew` for an image. The archive keeps exactly what the provider
+ * returned, so it must not be re-encoded on the way in.
+ */
+export async function writeNewBytes(path: string, bytes: Buffer): Promise<Result<true>> {
+  try {
+    await mkdir(dirOf(path), { recursive: true });
+    await writeFile(path, bytes, { flag: "wx" });
     return ok(true);
   } catch (cause) {
     return err(new FileError(path, `nie można zapisać ${path}`, { cause }));

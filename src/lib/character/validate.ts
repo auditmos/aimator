@@ -35,11 +35,11 @@ export interface ImageVerdict {
   readonly width: number;
 }
 
-export type ImagePayload =
+type ImagePayload =
   | { readonly bytes: Buffer; readonly kind: "bytes" }
   | { readonly kind: "url"; readonly url: string };
 
-export interface ImageAnswer {
+interface ImageAnswer {
   readonly jobId: string | null;
   readonly payload: ImagePayload;
 }

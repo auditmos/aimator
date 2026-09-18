@@ -59,19 +59,40 @@ export function isApproved(stage: StageFile): boolean {
 
 /** Approves every artifact in the file, binding the decision to this moment. */
 export function approveAll(stage: StageFile, approval: Approval): StageFile {
-  const reviewedAt = nowIso();
-  const artifacts: StageFile["artifacts"] = {};
+  return approveArtifacts(stage, Object.keys(stage.artifacts), approval);
+}
 
-  for (const [key, artifact] of Object.entries(stage.artifacts)) {
-    artifacts[key] = {
-      ...artifact,
-      review: {
-        note: approval.note,
-        reviewedAt,
-        reviewer: approval.reviewer,
-        status: "approved",
-      },
-    };
+/**
+ * Approves the named artifacts and leaves the rest alone.
+ *
+ * Stage 2 accepts its ten results one at a time, because they are ten separate
+ * creative judgements and because the next step's gate reads them separately: a
+ * view may not start until the card has been accepted, and an approval that
+ * spilled onto every key in the file would open that gate without anyone having
+ * looked. A key that is not in the file is skipped rather than invented.
+ */
+export function approveArtifacts(
+  stage: StageFile,
+  keys: readonly string[],
+  approval: Approval
+): StageFile {
+  const reviewedAt = nowIso();
+  const artifacts = { ...stage.artifacts };
+
+  for (const key of keys) {
+    const artifact = artifacts[key];
+
+    if (artifact !== undefined) {
+      artifacts[key] = {
+        ...artifact,
+        review: {
+          note: approval.note,
+          reviewedAt,
+          reviewer: approval.reviewer,
+          status: "approved",
+        },
+      };
+    }
   }
 
   return { ...stage, artifacts };

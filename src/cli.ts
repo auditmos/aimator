@@ -1,5 +1,15 @@
 import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
+import {
+  approveCharacter,
+  CHARACTER_ARTIFACTS,
+  type CharacterArtifact,
+  type CharacterReport,
+  type CharacterStatus,
+  checkCharacter,
+  generateCharacter,
+  isCharacterArtifact,
+} from "./lib/character/index.js";
 import { env } from "./lib/env.js";
 import {
   addCharacter,
@@ -20,7 +30,7 @@ import {
   type ScreenplayReport,
   type ScreenplayStatus,
 } from "./lib/screenplay/index.js";
-import { resolveWorkspace, type Workspace } from "./lib/workspace.js";
+import { type ImageTrack, imageTracks, resolveWorkspace, type Workspace } from "./lib/workspace.js";
 
 const USAGE = `Usage: aimator <command>
 
@@ -33,18 +43,30 @@ Etap 0 — przygotowanie projektu i odcinka:
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
   episode set <id> <episode-id> [te same flagi decyzji]
 
-Etap 1 — scenariusz (jedyne polecenie, które wydaje pieniądze):
+Etap 1 — scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                                         [--dry-run] [--regenerate]
 
+Etap 2 — postać (płatny; niezależny od etapu 1, może biec równolegle):
+  character generate <id> <character-id> --track <gpt-image|seedream>
+                     [--artifact card|hero|<widok>,...] [--model <id>]
+                     [--dry-run] [--regenerate]
+
 Wspólne:
   check <id> [<episode-id>]
+  check <id> <character-id> --stage character --track <tor>
   approve <id> [<episode-id>] [--stage prepare|screenplay]
                [--note <uzasadnienie>] [--reviewer <kto>]
+  approve <id> <character-id> --stage character --track <tor>
+               --artifact <klucz>[,<klucz>...]
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
+  --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
+  --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,
+               three-quarter-left, three-quarter-right, profile-left,
+               profile-right, rear
 
 Obsada jest jawną decyzją: wymień każdą powracającą postać przez "character new".
 Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę —
@@ -55,8 +77,9 @@ Globalne:
   --dry-run              pokaż, co powstanie, nie zapisuj niczego
   --help                 ten komunikat
 
-Etap 1 odmawia płatnego wywołania, dopóki etap 0 tego projektu i odcinka nie ma
-review.status = "approved". Nic nie ponawia się samo; nową płatną próbę zaczyna
+Etapy 1 i 2 odmawiają płatnego wywołania, dopóki etap 0 nie ma review.status =
+"approved". W etapie 2 osiem widoków czeka na zatwierdzoną kartę, a hero na
+zatwierdzone widoki. Nic nie ponawia się samo; nową płatną próbę zaczyna
 wyłącznie --regenerate, zachowując poprzedni wynik.`;
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 12_000;
@@ -383,13 +406,19 @@ async function runCharacterDescribe(parsed: Parsed): Promise<Result<string>> {
 const CHARACTER_OPTIONS = {
   add: { source: { multiple: true, type: "string" } },
   describe: {},
+  generate: {
+    artifact: { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+    track: { type: "string" },
+  },
   new: { name: { type: "string" } },
 } as const satisfies Record<string, ParseArgsConfig["options"]>;
 
 async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
   const [action] = argv;
 
-  if (action !== "add" && action !== "describe" && action !== "new") {
+  if (action !== "add" && action !== "describe" && action !== "new" && action !== "generate") {
     return err(new UsageError(`nieznane polecenie: character ${action ?? ""}`.trim()));
   }
 
@@ -403,9 +432,209 @@ async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
     return await runCharacterNew(parsed.data);
   }
 
+  if (action === "generate") {
+    return await runCharacterGenerate(parsed.data);
+  }
+
   return action === "add"
     ? await runCharacterAdd(parsed.data)
     : await runCharacterDescribe(parsed.data);
+}
+
+const TRACKS = new Set<string>(imageTracks);
+
+/** The track is never guessed: the two cost money separately. */
+function trackOf(parsed: Parsed): Result<ImageTrack> {
+  const flag = parsed.values.track;
+
+  return typeof flag === "string" && TRACKS.has(flag)
+    ? ok(flag as ImageTrack)
+    : err(new UsageError(`--track — dozwolone: ${imageTracks.join(", ")}`));
+}
+
+/** `--artifact` accepts the same words the stage file uses as keys. */
+function artifactsOf(parsed: Parsed): Result<readonly CharacterArtifact[]> {
+  const flag = parsed.values.artifact;
+
+  if (typeof flag !== "string") {
+    return ok([]);
+  }
+
+  const names = flag.split(",").map((name) => name.trim());
+  const known = names.filter((name) => isCharacterArtifact(name));
+  const unknown = names.filter((name) => !isCharacterArtifact(name));
+
+  return unknown.length === 0
+    ? ok(known)
+    : err(
+        new UsageError(
+          `--artifact "${unknown.join(", ")}" — dozwolone: ${CHARACTER_ARTIFACTS.join(", ")}`
+        )
+      );
+}
+
+/** `--model` wins over the environment; neither has a default. */
+function imageModelOf(parsed: Parsed, track: ImageTrack): Result<string | null> {
+  const flag = parsed.values.model;
+  const fallback =
+    track === "gpt-image"
+      ? (env.AIMATOR_IMAGE_MODEL_GPT_IMAGE ?? null)
+      : (env.AIMATOR_IMAGE_MODEL_SEEDREAM ?? null);
+  const value = typeof flag === "string" ? flag : fallback;
+
+  if (value !== null && !MODEL_ID.test(value)) {
+    return err(new UsageError(`niepoprawny identyfikator modelu "${value}"`));
+  }
+
+  return ok(value);
+}
+
+async function runCharacterGenerate(parsed: Parsed): Promise<Result<string>> {
+  const scope = castScope(parsed);
+  const track = trackOf(parsed);
+  const artifacts = artifactsOf(parsed);
+
+  if (!scope.ok) {
+    return scope;
+  }
+  if (!track.ok) {
+    return track;
+  }
+  if (!artifacts.ok) {
+    return artifacts;
+  }
+
+  const model = imageModelOf(parsed, track.data);
+
+  if (!model.ok) {
+    return model;
+  }
+
+  const mode = modeOf(parsed);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generateCharacter({
+    apiKey: mode === "dry-run" ? null : (keyFor(track.data) ?? null),
+    artifacts: artifacts.data,
+    characterId: scope.data.characterId,
+    fetch,
+    mode,
+    model: model.data,
+    projectId: scope.data.projectId,
+    regenerate: parsed.values.regenerate === true,
+    track: track.data,
+    workspace: scope.data.workspace,
+  });
+
+  return result.ok ? ok(renderCharacter(result.data, scope.data, mode)) : result;
+}
+
+function keyFor(track: ImageTrack): string | undefined {
+  return track === "gpt-image" ? env.OPENAI_API_KEY : env.BYTEPLUS_MODELARK;
+}
+
+/**
+ * `--dry-run` prints every prompt in full, not a byte count. On a stage that
+ * spends money ten times over, the point of a preview is to let a person read
+ * what would be sent.
+ */
+function renderCharacter(
+  report: CharacterReport,
+  scope: { characterId: string; projectId: string },
+  mode: "apply" | "dry-run"
+): string {
+  const headline = `Postać "${report.name}" (${scope.characterId}), tor ${report.track}`;
+  const lines = [
+    mode === "dry-run"
+      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      : headline,
+  ];
+
+  for (const outcome of report.artifacts) {
+    lines.push(`  ${outcome.artifact}: ${outcome.state} — ${outcome.note}`);
+
+    for (const reference of outcome.references) {
+      lines.push(`      ← ${reference.path}  ${reference.sha256.slice(0, 12)}`);
+    }
+  }
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (report.created.length > 0) {
+    lines.push("  ! obrazy przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  for (const outcome of report.artifacts) {
+    if (outcome.prompt !== null) {
+      lines.push(
+        "",
+        `--- prompt dla ${outcome.artifact} (dokładnie ten tekst) ---`,
+        outcome.prompt
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function renderCharacterStatus(headline: string, status: CharacterStatus): string {
+  const lines = [headline];
+
+  for (const entry of status.artifacts) {
+    const mark = entry.approved ? "zatwierdzony" : entry.state;
+    lines.push(`  ${entry.artifact}: ${mark} — ${entry.note}`);
+  }
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${status.nextStep}`);
+
+  return lines.join("\n");
+}
+
+/**
+ * `check --stage character` reports one character on one track. It writes
+ * nothing, like every other check: drift is reported, never recorded.
+ */
+async function checkCharacterStage(
+  parsed: Parsed,
+  projectId: string,
+  workspace: Workspace
+): Promise<Result<string>> {
+  const characterId = requirePositional(parsed, 1, "character-id");
+  const track = trackOf(parsed);
+
+  if (!characterId.ok) {
+    return characterId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const result = await checkCharacter({
+    characterId: characterId.data,
+    projectId,
+    track: track.data,
+    workspace,
+  });
+
+  return result.ok
+    ? ok(
+        renderCharacterStatus(
+          `Postać "${result.data.name}" (${characterId.data}), tor ${track.data} — etap 2${result.data.approved ? ", zatwierdzony w całości" : ""}`,
+          result.data
+        )
+      )
+    : result;
 }
 
 async function runApprove(argv: readonly string[]): Promise<Result<string>> {
@@ -447,8 +676,42 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
       : result;
   }
 
+  if (stage === "character") {
+    const characterId = requirePositional(parsed.data, 1, "character-id");
+    const track = trackOf(parsed.data);
+    const artifacts = artifactsOf(parsed.data);
+
+    if (!characterId.ok) {
+      return characterId;
+    }
+    if (!track.ok) {
+      return track;
+    }
+    if (!artifacts.ok) {
+      return artifacts;
+    }
+
+    const result = await approveCharacter({
+      ...approval,
+      artifacts: artifacts.data,
+      characterId: characterId.data,
+      track: track.data,
+    });
+
+    return result.ok
+      ? ok(
+          renderCharacterStatus(
+            `Postać "${characterId.data}" na torze ${track.data} — zatwierdzono: ${artifacts.data.join(", ")}`,
+            result.data
+          )
+        )
+      : result;
+  }
+
   if (stage !== "screenplay") {
-    return err(new UsageError(`--stage "${String(stage)}" — dozwolone: prepare, screenplay`));
+    return err(
+      new UsageError(`--stage "${String(stage)}" — dozwolone: prepare, screenplay, character`)
+    );
   }
 
   const episodeId = requirePositional(parsed.data, 1, "episode-id");
@@ -630,7 +893,7 @@ async function runEpisode(argv: readonly string[]): Promise<Result<string>> {
 }
 
 async function runCheck(argv: readonly string[]): Promise<Result<string>> {
-  const parsed = parse(argv, {});
+  const parsed = parse(argv, { stage: { type: "string" }, track: { type: "string" } });
 
   if (!parsed.ok) {
     return parsed;
@@ -644,6 +907,10 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
   }
   if (!workspace.ok) {
     return workspace;
+  }
+
+  if (parsed.data.values.stage === "character") {
+    return await checkCharacterStage(parsed.data, projectId.data, workspace.data);
   }
 
   const result = await checkStage0({ projectId: projectId.data, workspace: workspace.data });

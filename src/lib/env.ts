@@ -19,6 +19,13 @@ export const env = createEnv({
   runtimeEnv: process.env,
   server: {
     /**
+     * One image model per track, because the two tracks are drawn side by side
+     * and a single shared variable would make running both from one shell a
+     * matter of editing a file between commands.
+     */
+    AIMATOR_IMAGE_MODEL_GPT_IMAGE: z.string().min(1).optional(),
+    AIMATOR_IMAGE_MODEL_SEEDREAM: z.string().min(1).optional(),
+    /**
      * The text model stage 1 sends the screenplay prompt to. Optional because
      * `--dry-run` has to work without it — and because a default here would be
      * a model choice nobody made, on a command that spends money.
@@ -28,6 +35,12 @@ export const env = createEnv({
     // condition that `run()` reports as a Result. Marking it required would
     // throw here, at import time, before the CLI could explain itself.
     AIMATOR_WORKSPACE: z.string().min(1).optional(),
+    /**
+     * The seedream track's key. Image generation on BytePlus is a plain bearer
+     * token; the AccessKey/Secret signature belongs to their asset-library API,
+     * which stage 2 does not call.
+     */
+    BYTEPLUS_MODELARK: z.string().min(1).optional(),
     /** Read only on the paid path; `--dry-run` never asks for it. */
     OPENAI_API_KEY: z.string().min(1).optional(),
   },
