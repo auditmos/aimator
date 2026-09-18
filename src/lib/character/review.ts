@@ -18,7 +18,7 @@ import {
   type Workspace,
 } from "../workspace.js";
 import { sizeOf } from "./client.js";
-import { accepted, nextGroup, outputPath, readStage, sequenceGate } from "./generate.js";
+import { accepted, nextGroup, outputPath, readStage, sequenceGate } from "./plan.js";
 import { CHARACTER_ARTIFACTS, type CharacterArtifact } from "./prompt.js";
 import { type ImageVerdict, validateImage } from "./validate.js";
 
