@@ -20,6 +20,14 @@ import {
 import { readStage0Inputs, type Stage0Inputs } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
+  buildRequest,
+  callModel,
+  ENDPOINT,
+  httpFailure,
+  readOutputText,
+  refusedWithoutCharge,
+} from "../text-model.js";
+import {
   type EpisodePaths,
   episodePaths,
   projectPaths,
@@ -27,14 +35,6 @@ import {
   runPaths,
   type Workspace,
 } from "../workspace.js";
-import {
-  buildRequest,
-  callModel,
-  ENDPOINT,
-  httpFailure,
-  readScreenplay,
-  refusedWithoutCharge,
-} from "./client.js";
 import { buildPrompt, PROMPT_VERSION } from "./prompt.js";
 import { minimumScenes, type ScreenplayVerdict, validateScreenplay } from "./validate.js";
 
@@ -421,7 +421,7 @@ async function publish(
     readonly settings: Stage0Inputs["settings"];
   }
 ): Promise<Result<ScreenplayReport>> {
-  const parsed = readScreenplay(data.body);
+  const parsed = readOutputText(data.body, "scenariusz");
 
   if (!parsed.ok) {
     return parsed;

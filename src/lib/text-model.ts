@@ -1,17 +1,25 @@
-import { err, ok, type Result } from "../result.js";
+import { err, ok, type Result } from "./result.js";
 
 /**
- * Internal to the screenplay module: the paid call and nothing else.
+ * The paid text call, and nothing else.
+ *
+ * Promoted out of `lib/screenplay` when the shot list became the second stage
+ * to make it: the transport, the redaction, the single-attempt rule and the
+ * refusal classification are identical for every text stage, and a second copy
+ * is a place for them to diverge. The same reason `lib/artifact` exists.
  *
  * `fetch` is injected so every rule around the call — no retry, the key never
- * reaching disk, a refusal being an error rather than an empty screenplay —
- * is testable without spending anything.
+ * reaching disk, a refusal being an error rather than an empty document — is
+ * testable without spending anything.
  *
  * `store: false` is deliberate and has a consequence worth stating: the
  * provider keeps nothing, so a response that never reached disk cannot be
  * fetched again by id. An interrupted attempt is therefore a dead end that
  * only `--regenerate` reopens, and the tool says so rather than silently
  * paying twice.
+ *
+ * Nothing here knows which stage is calling, what a valid result looks like,
+ * or where anything is written.
  */
 
 export const ENDPOINT = "https://api.openai.com/v1/responses";
@@ -164,8 +172,16 @@ export function refusedWithoutCharge(httpStatus: number): boolean {
   return httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
 }
 
-/** Pulls the screenplay out of a Responses payload, or says why there is none. */
-export function readScreenplay(body: string): Result<{ jobId: string | null; text: string }> {
+/**
+ * Pulls the document out of a Responses payload, or says why there is none.
+ *
+ * `what` names the thing in the error message — the caller knows whether it
+ * asked for a screenplay or a shot list, and this module does not.
+ */
+export function readOutputText(
+  body: string,
+  what: string
+): Result<{ jobId: string | null; text: string }> {
   let parsed: ModelResponse;
 
   try {
@@ -178,7 +194,7 @@ export function readScreenplay(body: string): Result<{ jobId: string | null; tex
     return err(
       new ModelOutputError(
         "incomplete",
-        `odpowiedź API ma status "${parsed.status ?? "brak"}" zamiast "completed" — zachowano ją do sprawdzenia, nie publikuję scenariusza`
+        `odpowiedź API ma status "${parsed.status ?? "brak"}" zamiast "completed" — zachowano ją do sprawdzenia, nie publikuję wyniku (${what})`
       )
     );
   }
@@ -195,7 +211,7 @@ export function readScreenplay(body: string): Result<{ jobId: string | null; tex
     return err(
       new ModelOutputError(
         "refusal",
-        "model odmówił napisania scenariusza — odpowiedź zachowana w archiwum próby"
+        `model odmówił wykonania zadania (${what}) — odpowiedź zachowana w archiwum próby`
       )
     );
   }
