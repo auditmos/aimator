@@ -12,12 +12,13 @@ Artefakty leżą poza repozytorium, w katalogu z `AIMATOR_WORKSPACE`.
 ```
 $AIMATOR_WORKSPACE/
 └── projects/<project-id>/
-    ├── project.json                  identyfikator, tytuł, proporcje, podstawa postaci
+    ├── project.json                  identyfikator, tytuł, proporcje, obsada
     ├── project.md                    zasady wspólne — jedyny plik pisany ręcznie
     ├── prepare.stage.json
-    ├── character/
+    ├── characters/<character-id>/
     │   ├── sources/                  zdjęcia użytkownika (etap 0)
-    │   ├── gpt-image/                card.png, views/, hero.png, character.stage.json
+    │   ├── gpt-image/                card.png, views/, hero.png,
+    │   │                             character.stage.json, character.lock, runs/
     │   └── seedream/                 to samo, niezależnie
     └── episodes/<episode-id>/
         ├── source.md                 kopia bajtowa źródła (etap 0)
@@ -33,18 +34,21 @@ $AIMATOR_WORKSPACE/
         └── seedream/                 ┘ edit-plan.json, episode.mp4, runs/
 ```
 
-Trzy reguły, które ten układ egzekwuje:
+Cztery reguły, które ten układ egzekwuje:
 
 1. **Tor modelu to poziom katalogu, nigdy prefiks nazwy.** Nie ma `byteplus-images/`
    obok `references/`; jest `gpt-image/references/` i `seedream/references/`. Izolacja
    torów jest darmowa, więc nie trzeba nigdy doklejać równoległego drzewa.
-2. **Etapy tekstowe są wspólne, obrazowe i wideo — per tor.** Scenariusz, lista ujęć
+2. **Postać też jest poziomem katalogu** — z tego samego powodu. `characters/ewa/`
+   i `characters/tata/` nie wiedzą o sobie nawzajem, a każda postać ma własne `sources/`,
+   własną podstawę i własny plik etapu na każdym torze.
+3. **Etapy tekstowe są wspólne, obrazowe i wideo — per tor.** Scenariusz, lista ujęć
    i pakiet promptów opisują historię, nie obrazy. Rozejście zaczyna się przy pierwszym
    obrazie i kończy dwiema niezależnymi animacjami z tej samej historii.
-3. **Ścieżki zna wyłącznie `src/lib/workspace.ts`.** Żaden inny moduł nie składa ścieżek.
+4. **Ścieżki zna wyłącznie `src/lib/workspace.ts`.** Żaden inny moduł nie składa ścieżek.
 
 Katalog powstaje dopiero wtedy, gdy jakiś etap do niego pisze — dotyczy to zarówno torów
-modelowych, jak i `character/sources/` czy `episodes/`. Pusty katalog jest obietnicą,
+modelowych, jak i `characters/<id>/sources/` czy `episodes/`. Pusty katalog jest obietnicą,
 której narzędzie nie dotrzymuje.
 
 **Zasady projektu są wejściem każdego etapu.** `project.json` i `project.md` leżą poza
@@ -150,16 +154,19 @@ Obowiązują we wszystkich etapach.
 |---|---|---|---|---|
 | 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci | `project.md`, `project.json`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
 | 1 scenariusz | `project.json`, `project.md`, `source.md`, `episode.json` | `screenplay.md`, `screenplay.stage.json`, `runs/<runId>/` | zatwierdzony etap 0 przed wywołaniem; potem `aimator check`, `aimator approve … --stage screenplay` | **zaimplementowany** |
-| 2 postać | `characterBasis`: `character/sources/` albo opis wyglądu z `project.md` | `card.png` → 8 widoków → `hero.png`, per tor | ocena każdego obrazu | niezaimplementowany |
+| 2 postać | `project.json`, `project.md` i — przy podstawie `photographs` — `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 3 lista ujęć | `screenplay.md` | `shot-list.md` | ocena użytkownika | niezaimplementowany |
-| 4 pakiet promptów | `shot-list.md`, zatwierdzony `hero.png` | `prompt-package.json`, `prompts/**` | ocena pakietu | niezaimplementowany |
+| 4 pakiet promptów | `shot-list.md`, zatwierdzony `hero.png` **każdej postaci obsady** | `prompt-package.json`, `prompts/**` | ocena pakietu | niezaimplementowany |
 | 5 obrazy referencyjne | pakiet, zatwierdzone zależności `dependsOn` | `<tor>/references/Rxx.png` | ocena każdego obrazu | niezaimplementowany |
 | 6 pierwsza klatka | pakiet, zatwierdzone referencje otwarcia | `<tor>/opening-frame.png` | ocena kadru | niezaimplementowany |
 | 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 2–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
+Etapy 3–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
 żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
+
+Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
+Jedyne, co je wiąże, to wspólna bramka etapu 0.
 
 ## Etap 0 — szczegóły
 
@@ -177,13 +184,31 @@ Dwie decyzje projektu — obie jawne, obie bez wartości domyślnej:
 | Pole | Wartość |
 |---|---|
 | `aspectRatio` | np. `16:9`; po powstaniu obrazów nie da się zmienić bez ich unieważnienia |
-| `characterBasis` | `photographs` albo `description` — skąd etap postaci bierze wygląd |
+| `characters` | obsada: każda powracająca postać z własnym identyfikatorem, nazwą i podstawą |
 
-`characterBasis` istnieje, bo pusty `character/sources/` nie odróżnia „świadomie bez zdjęć"
-od „jeszcze nie dodane". Przy `photographs` bramka blokuje, dopóki nie ma ani jednego
-zdjęcia. Przy `description` jedynym wejściem etapu postaci jest opis wyglądu w `project.md`
-— i wtedy to on musi być konkretny, bo nic dalej go nie uzupełni. Dodanie zdjęcia przez
-`character add` samo w sobie jest deklaracją i przestawia pole na `photographs`.
+**Obsada jest decyzją, nie wnioskiem.** Pusta obsada znaczy „nikt nie powiedział, kto
+występuje w tej serii", i bramka blokuje. Nie ma tu wartości domyślnej, bo projekt bez
+zadeklarowanej postaci znaczył kiedyś „dokładnie jedna, bezimienna" — i właśnie ten cichy
+domysł sprawiał, że seria opisująca dwie osoby produkowała jedną, a którą, rozstrzygał
+model. Kryterium jest powracalność: postać, której tożsamość musi przetrwać między
+odcinkami, należy do obsady; twarz widziana raz to referencja etapu 5.
+
+Nazwa postaci nie jest ozdobą — to ona trafia do promptu etapu 2 i to jej model szuka
+w zasadach projektu.
+
+Każda postać ma **własną podstawę**, więc projekt może budować jedną z fotografii, a resztę
+z zapisanych zasad. Podstawa istnieje, bo puste `characters/<id>/sources/` nie odróżnia
+„świadomie bez zdjęć" od „jeszcze nie dodane". Przy `photographs` bramka blokuje, dopóki
+nie ma ani jednego zdjęcia tej postaci. Przy `description` jedynym wejściem etapu postaci
+jest opis wyglądu w `project.md` — i wtedy to on musi być konkretny, bo nic dalej go nie
+uzupełni. Dodanie zdjęcia przez `character add` samo w sobie jest deklaracją i przestawia
+podstawę tej postaci na `photographs`.
+
+Plik `project.json` sprzed obsady czyta się jako **pustą obsadę**, nie jako jedną bezimienną
+postać: zapisana w nim podstawa opisywała kogoś, kogo nikt nie nazwał, więc przeniesienie
+jej na pierwszą zadeklarowaną osobę byłoby wymyśleniem odpowiedzi. Plik, który trzyma już
+zdjęcia, jest odrzucany wprost — te bajty należą do konkretnego człowieka, a narzędzie nie
+wie, do którego.
 
 Pięć decyzji odcinka — wszystkie jawne, żadna z domyślną wartością:
 
@@ -198,8 +223,9 @@ Pięć decyzji odcinka — wszystkie jawne, żadna z domyślną wartością:
 Świeży `episode.json` ma wszystkie pięć jako `null` i jest celowo niegotowy do generacji.
 Gotowość jest **wyliczana**, nie deklarowana: nie ma pola `status`, które plik mógłby
 podać niezgodnie z prawdą. `check` przepuszcza, gdy `project.md` nie zawiera już żadnego
-`TODO(etap-0)`, obie decyzje projektu są ustalone, hashe wyników — projektu i odcinków —
-zgadzają się, i żadne z pięciu pól nie jest `null`.
+`TODO(etap-0)`, proporcje są ustalone, obsada jest niepusta i każda postać ma ustaloną
+podstawę wraz z materiałem, którego ta podstawa wymaga, hashe wyników — projektu i odcinków
+— zgadzają się, i żadne z pięciu pól nie jest `null`.
 
 `check` niczego nie zapisuje i niczego nie przyjmuje. Etap 0 kończy `aimator approve
 <project-id>`, które powtarza całą weryfikację, dopisuje hash `project.md` i ustawia
@@ -251,3 +277,86 @@ limicie sceny poprawna suma nie da się osiągnąć mniejszą liczbą scen.
 nie zmieniło się od czasu generacji. `aimator check <project-id> <episode-id>` sprawdza to
 samo i nie zapisuje niczego — rozjazd wejść raportuje, `needsReview` wpisze dopiero etap
 zależny w chwili uruchomienia.
+
+## Etap 2 — szczegóły
+
+Pierwszy etap obrazowy i pierwszy, który rozgałęzia się na dwa tory modelowe. Konsumuje
+wyłącznie artefakty etapu 0 — proporcje i obsadę z `project.json`, zasady z `project.md`,
+a przy podstawie `photographs` zdjęcia z `characters/<id>/sources/` — i zapisuje hash
+każdego z nich w chwili, gdy je czyta. **Nie zależy od etapu 1** i może biec równolegle.
+
+Jedno polecenie, `character generate <project-id> <character-id> --track <tor>`, produkuje
+w tej kolejności `card.png`, osiem widoków i `hero.png`. Nie ma osobnych poleceń per tor
+ani per widok: tor jest poziomem katalogu, a osiem widoków to osiem rekordów w jednym
+pliku etapu.
+
+**Trzy bramki, jedna za drugą.** Płatne wywołanie odmawia, dopóki `prepare.stage.json`
+projektu nie ma `review.status = "approved"` i hashe jego wyników się zgadzają. Osiem
+widoków odmawia, dopóki `card.png` nie jest **zatwierdzona** — nie „poprawna", tylko
+przyjęta przez człowieka. `hero.png` odmawia, dopóki nie są zatwierdzone wszystkie osiem.
+Walidacja nie otwiera żadnej z tych bramek. `--dry-run` ich nie omija: raportuje je jako
+przeszkody, ale i tak pokazuje każdy prompt w całości.
+
+**Bez flag polecenie robi następny krok i przestaje.** Bramki sprawiają, że wykonalny jest
+zawsze dokładnie jeden etap sekwencji, więc `character generate` nie próbuje wydać budżetu
+całego etapu za jednym razem. `--artifact card|hero|<widok>[,...]` zawęża przebieg, a
+`--regenerate` **wymaga** jawnego `--artifact`: nowa opłata ma adresata.
+
+**Skąd bierze się model.** `--model <id>`, a bez tej flagi `AIMATOR_IMAGE_MODEL_GPT_IMAGE`
+albo `AIMATOR_IMAGE_MODEL_SEEDREAM`. Jedna zmienna na tor, żeby oba dało się puścić z jednej
+powłoki; wartości domyślnej nie ma i nie będzie. Endpoint nie jest decyzją użytkownika, więc
+jest stałą toru — przy czym gpt-image rozgałęzia go na `/v1/images/edits` i
+`/v1/images/generations`, bo postać rysowana z opisu nie ma czego edytować. Klucz czytany
+jest wyłącznie na ścieżce płatnej: `OPENAI_API_KEY` albo `BYTEPLUS_MODELARK`. Generowanie
+obrazów na BytePlus idzie zwykłym tokenem — podpis `AccessKey`/`Secret` obsługuje ich
+bibliotekę materiałów, do której ten etap nie sięga.
+
+**Prompty są stałymi w `src/lib/character/prompt.ts`, z jawną wersją.** Niosą rzemiosło:
+kartę o dziewięciu komórkach w siatce 3 × 3, dyscyplinę obrotówki, kryteria spójności między
+widokami, reguły alfy i wyprowadzenie hero z zatwierdzonej karty oraz ośmiu zatwierdzonych
+widoków. **Nie niosą kierunku artystycznego.** Medium, stylizacja, proporcje, paleta i strój
+pochodzą z `project.md`, a prompt mówi o tym wprost — inaczej seria płaska 2D odziedziczyłaby
+fotorealizm po produkcji, dla której te prompty pierwotnie powstały.
+
+**Rozróżnienie podstawy.** Przy `photographs` obraz 1 jest głównym źródłem tożsamości,
+kolejne zdjęcia to materiał pomocniczy na inne kąty, a przy sprzeczności wygrywa obraz 1.
+Przy `description` nie ma żadnej referencji: prompt mówi modelowi, że opis w zasadach jest
+jedynym wejściem, jakie ten etap dostanie, i że decyzje podjęte na karcie obowiązują
+wszystkie późniejsze obrazy.
+
+**Plan referencji.** Karta: wszystkie zdjęcia albo nic. Widok: zdjęcie główne, karta,
+pozostałe zdjęcia. Hero: zdjęcie główne, karta, osiem widoków, pozostałe zdjęcia — przy czym
+tor seedream przyjmuje najwyżej dziesięć referencji, więc jego hero kończy się na widokach.
+To jest **zapisany krótszy plan**, nie ciche obcięcie dłuższego. Przekroczenie limitu przez
+samą liczbę zdjęć jest odmową: użytkownik, który dostarczył dwanaście fotografii, nie prosił
+narzędzia o wybranie dziesięciu.
+
+**Archiwum próby.** `characters/<id>/<tor>/runs/<runId>/` trzyma `prompt.md`, `request.json`,
+`response.json`, `transport.json`, `run.json`, `validation.json` i — na torze seedream —
+`original.png`, czyli dokładnie to, co dostawca zwrócił. `request.json` niesie prompt
+i ustawienia, ale **nigdy bajtów referencji**: te są wejściami, identyfikowanymi ścieżką
+i sha256. Hero na torze seedream wiózłby inaczej dziesięć PNG-ów w base64 na każdą próbę.
+Poprzedni wynik trafia do `previous.png` wyłącznie przy `--regenerate`.
+
+**Wznowienie bez drugiej opłaty.** Rekord `submitted` bez zapisanej odpowiedzi to ślepy
+zaułek, który otwiera tylko `--regenerate`. Ale odpowiedź, która zdążyła trafić na dysk,
+jest już opłacona: gpt-image niesie bajty w treści odpowiedzi, seedream adres ważny 24 h.
+W obu wypadkach powtórzenie tego samego polecenia dokańcza próbę bez wysyłania czegokolwiek.
+Nic nie ponawia się samo.
+
+**Walidacja obrazu jest czysta i offline.** Sprawdza sygnaturę PNG, kompletność bloków
+i zgodność wymiarów z żądaniem — obraz w złym rozmiarze nie jest publikowany ani skalowany.
+Kanał alfa jest **raportowany, nie egzekwowany**: seedream nie ma przełącznika tła, więc
+przezroczystość widoku jest proszona wyłącznie w promptcie, a jej brak to uwaga dla
+oceniającego, nie powód do wyrzucenia obrazu, za który już zapłacono.
+
+**Akceptacja dotyczy jednego obrazu naraz.** `aimator approve <project-id> <character-id>
+--stage character --track <tor> --artifact <klucz>[,...]` odmawia bez jawnego wskazania, co
+jest przyjmowane: przyjęcie karty uruchamia osiem płatnych wywołań, więc musi być czymś,
+co ktoś napisał, a nie skutkiem ubocznym przyjęcia czegoś innego. `aimator check
+<project-id> <character-id> --stage character --track <tor>` sprawdza to samo i nie zapisuje
+niczego.
+
+Ramki są stałymi toru, nie decyzją: karta 1920×1920, widok 1536×1536, hero 1536×2304.
+Żadna z nich nie jest `aspectRatio` projektu — ten rządzi kadrem filmu od etapu 5, a karta
+postaci w 16:9 zmarnowałaby większość siebie.

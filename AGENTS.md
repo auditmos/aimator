@@ -12,9 +12,10 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 and 1 are implemented. Stages 2–8 are a declared contract, not working code.
+Stages 0, 1 and 2 are implemented. Stages 3–8 are a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
-approved for that project and episode.
+approved for that project and episode. Stage 2 is the first image stage and the first to
+branch into two model tracks; it does not depend on stage 1 and may run alongside it.
 
 ## Project Structure
 
@@ -38,8 +39,9 @@ src/
     │   └── review.ts     # Internal — digest verification and creative approval
     ├── project/      # Folder form — index.ts is the only entry (stage 0)
     │   ├── index.ts      # Public: initProject, addEpisode, setEpisodeSettings,
-    │   │                 #         addCharacterSources, setCharacterBasis,
-    │   │                 #         checkStage0, approveStage0, readStage0Inputs
+    │   │                 #         addCharacter, addCharacterSources, setCharacterBasis,
+    │   │                 #         checkStage0, approveStage0,
+    │   │                 #         readStage0Inputs, readStage0Character
     │   ├── schema.ts     # Internal — Zod schemas for the artifacts
     │   ├── template.ts   # Internal — the project.md scaffold
     │   └── index.test.ts # Tests through the entry
@@ -53,11 +55,23 @@ src/
     │   ├── generate.ts   # Internal — order of operations around the paid call
     │   ├── index.test.ts    # Validator and prompt, through the entry
     │   └── generate.test.ts # Generate/check/approve, through the entry
+    ├── character/    # Folder form — index.ts is the only entry (stage 2)
+    │   ├── index.ts      # Public: generateCharacter, checkCharacter,
+    │   │                 #         approveCharacter, validateImage,
+    │   │                 #         readImageResponse, buildPrompt, referencePlan
+    │   ├── prompt.ts     # Internal — the three prompts, the view order, the
+    │   │                 #            reference plan, and the declared version
+    │   ├── validate.ts   # Internal — the PNG and response verdicts, pure and offline
+    │   ├── client.ts     # Internal — both paid calls, fetch injected
+    │   ├── review.ts     # Internal — per-image verification and approval
+    │   ├── generate.ts   # Internal — gates, lock, and the order of operations
+    │   ├── index.test.ts    # Validator, response reader and prompts, through the entry
+    │   └── generate.test.ts # Gates/resume/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
 
-`lib/artifact` exists because two stages now write the same state file. A stage never
+`lib/artifact` exists because three stages now write the same state file. A stage never
 reaches into another stage's internals: shared pieces are promoted here instead.
 
 ## Pipeline rules
@@ -68,7 +82,8 @@ Full contract in [docs/pipeline.md](docs/pipeline.md).
 1. **One state filename: `<stage>.stage.json`.** One shape for every stage. Never invent
    `screenplay-state.json`, `references-state.json` or `downstream-status.json`.
 2. **The image-model track is a directory level** (`gpt-image/`, `seedream/`), never a
-   filename prefix and never a parallel tree.
+   filename prefix and never a parallel tree. **A character is a directory level too**
+   (`characters/ewa/`, `characters/tata/`), for the same reason.
 3. **Paths come from `src/lib/workspace.ts` only.** No other module joins path segments.
 4. **A run archive never copies an input.** Inputs are referenced by path + sha256.
 5. **No document in this repo records project state or progress.** State is a file read
@@ -190,6 +205,10 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   shell > `.env.local` > `.env`. Do not "fix" the order.
 - `AIMATOR_WORKSPACE` is optional in the schema on purpose: a missing workspace is a
   recoverable condition `run()` reports as a `Result`, not an exception at import time.
+- One model variable **per image track** (`AIMATOR_IMAGE_MODEL_GPT_IMAGE`,
+  `AIMATOR_IMAGE_MODEL_SEEDREAM`), because the two tracks are drawn side by side and a
+  single shared variable would make running both from one shell an edit between commands.
+  Neither has a default, for the same reason `AIMATOR_SCREENPLAY_MODEL` does not.
 
 ## Development Workflow
 
