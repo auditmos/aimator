@@ -17,6 +17,7 @@ export {
   approveArtifacts,
   isApproved,
   verifyOutputs,
+  withInputs,
   withOutputs,
 } from "./review.js";
 export { type RecordedFile, type StageFile, sha256Schema, stageFileSchema } from "./schema.js";

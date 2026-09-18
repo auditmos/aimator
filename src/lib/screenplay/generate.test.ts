@@ -473,6 +473,62 @@ describe("checkScreenplay and approveScreenplay", () => {
 
     expect(result.ok ? result.data.inputsChanged : []).toContain(`projects/${PROJECT}/project.md`);
   });
+
+  it("should revoke an approval when a stage-0 input changes", async () => {
+    await generate();
+    await approve();
+    await writeFile(
+      join(root, "projects", PROJECT, "project.md"),
+      "# Ewa\n\nInne zasady.\n",
+      "utf8"
+    );
+
+    const result = await checkScreenplay(scope());
+
+    expect(result.ok ? result.data.approved : null).toBe(false);
+  });
+
+  // Drift is a lapsed consent, not a broken screenplay: the draft still
+  // validates against the decisions on disk. Refusing here would leave the one
+  // command able to clear the drift forbidden by it, and the only way on would
+  // be a second paid screenplay.
+  it("should let a human re-approve over a changed input, re-recording it", async () => {
+    await generate();
+    await approve();
+    await writeFile(
+      join(root, "projects", PROJECT, "project.md"),
+      "# Ewa\n\nInne zasady.\n",
+      "utf8"
+    );
+
+    const again = await approve();
+
+    expect(again.ok ? again.data.approved : again.error.message).toBe(true);
+
+    const after = await checkScreenplay(scope());
+
+    expect(after.ok ? after.data.inputsChanged : null).toEqual([]);
+    expect(after.ok ? after.data.approved : null).toBe(true);
+  });
+
+  // The digest only ever caught the cosmetic half. A decision the screenplay
+  // actually answers fails the structural check first, and that still blocks.
+  it("should still refuse when a changed decision makes the draft wrong", async () => {
+    await generate();
+    await approve();
+    await setEpisodeSettings({
+      episodeId: EPISODE,
+      mode: "apply",
+      projectId: PROJECT,
+      settings: { durationSeconds: 45 },
+      workspace,
+    });
+
+    const again = await approve();
+
+    expect(again.ok).toBe(false);
+    expect(again.ok ? "" : again.error.message).toContain("nie przechodzi walidacji");
+  });
 });
 
 describe("resuming a submitted attempt", () => {

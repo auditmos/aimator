@@ -10,6 +10,7 @@ import {
   stageFileSchema,
   verifyOutputs,
   type WriteMode,
+  withInputs,
 } from "../artifact/index.js";
 import { readStage0Inputs } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
@@ -24,6 +25,14 @@ import { type ScreenplayVerdict, validateScreenplay } from "./validate.js";
  * belongs to the dependent stage, at the moment it runs. `approve` repeats the
  * whole verification and only then records a human's acceptance, bound to the
  * digest of the screenplay as it stands.
+ *
+ * Two kinds of wrong are kept apart here, because only one of them may stop an
+ * approval. A screenplay that fails its structure, or whose bytes no longer
+ * hash to what was recorded, is broken: `approve` refuses. A screenplay whose
+ * input has been edited since it was written is not broken — it is unread for
+ * those inputs, which is a lapsed consent and exactly what an approval is for.
+ * `approve` re-records the inputs and accepts, the same way stage 0 lets an
+ * edited `project.md` be approved again.
  */
 
 const ARTIFACT = "screenplay";
@@ -62,6 +71,10 @@ class ScreenplayStateError extends Error {
 }
 
 interface Inspection {
+  /** Problems an approval may not write over. Input drift is not among them. */
+  readonly blocking: readonly string[];
+  /** The stage-0 inputs as they stand now — what an approval re-records. */
+  readonly inputs: readonly RecordedFile[];
   readonly stage: StageFile | null;
   readonly status: ScreenplayStatus;
 }
@@ -100,6 +113,8 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
 
   if (!stage.ok) {
     return ok({
+      blocking: [],
+      inputs: stage0.data.inputs,
       stage: null,
       status: {
         approved: false,
@@ -114,30 +129,32 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
   }
 
   const record = stage.data.artifacts[ARTIFACT];
-  const problems: string[] = [];
+  const blocking: string[] = [];
 
   if (record === undefined) {
     return err(new ScreenplayStateError("screenplay.stage.json nie zawiera artefaktu screenplay"));
   }
 
   if (record.status === "submitted") {
-    problems.push(
+    blocking.push(
       `odcinek "${input.episodeId}": próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca — mogła zostać rozliczona; nową próbę zaczyna --regenerate`
     );
 
     return ok({
+      blocking,
+      inputs: stage0.data.inputs,
       stage: stage.data,
       status: {
         approved: false,
         inputsChanged: changedInputs(record.inputs, stage0.data.inputs),
-        problems,
+        problems: blocking,
         status: "submitted",
         verdict: null,
       },
     });
   }
 
-  await verifyOutputs(input.workspace, stage.data, `odcinek "${input.episodeId}"`, problems);
+  await verifyOutputs(input.workspace, stage.data, `odcinek "${input.episodeId}"`, blocking);
 
   const screenplay = await readDigest(paths.data.screenplay);
   const verdict = screenplay.ok
@@ -145,18 +162,22 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
     : null;
 
   if (verdict !== null && !verdict.ok) {
-    problems.push(`screenplay.md: ${verdict.error.message}`);
+    blocking.push(`screenplay.md: ${verdict.error.message}`);
   }
 
+  // Drift is reported beside the blocking problems and revokes the approval
+  // just as loudly — but it is not one of them. The screenplay is intact; it
+  // is unread for these inputs, and `approve` is what reads it.
   const inputsChanged = changedInputs(record.inputs, stage0.data.inputs);
-
-  for (const path of inputsChanged) {
-    problems.push(
-      `${path}: zmienił się od czasu generacji scenariusza — wynik etapu 1 opisuje inne wejście`
-    );
-  }
+  const lapsed = inputsChanged.map(
+    (path) =>
+      `${path}: zmienił się od czasu generacji scenariusza — tych wejść nikt jeszcze nie przyjął; przeczytaj scenariusz jeszcze raz i zatwierdź go ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`
+  );
+  const problems = [...blocking, ...lapsed];
 
   return ok({
+    blocking,
+    inputs: stage0.data.inputs,
     stage: stage.data,
     status: {
       // Approval is bound to bytes: a recorded "approved" that no longer
@@ -178,11 +199,16 @@ export async function checkScreenplay(input: EpisodeScope): Promise<Result<Scree
 }
 
 /**
- * Records that a human accepted this screenplay, bound to its current bytes.
+ * Records that a human accepted this screenplay, bound to its current bytes
+ * and to the inputs as they now stand.
  *
  * It refuses over anything that does not verify: an approval written on top of
- * a failing draft, a changed input or an unfinished attempt would be a claim
- * the later stages have no way to doubt.
+ * a failing draft or an unfinished attempt would be a claim the later stages
+ * have no way to doubt. An edited input is not that. The draft still validates
+ * against the decisions on disk, so the digests are re-recorded and the
+ * approval proceeds — otherwise the one command able to clear the drift would
+ * be the one command the drift forbids, and the episode would need a second
+ * paid screenplay to say something everybody already knew.
  */
 export async function approveScreenplay(input: ApproveScope): Promise<Result<ScreenplayStatus>> {
   const inspection = await inspect(input);
@@ -191,7 +217,7 @@ export async function approveScreenplay(input: ApproveScope): Promise<Result<Scr
     return inspection;
   }
 
-  const { stage, status } = inspection.data;
+  const { blocking, inputs, stage, status } = inspection.data;
 
   if (stage === null || status.status !== "completed") {
     return err(
@@ -202,12 +228,9 @@ export async function approveScreenplay(input: ApproveScope): Promise<Result<Scr
     );
   }
 
-  if (status.problems.length > 0) {
+  if (blocking.length > 0) {
     return err(
-      new ScreenplayStateError(
-        "nie akceptuje się tego, co nie przechodzi walidacji",
-        status.problems
-      )
+      new ScreenplayStateError("nie akceptuje się tego, co nie przechodzi walidacji", blocking)
     );
   }
 
@@ -223,11 +246,12 @@ export async function approveScreenplay(input: ApproveScope): Promise<Result<Scr
     return paths;
   }
 
-  const approved = approveAll(stage, { note: input.note, reviewer: input.reviewer });
+  const rebound = withInputs(stage, ARTIFACT, inputs);
+  const approved = approveAll(rebound, { note: input.note, reviewer: input.reviewer });
   const written = await applyWrites(
     [{ kind: "text", text: serialize(approved), to: paths.data.screenplayStage }],
     input.mode
   );
 
-  return written.ok ? ok({ ...status, approved: true }) : written;
+  return written.ok ? ok({ ...status, approved: true, inputsChanged: [], problems: [] }) : written;
 }

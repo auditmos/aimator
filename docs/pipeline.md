@@ -126,8 +126,19 @@ Obowiązują we wszystkich etapach.
   `outputs[].sha256`. Zmiana pliku unieważnia akceptację; nie ma sposobu, by przeniosła
   się na inny wynik. Ponowny zapis pliku etapu przywraca `pending` i mówi o tym wprost.
 - **Nie akceptuje się tego, co nie przechodzi walidacji.** `approve` odmawia, dopóki hashe
-  się nie zgadzają albo brakuje decyzji: akceptacja zapisana na zepsutym pochodzeniu byłaby
-  kłamstwem, któremu kolejne etapy zaufałyby.
+  **wyników** się nie zgadzają, dokument nie przechodzi walidacji strukturalnej albo brakuje
+  decyzji: akceptacja zapisana na zepsutym pochodzeniu byłaby kłamstwem, któremu kolejne
+  etapy zaufałyby.
+- **Rozjazd wejścia to wygaśnięcie zgody, nie błąd walidacji.** Zapisane wejście, którego
+  bajty się zmieniły, unieważnia akceptację i `check` to zgłasza — ale wynik nie jest
+  zepsuty, tylko nieprzeczytany dla tych wejść, a od czytania jest człowiek. `approve`
+  przepisuje wtedy hashe wejść i zapisuje akceptację, dokładnie jak przy `project.md`
+  edytowanym po etapie 0. Gdyby liczyć to jako błąd walidacji, `approve` odmawiałby
+  w jedynym miejscu, które potrafi tę sytuację naprawić, a jedyną drogą dalej byłoby
+  kupienie drugiego wyniku, żeby powiedzieć to samo. Zmiana, która naprawdę coś znaczy, i
+  tak nie przejdzie: scenariusz waliduje się wtedy wobec nowych decyzji odcinka, a lista
+  ujęć wobec scenariusza w takim kształcie, w jakim leży — więc wcześniej wywraca się na
+  walidacji strukturalnej.
 - **`needsReview` nigdy nie czyści się samo.** Wpisuje go etap zależny w chwili
   uruchomienia. `check` tylko raportuje rozjazd — polecenie kontrolne niczego nie zapisuje.
 - **Stan `submitted` zapisuje się przed płatnym POST-em.** Przerwana próba zostawia więc
@@ -291,10 +302,16 @@ limicie sceny poprawna suma nie da się osiągnąć mniejszą liczbą scen.
 **Walidacja to nie akceptacja.** Wynik, który przeszedł walidację, ma
 `review.status = "pending"`. Przyjmuje go dopiero
 `aimator approve <project-id> <episode-id> --stage screenplay`, i tylko wtedy, gdy hash
-`screenplay.md` się zgadza, dokument nadal przechodzi walidację i żadne wejście etapu 0
-nie zmieniło się od czasu generacji. `aimator check <project-id> <episode-id>` sprawdza to
-samo i nie zapisuje niczego — rozjazd wejść raportuje, `needsReview` wpisze dopiero etap
-zależny w chwili uruchomienia.
+`screenplay.md` się zgadza i dokument nadal przechodzi walidację wobec decyzji odcinka
+w takim kształcie, w jakim leżą.
+
+Rozjazd wejścia etapu 0 unieważnia akceptację, ale jej nie blokuje: `approve` przepisuje
+wtedy hashe wejść i zapisuje nową zgodę — zobacz niezmiennik o wygaśnięciu zgody. Scenariusz
+jest bowiem ponownie walidowany wobec **bieżących** decyzji, więc zmiana, która naprawdę coś
+dla niego znaczy — inne `durationSeconds`, inne `subtitles` — wywraca się na walidacji, a nie
+przechodzi tylnymi drzwiami. `aimator check <project-id> <episode-id>` sprawdza to samo i nie
+zapisuje niczego — rozjazd wejść raportuje, `needsReview` wpisze dopiero etap zależny
+w chwili uruchomienia.
 
 ## Etap 2 — szczegóły
 
@@ -459,6 +476,12 @@ i wolno ją powtórzyć zwykłym przebiegiem.
 **Walidacja to nie akceptacja.** Wynik, który przeszedł walidację, ma
 `review.status = "pending"`. Przyjmuje go dopiero
 `aimator approve <project-id> <episode-id> --stage shot-list`, i tylko wtedy, gdy hash
-`shot-list.md` się zgadza, dokument nadal przechodzi walidację i żadne wejście nie zmieniło
-się od czasu generacji. `aimator check <project-id> <episode-id>` sprawdza to samo dla
-etapów 1 i 3 naraz i nie zapisuje niczego.
+`shot-list.md` się zgadza i plan nadal przechodzi walidację wobec scenariusza w takim
+kształcie, w jakim leży.
+
+Rozjazd wejścia działa tu tak samo jak w etapie 1: unieważnia akceptację, `approve`
+przepisuje hashe i zapisuje nową zgodę. Zabezpieczeniem jest to, że lista ujęć waliduje się
+wobec **bieżącego** scenariusza, więc scenariusz, któremu naprawdę zmienił się kształt —
+inny czas sceny, inna scena — zostawia ujęcia poza granicami i walidacja odmawia.
+`aimator check <project-id> <episode-id>` sprawdza to samo dla etapów 1 i 3 naraz i nie
+zapisuje niczego.

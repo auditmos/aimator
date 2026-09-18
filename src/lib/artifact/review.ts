@@ -123,3 +123,38 @@ export function withOutputs(
     artifacts: { ...stage.artifacts, [key]: { ...artifact, outputs: [...kept, ...outputs] } },
   };
 }
+
+/**
+ * Re-records what one artifact was drawn from, at the moment somebody accepts it.
+ *
+ * A recorded input whose bytes have changed is a lapsed consent, not a broken
+ * result: the output is still exactly what the stage produced, it just answers
+ * a question that has since been reworded. The same situation as `project.md`
+ * edited after stage 0 was approved — and the contract already says that
+ * counting it as a validation failure would make `approve` refuse in the one
+ * place able to repair it, leaving the episode blocked for good.
+ *
+ * So the digests are rewritten here, by an `approve` that has already verified
+ * the output still validates against the inputs as they now stand. Meaningful
+ * drift does not slip through: a duration or a screenplay that really changed
+ * fails the structural check first, and this is never reached.
+ *
+ * Replaces the list rather than merging it: what a stage consumed is a complete
+ * answer, and half of an old one is not a fact about anything.
+ */
+export function withInputs(
+  stage: StageFile,
+  key: string,
+  inputs: readonly RecordedFile[]
+): StageFile {
+  const artifact = stage.artifacts[key];
+
+  if (artifact === undefined) {
+    return stage;
+  }
+
+  return {
+    ...stage,
+    artifacts: { ...stage.artifacts, [key]: { ...artifact, inputs: [...inputs] } },
+  };
+}

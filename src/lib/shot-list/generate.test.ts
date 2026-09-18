@@ -506,4 +506,58 @@ describe("checkShotList and approveShotList", () => {
 
     expect(status.ok ? status.data.inputsChanged.join("\n") : "").toContain("screenplay.md");
   });
+
+  // A lapsed consent, not a broken plan: the shot list still covers every scene
+  // of the screenplay as it now stands, so the person who reads both decides.
+  it("should let a human re-approve over a changed input, re-recording it", async () => {
+    await makeUpstream();
+    await generate();
+    const accept = (): ReturnType<typeof approveShotList> =>
+      approveShotList({
+        episodeId: EPISODE,
+        mode: "apply",
+        note: null,
+        projectId: PROJECT,
+        reviewer: "tester",
+        workspace,
+      });
+    await accept();
+    // `project.md`, not `screenplay.md`: editing the screenplay would also
+    // break stage 1's own output digest, which is a different failure and
+    // would blur what this test is about.
+    await writeFile(join(root, "projects", PROJECT, "project.md"), "# Ewa\n\nInne.\n", "utf8");
+
+    const again = await accept();
+
+    expect(again.ok ? again.data.approved : again.error.message).toBe(true);
+
+    const after = await checkShotList({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+    expect(after.ok ? after.data.inputsChanged : null).toEqual([]);
+    expect(after.ok ? after.data.approved : null).toBe(true);
+  });
+
+  // A screenplay that really changed shape fails the structural check first,
+  // because the plan is re-validated against the screenplay as it now stands.
+  it("should still refuse when the changed screenplay no longer fits the plan", async () => {
+    await makeUpstream();
+    await generate();
+    await writeFile(
+      join(episodeDir(), "screenplay.md"),
+      screenplay().replace("### S03 | 10s | salon, wieczór", "### S03 | 8s | salon, wieczór"),
+      "utf8"
+    );
+
+    const again = await approveShotList({
+      episodeId: EPISODE,
+      mode: "apply",
+      note: null,
+      projectId: PROJECT,
+      reviewer: "tester",
+      workspace,
+    });
+
+    expect(again.ok).toBe(false);
+    expect(again.ok ? "" : again.error.message).toContain("nie przechodzi walidacji");
+  });
 });
