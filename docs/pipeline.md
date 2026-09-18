@@ -157,6 +157,17 @@ Obowiązują we wszystkich etapach.
 - **Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy**, nigdy
   kontekstu rozmowy ani ponownego odczytu surowego opisu. Ustawienia podróżują razem
   z artefaktem, żeby następny etap miał kompletne wejście.
+- **Instrukcja dla modelu jest po angielsku; materiał, z którego model ma pracować, zostaje
+  w języku, w którym go napisano.** Decyduje rola tekstu, nie to, kto go czyta. Instrukcją
+  jest zadanie etapu i każdy artefakt, który sam jest promptem — czyli całe `prompts/**`
+  razem z etykietami `subject`, bo te trafiają do modelu w liście załączników. Materiałem
+  są `project.md`, `source.md`, `screenplay.md` i `shot-list.md`: wklejane **dosłownie**,
+  nigdy tłumaczone, bo ich hashe są zapisane, a przekład byłby drugą wersją tej samej
+  prawdy. Żądanie bywa więc dwujęzyczne i tak ma być. Wynik etapu, który jest treścią
+  filmu — scenariusz, lista ujęć — idzie w `language`; wynik etapu, który jest instrukcją
+  — pakiet promptów — idzie po angielsku, bo modele obrazu i wideo są trenowane
+  przytłaczająco na angielskich promptach, a `language` opisuje film, nie rozmowę
+  z narzędziem.
 - **Prompt do modelu obrazu albo wideo to tekst **wraz z** uporządkowanymi załącznikami,
   a tekst adresuje je **pozycją w tej liście** — nigdy nazwą pliku, nigdy wewnętrznym
   identyfikatorem, nigdy ścieżką.** API tych dostawców przyjmuje referencje obrazowe i to
@@ -245,7 +256,7 @@ Decyzje odcinka — wszystkie jawne, żadna z domyślną wartością:
 |---|---|---|
 | `durationSeconds` | liczba całkowita 1–3600 | etap 0 |
 | `audio` | `music-and-effects`, `dialogue`, `narration`, `dialogue-and-narration` — wszystkie zawierają muzykę i efekty | etap 0 |
-| `language` | kod języka scenariusza i wypowiedzi; wymagany także w filmie bez mowy | etap 0 |
+| `language` | kod języka scenariusza i wypowiedzi; wymagany także w filmie bez mowy. **Nie jest językiem instrukcji dla modelu** — te są po angielsku, zobacz niezmiennik wyżej | etap 0 |
 | `subtitles` | kod języka albo `none`; niezależny od `language` | etap 0 |
 | `sourceNature` | `law-or-idea`, `synopsis`, `screenplay` — etap 1 rozgałęzia się na tym polu | etap 0 |
 | `maxClipSeconds` | liczba całkowita 1–60: najdłuższy klip, jaki etap 3 może zaplanować | etap 3 |

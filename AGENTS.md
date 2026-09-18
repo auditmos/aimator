@@ -113,7 +113,7 @@ the sequence is not its business. Do the same with the next thing two stages cop
 
 ## Pipeline rules
 
-Eight rules that stop an agent from re-creating the mess this tool was built to replace.
+Nine rules that stop an agent from re-creating the mess this tool was built to replace.
 Full contract in [docs/pipeline.md](docs/pipeline.md).
 
 1. **One state filename: `<stage>.stage.json`.** One shape for every stage. Never invent
@@ -138,6 +138,14 @@ Full contract in [docs/pipeline.md](docs/pipeline.md).
    into prose only because that list is guaranteed. Never a filename, a path or a track
    name — the id resolves to a file at the sender, per track, which is what lets one prompt
    package serve both. `character/prompt.ts` shows the shape; stages 5–7 owe the same.
+9. **An instruction to a model is written in English; material the model works from stays
+   in the language it was authored in.** Role decides, not readership. Every stage's task
+   text and every artifact that is itself a prompt — `prompts/**`, including its `subject`
+   labels, which reach the model in the attachment list — are English. `project.md`,
+   `source.md`, `screenplay.md` and `shot-list.md` travel verbatim and are never translated:
+   their digests are recorded, and a translation is a second version of the same truth. A
+   request is therefore often bilingual, by design. `language` is the film's language — what
+   is spoken and captioned on screen — and never the language of a prompt.
 
 ## Deep Modules
 

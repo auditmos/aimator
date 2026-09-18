@@ -277,4 +277,20 @@ describe("buildPrompt", () => {
   it("should forbid a filename, a path or a track name in the prose", () => {
     expect(prompt).toContain("Never write a filename, a path or a track name");
   });
+
+  /**
+   * Everything this stage returns is an instruction to an image or video model,
+   * so it follows the rule for instructions rather than the one for the film.
+   * `language` describes what is spoken on screen; reaching for it here is the
+   * mistake version 1 made, and the prompt now says so where the value appears.
+   */
+  it("should demand English and say that the film's language does not govern it", () => {
+    expect(prompt).toContain("**Write every string you return in English**");
+    expect(prompt).toContain("They say nothing about this answer, which is written in English.");
+  });
+
+  it("should still carry the material in its original language, unmodified", () => {
+    expect(prompt).toContain(RULES);
+    expect(prompt).toContain("do not translate, paraphrase or restate them");
+  });
 });
