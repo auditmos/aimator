@@ -694,3 +694,18 @@ nazwami. Wywołanie idzie ze `store: false`, więc obowiązuje ta sama zasada, c
 zdążyła trafić na dysk, jest już opłacona i powtórzenie polecenia dokańcza z niej próbę bez
 wysyłania czegokolwiek. Odmowa 4xx nie została rozliczona i wolno ją powtórzyć zwykłym
 przebiegiem.
+
+**Republikacja z opłaconego archiwum.** `--republish` publikuje jeszcze raz odpowiedź
+zapisaną w `runs/<runId>/response.json`, **nie wysyłając niczego i nie wymagając ani modelu,
+ani klucza**. Zachowuje `runId` i `producer` poprzedniej próby, bo to jest ta sama próba —
+zmieniło się coś po stronie narzędzia, a nowy identyfikator i nowa data opisywałyby pracę,
+której nikt nie wykonał. Odmawia, gdy próba nie zachowała odpowiedzi albo gdy wejście się
+rozjechało; `--regenerate` i `--republish` wykluczają się wzajemnie.
+
+Istnieje, bo kontrakt mówi już, że kupiona odpowiedź musi dać się ponownie wyprowadzić za
+darmo — inaczej błąd walidatora byłby płatny. Ta zasada działała wyłącznie dla rekordu
+`submitted`. Błąd **renderera** wychodzi na jaw dopiero po publikacji, przy rekordzie
+`completed`, i jedyną drogą była druga opłata za identyczną odpowiedź. To ta sama zasada,
+rozciągnięta na pomyłki, które widać o krok później. Flagę niosą wyłącznie etapy z własnym
+rendererem: etapy 1 i 3 publikują dokładnie to, co zwrócił model, więc nie mają czego
+naprawiać po stronie publikacji.

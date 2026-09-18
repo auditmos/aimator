@@ -198,6 +198,7 @@ async function generate(
     model: "gpt-6-astra",
     projectId: PROJECT,
     regenerate: false,
+    republish: false,
     workspace,
     ...overrides,
   });
@@ -579,6 +580,50 @@ describe("generatePromptPackage", () => {
     expect(calls).toBe(0);
     expect(resumed.ok).toBe(true);
     expect(await readdir(episodeDir())).toContain("prompt-package.json");
+  });
+
+  /**
+   * A renderer found wrong after publication is this stage's own mistake, and
+   * the answer it would be re-derived from is already bought. Charging for it
+   * again would make a bug in this repo billable to the user.
+   */
+  it("should publish the archived answer again without sending anything", async () => {
+    await makeUpstream();
+    await generate();
+    await rm(join(episodeDir(), "prompts", "clips", "C01.md"));
+    calls = 0;
+
+    const again = await generate({ republish: true });
+    const runs = await runDirs();
+
+    expect(calls).toBe(0);
+    expect(again.ok).toBe(true);
+    expect(await promptFiles()).toContain("/clips/C01.md");
+    // The same attempt, not a new one: no run id is minted for work nobody did.
+    expect(runs).toHaveLength(3);
+  });
+
+  it("should refuse to republish an attempt that saved no answer", async () => {
+    await makeUpstream();
+    const result = await generate({ republish: true });
+
+    expect(calls).toBe(0);
+    expect(result.ok ? null : result.error.message).toContain("nie ma czego opublikować ponownie");
+  });
+
+  it("should refuse to republish against inputs that have changed since", async () => {
+    await makeUpstream();
+    await generate();
+    await writeFile(
+      join(root, "projects", PROJECT, "characters", "ewa", "seedream", "hero.png"),
+      png(1536, 2304, 6)
+    );
+    calls = 0;
+
+    const again = await generate({ republish: true });
+
+    expect(calls).toBe(0);
+    expect(again.ok ? null : again.error.message).toContain("hero.png");
   });
 
   it("should keep the previous package when --regenerate replaces it", async () => {

@@ -67,6 +67,8 @@ interface GenerateInput {
   readonly model: string | null;
   readonly projectId: string;
   readonly regenerate: boolean;
+  /** Publish the archived answer again, sending nothing. */
+  readonly republish: boolean;
   readonly workspace: Workspace;
 }
 
@@ -91,6 +93,12 @@ class Stage4BlockedError extends Error {
  */
 function blockers(input: GenerateInput, stage4: Stage4Inputs): readonly string[] {
   const problems = [...stage4.gate];
+
+  // A republication sends nothing, so it needs neither a model nor a key.
+  // Demanding them would make the free path look like the paid one.
+  if (input.republish) {
+    return problems;
+  }
 
   if (input.model === null || input.model === "") {
     problems.push(
@@ -156,6 +164,7 @@ export async function generatePromptPackage(
       maxOutputTokens: input.maxOutputTokens,
       model: input.model ?? "",
       regenerate: input.regenerate,
+      republish: input.republish,
       workspace: input.workspace,
     },
     stage(input, stage4.data, prompt, previous)

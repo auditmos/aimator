@@ -58,6 +58,17 @@ interface TextCall {
   readonly model: string;
   /** The only road to a second charge. Nothing here retries on its own. */
   readonly regenerate: boolean;
+  /**
+   * Publish the archived answer again, sending nothing.
+   *
+   * The contract already says a bought answer must be re-derivable for free,
+   * otherwise a bug in a validator would be billable. That held only while a
+   * record was `submitted`; a stage whose *renderer* turns out wrong is found
+   * after the record is `completed`, and re-deriving was then possible only by
+   * paying for a second identical answer. This is that same right, for the
+   * mistakes that surface one step later.
+   */
+  readonly republish: boolean;
   readonly workspace: Workspace;
 }
 
@@ -159,6 +170,10 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
   const previousStage = await readJson(stage.stagePath, stageFileSchema);
   const record = previousStage.ok ? previousStage.data.artifacts[stage.artifact] : undefined;
 
+  if (call.republish) {
+    return await republish(call, stage, record);
+  }
+
   if (record !== undefined && !call.regenerate) {
     const resumed = await resume(call, stage, record);
 
@@ -225,6 +240,64 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
     body: transport.data.body,
     producer,
     runId,
+  });
+}
+
+/**
+ * Publishes the archived answer again, sending nothing and charging nothing.
+ *
+ * The run id and the producer are kept: this is the same attempt, and its
+ * `promptVersion` still names the prompt that really produced the answer. What
+ * changed is on this side — a validator or a renderer — and pretending a new
+ * attempt happened would put a date and an id on work nobody did.
+ *
+ * It refuses on drifted inputs for the reason `resume` does: the saved answer
+ * was written for the inputs recorded beside it, and attaching it to different
+ * ones would answer a question nobody asked.
+ */
+async function republish<T>(
+  call: TextCall,
+  stage: TextStage<T>,
+  record: StageFile["artifacts"][string] | undefined
+): Promise<Result<TextAttempt<T>>> {
+  if (record === undefined) {
+    return err(
+      stage.blocked([
+        `nie ma czego opublikować ponownie — ${stage.what} nie ma jeszcze żadnej próby`,
+      ])
+    );
+  }
+
+  const archive = runPaths(call.episode, record.runId);
+  const response = await readDigest(archive.response);
+
+  if (!response.ok) {
+    return err(
+      stage.blocked([
+        `próba ${record.runId} nie zachowała odpowiedzi, więc nie ma z czego publikować`,
+        "bez zapisanej odpowiedzi jedyną drogą dalej jest --regenerate, czyli druga opłata",
+      ])
+    );
+  }
+
+  const changed = record.inputs.filter(
+    (entry) => !stage.inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
+  );
+
+  if (changed.length > 0) {
+    return err(
+      stage.blocked([
+        ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
+        "zapisana odpowiedź opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
+      ])
+    );
+  }
+
+  return await publish(call, stage, {
+    archive,
+    body: response.data.bytes.toString("utf8"),
+    producer: record.producer,
+    runId: record.runId,
   });
 }
 

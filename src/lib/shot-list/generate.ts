@@ -138,6 +138,9 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
       maxOutputTokens: input.maxOutputTokens,
       model: input.model ?? "",
       regenerate: input.regenerate,
+      // This stage publishes exactly what the model returned, with no renderer
+      // of its own, so there is nothing here a republication could repair.
+      republish: false,
       workspace: input.workspace,
     },
     stage(input, stage3.data, prompt)

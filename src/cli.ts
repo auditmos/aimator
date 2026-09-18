@@ -74,6 +74,7 @@ Etap 3 — lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu 
 Etap 4 — pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
   prompt-package generate <id> <episode-id> [--model <id>]
                           [--max-output-tokens <n>] [--dry-run] [--regenerate]
+                          [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
 
 Wspólne:
   check <id> [<episode-id>]
@@ -1180,6 +1181,7 @@ async function runPromptPackage(argv: readonly string[]): Promise<Result<string>
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
+    republish: { type: "boolean" },
   });
 
   if (!parsed.ok) {
@@ -1198,6 +1200,14 @@ async function runPromptPackage(argv: readonly string[]): Promise<Result<string>
   }
   if (!workspace.ok) {
     return workspace;
+  }
+
+  if (parsed.data.values.regenerate === true && parsed.data.values.republish === true) {
+    return err(
+      new UsageError(
+        "--regenerate i --republish wykluczają się: pierwsze płaci za nową odpowiedź, drugie publikuje zapisaną"
+      )
+    );
   }
 
   const model = promptsModelOf(parsed.data);
@@ -1221,6 +1231,7 @@ async function runPromptPackage(argv: readonly string[]): Promise<Result<string>
     model: model.data,
     projectId: projectId.data,
     regenerate: parsed.data.values.regenerate === true,
+    republish: parsed.data.values.republish === true,
     workspace: workspace.data,
   });
 
