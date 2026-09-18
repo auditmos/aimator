@@ -630,12 +630,34 @@ describe("approveStage0", () => {
     expect(paths).toContain("projects/demo/project.md");
   });
 
+  /**
+   * Rewritten rules revoke the approval the same way a changed decision does:
+   * the files still validate, nobody has accepted these bytes. Treating it as
+   * a validation failure instead made the lapse permanent, because `approve`
+   * refuses what does not validate and is the only thing that records the new
+   * digest.
+   */
   it("should revoke the approval when the rules are rewritten", async () => {
     await readyProject();
     await approve();
     await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nCo innego.\n", "utf8");
+
     const result = await checkStage0({ projectId: "demo", workspace });
-    expect(result.ok ? null : result.error.message).toContain("zmieniony poza narzędziem");
+
+    expect(result.ok ? result.data.approved : null).toBe(false);
+    expect(result.ok ? result.data.problems.join(" ") : null).toContain("po akceptacji");
+  });
+
+  it("should let rewritten rules be approved again", async () => {
+    await readyProject();
+    await approve();
+    await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nCo innego.\n", "utf8");
+
+    const again = await approve();
+
+    expect(again.ok ? again.data.approved : null).toBe(true);
+    const after = await checkStage0({ projectId: "demo", workspace });
+    expect(after.ok ? after.data.approved : null).toBe(true);
   });
 
   it("should report an approval lapsed by a later decision", async () => {

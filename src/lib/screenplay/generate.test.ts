@@ -491,6 +491,25 @@ describe("refusing to resume", () => {
     expect(result.ok ? "" : result.error.message).toContain("approved");
   });
 
+  it("should refuse to publish a saved response against re-approved inputs", async () => {
+    await generate({ fetch: respondWith(completion(draft([10, 10]))) });
+    await writeFile(join(root, "projects", PROJECT, "project.md"), "# Ewa\n\nInne.\n", "utf8");
+    // Re-approved, so the stage-0 gate passes and the saved answer is the only
+    // thing left that still describes the old rules.
+    await approveStage0({
+      mode: "apply",
+      note: null,
+      projectId: PROJECT,
+      reviewer: "test",
+      workspace,
+    });
+
+    const result = await generate();
+
+    expect(calls).toBe(1);
+    expect(result.ok ? "" : result.error.message).toContain("opisuje inne wejście");
+  });
+
   /**
    * The case that actually happened: the archived answer was fine all along and
    * the validator was wrong. Swapping the archived body stands in for fixing

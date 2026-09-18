@@ -880,7 +880,11 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
     nextStep: verdict.approved
       ? readyNext(input.projectId)
       : `pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve ${input.projectId}`,
-    problems: [],
+    problems: verdict.lapsed
+      ? [
+          `project.md zmienił się po akceptacji — te zasady nikt jeszcze nie przyjął; zatwierdź ponownie: aimator approve ${input.projectId}`,
+        ]
+      : [],
     ready: true,
     reused: verdict.checked,
   });
@@ -991,21 +995,27 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
   const file = await readJson(project.file, projectFileSchema);
 
   if (!file.ok) {
-    return { approved: false, checked: [], problems: [file.error.message] };
+    return { approved: false, checked: [], lapsed: false, problems: [file.error.message] };
   }
 
   const problems: string[] = [];
   const checked: string[] = [];
   const stage = await readJson(project.prepareStage, stageFileSchema);
   let approved = false;
+  let lapsed = false;
 
   await checkRules(project, problems);
   await checkLayout(workspace, project, problems);
   checkDecisions(file.data, problems);
 
   if (stage.ok) {
-    await verifyOutputs(workspace, stage.data, "projekt", problems);
-    approved = isApproved(stage.data);
+    const rules = await separateRules(workspace, project, stage.data);
+
+    ({ lapsed } = rules);
+
+    await verifyOutputs(workspace, rules.stage, "projekt", problems);
+
+    approved = isApproved(stage.data) && !lapsed;
   } else {
     problems.push("projekt: brak zapisu etapu (prepare.stage.json)");
   }
@@ -1029,7 +1039,7 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
     }
   }
 
-  return { approved, checked, problems };
+  return { approved, checked, lapsed, problems };
 }
 
 /**
@@ -1089,7 +1099,53 @@ async function checkRules(project: ProjectPaths, problems: string[]): Promise<vo
 interface Stage0Verdict {
   readonly approved: boolean;
   readonly checked: readonly string[];
+  /** The rules were rewritten after somebody approved them. */
+  readonly lapsed: boolean;
   readonly problems: readonly string[];
+}
+
+/**
+ * `project.md`'s recorded digest is the rules somebody accepted, not something
+ * a stage produced. Rewriting the file therefore revokes the approval rather
+ * than breaking validation — exactly like changing an episode decision does.
+ *
+ * The distinction is load-bearing. `approve` refuses whatever fails validation
+ * and is also the only thing that records a new digest for these bytes, so
+ * counting the mismatch as a failure locked the project out of ever being
+ * approved again.
+ */
+async function separateRules(
+  workspace: Workspace,
+  project: ProjectPaths,
+  stage: StageFile
+): Promise<{ lapsed: boolean; stage: StageFile }> {
+  const path = toWorkspacePath(workspace.root, project.rules);
+  const artifact = stage.artifacts.project;
+  const recorded = artifact?.outputs.find((output) => output.path === path);
+
+  if (artifact === undefined || recorded === undefined) {
+    return { lapsed: false, stage };
+  }
+
+  const rules = await readDigest(project.rules);
+
+  if (rules.ok && rules.data.sha256 === recorded.sha256) {
+    return { lapsed: false, stage };
+  }
+
+  return {
+    lapsed: true,
+    stage: {
+      ...stage,
+      artifacts: {
+        ...stage.artifacts,
+        project: {
+          ...artifact,
+          outputs: artifact.outputs.filter((output) => output.path !== path),
+        },
+      },
+    },
+  };
 }
 
 interface EpisodeVerdict {

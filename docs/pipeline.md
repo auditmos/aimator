@@ -103,8 +103,12 @@ plik spoza katalogu roboczego — jedyne miejsce, gdzie to ma sens.
 etapu. `project.md` nie ma hasha od chwili `init`, bo pisze go wtedy człowiek i hash pustego
 szkieletu byłby z założenia nieaktualny — dostaje go dopiero przy `aimator approve`, czyli
 w momencie, w którym ktoś przyjmuje zasady w takim kształcie, w jakim leżą. Od tej chwili
-każda edycja `project.md` unieważnia akceptację i `check` to zgłasza. Każdy etap zapisuje
-hashe swoich własnych wejść w chwili, gdy je konsumuje.
+każda edycja `project.md` unieważnia akceptację i `check` to zgłasza — ale **nie jest to
+błąd walidacji**, tylko wygaśnięcie zgody, dokładnie jak przy zmianie decyzji odcinka.
+Pliki nadal się zgadzają, po prostu tych bajtów nikt jeszcze nie przyjął, więc `approve`
+działa i zapisuje nowy hash. Gdyby liczyć to jako błąd walidacji, `approve` odmawiałby
+w jedynym miejscu, które potrafi tę sytuację naprawić, i projekt zostawałby zablokowany
+na zawsze. Każdy etap zapisuje hashe swoich własnych wejść w chwili, gdy je konsumuje.
 
 ## Niezmienniki
 
