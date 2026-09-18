@@ -267,25 +267,33 @@ function wireBody(request: ImageRequest): FormData | string {
     });
   }
 
-  const fields: Record<string, string> = {
+  /**
+   * The two gpt-image endpoints want the same settings in different types.
+   * `/images/generations` takes JSON, where `n` is a number; `/images/edits`
+   * takes multipart, where every field is a string because that is all a form
+   * can carry. Sharing one record between them sent `"n": "1"` as JSON and the
+   * API rejected the request — so the shapes are built separately on purpose.
+   */
+  const settings = {
     background: request.background,
     model: request.model,
-    n: "1",
     output_format: "png",
     prompt: request.prompt,
     quality: "high",
     size: request.size,
-  };
+  } as const;
 
   if (request.attachments.length === 0) {
-    return JSON.stringify(fields);
+    return JSON.stringify({ ...settings, n: 1 });
   }
 
   const form = new FormData();
 
-  for (const [key, value] of Object.entries(fields)) {
+  for (const [key, value] of Object.entries(settings)) {
     form.set(key, value);
   }
+
+  form.set("n", "1");
 
   for (const item of request.attachments) {
     form.append("image[]", new File([Uint8Array.from(item.bytes)], item.name, { type: item.type }));

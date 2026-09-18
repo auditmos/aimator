@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   addCharacter,
+  addCharacterSources,
   addEpisode,
   approveStage0,
   initProject,
@@ -694,5 +695,62 @@ describe("generateCharacter refusals", () => {
     expect(call.calls).toHaveLength(0);
     expect(again.ok ? null : again.error.message).toContain("HTTP 503");
     expect(again.ok ? null : again.error.message).toContain("--regenerate");
+  });
+});
+
+describe("generateCharacter wire format", () => {
+  /**
+   * The two gpt-image endpoints take the same settings in different types, and
+   * sharing one record between them sent `"n": "1"` as JSON. The API rejected
+   * it, which cost a round trip to find out.
+   */
+  it("should send n as a number to the json endpoint", async () => {
+    await makeStage0();
+    const call = recorder();
+    await generate({ fetch: call.fetch });
+
+    expect(call.calls[0]?.url).toBe("https://api.openai.com/v1/images/generations");
+    expect(call.calls[0]?.body).toMatchObject({ n: 1, quality: "high", size: "1920x1920" });
+  });
+
+  it("should post multipart to the edit endpoint when the character has photographs", async () => {
+    await makeStage0();
+    const photo = join(root, "portret.png");
+    await writeFile(photo, png(800, 600, 2));
+    await addCharacterSources({
+      characterId: CHARACTER,
+      mode: "apply",
+      projectId: PROJECT,
+      sourcePaths: [photo],
+      workspace,
+    });
+    await approveStage0({
+      mode: "apply",
+      note: "ze zdjęciem",
+      projectId: PROJECT,
+      reviewer: "tester",
+      workspace,
+    });
+
+    const call = recorder();
+    await generate({ fetch: call.fetch });
+    const body = call.calls[0]?.body;
+
+    expect(call.calls[0]?.url).toBe("https://api.openai.com/v1/images/edits");
+    expect(body).toBeInstanceOf(FormData);
+    // A form carries strings and nothing else, so here "1" is correct.
+    expect((body as FormData).get("n")).toBe("1");
+    expect((body as FormData).getAll("image[]")).toHaveLength(1);
+  });
+
+  it("should send the seedream request as json with the references inline", async () => {
+    await makeStage0();
+    const call = recorder();
+    await generate({ fetch: call.fetch, model: "seedream-pro", track: "seedream" });
+    const body = call.calls[0]?.body as Record<string, unknown>;
+
+    expect(body).toMatchObject({ response_format: "url", size: "1920x1920", watermark: false });
+    // Text-to-image: no `image` key at all rather than an empty list.
+    expect("image" in body).toBe(false);
   });
 });
