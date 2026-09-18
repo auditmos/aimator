@@ -31,6 +31,14 @@ cp .env.example .env
 ```dotenv
 # .env — Twoje lokalne wartości, poza gitem
 AIMATOR_WORKSPACE=~/Documents/Video/aimator-workspace
+
+# Etapy płatne. Żaden model nie ma wartości domyślnej: model, którego nikt nie
+# wybrał, nie jest decyzją. Klucze czytane są wyłącznie na ścieżce płatnej.
+AIMATOR_SCREENPLAY_MODEL=…            # etap 1
+AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
+AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream
+OPENAI_API_KEY=…
+BYTEPLUS_MODELARK=…
 ```
 
 Wiodące `~/` jest rozwijane. Kolejność ma znaczenie: `.env.local` wygrywa z `.env`,
@@ -56,9 +64,11 @@ Ręcznie wygląda to tak:
 ```bash
 pnpm dev project init 48-praw-wladzy --title "48 praw władzy" --aspect-ratio 16:9
 # uzupełnij każdy TODO(etap-0) w project.md — to jedyny plik pisany ręcznie
-pnpm dev character add 48-praw-wladzy --source ~/Zdjecia/portret.jpg
+# wymień każdą powracającą postać, nie tylko główną
+pnpm dev character new 48-praw-wladzy narrator --name "Narrator"
+pnpm dev character add 48-praw-wladzy narrator --source ~/Zdjecia/portret.jpg
 # albo, jeśli zdjęć nie będzie i postać powstaje z opisu:
-pnpm dev character describe 48-praw-wladzy
+pnpm dev character describe 48-praw-wladzy narrator
 pnpm dev episode add 48-praw-wladzy --source '~/48/01-NEVER OUTSHINE THE MASTER.md'
 pnpm dev episode set 48-praw-wladzy 01-never-outshine-the-master \
   --duration 60 --audio music-and-effects --language pl --subtitles pl --nature law-or-idea
@@ -73,10 +83,10 @@ Powstaje:
 
 ```
 $AIMATOR_WORKSPACE/projects/48-praw-wladzy/
-├── project.json        identyfikator, tytuł, proporcje, podstawa postaci
+├── project.json        identyfikator, tytuł, proporcje, obsada
 ├── project.md          zasady wspólne — pisane ręcznie
 ├── prepare.stage.json  pochodzenie i ocena
-├── character/sources/  zdjęcia, skopiowane i zahashowane (tylko jeśli są)
+├── characters/narrator/sources/   zdjęcia tej postaci, skopiowane i zahashowane
 └── episodes/01-never-outshine-the-master/
     ├── source.md       kopia bajtowa Twojego opisu
     ├── episode.json    pięć decyzji odcinka
@@ -88,16 +98,23 @@ której narzędzie nie dotrzymuje.
 
 ### Dwie decyzje projektu
 
-| Flaga | Wartość |
+| Decyzja | Wartość |
 |---|---|
 | `--aspect-ratio` | np. `16:9`; po powstaniu obrazów nie da się zmienić bez ich unieważnienia |
-| `--character` | `photographs` albo `description` — skąd etap postaci bierze wygląd |
+| obsada | każda powracająca postać, z identyfikatorem, nazwą i własną podstawą |
 
-`--character` istnieje, bo pusty katalog na zdjęcia nie odróżnia „świadomie bez zdjęć" od
-„jeszcze nie dodałem". Przy `photographs` bramka blokuje, dopóki nie ma ani jednego zdjęcia.
-Przy `description` **jedynym** wejściem etapu postaci jest opis wyglądu w `project.md` — i
-wtedy to on musi być konkretny, bo nic dalej go nie uzupełni. `character add` samo w sobie
-jest deklaracją i przestawia pole na `photographs`.
+**Obsada jest decyzją, nie wnioskiem.** Pusta obsada blokuje bramkę, bo projekt bez
+zadeklarowanej postaci znaczył kiedyś „dokładnie jedna, bezimienna" — i właśnie ten cichy
+domysł sprawiał, że seria opisująca dwie osoby produkowała jedną, a którą, rozstrzygał model.
+Kryterium jest powracalność: postać, której tożsamość musi przetrwać między odcinkami, należy
+do obsady; twarz widziana raz to referencja etapu 5.
+
+Każda postać ma **własną podstawę**, więc jedną możesz zbudować ze zdjęć, a resztę z opisu.
+Podstawa istnieje, bo pusty katalog na zdjęcia nie odróżnia „świadomie bez zdjęć" od „jeszcze
+nie dodałem". Przy `photographs` bramka blokuje, dopóki nie ma ani jednego zdjęcia tej
+postaci. Przy `description` **jedynym** wejściem etapu postaci jest opis jej wyglądu
+w `project.md` — i wtedy to on musi być konkretny, bo nic dalej go nie uzupełni.
+`character add` samo w sobie jest deklaracją i przestawia podstawę na `photographs`.
 
 ### Pięć decyzji odcinka
 
@@ -130,6 +147,39 @@ na zepsutym pochodzeniu byłaby kłamstwem, któremu zaufałyby kolejne etapy. P
 momentu `init` opisywałby pusty szkielet. Każda późniejsza edycja unieważnia akceptację,
 a `check` to zgłasza.
 
+## Etap 2 — postać
+
+Pierwszy etap obrazowy i pierwszy, który rozgałęzia się na dwa tory modelowe. Nie zależy
+od etapu 1, więc scenariusz i postacie mogą powstawać równolegle.
+
+```bash
+pnpm dev character generate 48-praw-wladzy narrator --track gpt-image --dry-run
+pnpm dev character generate 48-praw-wladzy narrator --track gpt-image
+pnpm dev approve 48-praw-wladzy narrator --stage character --track gpt-image \
+  --artifact card --note "podobieństwo się zgadza"
+pnpm dev character generate 48-praw-wladzy narrator --track gpt-image   # osiem widoków
+```
+
+Jedno polecenie produkuje w tej kolejności `card.png`, osiem widoków i `hero.png` pod
+`characters/<postać>/<tor>/`. **Bez flag robi następny krok i przestaje**, bo osiem widoków
+czeka na zatwierdzoną kartę, a `hero.png` na zatwierdzone widoki — i ani jednej z tych
+bramek nie otwiera sama walidacja. `--artifact card|hero|<widok>[,...]` zawęża przebieg,
+`--regenerate` wymaga jawnego `--artifact`, bo nowa opłata ma adresata.
+
+Model wskazuje `--model <id>`, a bez tej flagi `AIMATOR_IMAGE_MODEL_GPT_IMAGE` albo
+`AIMATOR_IMAGE_MODEL_SEEDREAM` — jedna zmienna na tor, żeby oba dało się puścić z jednej
+powłoki. Wartości domyślnej nie ma. Klucz (`OPENAI_API_KEY` albo `BYTEPLUS_MODELARK`)
+czytany jest wyłącznie na ścieżce płatnej; `--dry-run` pokazuje każdy prompt w całości,
+nie sięgając po sekret ani po sieć.
+
+Przerwana próba zwykle wznawia się **bez drugiej opłaty**: powtórz to samo polecenie.
+Odpowiedź, która zdążyła trafić na dysk, jest już opłacona — gpt-image niesie w niej bajty,
+seedream adres ważny 24 h.
+
+Akceptacja dotyczy jednego obrazu naraz i jest związana z jego sha256. `approve` odmawia
+bez `--artifact`: przyjęcie karty uruchamia osiem płatnych wywołań, więc musi być czymś,
+co ktoś napisał.
+
 ## Zasady, na których stoi całe narzędzie
 
 - Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy — nigdy
@@ -140,8 +190,11 @@ a `check` to zgłasza.
 - Akceptacja jest związana z bajtami. Zmiana pliku poza narzędziem unieważnia ją i `check`
   to zgłasza.
 - Nic nie ponawia się automatycznie, a stan `submitted` zapisuje się przed płatnym
-  wywołaniem — przerwana generacja wznawia się przez odpytanie zadania, nie przez drugą
-  opłatę.
+  wywołaniem. Przerwana próba zostawia więc ślad mówiący, że opłata mogła już paść.
+  Czy da się ją dokończyć bez drugiej, zależy od dostawcy: tam, gdzie odpowiedź zdążyła
+  trafić na dysk, wystarczy powtórzyć polecenie; poza tym jedyną drogą jest `--regenerate`.
+- Obsada jest jawną decyzją. Brak zadeklarowanej postaci znaczy „nikt nie powiedział, kto
+  występuje", a nie „jedna, bezimienna".
 
 Pełny kontrakt: [docs/pipeline.md](docs/pipeline.md).
 

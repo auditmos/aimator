@@ -89,10 +89,10 @@ For each episode establish:
 ## 3. Save
 
 ```sh
-aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9 \
-  --character photographs|description
-aimator character add <project-id> --source <zdjęcie> [--source <zdjęcie>...]
-aimator character describe <project-id>
+aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9
+aimator character new <project-id> <character-id> --name "<nazwa>"
+aimator character add <project-id> <character-id> --source <zdjęcie> [--source <zdjęcie>...]
+aimator character describe <project-id> <character-id>
 aimator episode add <project-id> --source <NN-tytul.md>
 aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-effects \
   --language pl --subtitles pl --nature law-or-idea
@@ -100,10 +100,19 @@ aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-ef
 
 Add `--dry-run` to any of these to see what would be written without writing it.
 
-`character add` and `character describe` are the two ways to answer the same question, and
-supplying a photograph counts as the answer. `character describe` is not a formality: it
-records that no photograph is coming, which is what lets the gate distinguish a decision
-from an omission.
+**Declare every recurring character, not just the lead.** The roster is an explicit
+decision and an empty one blocks the gate — a project with nobody in it used to mean
+"exactly one, anonymous", which is how a series whose rules described two people produced
+one. The criterion is recurrence: a character whose identity has to survive between
+episodes belongs here; a face seen once is a stage-5 reference image instead. Ask the user
+who comes back, and name each one. The `--name` is what the image stage puts in its prompt,
+so it must be the word the rules use for that character.
+
+`character add` and `character describe` are the two ways to answer the same question for
+**one** character, and supplying a photograph counts as the answer. `character describe` is
+not a formality: it records that no photograph is coming, which is what lets the gate
+distinguish a decision from an omission. Different characters in one project may answer
+differently.
 
 `project init` scaffolds `project.md` with `TODO(etap-0)` markers. **Replace every marker
 with the approved decisions** and delete the leading quote block. Keep unresolved,
