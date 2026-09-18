@@ -31,6 +31,11 @@ export function renderRules(title: string): string {
   cechy szczególne. Przy \`characterBasis: "description"\` **to jest jedyne wejście etapu
   postaci** — czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.
 - Stała obsada drugoplanowa: ${PLACEHOLDER} albo jawne „brak stałej obsady".
+- Relacje i wspólne zasady rysowania postaci: ${PLACEHOLDER} jak postacie mają się do siebie
+  skalą — kto jest ile wyższy i czy głowy są tej samej wielkości — oraz co jest rysowane
+  identycznie u każdej z nich. Proporcja podana osobno dla każdej postaci **nie wystarcza**:
+  dwie niezależne proporcje nie wyznaczają jeszcze relacji między nimi, a etap postaci
+  rysuje każdą osobno.
 - Powracające rekwizyty: ${PLACEHOLDER} albo jawne „brak". Każdy wymieniony opisz: kształt,
   wielkość względem postaci, materiał, barwa, zużycie. Sama nazwa to nie opis.
 - Styl wizualny: ${PLACEHOLDER} zatwierdzony kierunek.

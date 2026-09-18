@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { Dirent } from "node:fs";
 import { access, copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import type { ZodType } from "zod";
 import { z } from "zod";
 import { err, ok, type Result } from "../result.js";
@@ -109,6 +110,52 @@ export async function readJson<T>(path: string, schema: ZodType<T>): Promise<Res
 
 export function serialize(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+/**
+ * Directories below `root` that hold no file at any depth, topmost first and
+ * with nested ones collapsed into their outermost ancestor.
+ *
+ * The layout rule says a directory appears when a stage writes into it, which
+ * is enforced at creation time and never verified afterwards. A digest check
+ * can only see what a stage recorded; it is blind to a leftover from an older
+ * version of the tool, from a stage that failed between `mkdir` and its first
+ * write, or from a hand-made folder. This is the other direction of that
+ * question. Dotfiles do not count as contents — an `.DS_Store` is the
+ * filesystem talking, not the pipeline.
+ */
+export async function emptyDirectories(root: string): Promise<readonly string[]> {
+  const directories: string[] = [];
+  const holding = new Set<string>();
+
+  for (const entry of await readEntries(root)) {
+    const path = join(entry.parentPath, entry.name);
+
+    if (entry.isDirectory()) {
+      directories.push(path);
+    } else if (!entry.name.startsWith(".")) {
+      markAncestors(entry.parentPath, root, holding);
+    }
+  }
+
+  return directories.filter((path) => !holding.has(path) && holding.has(dirname(path)));
+}
+
+function markAncestors(from: string, root: string, holding: Set<string>): void {
+  let current = from;
+
+  while (current.length >= root.length && current !== dirname(current)) {
+    holding.add(current);
+    current = dirname(current);
+  }
+}
+
+async function readEntries(root: string): Promise<readonly Dirent[]> {
+  try {
+    return await readdir(root, { recursive: true, withFileTypes: true });
+  } catch {
+    return [];
+  }
 }
 
 /** Returns the directory entries of `path`, or an empty list when it does not exist. */

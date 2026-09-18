@@ -121,6 +121,9 @@ Work down the list until each entry is something a renderer could act on:
 - **The recurring wardrobe**, for every character on the list. The exact outfit that returns
   every episode: garments, cut, colours. In flat or stylised 2D the outfit carries
   recognition more reliably than the face, so this one is not optional.
+- **How the characters relate to each other**, once there is more than one. How they scale
+  — who is how much taller, and whether their heads are the same size — and what is drawn
+  identically across all of them. See below; this row is the one people skip.
 - **Every recurring object on the list.** Ask first whether any object recurs at all — many
   series have none, and inventing one is not your job. For each that does: what it is, its
   size against the character, shape, material, colour, wear, and whatever makes it *that*
@@ -134,8 +137,22 @@ The boundary is recurrence, not subject matter. Ask yourself: would this have to
 same in episode seven? Then it belongs here. The episode's own locations, its one-off
 objects and every shot still belong to later stages, derived from the screenplay.
 
+**Some facts live between two entries and therefore sit on neither.** A list closes them
+only if you look for them on purpose, so make one pass over the finished entries asking
+what holds *across* them rather than within any one:
+
+- **Scale.** Two independent ratios do not fix a relation. "Head is a third of her height"
+  and "head is a quarter of his" only agree with "he is a head taller" if their heads are
+  the same size — which nobody said, and which the character stage, drawing each figure
+  separately, has no reason to assume. State the relation, not just the two ratios.
+- **Shared construction.** What is drawn the same way on everyone: how faces are treated,
+  how hands and joints are handled, outline or no outline. Saying it once for the cast beats
+  repeating it per entry and contradicting yourself by the third.
+- **Shared palette.** One colour list for the whole series, with each entry drawing from it.
+  Per-entry colours invented separately are how a cast ends up not looking like a cast.
+
 Before handing off, re-read the list. Any entry named but not described is an unasked
-question, not a finished session.
+question, and any relation between entries that nobody stated is the same thing.
 
 If they truly cannot answer one of these yet, that is allowed — but say plainly that the
 character stage will then have to invent it, and will invent it differently each run.

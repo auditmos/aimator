@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -690,5 +690,61 @@ describe("project.json written before characterBasis existed", () => {
 
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? null : result.error.message).toContain("characterBasis nie jest ustalony");
+  });
+});
+
+describe("layout drift", () => {
+  it("should report a directory nothing has written to", async () => {
+    await makeProject();
+    await fillRules();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    await mkdir(join(root, "projects/demo/character/sources"), { recursive: true });
+
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("katalog nic nie zawiera");
+  });
+
+  it("should name the outermost empty directory, not every level of it", async () => {
+    await makeProject();
+    await fillRules();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    await mkdir(join(root, "projects/demo/character/sources"), { recursive: true });
+
+    const result = await checkStage0({ projectId: "demo", workspace });
+    const reported = result.ok
+      ? []
+      : result.error.message.split("\n").filter((line) => line.includes("katalog nic nie zawiera"));
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toContain("projects/demo/character");
+    expect(reported[0]).not.toContain("character/sources");
+  });
+
+  it("should not count a dotfile as contents", async () => {
+    await makeProject();
+    await fillRules();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    await mkdir(join(root, "projects/demo/character"), { recursive: true });
+    await writeFile(join(root, "projects/demo/character/.DS_Store"), "x", "utf8");
+
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("katalog nic nie zawiera");
   });
 });

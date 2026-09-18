@@ -49,6 +49,12 @@ For a new project establish:
    body, the recurring wardrobe, every recurring character, each recurring prop, the
    recurring setting, and the visual style.
 
+   Once there is more than one character, also record how they relate: how they scale
+   against each other, whether their heads are the same size, and what is drawn identically
+   across all of them. Two independent proportions never fix a relation, and the character
+   stage draws each figure separately, so what nobody stated it will invent. `project.md`
+   has a row for exactly this, and `aimator check` blocks while its marker is unfilled.
+
    Keep a running list of every recurring character, object and place the answers surface,
    and describe each entry on it. The list is whatever this interview produced — one series
    has several recurring characters and no objects, another the reverse — so never ask for

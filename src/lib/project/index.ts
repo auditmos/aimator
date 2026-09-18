@@ -26,6 +26,7 @@ import {
 } from "./schema.js";
 import {
   applyWrites,
+  emptyDirectories,
   exists,
   listEntries,
   newRunId,
@@ -843,6 +844,7 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
   let approved = false;
 
   await checkRules(project, problems);
+  await checkLayout(workspace, project, problems);
   checkDecisions(file.data, problems);
 
   if (stage.ok) {
@@ -872,6 +874,24 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
   }
 
   return { approved, checked, problems };
+}
+
+/**
+ * The layout rule, verified rather than merely stated. Digests answer "is what
+ * we recorded still there"; this answers the other half, "is there something
+ * here we never wrote" — which is how a leftover directory survives a tool
+ * upgrade and quietly contradicts the rules document beside it.
+ */
+async function checkLayout(
+  workspace: Workspace,
+  project: ProjectPaths,
+  problems: string[]
+): Promise<void> {
+  for (const path of await emptyDirectories(project.root)) {
+    problems.push(
+      `${toWorkspacePath(workspace.root, path)}: katalog nic nie zawiera — usuń go; katalog powstaje dopiero wtedy, gdy etap coś do niego zapisze`
+    );
+  }
 }
 
 /** The project-level decisions that have no default and no later owner. */
