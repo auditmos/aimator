@@ -330,3 +330,49 @@ describe("approve --stage", () => {
     expect(result.text).toContain("<episode-id>");
   });
 });
+
+describe("approve --stage character", () => {
+  it("should accept the track and artifact flags the usage documents", async () => {
+    const result = await cli(
+      "approve",
+      "demo",
+      "ewa",
+      "--stage",
+      "character",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "card"
+    );
+
+    expect(result.text).not.toContain("Unknown option");
+  });
+
+  it("should name the artifacts it knows when given one it does not", async () => {
+    const result = await cli(
+      "approve",
+      "demo",
+      "ewa",
+      "--stage",
+      "character",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "kadr"
+    );
+
+    expect(result.text).toContain('--artifact "kadr"');
+  });
+
+  it("should require the track, because each one costs separately", async () => {
+    const result = await cli("approve", "demo", "ewa", "--stage", "character");
+    expect(result.text).toContain("--track");
+  });
+});
+
+describe("project init flags", () => {
+  it("should refuse --character, because the cast is declared one at a time", async () => {
+    const result = await cli("project", "init", "demo", "--title", "Demo", "--character", "ewa");
+    expect(result.ok).toBe(false);
+  });
+});

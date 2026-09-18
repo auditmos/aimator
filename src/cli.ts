@@ -280,9 +280,11 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
     return err(new UsageError(`nieznane polecenie: project ${argv[0] ?? ""}`.trim()));
   }
 
+  // No `--character` here on purpose: the cast is declared by `character new`,
+  // one entry at a time. A flag accepted and discarded would let somebody
+  // believe they had named a character when nothing was written.
   const parsed = parse(argv.slice(1), {
     "aspect-ratio": { type: "string" },
-    character: { type: "string" },
     title: { type: "string" },
   });
 
@@ -638,10 +640,16 @@ async function checkCharacterStage(
 }
 
 async function runApprove(argv: readonly string[]): Promise<Result<string>> {
+  // `--stage character` narrows acceptance to one track and to named images,
+  // so both flags belong to every approve call rather than to a separate
+  // command. Declared here because a reader that is never parsed is a flag the
+  // usage promises and the parser rejects.
   const parsed = parse(argv, {
+    artifact: { type: "string" },
     note: { type: "string" },
     reviewer: { type: "string" },
     stage: { type: "string" },
+    track: { type: "string" },
   });
 
   if (!parsed.ok) {
