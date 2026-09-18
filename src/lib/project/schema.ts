@@ -86,3 +86,5 @@ export const episodeFileSchema = z.strictObject({
 export type DraftSettings = z.infer<typeof draftSettingsSchema>;
 export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;
+/** Every episode decision made — the shape a later stage is allowed to read. */
+export type ReadySettings = z.infer<typeof readySettingsSchema>;

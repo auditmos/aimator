@@ -45,6 +45,9 @@ import {
 } from "./schema.js";
 import { PLACEHOLDER, renderRules } from "./template.js";
 
+/** The five episode decisions, all made. A later stage reads them, never the draft. */
+export type { ReadySettings as EpisodeSettings } from "./schema.js";
+
 /**
  * Stage 0 — preparation. The only stage that legitimately ingests material
  * from outside the workspace, which is exactly why it copies those bytes in
