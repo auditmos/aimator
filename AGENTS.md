@@ -63,8 +63,10 @@ src/
     │   │                 #            reference plan, and the declared version
     │   ├── validate.ts   # Internal — the PNG and response verdicts, pure and offline
     │   ├── client.ts     # Internal — both paid calls, fetch injected
+    │   ├── plan.ts       # Internal — the gates, and what an artifact is drawn from
+    │   ├── attempt.ts    # Internal — one billed call: submit, archive, resume, publish
+    │   ├── generate.ts   # Internal — the command: targets, lock, preview, series
     │   ├── review.ts     # Internal — per-image verification and approval
-    │   ├── generate.ts   # Internal — gates, lock, and the order of operations
     │   ├── index.test.ts    # Validator, response reader and prompts, through the entry
     │   └── generate.test.ts # Gates/resume/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
