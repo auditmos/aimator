@@ -1,8 +1,12 @@
 import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  characterPaths,
+  characterTrackPaths,
+  characterViewImage,
   episodeIdFromSource,
   episodePaths,
+  imageRunPaths,
   projectPaths,
   resolveWorkspace,
   runPaths,
@@ -40,7 +44,7 @@ describe("projectPaths", () => {
   it("should place every stage-0 artifact under the project directory", () => {
     const result = projectPaths(workspace, "48-praw-wladzy");
     expect(result.ok ? result.data : null).toEqual({
-      characterSources: "/srv/aimator/projects/48-praw-wladzy/character/sources",
+      characters: "/srv/aimator/projects/48-praw-wladzy/characters",
       episodes: "/srv/aimator/projects/48-praw-wladzy/episodes",
       file: "/srv/aimator/projects/48-praw-wladzy/project.json",
       prepareStage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
@@ -64,6 +68,63 @@ describe("projectPaths", () => {
 
   it("should reject an id containing non-ASCII letters", () => {
     expect(projectPaths(workspace, "władza").ok).toBe(false);
+  });
+});
+
+describe("characterPaths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+
+  it("should give each cast member its own directory and sources", () => {
+    const result = project.ok ? characterPaths(project.data, "ewa") : null;
+    expect(result?.ok ? result.data : null).toEqual({
+      root: "/srv/aimator/projects/demo/characters/ewa",
+      sources: "/srv/aimator/projects/demo/characters/ewa/sources",
+    });
+  });
+
+  it("should reject a character id that could escape the project", () => {
+    expect(project.ok ? characterPaths(project.data, "../..").ok : null).toBe(false);
+  });
+});
+
+describe("characterTrackPaths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const character = project.ok ? characterPaths(project.data, "ewa") : null;
+  const track = character?.ok ? characterTrackPaths(character.data, "seedream") : null;
+  const root = "/srv/aimator/projects/demo/characters/ewa/seedream";
+
+  it("should hold the whole track under one directory", () => {
+    expect(track).toEqual({
+      card: `${root}/card.png`,
+      hero: `${root}/hero.png`,
+      lock: `${root}/character.lock`,
+      root,
+      runs: `${root}/runs`,
+      stage: `${root}/character.stage.json`,
+      views: `${root}/views`,
+    });
+  });
+
+  /** Rule 2: the track is a directory level, never a filename prefix. */
+  it("should name the two tracks identically inside their own directories", () => {
+    const other = character?.ok ? characterTrackPaths(character.data, "gpt-image") : null;
+    expect(other?.card.endsWith("/gpt-image/card.png")).toBe(true);
+    expect(track?.card.endsWith("/seedream/card.png")).toBe(true);
+  });
+
+  it("should place a view inside the track's views directory", () => {
+    const view = track === null ? null : characterViewImage(track, "three-quarter-left");
+    expect(view?.ok ? view.data : null).toBe(`${root}/views/three-quarter-left.png`);
+  });
+
+  it("should reject a view name that is not a plain identifier", () => {
+    expect(track === null ? null : characterViewImage(track, "../hero").ok).toBe(false);
+  });
+
+  it("should keep one run archive per track, keyed by run id", () => {
+    const run = track === null ? null : imageRunPaths(track, "20260918T110000Z-abcd1234");
+    expect(run?.root).toBe(`${root}/runs/20260918T110000Z-abcd1234`);
+    expect(run?.image).toBe(`${root}/runs/20260918T110000Z-abcd1234/original.png`);
   });
 });
 

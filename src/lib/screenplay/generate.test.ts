@@ -2,7 +2,14 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { addEpisode, approveStage0, initProject, setEpisodeSettings } from "../project/index.js";
+import {
+  addCharacter,
+  addEpisode,
+  approveStage0,
+  initProject,
+  setCharacterBasis,
+  setEpisodeSettings,
+} from "../project/index.js";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
 import { approveScreenplay, checkScreenplay, generateScreenplay } from "./index.js";
 
@@ -89,10 +96,23 @@ async function makeStage0(approve = true): Promise<void> {
 
   await initProject({
     aspectRatio: "16:9",
-    characterBasis: "description",
     mode: "apply",
     projectId: PROJECT,
     title: "Dzielna Ewa",
+    workspace,
+  });
+  await addCharacter({
+    characterId: "ewa",
+    mode: "apply",
+    name: "Ewa",
+    projectId: PROJECT,
+    workspace,
+  });
+  await setCharacterBasis({
+    basis: "description",
+    characterId: "ewa",
+    mode: "apply",
+    projectId: PROJECT,
     workspace,
   });
   await writeFile(join(root, "projects", PROJECT, "project.md"), "# Ewa\n\nZasady.\n", "utf8");

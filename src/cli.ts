@@ -2,6 +2,7 @@ import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import { env } from "./lib/env.js";
 import {
+  addCharacter,
   addCharacterSources,
   addEpisode,
   approveStage0,
@@ -24,9 +25,10 @@ import { resolveWorkspace, type Workspace } from "./lib/workspace.js";
 const USAGE = `Usage: aimator <command>
 
 Etap 0 — przygotowanie projektu i odcinka:
-  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--character <podstawa>]
-  character add <id> --source <plik> [--source <plik>...]
-  character describe <id>
+  project init <id> --title <tytuł> [--aspect-ratio <w:h>]
+  character new <id> <character-id> --name <nazwa>
+  character add <id> <character-id> --source <plik> [--source <plik>...]
+  character describe <id> <character-id>
   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
   episode set <id> <episode-id> [te same flagi decyzji]
@@ -42,8 +44,11 @@ Wspólne:
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
-  --character  photographs | description — skąd etap postaci bierze wygląd
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
+
+Obsada jest jawną decyzją: wymień każdą powracającą postać przez "character new".
+Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę —
+zdjęcia ("character add") albo opis w project.md ("character describe").
 
 Globalne:
   --workspace <ścieżka>  katalog artefaktów (domyślnie AIMATOR_WORKSPACE)
@@ -119,16 +124,6 @@ function workspaceOf(parsed: Parsed): Result<Workspace> {
 
 function modeOf(parsed: Parsed): "apply" | "dry-run" {
   return parsed.values["dry-run"] === true ? "dry-run" : "apply";
-}
-
-function basisOf(raw: unknown): Result<"description" | "photographs" | null> {
-  if (raw === undefined) {
-    return ok(null);
-  }
-
-  return raw === "description" || raw === "photographs"
-    ? ok(raw)
-    : err(new UsageError(`--character "${String(raw)}" — dozwolone: photographs, description`));
 }
 
 /** Who ran the command. An approval with no name attached is worth nothing. */
@@ -287,16 +282,9 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
   }
 
   const ratio = parsed.data.values["aspect-ratio"];
-  const basis = basisOf(parsed.data.values.character);
-
-  if (!basis.ok) {
-    return basis;
-  }
-
   const mode = modeOf(parsed.data);
   const result = await initProject({
     aspectRatio: typeof ratio === "string" ? ratio : null,
-    characterBasis: basis.data,
     mode,
     projectId: projectId.data,
     title: title.data,
@@ -308,70 +296,111 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
     : result;
 }
 
-async function runCharacterAdd(parsed: Parsed): Promise<Result<string>> {
+/** Project id, character id and the workspace — what every cast command needs. */
+function castScope(
+  parsed: Parsed
+): Result<{ characterId: string; projectId: string; workspace: Workspace }> {
   const projectId = requirePositional(parsed, 0, "project-id");
+  const characterId = requirePositional(parsed, 1, "character-id");
   const workspace = workspaceOf(parsed);
-  const sources = parsed.values.source;
 
   if (!projectId.ok) {
     return projectId;
   }
+  if (!characterId.ok) {
+    return characterId;
+  }
   if (!workspace.ok) {
     return workspace;
+  }
+
+  return ok({
+    characterId: characterId.data,
+    projectId: projectId.data,
+    workspace: workspace.data,
+  });
+}
+
+async function runCharacterNew(parsed: Parsed): Promise<Result<string>> {
+  const scope = castScope(parsed);
+  const name = requireFlag(parsed, "name");
+
+  if (!scope.ok) {
+    return scope;
+  }
+  if (!name.ok) {
+    return name;
+  }
+
+  const mode = modeOf(parsed);
+  const result = await addCharacter({ ...scope.data, mode, name: name.data });
+
+  return result.ok
+    ? ok(render(`Postać "${name.data}" dopisana do obsady`, result.data, mode))
+    : result;
+}
+
+async function runCharacterAdd(parsed: Parsed): Promise<Result<string>> {
+  const scope = castScope(parsed);
+  const sources = parsed.values.source;
+
+  if (!scope.ok) {
+    return scope;
   }
   if (!Array.isArray(sources) || sources.length === 0) {
     return err(new UsageError("brakuje wymaganej flagi --source"));
   }
 
   const mode = modeOf(parsed);
-  const result = await addCharacterSources({
-    mode,
-    projectId: projectId.data,
-    sourcePaths: sources,
-    workspace: workspace.data,
-  });
+  const result = await addCharacterSources({ ...scope.data, mode, sourcePaths: sources });
 
-  return result.ok ? ok(render("Materiały postaci", result.data, mode)) : result;
+  return result.ok
+    ? ok(render(`Materiały postaci "${scope.data.characterId}"`, result.data, mode))
+    : result;
 }
 
 async function runCharacterDescribe(parsed: Parsed): Promise<Result<string>> {
-  const projectId = requirePositional(parsed, 0, "project-id");
-  const workspace = workspaceOf(parsed);
+  const scope = castScope(parsed);
 
-  if (!projectId.ok) {
-    return projectId;
-  }
-  if (!workspace.ok) {
-    return workspace;
+  if (!scope.ok) {
+    return scope;
   }
 
   const mode = modeOf(parsed);
-  const result = await setCharacterBasis({
-    basis: "description",
-    mode,
-    projectId: projectId.data,
-    workspace: workspace.data,
-  });
+  const result = await setCharacterBasis({ ...scope.data, basis: "description", mode });
 
   return result.ok
-    ? ok(render("Postać powstaje z opisu w project.md, bez zdjęć", result.data, mode))
+    ? ok(
+        render(
+          `Postać "${scope.data.characterId}" powstaje z opisu w project.md, bez zdjęć`,
+          result.data,
+          mode
+        )
+      )
     : result;
 }
+
+const CHARACTER_OPTIONS = {
+  add: { source: { multiple: true, type: "string" } },
+  describe: {},
+  new: { name: { type: "string" } },
+} as const satisfies Record<string, ParseArgsConfig["options"]>;
 
 async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
   const [action] = argv;
 
-  if (action !== "add" && action !== "describe") {
+  if (action !== "add" && action !== "describe" && action !== "new") {
     return err(new UsageError(`nieznane polecenie: character ${action ?? ""}`.trim()));
   }
 
-  const parsed = parse(
-    argv.slice(1),
-    action === "add" ? { source: { multiple: true, type: "string" } } : {}
-  );
+  const parsed = parse(argv.slice(1), CHARACTER_OPTIONS[action]);
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  if (action === "new") {
+    return await runCharacterNew(parsed.data);
   }
 
   return action === "add"

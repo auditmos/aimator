@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
 import {
+  addCharacter,
   addCharacterSources,
   addEpisode,
   approveStage0,
@@ -35,13 +36,17 @@ async function tree(path: string): Promise<string[]> {
   return out.sort();
 }
 
+/**
+ * A project with one declared cast member, because that is now the smallest
+ * shape stage 0 accepts: a project with nobody in it is undecided, not a
+ * project holding one anonymous character.
+ */
 async function makeProject(
   aspectRatio: string | null = "16:9",
-  characterBasis: "description" | "photographs" | null = "description"
+  basis: "description" | null = "description"
 ): Promise<void> {
   const result = await initProject({
     aspectRatio,
-    characterBasis,
     mode: "apply",
     projectId: "demo",
     title: "Demo",
@@ -49,6 +54,37 @@ async function makeProject(
   });
 
   expect(result.ok).toBe(true);
+
+  const cast = await addCharacter({
+    characterId: "ewa",
+    mode: "apply",
+    name: "Ewa",
+    projectId: "demo",
+    workspace,
+  });
+
+  expect(cast.ok).toBe(true);
+
+  if (basis !== null) {
+    const declared = await setCharacterBasis({
+      basis,
+      characterId: "ewa",
+      mode: "apply",
+      projectId: "demo",
+      workspace,
+    });
+
+    expect(declared.ok).toBe(true);
+  }
+}
+
+async function readProject(): Promise<{
+  characters: Record<
+    string,
+    { basis: string | null; name: string; sources: { originPath: string }[] }
+  >;
+}> {
+  return JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
 }
 
 async function makeSource(name = "01-NEVER OUTSHINE THE MASTER.md"): Promise<string> {
@@ -93,15 +129,36 @@ describe("initProject", () => {
   it("should not promise directories nothing has written to yet", async () => {
     await makeProject();
     const entries = await tree(root);
-    expect(entries).not.toContain("projects/demo/character/sources");
+    expect(entries).not.toContain("projects/demo/characters/ewa/sources");
     expect(entries).not.toContain("projects/demo/episodes");
-    expect(entries).not.toContain("projects/demo/character/gpt-image");
+    expect(entries).not.toContain("projects/demo/characters/ewa/gpt-image");
   });
 
   it("should report an undecided character basis", async () => {
     await makeProject("16:9", null);
     const result = await checkStage0({ projectId: "demo", workspace });
-    expect(result.ok ? null : result.error.message).toContain("characterBasis");
+    expect(result.ok ? null : result.error.message).toContain("nie ma ustalonej podstawy");
+  });
+
+  /**
+   * The silent default this whole shape exists to remove: a project with no
+   * declared cast used to mean "one character, anonymous", which is how a
+   * series whose rules describe two people produced one.
+   */
+  it("should refuse an empty cast rather than assume a single character", async () => {
+    const result = await initProject({
+      aspectRatio: "16:9",
+      mode: "apply",
+      projectId: "demo",
+      title: "Demo",
+      workspace,
+    });
+
+    expect(result.ok ? result.data.problems.join(" ") : null).toContain("obsada jest pusta");
+
+    await fillRules();
+    const check = await checkStage0({ projectId: "demo", workspace });
+    expect(check.ok ? null : check.error.message).toContain("obsada jest pusta");
   });
 
   it("should scaffold rules that still carry placeholders", async () => {
@@ -124,7 +181,6 @@ describe("initProject", () => {
   it("should write nothing in dry-run mode", async () => {
     const result = await initProject({
       aspectRatio: "16:9",
-      characterBasis: "description",
       mode: "dry-run",
       projectId: "demo",
       title: "Demo",
@@ -139,7 +195,6 @@ describe("initProject", () => {
     await fillRules();
     const again = await initProject({
       aspectRatio: "16:9",
-      characterBasis: "description",
       mode: "apply",
       projectId: "demo",
       title: "Inny",
@@ -154,7 +209,6 @@ describe("initProject", () => {
   it("should reject an invalid project id", async () => {
     const result = await initProject({
       aspectRatio: null,
-      characterBasis: "description",
       mode: "apply",
       projectId: "../escape",
       title: "Demo",
@@ -166,7 +220,6 @@ describe("initProject", () => {
   it("should reject a malformed aspect ratio", async () => {
     const result = await initProject({
       aspectRatio: "szeroki",
-      characterBasis: "description",
       mode: "apply",
       projectId: "demo",
       title: "Demo",
@@ -398,6 +451,7 @@ describe("addCharacterSources", () => {
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
     const result = await addCharacterSources({
+      characterId: "ewa",
       mode: "apply",
       projectId: "demo",
       sourcePaths: [photo],
@@ -405,11 +459,11 @@ describe("addCharacterSources", () => {
     });
 
     expect(result.ok ? result.data.created : null).toEqual([
-      "projects/demo/character/sources/portret.png",
+      "projects/demo/characters/ewa/sources/portret.png",
     ]);
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
-    expect(project.characterSources).toHaveLength(1);
-    expect(project.characterSources[0].originPath).toBe(photo);
+    expect(project.characters.ewa.sources).toHaveLength(1);
+    expect(project.characters.ewa.sources[0].originPath).toBe(photo);
   });
 
   it("should not record the same photo twice", async () => {
@@ -417,12 +471,14 @@ describe("addCharacterSources", () => {
     const photo = join(scratch, "portret.png");
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await addCharacterSources({
+      characterId: "ewa",
       mode: "apply",
       projectId: "demo",
       sourcePaths: [photo],
       workspace,
     });
     const again = await addCharacterSources({
+      characterId: "ewa",
       mode: "apply",
       projectId: "demo",
       sourcePaths: [photo],
@@ -431,7 +487,7 @@ describe("addCharacterSources", () => {
 
     expect(again.ok ? again.data.created : null).toEqual([]);
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
-    expect(project.characterSources).toHaveLength(1);
+    expect(project.characters.ewa.sources).toHaveLength(1);
   });
 });
 
@@ -491,8 +547,14 @@ describe("checkStage0", () => {
   });
 
   it("should block photographs declared with no photograph supplied", async () => {
-    await makeProject("16:9", "photographs");
+    await makeProject("16:9", null);
     await fillRules();
+    // Written straight to disk: the command refuses this state, so only a file
+    // edited outside the tool can reach the check being exercised here.
+    const path = join(root, "projects/demo/project.json");
+    const file = JSON.parse(await readFile(path, "utf8"));
+    file.characters.ewa.basis = "photographs";
+    await writeFile(path, `${JSON.stringify(file, null, 2)}\n`, "utf8");
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? null : result.error.message).toContain("ani jednego zdjęcia");
   });
@@ -533,6 +595,7 @@ describe("setCharacterBasis", () => {
     await makeProject("16:9", null);
     const result = await setCharacterBasis({
       basis: "description",
+      characterId: "ewa",
       mode: "apply",
       projectId: "demo",
       workspace,
@@ -540,13 +603,14 @@ describe("setCharacterBasis", () => {
 
     expect(result.ok).toBe(true);
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
-    expect(project.characterBasis).toBe("description");
+    expect(project.characters.ewa.basis).toBe("description");
   });
 
   it("should refuse to declare photographs without any photograph", async () => {
     await makeProject("16:9", null);
     const result = await setCharacterBasis({
       basis: "photographs",
+      characterId: "ewa",
       mode: "apply",
       projectId: "demo",
       workspace,
@@ -560,6 +624,7 @@ describe("setCharacterBasis", () => {
     const photo = join(scratch, "portret.png");
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     const result = await addCharacterSources({
+      characterId: "ewa",
       mode: "apply",
       projectId: "demo",
       sourcePaths: [photo],
@@ -567,7 +632,7 @@ describe("setCharacterBasis", () => {
     });
 
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
-    expect(project.characterBasis).toBe("photographs");
+    expect(project.characters.ewa.basis).toBe("photographs");
     expect(result.ok ? result.data.problems.join(" ") : null).toContain("z opisu na zdjęcia");
   });
 });
@@ -702,16 +767,73 @@ describe("approveStage0", () => {
   });
 });
 
-describe("project.json written before characterBasis existed", () => {
-  it("should read as undecided rather than as a default", async () => {
+describe("project.json written before the cast existed", () => {
+  async function writeLegacy(sources: unknown[] = []): Promise<string> {
+    const path = join(root, "projects/demo/project.json");
+    await writeFile(
+      path,
+      `${JSON.stringify(
+        {
+          aspectRatio: "16:9",
+          characterBasis: "description",
+          characterSources: sources,
+          id: "demo",
+          schemaVersion: 1,
+          title: "Demo",
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+    return path;
+  }
+
+  /**
+   * The old basis is dropped, not carried onto whichever member is declared
+   * first: it described a character nobody had named, so moving it would be
+   * inventing an answer rather than migrating one.
+   */
+  it("should read as an empty cast rather than as one anonymous character", async () => {
     await makeProject();
     await fillRules();
-    const path = join(root, "projects/demo/project.json");
-    const { characterBasis, ...older } = JSON.parse(await readFile(path, "utf8"));
-    await writeFile(path, `${JSON.stringify(older, null, 2)}\n`, "utf8");
+    await writeLegacy();
 
     const result = await checkStage0({ projectId: "demo", workspace });
-    expect(result.ok ? null : result.error.message).toContain("characterBasis nie jest ustalony");
+    expect(result.ok ? null : result.error.message).toContain("obsada jest pusta");
+  });
+
+  it("should let a named character be declared over it", async () => {
+    await makeProject();
+    await fillRules();
+    await writeLegacy();
+
+    const result = await addCharacter({
+      characterId: "ewa",
+      mode: "apply",
+      name: "Ewa",
+      projectId: "demo",
+      workspace,
+    });
+
+    expect(result.ok).toBe(true);
+    const project = await readProject();
+    expect(project.characters.ewa).toEqual({ basis: null, name: "Ewa", sources: [] });
+  });
+
+  it("should refuse to convert one that already holds photographs", async () => {
+    await makeProject();
+    await fillRules();
+    await writeLegacy([
+      {
+        originPath: "/tmp/portret.png",
+        path: "projects/demo/character/sources/portret.png",
+        sha256: "a".repeat(64),
+      },
+    ]);
+
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? null : result.error.message).toContain("nienazwanej postaci");
   });
 });
 
@@ -726,7 +848,7 @@ describe("layout drift", () => {
       sourcePath: await makeSource(),
       workspace,
     });
-    await mkdir(join(root, "projects/demo/character/sources"), { recursive: true });
+    await mkdir(join(root, "projects/demo/characters/ewa/sources"), { recursive: true });
 
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? null : result.error.message).toContain("katalog nic nie zawiera");
@@ -742,7 +864,7 @@ describe("layout drift", () => {
       sourcePath: await makeSource(),
       workspace,
     });
-    await mkdir(join(root, "projects/demo/character/sources"), { recursive: true });
+    await mkdir(join(root, "projects/demo/characters/ewa/sources"), { recursive: true });
 
     const result = await checkStage0({ projectId: "demo", workspace });
     const reported = result.ok
@@ -763,8 +885,8 @@ describe("layout drift", () => {
       sourcePath: await makeSource(),
       workspace,
     });
-    await mkdir(join(root, "projects/demo/character"), { recursive: true });
-    await writeFile(join(root, "projects/demo/character/.DS_Store"), "x", "utf8");
+    await mkdir(join(root, "projects/demo/characters"), { recursive: true });
+    await writeFile(join(root, "projects/demo/characters/.DS_Store"), "x", "utf8");
 
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? null : result.error.message).toContain("katalog nic nie zawiera");

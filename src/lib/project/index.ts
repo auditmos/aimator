@@ -24,6 +24,8 @@ import {
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
+  type CharacterPaths,
+  characterPaths,
   type EpisodePaths,
   episodeIdFromSource,
   episodePaths,
@@ -33,11 +35,12 @@ import {
 } from "../workspace.js";
 import {
   audioModes,
-  characterBases,
+  type CharacterEntry,
   type DraftSettings,
   draftSettingsSchema,
   type EpisodeFile,
   episodeFileSchema,
+  legacyProjectFileSchema,
   type ProjectFile,
   projectFileSchema,
   type ReadySettings,
@@ -102,10 +105,14 @@ interface ProjectInput {
 }
 type InitProjectInput = ProjectInput & {
   readonly aspectRatio: string | null;
-  readonly characterBasis: ProjectFile["characterBasis"];
   readonly title: string;
 };
-type SetBasisInput = ProjectInput & { readonly basis: NonNullable<ProjectFile["characterBasis"]> };
+/** Every command that names one member of the cast carries its id. */
+type CharacterInput = ProjectInput & { readonly characterId: string };
+type AddCharacterInput = CharacterInput & { readonly name: string };
+type SetBasisInput = CharacterInput & {
+  readonly basis: NonNullable<CharacterEntry["basis"]>;
+};
 type ApproveInput = ProjectInput & { readonly note: string | null; readonly reviewer: string };
 type AddEpisodeInput = ProjectInput & {
   readonly settings: Partial<DraftSettings>;
@@ -115,7 +122,7 @@ type SetSettingsInput = ProjectInput & {
   readonly episodeId: string;
   readonly settings: Partial<DraftSettings>;
 };
-type AddSourcesInput = ProjectInput & { readonly sourcePaths: readonly string[] };
+type AddSourcesInput = CharacterInput & { readonly sourcePaths: readonly string[] };
 interface CheckInput {
   readonly projectId: string;
   readonly workspace: Workspace;
@@ -125,7 +132,12 @@ interface EpisodeRef {
 }
 
 class ProjectStateError extends Error {
-  readonly reason: "already-exists" | "duplicate-number" | "missing-episode" | "missing-project";
+  readonly reason:
+    | "already-exists"
+    | "duplicate-number"
+    | "missing-character"
+    | "missing-episode"
+    | "missing-project";
 
   constructor(reason: ProjectStateError["reason"], message: string) {
     super(message);
@@ -184,6 +196,203 @@ async function resolveProject(input: ProjectInput): Promise<Result<ProjectPaths>
   return paths;
 }
 
+/**
+ * Reads `project.json`, converting a pre-cast file in memory.
+ *
+ * A v1 file recorded one basis for a character nobody had named. Carrying that
+ * onto whichever member gets declared first would be inventing an answer, so
+ * the conversion drops it and every named character starts undecided — which
+ * `check` then reports until somebody decides. A v1 file that already holds
+ * photographs is refused outright: those bytes belong to a person, and this
+ * function has no way to know which one.
+ */
+async function readProjectFile(path: string): Promise<Result<ProjectFile>> {
+  const file = await readJson(path, projectFileSchema);
+
+  if (file.ok) {
+    return file;
+  }
+
+  const legacy = await readJson(path, legacyProjectFileSchema);
+
+  if (!legacy.ok) {
+    // Report against the current schema: the old one is an implementation detail.
+    return file;
+  }
+
+  if (legacy.data.characterSources.length > 0) {
+    return err(
+      new InvalidInputError(
+        "characters",
+        `${path} pochodzi sprzed obsady i trzyma ${legacy.data.characterSources.length} zdjęć przypisanych do nienazwanej postaci — zadeklaruj postać przez "aimator character new", a potem dodaj te zdjęcia do niej przez "aimator character add"; pliki zostają tam, gdzie są`
+      )
+    );
+  }
+
+  return ok({
+    aspectRatio: legacy.data.aspectRatio,
+    characters: {},
+    id: legacy.data.id,
+    schemaVersion: 2,
+    title: legacy.data.title,
+  });
+}
+
+/** Every photograph the cast holds. The project record's inputs are exactly these. */
+function castSources(file: ProjectFile): readonly RecordedFile[] {
+  return Object.values(file.characters).flatMap((entry) =>
+    entry.sources.map((asset) => ({ path: asset.path, sha256: asset.sha256 }))
+  );
+}
+
+/**
+ * `project.json` and the stage record carrying its digest, which are never
+ * written apart: a project file whose recorded hash describes older bytes is
+ * the one state every later stage is entitled to treat as tampering.
+ */
+function projectWrites(
+  workspace: Workspace,
+  paths: ProjectPaths,
+  file: ProjectFile
+): readonly WriteOp[] {
+  const text = serialize(file);
+
+  return [
+    { kind: "text", text, to: paths.file },
+    {
+      kind: "text",
+      text: serialize(
+        prepareStageFile({
+          project: record(castSources(file), [
+            {
+              path: toWorkspacePath(workspace.root, paths.file),
+              sha256: sha256Of(Buffer.from(text)),
+            },
+          ]),
+        })
+      ),
+      to: paths.prepareStage,
+    },
+  ];
+}
+
+interface ResolvedCharacter {
+  readonly entry: CharacterEntry;
+  readonly file: ProjectFile;
+  readonly paths: CharacterPaths;
+  readonly project: ProjectPaths;
+}
+
+/** One member of the cast, or the reason the roster does not hold them. */
+async function resolveCharacter(input: CharacterInput): Promise<Result<ResolvedCharacter>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const paths = characterPaths(project.data, input.characterId);
+
+  if (!paths.ok) {
+    return paths;
+  }
+
+  const file = await readProjectFile(project.data.file);
+
+  if (!file.ok) {
+    return file;
+  }
+
+  const entry = file.data.characters[input.characterId];
+
+  return entry === undefined
+    ? err(
+        new ProjectStateError(
+          "missing-character",
+          `postać "${input.characterId}" nie jest w obsadzie projektu "${input.projectId}" — zadeklaruj ją przez: aimator character new ${input.projectId} ${input.characterId} --name "..."`
+        )
+      )
+    : ok({ entry, file: file.data, paths: paths.data, project: project.data });
+}
+
+/**
+ * Declares that this character exists in the series.
+ *
+ * The roster is the decision the tool used to skip. Before it, a project with
+ * no declared character meant "exactly one, anonymous", so a series whose rules
+ * described two people produced one — and which one was left to the model.
+ * Whom to declare is a judgement about recurrence: a character whose identity
+ * must survive across episodes belongs here, a face seen once is a stage-5
+ * reference image instead.
+ */
+export async function addCharacter(input: AddCharacterInput): Promise<Result<Stage0Report>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const paths = characterPaths(project.data, input.characterId);
+
+  if (!paths.ok) {
+    return paths;
+  }
+
+  const current = await readProjectFile(project.data.file);
+
+  if (!current.ok) {
+    return current;
+  }
+
+  if (current.data.characters[input.characterId] !== undefined) {
+    return err(
+      new ProjectStateError(
+        "already-exists",
+        `postać "${input.characterId}" jest już w obsadzie — etap 0 nie nadpisuje zatwierdzonych ustaleń`
+      )
+    );
+  }
+
+  const name = input.name.trim();
+
+  if (name === "") {
+    return err(
+      new InvalidInputError(
+        "name",
+        "postać potrzebuje nazwy — to ona trafia do promptu etapu postaci i to jej szuka model w zasadach projektu"
+      )
+    );
+  }
+
+  const file: ProjectFile = {
+    ...current.data,
+    characters: {
+      ...current.data.characters,
+      [input.characterId]: { basis: null, name, sources: [] },
+    },
+  };
+  const lapsed = await approvalLapses(project.data.prepareStage);
+  const written = await applyWrites(
+    [...projectWrites(input.workspace, project.data, file)],
+    input.mode
+  );
+
+  return written.ok
+    ? ok({
+        approved: false,
+        created: [],
+        nextStep: `zdecyduj, skąd bierze się wygląd: aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
+        problems: lapsed
+          ? [
+              `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+            ]
+          : [],
+        ready: false,
+        reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+      })
+    : written;
+}
+
 export async function initProject(input: InitProjectInput): Promise<Result<Stage0Report>> {
   const paths = projectPaths(input.workspace, input.projectId);
 
@@ -202,21 +411,11 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
 
   const file: ProjectFile = {
     aspectRatio: input.aspectRatio,
-    characterBasis: input.characterBasis,
-    characterSources: [],
+    characters: {},
     id: input.projectId,
-    schemaVersion: 1,
+    schemaVersion: 2,
     title: input.title,
   };
-
-  if (input.characterBasis !== null && !characterBases.includes(input.characterBasis)) {
-    return err(
-      new InvalidInputError(
-        "characterBasis",
-        `nieznana podstawa postaci "${input.characterBasis}" — dozwolone: ${characterBases.join(", ")}`
-      )
-    );
-  }
 
   if (!projectFileSchema.safeParse(file).success) {
     return err(
@@ -228,8 +427,8 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
   }
 
   const text = serialize(file);
-  // No empty directories: `character/sources/` and `episodes/` appear when a
-  // command first writes into them, so the tree never promises more than it holds.
+  // No empty directories: `characters/` and `episodes/` appear when a command
+  // first writes into them, so the tree never promises more than it holds.
   const ops: WriteOp[] = [
     { kind: "text", text: renderRules(input.title), to: paths.data.rules },
     { kind: "text", text, to: paths.data.file },
@@ -258,13 +457,10 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
     ? ok({
         approved: false,
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
-        nextStep: `uzupełnij każdy ${PLACEHOLDER} w project.md, a potem: aimator episode add ${input.projectId} --source <plik.md>`,
-        problems:
-          input.characterBasis === null
-            ? [
-                "project.json: characterBasis nie jest ustalony — postać powstaje ze zdjęć (character add) albo z opisu (character describe)",
-              ]
-            : [],
+        nextStep: `zadeklaruj obsadę: aimator character new ${input.projectId} <postać> --name <nazwa>`,
+        problems: [
+          "project.json: obsada jest pusta — wymień każdą powracającą postać serii; jednorazowe pojawienie to referencja etapu 5, nie postać",
+        ],
         ready: false,
         reused: [],
       })
@@ -544,19 +740,14 @@ async function approvalLapses(stagePath: string): Promise<boolean> {
 }
 
 export async function addCharacterSources(input: AddSourcesInput): Promise<Result<Stage0Report>> {
-  const project = await resolveProject(input);
+  const resolved = await resolveCharacter(input);
 
-  if (!project.ok) {
-    return project;
+  if (!resolved.ok) {
+    return resolved;
   }
 
-  const current = await readJson(project.data.file, projectFileSchema);
-
-  if (!current.ok) {
-    return current;
-  }
-
-  const recorded = [...current.data.characterSources];
+  const { entry, file: current, paths, project } = resolved.data;
+  const recorded = [...entry.sources];
   const ops: WriteOp[] = [];
   const created: string[] = [];
   const reused: string[] = [];
@@ -572,7 +763,7 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
       return digest ?? err(new InvalidInputError("source", `nie można odczytać ${sourcePath}`));
     }
 
-    const destination = join(project.data.characterSources, basename(sourcePath));
+    const destination = join(paths.sources, basename(sourcePath));
     const path = toWorkspacePath(input.workspace.root, destination);
     const already = recorded.find((asset) => asset.sha256 === digest.data.sha256);
 
@@ -585,41 +776,25 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
     }
   }
 
-  // Supplying a photograph *is* the declaration that the character is built
+  // Supplying a photograph *is* the declaration that this character is built
   // from photographs; it is never inferred from an empty directory.
   const file: ProjectFile = {
-    ...current.data,
-    characterBasis: "photographs",
-    characterSources: recorded,
+    ...current,
+    characters: {
+      ...current.characters,
+      [input.characterId]: { ...entry, basis: "photographs", sources: recorded },
+    },
   };
-  const text = serialize(file);
 
-  ops.push({ kind: "text", text, to: project.data.file });
-  ops.push({
-    kind: "text",
-    text: serialize(
-      prepareStageFile({
-        project: record(
-          recorded.map((asset) => ({ path: asset.path, sha256: asset.sha256 })),
-          [
-            {
-              path: toWorkspacePath(input.workspace.root, project.data.file),
-              sha256: sha256Of(Buffer.from(text)),
-            },
-          ]
-        ),
-      })
-    ),
-    to: project.data.prepareStage,
-  });
+  ops.push(...projectWrites(input.workspace, project, file));
 
-  const lapsed = await approvalLapses(project.data.prepareStage);
+  const lapsed = await approvalLapses(project.prepareStage);
   const written = await applyWrites(ops, input.mode);
   const problems: string[] = [];
 
-  if (current.data.characterBasis === "description") {
+  if (entry.basis === "description") {
     problems.push(
-      "podstawa postaci zmieniona z opisu na zdjęcia — opis wyglądu w project.md przestaje być wejściem etapu postaci"
+      `podstawa postaci "${entry.name}" zmieniona z opisu na zdjęcia — opis jej wyglądu w project.md przestaje być wejściem etapu postaci`
     );
   }
 
@@ -643,62 +818,37 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
 }
 
 /**
- * The counterpart to `addCharacterSources`: declares that this project builds
- * its character from the written description instead of photographs. Without
- * it an empty `character/sources/` would be indistinguishable from one that is
- * merely still waiting for files.
+ * The counterpart to `addCharacterSources`: declares that this character is
+ * built from the written rules instead of photographs. Without it an empty
+ * `sources/` would be indistinguishable from one still waiting for files.
  */
 export async function setCharacterBasis(input: SetBasisInput): Promise<Result<Stage0Report>> {
-  const project = await resolveProject(input);
+  const resolved = await resolveCharacter(input);
 
-  if (!project.ok) {
-    return project;
+  if (!resolved.ok) {
+    return resolved;
   }
 
-  const current = await readJson(project.data.file, projectFileSchema);
+  const { entry, file: current, project } = resolved.data;
 
-  if (!current.ok) {
-    return current;
-  }
-
-  if (input.basis === "photographs" && current.data.characterSources.length === 0) {
+  if (input.basis === "photographs" && entry.sources.length === 0) {
     return err(
       new InvalidInputError(
-        "characterBasis",
-        `podstawy "photographs" nie deklaruje się pustą ręką — dodaj zdjęcia przez: aimator character add ${input.projectId} --source <plik>`
+        "basis",
+        `podstawy "photographs" nie deklaruje się pustą ręką — dodaj zdjęcia przez: aimator character add ${input.projectId} ${input.characterId} --source <plik>`
       )
     );
   }
 
-  const file: ProjectFile = { ...current.data, characterBasis: input.basis };
-  const text = serialize(file);
-  const lapsed = await approvalLapses(project.data.prepareStage);
-  const written = await applyWrites(
-    [
-      { kind: "text", text, to: project.data.file },
-      {
-        kind: "text",
-        text: serialize(
-          prepareStageFile({
-            project: record(
-              current.data.characterSources.map((asset) => ({
-                path: asset.path,
-                sha256: asset.sha256,
-              })),
-              [
-                {
-                  path: toWorkspacePath(input.workspace.root, project.data.file),
-                  sha256: sha256Of(Buffer.from(text)),
-                },
-              ]
-            ),
-          })
-        ),
-        to: project.data.prepareStage,
-      },
-    ],
-    input.mode
-  );
+  const file: ProjectFile = {
+    ...current,
+    characters: {
+      ...current.characters,
+      [input.characterId]: { ...entry, basis: input.basis },
+    },
+  };
+  const lapsed = await approvalLapses(project.prepareStage);
+  const written = await applyWrites([...projectWrites(input.workspace, project, file)], input.mode);
 
   return written.ok
     ? ok({
@@ -706,7 +856,7 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
         created: [],
         nextStep:
           input.basis === "description"
-            ? "opis wyglądu w project.md jest jedynym wejściem etapu postaci — musi być konkretny"
+            ? `opis wyglądu "${entry.name}" w project.md jest jedynym wejściem etapu postaci — musi być konkretny`
             : `aimator check ${input.projectId}`,
         problems: lapsed
           ? [
@@ -748,7 +898,7 @@ export async function readStage0Inputs(
     return paths;
   }
 
-  const file = await readJson(project.data.file, projectFileSchema);
+  const file = await readProjectFile(project.data.file);
   const episode = await readJson(paths.data.file, episodeFileSchema);
 
   if (!file.ok) {
@@ -992,7 +1142,7 @@ async function readEpisodeStage(
 }
 
 async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promise<Stage0Verdict> {
-  const file = await readJson(project.file, projectFileSchema);
+  const file = await readProjectFile(project.file);
 
   if (!file.ok) {
     return { approved: false, checked: [], lapsed: false, problems: [file.error.message] };
@@ -1066,17 +1216,27 @@ function checkDecisions(file: ProjectFile, problems: string[]): void {
     problems.push("project.json: aspectRatio nie jest ustalony");
   }
 
-  if (file.characterBasis === null) {
+  const cast = Object.entries(file.characters);
+
+  // An empty roster used to mean "one character, anonymous". It now means
+  // nobody has said who is in the series, and that is not an answer.
+  if (cast.length === 0) {
     problems.push(
-      "project.json: characterBasis nie jest ustalony — zdecyduj, czy postać powstaje ze zdjęć (aimator character add) czy z opisu w project.md (aimator character describe)"
+      `project.json: obsada jest pusta — wymień każdą powracającą postać przez "aimator character new ${file.id} <postać> --name <nazwa>"; postać widziana raz to referencja etapu 5, nie postać`
     );
     return;
   }
 
-  if (file.characterBasis === "photographs" && file.characterSources.length === 0) {
-    problems.push(
-      "project.json: characterBasis to photographs, ale nie ma ani jednego zdjęcia — etap postaci nie miałby od czego zacząć"
-    );
+  for (const [characterId, entry] of cast) {
+    if (entry.basis === null) {
+      problems.push(
+        `project.json: postać "${characterId}" nie ma ustalonej podstawy — zdecyduj, czy powstaje ze zdjęć (aimator character add ${file.id} ${characterId} --source <plik>) czy z opisu w project.md (aimator character describe ${file.id} ${characterId})`
+      );
+    } else if (entry.basis === "photographs" && entry.sources.length === 0) {
+      problems.push(
+        `project.json: postać "${characterId}" ma podstawę photographs, ale nie ma ani jednego zdjęcia — etap postaci nie miałby od czego zacząć`
+      );
+    }
   }
 }
 

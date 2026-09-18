@@ -26,9 +26,11 @@ export const audioModes = [
 export const sourceNatures = ["law-or-idea", "screenplay", "synopsis"] as const;
 
 /**
- * Where the character stage starts from. Recorded as a decision because an
- * empty `character/sources/` is otherwise ambiguous: "deliberately none" and
- * "not supplied yet" are different states and only one of them may pass stage 0.
+ * Where one character's appearance comes from. Recorded per character rather
+ * than per project, because a series may legitimately build one lead from
+ * photographs and the rest from the written rules. Recorded as a decision at
+ * all because an empty `sources/` is otherwise ambiguous: "deliberately none"
+ * and "not supplied yet" are different states and only one may pass stage 0.
  */
 export const characterBases = ["description", "photographs"] as const;
 
@@ -63,10 +65,45 @@ export const draftSettingsSchema = z.strictObject({
   subtitles: subtitlesSchema.nullable(),
 });
 
+/**
+ * One member of the cast: who the image stage draws, and from what.
+ *
+ * `name` is not decoration — it is what the prompt tells the model to render,
+ * and it is the word the project rules use for that character. The id is the
+ * directory it lives in; the name is the person.
+ */
+const characterSchema = z.strictObject({
+  // Undecided until somebody says so, exactly as `aspectRatio` is.
+  basis: z.enum(characterBases).nullable().default(null),
+  name: z.string().min(1),
+  sources: z.array(assetSchema),
+});
+
 export const projectFileSchema = z.strictObject({
   aspectRatio: z.string().regex(ASPECT_RATIO, "expected an aspect ratio such as 16:9").nullable(),
-  // Absent in files written before the decision existed. They read as
-  // undecided, which the readiness gate refuses — never as a silent default.
+  /**
+   * The cast, keyed by character id. An empty roster is "nobody has said who is
+   * in this series", which the readiness gate refuses — a project with no
+   * declared character used to mean "exactly one, anonymous", and that silent
+   * default is what let a two-character series produce one character.
+   */
+  characters: z.record(z.string(), characterSchema),
+  id: z.string().min(1),
+  schemaVersion: z.literal(2),
+  title: z.string().min(1),
+});
+
+/**
+ * The shape before the cast existed: one project, one anonymous character.
+ *
+ * Read only by `character new`, which is the one command that can convert it —
+ * and it converts nothing by itself. A v1 file recorded a basis for a character
+ * nobody had named, so carrying that basis onto whichever member happens to be
+ * declared first would be inventing an answer. Every named character starts
+ * undecided.
+ */
+export const legacyProjectFileSchema = z.strictObject({
+  aspectRatio: z.string().regex(ASPECT_RATIO, "expected an aspect ratio such as 16:9").nullable(),
   characterBasis: z.enum(characterBases).nullable().default(null),
   characterSources: z.array(assetSchema),
   id: z.string().min(1),
@@ -83,6 +120,7 @@ export const episodeFileSchema = z.strictObject({
   source: assetSchema,
 });
 
+export type CharacterEntry = z.infer<typeof characterSchema>;
 export type DraftSettings = z.infer<typeof draftSettingsSchema>;
 export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;

@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -147,28 +147,39 @@ describe("check", () => {
   });
 });
 
-describe("character describe", () => {
+describe("character", () => {
   beforeEach(async () => {
     await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
   });
 
-  it("should record that the character comes from the description", async () => {
-    const result = await cli("character", "describe", "demo");
+  it("should record that a character comes from the description", async () => {
+    await cli("character", "new", "demo", "ewa", "--name", "Ewa");
+    const result = await cli("character", "describe", "demo", "ewa");
     expect(result.ok).toBe(true);
     expect(result.text).toContain("project.md");
   });
 
-  it("should reject an unknown character basis at init", async () => {
-    const result = await cli(
-      "project",
-      "init",
-      "inny",
-      "--title",
-      "Inny",
-      "--character",
-      "zdjecia"
-    );
-    expect(result.text).toContain("photographs, description");
+  it("should refuse a basis for somebody who is not in the cast", async () => {
+    const result = await cli("character", "describe", "demo", "tata");
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("nie jest w obsadzie");
+  });
+
+  it("should carry every declared character separately", async () => {
+    await cli("character", "new", "demo", "ewa", "--name", "Ewa");
+    await cli("character", "new", "demo", "tata", "--name", "Tata");
+    await cli("character", "describe", "demo", "ewa");
+
+    const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
+    expect(Object.keys(project.characters)).toEqual(["ewa", "tata"]);
+    expect(project.characters.ewa.basis).toBe("description");
+    expect(project.characters.tata.basis).toBeNull();
+  });
+
+  it("should require a name, because the prompt renders one", async () => {
+    const result = await cli("character", "new", "demo", "ewa");
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("--name");
   });
 });
 
@@ -176,17 +187,9 @@ describe("approve", () => {
   async function readyProject(): Promise<void> {
     const path = join(scratch, "01-prawo.md");
     await writeFile(path, "Nigdy nie przyćmiewaj mistrza.\n", "utf8");
-    await cli(
-      "project",
-      "init",
-      "demo",
-      "--title",
-      "Demo",
-      "--aspect-ratio",
-      "16:9",
-      "--character",
-      "description"
-    );
+    await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
+    await cli("character", "new", "demo", "ewa", "--name", "Ewa");
+    await cli("character", "describe", "demo", "ewa");
     await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nUstalone.\n", "utf8");
     await cli(
       "episode",
@@ -238,7 +241,8 @@ describe("approve", () => {
 describe("screenplay generate", () => {
   async function approvedProject(): Promise<void> {
     await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
-    await cli("character", "describe", "demo");
+    await cli("character", "new", "demo", "ewa", "--name", "Ewa");
+    await cli("character", "describe", "demo", "ewa");
     await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nZasady serii.\n", "utf8");
     const source = join(scratch, "01-Burza.md");
     await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
