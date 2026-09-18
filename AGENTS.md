@@ -113,7 +113,7 @@ the sequence is not its business. Do the same with the next thing two stages cop
 
 ## Pipeline rules
 
-Seven rules that stop an agent from re-creating the mess this tool was built to replace.
+Eight rules that stop an agent from re-creating the mess this tool was built to replace.
 Full contract in [docs/pipeline.md](docs/pipeline.md).
 
 1. **One state filename: `<stage>.stage.json`.** One shape for every stage. Never invent
@@ -132,6 +132,12 @@ Full contract in [docs/pipeline.md](docs/pipeline.md).
 7. **A decision with no default is stored, never inferred.** An absent file, an empty
    directory or a missing flag means undecided, and the gate blocks — it never stands in
    for an answer the user did not give.
+8. **A prompt to an image or video model is text *plus* ordered attachments, and the text
+   addresses them by position.** The sending stage prints `Image N = <id> — <role>` ahead
+   of the task, generated at call time and never stored; a planning stage may write an id
+   into prose only because that list is guaranteed. Never a filename, a path or a track
+   name — the id resolves to a file at the sender, per track, which is what lets one prompt
+   package serve both. `character/prompt.ts` shows the shape; stages 5–7 owe the same.
 
 ## Deep Modules
 

@@ -157,6 +157,19 @@ Obowiązują we wszystkich etapach.
 - **Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy**, nigdy
   kontekstu rozmowy ani ponownego odczytu surowego opisu. Ustawienia podróżują razem
   z artefaktem, żeby następny etap miał kompletne wejście.
+- **Prompt do modelu obrazu albo wideo to tekst **wraz z** uporządkowanymi załącznikami,
+  a tekst adresuje je **pozycją w tej liście** — nigdy nazwą pliku, nigdy wewnętrznym
+  identyfikatorem, nigdy ścieżką.** API tych dostawców przyjmuje referencje obrazowe i to
+  jest właściwy sposób ich użycia; prompt, który opisuje załącznik słowami zamiast go
+  dołączyć, wyrzuca połowę tego, za co się płaci. Stąd dwie strony jednej umowy:
+  **etap składający** wypisuje przed zadaniem listę `Image N = <identyfikator> — <rola>`,
+  w dokładnie tej kolejności, w jakiej żądanie niesie bajty, i **etap planujący** może
+  w prozie użyć identyfikatora wyłącznie takiego, który w tej liście wystąpi. Lista jest
+  generowana przy wywołaniu, nigdy przechowywana: różni się per tor i per podstawa, a
+  zapisana rozjechałaby się z pozycją, którą żądanie faktycznie niesie. Identyfikator
+  rozwiązuje się na plik dopiero u składającego — `hero:<id>` na
+  `characters/<id>/<tor>/hero.png`, `Rnn` na `<tor>/references/Rnn.png` — i to jest cały
+  powód, dla którego pakiet promptów może być wspólny dla obu torów.
 - **Archiwum próby nie kopiuje wejść.** `runs/<runId>/` przechowuje tylko to, czego nie
   da się odtworzyć: wysłany request, dokładny prompt, odpowiedź, wynik walidacji, status
   HTTP i identyfikator zadania. Wejścia są referowane przez ścieżkę i sha256. Poprzedni
@@ -564,6 +577,21 @@ który człowiek czyta i poprawia przy ocenie, i to jego wysyła etap 5, 6 albo 
 `prompt-package.json` to **okablowanie**: identyfikatory, `kind`, jednoliniowy `subject`,
 `dependsOn`, `referenceIds` każdego kadru i własna ocena modelu w polu `review`. Graf zapisany
 prozą jest grafem, którego nikt nie sprawdzi, więc mieszka tu, a nie w promptach.
+
+**Proza promptu adresuje załączniki identyfikatorem, bo składający obiecuje go wypisać.**
+`prompts/references/R03.md` wolno napisać „zachować tożsamość zabawki z R02", a
+`prompts/clips/C03.md` — „hero:ewa i hero:tata określają postacie we wspólnej skali",
+ponieważ niezmiennik o prompcie z załącznikami zobowiązuje etap wysyłający do
+poprzedzenia zadania listą `Image N = <identyfikator> — <rola>`. Bez tej obietnicy
+identyfikator w prozie byłby napisem, którego model obrazu nie ma jak rozwiązać, a etap
+planujący nie miałby jak wskazać konkretnego z dwóch podobnych załączników. Odwrotna
+droga — proza opisująca załącznik słowami („referencja salonu") — traci precyzję dokładnie
+tam, gdzie referencji tego samego rodzaju jest więcej niż jedna.
+
+Dlatego w promptcie etapu 4 ta umowa jest **wypisana modelowi wprost**, razem z przykładem
+listy, którą zobaczy odbiorca. Model, który nie wie, jak jego identyfikator wygląda po
+drugiej stronie, pisze na ślepo — i to była jedyna przyczyna, dla której `prompts/**`
+mogło zawierać identyfikator nieznaczący nic dla modelu obrazu.
 
 Żaden z tych plików nie trzyma tego, co mówi drugi, i **żaden nie trzyma kopii listy ujęć**.
 Prompt nie powtarza czasów, akcji, dźwięku ani tekstu ekranowego, i nie wylicza swoich

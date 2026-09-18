@@ -262,4 +262,19 @@ describe("buildPrompt", () => {
   it("should forbid restating the shot list inside a prompt", () => {
     expect(prompt).toContain("second copy of the shot list");
   });
+
+  /**
+   * The planner writes ids into prose an image model will read. That is only
+   * legitimate because the sending stage promises to print the list those ids
+   * appear in — so the promise has to be in the prompt, not merely honoured
+   * later by whoever assembles the request.
+   */
+  it("should show the planner the attachment list its ids will be read beside", () => {
+    expect(prompt).toContain("REFERENCE INPUTS — IN THIS ORDER");
+    expect(prompt).toContain("Image 1 = hero:ewa");
+  });
+
+  it("should forbid a filename, a path or a track name in the prose", () => {
+    expect(prompt).toContain("Never write a filename, a path or a track name");
+  });
 });

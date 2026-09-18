@@ -21,9 +21,17 @@ import { manifestSchema } from "./validate.js";
  * planned images as existing files. The art direction did not, and neither did
  * the provider: medium, palette and costume come from `project.md`, and the
  * package names no model, no endpoint and no track.
+ *
+ * The attachment contract is stated to the model on purpose, with the list it
+ * will be read beside. Version 1 asked for ids without saying what an id would
+ * look like on the other side, so the model wrote them blind and `prompts/**`
+ * came out carrying `hero:ewa` as a bare string no image model could resolve.
+ * The fix is not a renderer that patches the text later: it is telling the
+ * planner what the sender guarantees, so that every package — this episode's
+ * and every future one — is written against a binding that actually holds.
  */
 
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 /**
  * The answer: the manifest plus the prose, which are separated the moment it
@@ -153,9 +161,32 @@ it is drawn.
   alone cannot establish a wider composition: the space has to come from
   somewhere, so give stable screen sides, the camera axis, routes, positions,
   eyelines and where a prop can be reached.
-- Refer to assets by id and by role. Do not invent file paths, attachment
-  syntax, model names, image sizes or provider limits; none of that is decided
-  yet, and no track is chosen here. The same package serves every image track.
+- Do not invent file paths, attachment syntax, model names, image sizes or
+  provider limits; none of that is decided yet, and no track is chosen here.
+  The same package serves every image track.
+
+## How your prompts reach the model — the attachment contract
+
+Every prompt you write is sent **together with the images it assigns**, as real
+reference attachments, and the stage that sends it puts an ordered list ahead of
+your text. What the model reads looks like this:
+
+    REFERENCE INPUTS — IN THIS ORDER
+    Image 1 = hero:ewa — the canonical image of Ewa; binding for identity.
+    Image 2 = R05 — the living room: couch, rug and closed window.
+    <your prompt>
+
+So an id you write **is resolvable**, because it is guaranteed to appear in that
+list beside its role. Use ids in the prose exactly where you need to point at one
+specific attachment — "keep the toy's identity from R02", "hero:ewa is binding
+for the face" — and prefer them over a description whenever two references could
+be confused for one another. Never write a filename, a path or a track name; the
+id is resolved to a file by the sending stage, per track, which is what lets one
+package serve both.
+
+An id you use anywhere in prose must also be assigned: in this reference's
+\`dependsOn\`, or in this frame's \`referenceIds\`. Pointing at an image the
+request will not carry is worse than not pointing at all.
 
 ## Frames describe one instant
 
