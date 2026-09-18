@@ -268,6 +268,7 @@ describe("addEpisode", () => {
       audio: null,
       durationSeconds: null,
       language: null,
+      maxClipSeconds: null,
       sourceNature: null,
       subtitles: null,
     });
@@ -517,11 +518,28 @@ describe("checkStage0", () => {
     expect(result.ok ? null : result.error.message).toContain("aspectRatio");
   });
 
-  it("should block a project with no episode", async () => {
+  // Stage 2 opens on the project's approval alone and never reads an episode,
+  // so an episodeless project passes and says what is still missing for stage 1.
+  it("should report a project with no episode without blocking on it", async () => {
     await makeProject();
     await fillRules();
     const result = await checkStage0({ projectId: "demo", workspace });
-    expect(result.ok ? null : result.error.message).toContain("żadnego odcinka");
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.problems.join("\n") : "").toContain("żadnego odcinka");
+  });
+
+  it("should approve a project that has no episode yet", async () => {
+    await makeProject();
+    await fillRules();
+    const result = await approveStage0({
+      mode: "apply",
+      note: null,
+      projectId: "demo",
+      reviewer: "tester",
+      workspace,
+    });
+    expect(result.ok ? result.data.approved : null).toBe(true);
+    expect(result.ok ? result.data.nextStep : "").toContain("character generate");
   });
 
   it("should block while an episode decision is missing", async () => {

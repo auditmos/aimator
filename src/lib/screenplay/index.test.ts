@@ -6,6 +6,8 @@ const SETTINGS: EpisodeSettings = {
   audio: "narration",
   durationSeconds: 30,
   language: "pl",
+  // Stage 3's decision; stage 1 neither reads it nor sends it.
+  maxClipSeconds: null,
   sourceNature: "law-or-idea",
   subtitles: "none",
 };

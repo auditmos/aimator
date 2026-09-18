@@ -45,12 +45,13 @@ import {
   projectFileSchema,
   type ReadySettings,
   readySettingsSchema,
+  STAGE0_DECISIONS,
   sourceNatures,
 } from "./schema.js";
 import { PLACEHOLDER, renderRules } from "./template.js";
 
 /** The five episode decisions, all made. A later stage reads them, never the draft. */
-export type { ReadySettings as EpisodeSettings } from "./schema.js";
+export type { ReadySettings as EpisodeSettings, ShotListSettings } from "./schema.js";
 
 /**
  * Stage 0 — preparation. The only stage that legitimately ingests material
@@ -67,23 +68,42 @@ const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
  * each other and may run in either order or at once, so naming only the
  * screenplay would read as a sequence the contract does not impose.
  */
-const readyNext = (projectId: string): string =>
-  `etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:
+const readyNext = (projectId: string, noEpisodes = false): string =>
+  noEpisodes
+    ? `etap 0 zatwierdzony dla samego projektu. Etap 2 może ruszyć — zacznij od podglądu:
+  aimator character generate ${projectId} <character-id> --track <gpt-image|seedream> --dry-run
+Etap 1 czeka na odcinek: aimator episode add ${projectId} --source <NN-tytul.md>`
+    : `etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:
   aimator screenplay generate ${projectId} <episode-id> --dry-run
   aimator character generate ${projectId} <character-id> --track <gpt-image|seedream> --dry-run`;
 const EMPTY_SETTINGS: DraftSettings = {
   audio: null,
   durationSeconds: null,
   language: null,
+  maxClipSeconds: null,
   sourceNature: null,
   subtitles: null,
 };
+
+/** One member of the cast as a later stage names it: an id and the person. */
+export interface CastMember {
+  readonly id: string;
+  readonly name: string;
+}
 
 /** Everything stage 1 is allowed to read, with the digests of the bytes it read. */
 export interface Stage0Inputs {
   /** Whether a human accepted stage 0 for this project *and* this episode. */
   readonly approved: boolean;
   readonly aspectRatio: string;
+  /**
+   * The roster, in declaration order. Stage 3 needs it because a shot names who
+   * is on screen by cast id, which is the only binding stage 4 can follow back
+   * to an image: Polish prose inflects "Ewa" into "Ewy" and "Ewie", so matching
+   * a name out of the text would be guesswork. This is the stage-0 roster, not
+   * the stage-2 images — stage 3 still does not depend on stage 2.
+   */
+  readonly cast: readonly CastMember[];
   readonly inputs: readonly RecordedFile[];
   /** Why the approval does not hold, when it does not. */
   readonly problems: readonly string[];
@@ -656,13 +676,30 @@ function describeSettingsError(merged: DraftSettings): string {
     problems.push(`--subtitles "${merged.subtitles}" — oczekiwano kodu języka albo "none"`);
   }
 
+  if (
+    merged.maxClipSeconds !== null &&
+    (!Number.isInteger(merged.maxClipSeconds) ||
+      merged.maxClipSeconds < 1 ||
+      merged.maxClipSeconds > 60)
+  ) {
+    problems.push(
+      `--max-clip ${merged.maxClipSeconds} — liczba całkowita od 1 do 60 (plan montażowy, nie zmierzony limit dostawcy wideo)`
+    );
+  }
+
   return problems.length === 0 ? "nieprawidłowe ustawienia odcinka" : problems.join("; ");
 }
 
+/**
+ * Which of stage 0's own decisions are still unmade.
+ *
+ * Only the five stages 1 and 2 consume. `maxClipSeconds` sits in the same block
+ * but belongs to stage 3, which gates it itself: holding up a character card
+ * until somebody has chosen a video-clip length would be an over-constraint, in
+ * the same way that requiring an episode before approving a project is one.
+ */
 function missingSettings(settings: DraftSettings): readonly string[] {
-  return Object.entries(settings)
-    .filter(([, value]) => value === null)
-    .map(([key]) => key);
+  return STAGE0_DECISIONS.filter((key) => settings[key] === null);
 }
 
 export async function setEpisodeSettings(input: SetSettingsInput): Promise<Result<Stage0Report>> {
@@ -962,6 +999,7 @@ export async function readStage0Inputs(
   return ok({
     approved: approval.approved,
     aspectRatio: file.data.aspectRatio,
+    cast: Object.entries(file.data.characters).map(([id, entry]) => ({ id, name: entry.name })),
     inputs: [
       { path: relative(project.data.file), sha256: projectJson.data.sha256 },
       { path: relative(project.data.rules), sha256: rules.data.sha256 },
@@ -1031,17 +1069,30 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
     return err(new NotReadyError(verdict.problems));
   }
 
+  const problems: string[] = [];
+
+  if (verdict.lapsed) {
+    problems.push(
+      `project.md zmienił się po akceptacji — te zasady nikt jeszcze nie przyjął; zatwierdź ponownie: aimator approve ${input.projectId}`
+    );
+  }
+
+  // Reported, never a blocker. Stage 2 reads no episode at all, so refusing to
+  // approve a project without one would hold the character stage hostage to a
+  // file it never opens.
+  if (verdict.noEpisodes) {
+    problems.push(
+      `projekt nie ma jeszcze żadnego odcinka — etap 2 tego nie potrzebuje, etap 1 tak: aimator episode add ${input.projectId} --source <NN-tytul.md>`
+    );
+  }
+
   return ok({
     approved: verdict.approved,
     created: [],
     nextStep: verdict.approved
-      ? readyNext(input.projectId)
+      ? readyNext(input.projectId, verdict.noEpisodes)
       : `pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve ${input.projectId}`,
-    problems: verdict.lapsed
-      ? [
-          `project.md zmienił się po akceptacji — te zasady nikt jeszcze nie przyjął; zatwierdź ponownie: aimator approve ${input.projectId}`,
-        ]
-      : [],
+    problems,
     ready: true,
     reused: verdict.checked,
   });
@@ -1078,7 +1129,7 @@ export async function approveStage0(input: ApproveInput): Promise<Result<Stage0R
     ? ok({
         approved: true,
         created: [],
-        nextStep: readyNext(input.projectId),
+        nextStep: readyNext(input.projectId, verdict.noEpisodes),
         problems: [],
         ready: true,
         reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
@@ -1152,7 +1203,13 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
   const file = await readProjectFile(project.file);
 
   if (!file.ok) {
-    return { approved: false, checked: [], lapsed: false, problems: [file.error.message] };
+    return {
+      approved: false,
+      checked: [],
+      lapsed: false,
+      noEpisodes: false,
+      problems: [file.error.message],
+    };
   }
 
   const problems: string[] = [];
@@ -1179,10 +1236,6 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
 
   const episodes = (await listEntries(project.episodes)).filter((entry) => !entry.startsWith("."));
 
-  if (episodes.length === 0) {
-    problems.push("projekt nie ma jeszcze żadnego odcinka");
-  }
-
   const verdicts = await Promise.all(
     episodes.map((episodeId) => checkEpisode(workspace, project, episodeId))
   );
@@ -1196,7 +1249,7 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
     }
   }
 
-  return { approved, checked, lapsed, problems };
+  return { approved, checked, lapsed, noEpisodes: episodes.length === 0, problems };
 }
 
 /**
@@ -1268,6 +1321,8 @@ interface Stage0Verdict {
   readonly checked: readonly string[];
   /** The rules were rewritten after somebody approved them. */
   readonly lapsed: boolean;
+  /** True as long as no episode has been added. Reported, never a blocker. */
+  readonly noEpisodes: boolean;
   readonly problems: readonly string[];
 }
 

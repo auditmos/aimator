@@ -49,18 +49,53 @@ const settingsShape = {
   audio: audioSchema,
   durationSeconds: z.int().min(1).max(3600),
   language: languageSchema,
+  /**
+   * The longest clip stage 3 may plan. An episode decision rather than a stage-3
+   * flag, because `check` has to re-validate the shot list offline long after
+   * the command that produced it — a limit that lived only in a flag would have
+   * to be retyped to mean anything, and a limit that lived only in a run archive
+   * would make the archive load-bearing state.
+   *
+   * Per episode rather than per track: both image tracks plan from one shot
+   * list, so there is exactly one number to have. It is an editorial plan; no
+   * video provider's real limit is verified before stage 7.
+   */
+  maxClipSeconds: z.int().min(1).max(60),
   sourceNature: sourceNatureSchema,
   subtitles: subtitlesSchema,
 };
 
-/** What stage 1 requires: every decision made, no nulls. */
-export const readySettingsSchema = z.strictObject(settingsShape);
+/**
+ * The decisions stage 0's own gate requires — the five that stages 1 and 2
+ * consume. `maxClipSeconds` is deliberately absent: it is stage 3's input, so
+ * stage 3 gates it. Making the character stage wait on a video-clip length
+ * would be the same over-constraint as making it wait on an episode.
+ */
+export const STAGE0_DECISIONS = [
+  "audio",
+  "durationSeconds",
+  "language",
+  "sourceNature",
+  "subtitles",
+] as const;
+
+/**
+ * What stage 1 requires. Every decision it consumes is made; `maxClipSeconds`
+ * may still be null here, because stage 1 neither reads it nor sends it.
+ */
+export const readySettingsSchema = z.strictObject({
+  ...settingsShape,
+  maxClipSeconds: settingsShape.maxClipSeconds.nullable().default(null),
+});
 
 /** What may legitimately sit on disk after `episode add`. */
 export const draftSettingsSchema = z.strictObject({
   audio: audioSchema.nullable(),
   durationSeconds: settingsShape.durationSeconds.nullable(),
   language: languageSchema.nullable(),
+  // Defaulted so an episode written before stage 3 existed reads as undecided
+  // rather than as a parse failure. Absent means nobody chose, and the gate blocks.
+  maxClipSeconds: settingsShape.maxClipSeconds.nullable().default(null),
   sourceNature: sourceNatureSchema.nullable(),
   subtitles: subtitlesSchema.nullable(),
 });
@@ -126,3 +161,11 @@ export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;
 /** Every episode decision made — the shape a later stage is allowed to read. */
 export type ReadySettings = z.infer<typeof readySettingsSchema>;
+/**
+ * The stage-3 shape: the same decisions, with the clip limit no longer null.
+ *
+ * A narrowing of `ReadySettings` rather than a schema of its own, because the
+ * bytes on disk are the same bytes — what differs is only which stage insists
+ * the decision has been made.
+ */
+export type ShotListSettings = ReadySettings & { readonly maxClipSeconds: number };
