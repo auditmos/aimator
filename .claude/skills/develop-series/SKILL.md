@@ -64,6 +64,10 @@ These are exactly the five project-level decisions stage 0 records — nothing m
 
    Record neither as approved material. Stage 0 writes the decision itself; the photographs
    are only ever inspected in the character stage.
+
+   Whatever recurring characters, objects and places come up while answering this go on the
+   running list described below — **in both branches**. A photograph fixes a face; it never
+   fixes an object or a room, so those need prose either way.
 4. **Aspect ratio, opening composition, continuity.** What must stay constant between
    scenes and episodes.
 5. **Any other binding constraint** they consider non-negotiable.
@@ -74,50 +78,63 @@ actually is — an idea, a synopsis or a finished screenplay. If they can, the s
 done. If a settings answer is genuinely undecided, that is fine too — `prepare-project`
 will ask again and `aimator check` will hold the line.
 
-## When the character comes from a description
+## The running list, and the brief it has to close
 
-Choosing "no photographs" moves work into this conversation that a file would otherwise
-have done. Nothing downstream invents it: the image model receives this prose and nothing
+Nothing downstream invents appearance: the image model receives this prose and nothing
 else, and whatever the prose leaves open it fills in differently on every single run.
+Choosing "no photographs" widens that to the characters themselves — their look moves into
+this conversation, because there is no file anywhere later that holds it.
 
-So when they choose description, keep going — still one question at a time, still offering
-options — until each of these is something a renderer could act on:
+Closing that gap is still the same conversation: one question at a time, still offering
+options, still not asking anyone to justify taste.
 
-**Naming a thing is not describing it, and the difference is the whole point.** "Ma
-przytulankę" and "nosi ten sam strój" are inventory, not appearance; a renderer given only
-those draws something new each time. So whenever an answer introduces a recurring element,
-that element becomes its own question before you move on. Two exchanges, not one.
+**Keep a running list.** Any answer can introduce a recurring character, object or place.
+Add each one to a list the moment it appears, and treat that list — not this page — as the
+set of things that must be described before the session ends. It holds whatever this
+particular interview surfaced: one series has three recurring characters and no objects,
+another has a single character and four. Nothing belongs on the list because you expected
+it, and nothing stays off it because you did not.
 
-Work through these until each is something a renderer could act on:
+Only the main character is on the list from the start. Everything else is there because the
+user put it there, and how much detail an entry needs follows how often it will be on
+screen, not what kind of thing it is.
 
-- **The protagonist's proportions.** Head-to-body ratio and how deformed the figure is —
-  three heads tall and round, or seven and naturalistic. This is the single strongest
-  stylistic tell and the easiest to forget, because people describe colours first. Ask it
-  separately from the aspect ratio; in Polish both are "proporcje" and the two get confused.
-- **The protagonist's face and body.** Age read, build, skin tone, hair colour, hair shape
-  and length, eyes, distinguishing features. "Dziewczynka około czterech lat" is a casting
-  note, not an appearance.
-- **The recurring wardrobe.** The exact outfit that returns every episode: garments, cut,
-  colours. In flat or stylised 2D the outfit carries recognition more reliably than the
-  face, so this one is not optional.
-- **Every recurring character.** Proportions, face, wardrobe — the same treatment, shorter.
-  A parent who appears in every episode needs an appearance; a neighbour who appears once
-  does not.
-- **Recurring props.** First ask which objects recur at all; a series may have none. Then
-  take each one they name and describe it: what it is, its size relative to the character,
-  its shape, material, colour, wear and any detail that makes it *that* one rather than a
-  generic one. A prop the story leans on — the toy that gets held in every episode — earns
-  as much detail as a supporting character, because it will be in as many frames.
-- **The recurring setting.** The places the series keeps returning to, and what is fixed in
-  them: palette, light, the furniture that may not move between episodes.
+With photographs, the photos settle face and body, so skip that row — proportions and
+wardrobe are still yours, because a photograph fixes who someone is, not how stylised the
+drawing of them is nor what they wear in every episode. With a description all three rows
+are yours. The object and place rows apply either way.
+
+**Naming a thing is not describing it, and the difference is the whole point.** "Nosi ten
+sam strój" and "ma swój przedmiot" are inventory, not appearance; a renderer given only
+those draws something new each time. So whenever an answer puts something on the list, that
+element becomes its own question before you move on. Two exchanges, not one.
+
+Work down the list until each entry is something a renderer could act on:
+
+- **Proportions and degree of stylisation**, for every character on the list. Head-to-body
+  ratio, how deformed or naturalistic the figure is. This is the strongest stylistic tell
+  and the easiest to skip, because people describe colour first. Ask it separately from the
+  aspect ratio; in Polish both are "proporcje" and the two get confused.
+- **Face and body**, for every character on the list. Age read, build, skin tone, hair
+  colour, hair shape and length, eyes, distinguishing features. An age and a role together
+  are a casting note, not an appearance.
+- **The recurring wardrobe**, for every character on the list. The exact outfit that returns
+  every episode: garments, cut, colours. In flat or stylised 2D the outfit carries
+  recognition more reliably than the face, so this one is not optional.
+- **Every recurring object on the list.** Ask first whether any object recurs at all — many
+  series have none, and inventing one is not your job. For each that does: what it is, its
+  size against the character, shape, material, colour, wear, and whatever makes it *that*
+  one rather than a generic one. An object the story leans on earns as much detail as a
+  character, because it will be in as many frames.
+- **Every recurring place on the list.** What is fixed in it: palette, light, and the
+  furnishings that may not move between episodes.
 - **The visual style**, below. That one applies whichever basis they chose.
 
 The boundary is recurrence, not subject matter. Ask yourself: would this have to look the
-same in episode seven? Then it belongs here. The episode's own locations, its one-off props
-and every shot still belong to later stages, derived from the screenplay.
+same in episode seven? Then it belongs here. The episode's own locations, its one-off
+objects and every shot still belong to later stages, derived from the screenplay.
 
-Before handing off, re-read your own list of what they decided and check every noun in it.
-If any recurring person, prop or place is named but not described, that is an unasked
+Before handing off, re-read the list. Any entry named but not described is an unasked
 question, not a finished session.
 
 If they truly cannot answer one of these yet, that is allowed — but say plainly that the
@@ -143,8 +160,9 @@ images exist without invalidating them, and stage 0 will not pass without it.
 **Where the character comes from is a hard requirement too.** Photographs or description —
 stage 0 will not pass while it is undecided, because an empty photo directory cannot tell
 "deliberately none" apart from "not supplied yet". And when the answer is description, the
-whole brief above becomes as binding as the style, for the same reason: it is the only
-input the character stage will ever get.
+characters' own rows become as binding as the style, for the same reason: they are the only
+input the character stage will ever get. The object and place entries on the list bind
+whichever way that question went — no photograph ever described a room.
 
 Everything else — the plot, the episode's own locations, its one-off props — is deliberately
 **not** settled here. Those are derived from the story by later stages, not invented up front.
@@ -166,8 +184,9 @@ Everything else — the plot, the episode's own locations, its one-off props —
 End with four things:
 
 1. **The decisions**, restated as a short list, marked as theirs to confirm — including
-   whether the character comes from photographs or from the description, and, when it is
-   the description, the visual brief in full.
+   whether the character comes from photographs or from the description, and the running
+   list with every entry's description attached. Restate only what they introduced; an
+   entry you added on your own is a proposal and says so.
 2. **What is still open**, listed separately and honestly — an open matter is not a failure
    of this session, it is information stage 0 needs.
 3. **What nothing downstream will fill in**, if anything in the brief stayed open. Say it

@@ -49,12 +49,15 @@ For a new project establish:
    body, the recurring wardrobe, every recurring character, each recurring prop, the
    recurring setting, and the visual style.
 
-   **Naming a recurring element is not describing it.** "Ma przytulankę" is inventory; the
-   toy still needs its shape, size against the character, material, colour and wear, and a
-   prop the story leans on earns as much detail as a supporting character because it will
-   be in as many frames. Before you write anything, re-read your own summary and check
-   every noun in it: a recurring person, prop or place that is named but not described is
-   an unasked question.
+   Keep a running list of every recurring character, object and place the answers surface,
+   and describe each entry on it. The list is whatever this interview produced — one series
+   has several recurring characters and no objects, another the reverse — so never ask for
+   an element the user has not introduced, and never let one they did introduce go
+   unspecified. **Naming a recurring element is not describing it:** an object still needs
+   its shape, size against the character, material, colour and wear, and one the story
+   leans on earns as much detail as a character because it will be in as many frames.
+   Before you write anything, re-read the list; an entry named but not described is an
+   unasked question.
 
    What recurs across episodes belongs in the rules; this episode's own locations, one-off
    props and shots do not — those are derived from the screenplay several stages later. If

@@ -38,11 +38,15 @@ Two boundaries make it useful rather than chatty:
 
 That last one decides how long the session runs. Answer "photographs" and the character
 stage starts from those files. Answer "description" and no photograph exists anywhere in
-the pipeline — so the skill keeps going until the prose covers the protagonist's face and
-body, the recurring wardrobe, every recurring character, the recurring props, the recurring
-setting and the style. The boundary is recurrence: what has to look identical in episode
-seven belongs in the rules, while this episode's own locations, one-off props and shots
-stay with the later stages that derive them from the screenplay.
+the pipeline, so the characters' own looks have to be written here too.
+
+Either way the skill keeps a running list of every recurring character, object and place
+the conversation surfaces, and will not hand off while an entry on it is named but not
+described — naming is inventory, not appearance. The list is whatever your interview
+produced, never a fixed checklist: a photograph fixes a face, never an object or a room, so
+those need prose in both branches. The boundary is recurrence — what has to look identical
+in episode seven belongs in the rules, while the episode's own locations, one-off objects
+and shots stay with the later stages that derive them from the screenplay.
 
 Skip it if you can already answer those questions. An interview with someone who has
 decided invites them to second-guess good instincts.
