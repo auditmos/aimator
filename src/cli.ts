@@ -30,6 +30,13 @@ import {
   type ScreenplayReport,
   type ScreenplayStatus,
 } from "./lib/screenplay/index.js";
+import {
+  approveShotList,
+  checkShotList,
+  generateShotList,
+  type ShotListReport,
+  type ShotListStatus,
+} from "./lib/shot-list/index.js";
 import { type ImageTrack, imageTracks, resolveWorkspace, type Workspace } from "./lib/workspace.js";
 
 const USAGE = `Usage: aimator <command>
@@ -41,6 +48,7 @@ Etap 0 — przygotowanie projektu i odcinka:
   character describe <id> <character-id>
   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
+                   [--max-clip <s>]
   episode set <id> <episode-id> [te same flagi decyzji]
 
 Etap 1 — scenariusz (płatny):
@@ -52,16 +60,22 @@ Etap 2 — postać (płatny; niezależny od etapu 1, może biec równolegle):
                      [--artifact card|hero|<widok>,...] [--model <id>]
                      [--dry-run] [--regenerate]
 
+Etap 3 — lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
+  shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                                       [--dry-run] [--regenerate]
+
 Wspólne:
   check <id> [<episode-id>]
   check <id> <character-id> --stage character --track <tor>
-  approve <id> [<episode-id>] [--stage prepare|screenplay]
+  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list]
                [--note <uzasadnienie>] [--reviewer <kto>]
   approve <id> <character-id> --stage character --track <tor>
                --artifact <klucz>[,<klucz>...]
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
+  --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
+               wartości domyślnej, wymagana dopiero przez etap 3
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,
@@ -79,16 +93,24 @@ Globalne:
 
 Etapy 1 i 2 odmawiają płatnego wywołania, dopóki etap 0 nie ma review.status =
 "approved". W etapie 2 osiem widoków czeka na zatwierdzoną kartę, a hero na
-zatwierdzone widoki. Nic nie ponawia się samo; nową płatną próbę zaczyna
-wyłącznie --regenerate, zachowując poprzedni wynik.`;
+zatwierdzone widoki. Etap 3 czeka na zatwierdzony scenariusz i nie zależy od
+etapu 2. Nic nie ponawia się samo; nową płatną próbę zaczyna wyłącznie
+--regenerate, zachowując poprzedni wynik.`;
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 12_000;
+/**
+ * The shot list is two to three times the length of the screenplay it plans:
+ * every scene becomes several shots and every shot carries ten fields. A cap is
+ * a ceiling rather than a creative decision, so unlike the model it has one.
+ */
+const DEFAULT_SHOT_LIST_MAX_OUTPUT_TOKENS = 24_000;
 const MODEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 
 const SETTINGS_OPTIONS = {
   audio: { type: "string" },
   duration: { type: "string" },
   language: { type: "string" },
+  "max-clip": { type: "string" },
   nature: { type: "string" },
   subtitles: { type: "string" },
 } as const satisfies ParseArgsConfig["options"];
@@ -160,6 +182,7 @@ function reviewerOf(parsed: Parsed): string {
 function settingsOf(parsed: Parsed): Record<string, number | string> {
   const patch: Record<string, number | string> = {};
   const { duration } = parsed.values;
+  const maxClip = parsed.values["max-clip"];
   const pairs = [
     ["audio", parsed.values.audio],
     ["language", parsed.values.language],
@@ -169,6 +192,10 @@ function settingsOf(parsed: Parsed): Record<string, number | string> {
 
   if (typeof duration === "string") {
     patch.durationSeconds = Number(duration);
+  }
+
+  if (typeof maxClip === "string") {
+    patch.maxClipSeconds = Number(maxClip);
   }
 
   for (const [key, value] of pairs) {
@@ -639,6 +666,92 @@ async function checkCharacterStage(
     : result;
 }
 
+/** Who is accepting what, and where. The stage decides the rest. */
+interface Approval {
+  readonly mode: "apply" | "dry-run";
+  readonly note: string | null;
+  readonly projectId: string;
+  readonly reviewer: string;
+  readonly workspace: Workspace;
+}
+
+async function approveCharacterStage(parsed: Parsed, approval: Approval): Promise<Result<string>> {
+  const characterId = requirePositional(parsed, 1, "character-id");
+  const track = trackOf(parsed);
+  const artifacts = artifactsOf(parsed);
+
+  if (!characterId.ok) {
+    return characterId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+  if (!artifacts.ok) {
+    return artifacts;
+  }
+
+  const result = await approveCharacter({
+    ...approval,
+    artifacts: artifacts.data,
+    characterId: characterId.data,
+    track: track.data,
+  });
+
+  return result.ok
+    ? ok(
+        renderCharacterStatus(
+          `Postać "${characterId.data}" na torze ${track.data} — zatwierdzono: ${artifacts.data.join(", ")}`,
+          result.data
+        )
+      )
+    : result;
+}
+
+/** The two text stages an episode carries. Both accept the whole document. */
+async function approveEpisodeStage(
+  parsed: Parsed,
+  approval: Approval,
+  stage: "screenplay" | "shot-list"
+): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+
+  const scope = { ...approval, episodeId: episodeId.data };
+
+  if (stage === "shot-list") {
+    const planned = await approveShotList(scope);
+
+    return planned.ok
+      ? ok(
+          renderShotList(
+            `Lista ujęć odcinka "${episodeId.data}" zatwierdzona`,
+            planned.data,
+            approval.projectId,
+            episodeId.data,
+            approval.mode
+          )
+        )
+      : planned;
+  }
+
+  const result = await approveScreenplay(scope);
+
+  return result.ok
+    ? ok(
+        renderScreenplay(
+          `Scenariusz odcinka "${episodeId.data}" zatwierdzony`,
+          result.data,
+          approval.projectId,
+          episodeId.data,
+          approval.mode
+        )
+      )
+    : result;
+}
+
 async function runApprove(argv: readonly string[]): Promise<Result<string>> {
   // `--stage character` narrows acceptance to one track and to named images,
   // so both flags belong to every approve call rather than to a separate
@@ -685,62 +798,18 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
   }
 
   if (stage === "character") {
-    const characterId = requirePositional(parsed.data, 1, "character-id");
-    const track = trackOf(parsed.data);
-    const artifacts = artifactsOf(parsed.data);
-
-    if (!characterId.ok) {
-      return characterId;
-    }
-    if (!track.ok) {
-      return track;
-    }
-    if (!artifacts.ok) {
-      return artifacts;
-    }
-
-    const result = await approveCharacter({
-      ...approval,
-      artifacts: artifacts.data,
-      characterId: characterId.data,
-      track: track.data,
-    });
-
-    return result.ok
-      ? ok(
-          renderCharacterStatus(
-            `Postać "${characterId.data}" na torze ${track.data} — zatwierdzono: ${artifacts.data.join(", ")}`,
-            result.data
-          )
-        )
-      : result;
+    return await approveCharacterStage(parsed.data, approval);
   }
 
-  if (stage !== "screenplay") {
+  if (stage !== "screenplay" && stage !== "shot-list") {
     return err(
-      new UsageError(`--stage "${String(stage)}" — dozwolone: prepare, screenplay, character`)
+      new UsageError(
+        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list`
+      )
     );
   }
 
-  const episodeId = requirePositional(parsed.data, 1, "episode-id");
-
-  if (!episodeId.ok) {
-    return episodeId;
-  }
-
-  const result = await approveScreenplay({ ...approval, episodeId: episodeId.data });
-
-  return result.ok
-    ? ok(
-        renderScreenplay(
-          `Scenariusz odcinka "${episodeId.data}" zatwierdzony`,
-          result.data,
-          projectId.data,
-          episodeId.data,
-          mode
-        )
-      )
-    : result;
+  return await approveEpisodeStage(parsed.data, approval, stage);
 }
 
 async function runScreenplay(argv: readonly string[]): Promise<Result<string>> {
@@ -811,11 +880,11 @@ function modelOf(parsed: Parsed): Result<string | null> {
   return ok(value);
 }
 
-function maxOutputTokensOf(parsed: Parsed): Result<number> {
+function maxOutputTokensOf(parsed: Parsed, fallback = DEFAULT_MAX_OUTPUT_TOKENS): Result<number> {
   const flag = parsed.values["max-output-tokens"];
 
   if (typeof flag !== "string") {
-    return ok(DEFAULT_MAX_OUTPUT_TOKENS);
+    return ok(fallback);
   }
 
   const value = Number(flag);
@@ -823,6 +892,151 @@ function maxOutputTokensOf(parsed: Parsed): Result<number> {
   return Number.isSafeInteger(value) && value >= 256 && value <= 100_000
     ? ok(value)
     : err(new UsageError("--max-output-tokens: liczba całkowita od 256 do 100000"));
+}
+
+/**
+ * `--dry-run` prints the prompt itself, not a byte count — the same promise
+ * stage 1 makes, for the same reason: the preview exists so a person can read
+ * what a paid call would send.
+ */
+function renderShotListGenerate(
+  report: ShotListReport,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const lines =
+    mode === "dry-run"
+      ? [
+          `Próba na sucho — nic nie zapisano, nic nie wysłano. Lista ujęć ${projectId}/${episodeId}`,
+          "  OPENAI_API_KEY nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+        ]
+      : [`Lista ujęć ${projectId}/${episodeId} — próba ${report.runId ?? ""}`];
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  if (report.verdict !== null) {
+    const { verdict } = report;
+    lines.push(
+      `  ujęcia: ${verdict.shots.length} w ${verdict.scenes.length} scenach, klipy: ${verdict.clips.length}, suma ${verdict.durationSeconds} s, najdłuższy klip ${verdict.longestClipSeconds} s (limit ${verdict.maxClipSeconds} s)`
+    );
+    lines.push(
+      `  obsada w kadrze: ${verdict.castSeen.length === 0 ? "nikt z obsady" : verdict.castSeen.join(", ")}`
+    );
+    lines.push("  ! pokrycie i sumy czasów się zgadzają — inscenizacja wymaga oceny człowieka");
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  if (report.prompt !== null) {
+    lines.push("", "--- prompt wysłany do modelu (dokładnie ten tekst) ---", report.prompt);
+  }
+
+  return lines.join("\n");
+}
+
+function renderShotList(
+  headline: string,
+  status: ShotListStatus,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+
+  if (status.verdict !== null) {
+    lines.push(
+      `  ujęcia: ${status.verdict.shots.length}, klipy: ${status.verdict.clips.length}, suma ${status.verdict.durationSeconds} s`
+    );
+  }
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (status.status === "completed" && !status.approved && status.problems.length === 0) {
+    lines.push(
+      `  ! plik przeszedł walidację — to nie to samo co przyjęcie go przez człowieka: aimator approve ${projectId} ${episodeId} --stage shot-list`
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/** `--model` wins over the environment; neither has a default. */
+function shotListModelOf(parsed: Parsed): Result<string | null> {
+  const flag = parsed.values.model;
+  const value = typeof flag === "string" ? flag : (env.AIMATOR_SHOTLIST_MODEL ?? null);
+
+  if (value !== null && !MODEL_ID.test(value)) {
+    return err(new UsageError(`niepoprawny identyfikator modelu "${value}"`));
+  }
+
+  return ok(value);
+}
+
+async function runShotList(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] !== "generate") {
+    return err(new UsageError(`nieznane polecenie: shot-list ${argv[0] ?? ""}`.trim()));
+  }
+
+  const parsed = parse(argv.slice(1), {
+    "max-output-tokens": { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const model = shotListModelOf(parsed.data);
+  const tokens = maxOutputTokensOf(parsed.data, DEFAULT_SHOT_LIST_MAX_OUTPUT_TOKENS);
+
+  if (!model.ok) {
+    return model;
+  }
+  if (!tokens.ok) {
+    return tokens;
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generateShotList({
+    apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    episodeId: episodeId.data,
+    fetch,
+    maxOutputTokens: tokens.data,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(renderShotListGenerate(result.data, projectId.data, episodeId.data, mode))
+    : result;
 }
 
 async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
@@ -934,25 +1148,43 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
     return ok(stage0);
   }
 
-  // Naming an episode widens the check to its stage 1. Nothing is written —
+  // Naming an episode widens the check to its text stages. Nothing is written —
   // a check reports drift, it never records it.
-  const stage1 = await checkScreenplay({
-    episodeId,
-    projectId: projectId.data,
-    workspace: workspace.data,
-  });
+  const scope = { episodeId, projectId: projectId.data, workspace: workspace.data };
+  const stage1 = await checkScreenplay(scope);
 
-  return stage1.ok
-    ? ok(
-        `${stage0}\n${renderScreenplay(
-          `Odcinek "${episodeId}" — etap 1: ${stage1.data.status}${stage1.data.approved ? ", zatwierdzony" : ""}`,
-          stage1.data,
-          projectId.data,
-          episodeId,
-          "apply"
-        )}`
-      )
-    : stage1;
+  if (!stage1.ok) {
+    return stage1;
+  }
+
+  const lines = [
+    stage0,
+    renderScreenplay(
+      `Odcinek "${episodeId}" — etap 1: ${stage1.data.status}${stage1.data.approved ? ", zatwierdzony" : ""}`,
+      stage1.data,
+      projectId.data,
+      episodeId,
+      "apply"
+    ),
+  ];
+
+  const stage3 = await checkShotList(scope);
+
+  if (!stage3.ok) {
+    return stage3;
+  }
+
+  lines.push(
+    renderShotList(
+      `Odcinek "${episodeId}" — etap 3: ${stage3.data.status}${stage3.data.approved ? ", zatwierdzony" : ""}`,
+      stage3.data,
+      projectId.data,
+      episodeId,
+      "apply"
+    )
+  );
+
+  return ok(lines.join("\n"));
 }
 
 /**
@@ -981,6 +1213,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "screenplay") {
     return await runScreenplay(rest);
+  }
+
+  if (command === "shot-list") {
+    return await runShotList(rest);
   }
 
   if (command === "check") {

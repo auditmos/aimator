@@ -42,11 +42,13 @@ const SECTION_HEADING = /^## (.+)\r?$/gm;
 const SCENE_HEADING = /^### S(\d{2,}) \| ([1-9]\d*)s \| (.+)\r?$/gm;
 const ANY_SCENE_HEADING = /^### /gm;
 
+const TEXT_FIELD = /^(?:- )?Text:([^\r\n]*)\r?$/gm;
+
 /** A Markdown bullet is presentation; the field name is the contract. */
 const FIELDS = [
   { label: "Action", pattern: /^(?:- )?Action:([^\r\n]*)\r?$/gm },
   { label: "Audio", pattern: /^(?:- )?Audio:([^\r\n]*)\r?$/gm },
-  { label: "Text", pattern: /^(?:- )?Text:([^\r\n]*)\r?$/gm },
+  { label: "Text", pattern: TEXT_FIELD },
   { label: "End state", pattern: /^(?:- )?End state:([^\r\n]*)\r?$/gm },
 ] as const;
 
@@ -56,6 +58,22 @@ export interface ScreenplayVerdict {
   readonly maxSceneSeconds: number;
   readonly minimumScenes: number;
   readonly scenes: number;
+}
+
+/**
+ * One scene as a later stage reads it: its id, where it sits on the episode
+ * timeline, and whether it carries on-screen text.
+ *
+ * Exported because stage 3 has to place every shot inside a scene, and a second
+ * regular expression for the same heading format in another module is a pair of
+ * parsers that can disagree about what a screenplay says.
+ */
+export interface ScreenplayScene {
+  readonly end: number;
+  readonly hasText: boolean;
+  readonly id: string;
+  readonly seconds: number;
+  readonly start: number;
 }
 
 class ScreenplayFormatError extends Error {
@@ -203,6 +221,69 @@ function readFields(scene: Scene, settings: EpisodeSettings): Result<boolean> {
   return ok(onScreenText);
 }
 
+/** The Scenes section of a document whose sections are already known good. */
+function sceneSection(text: string): Result<string> {
+  const bounds = sectionBounds(text);
+
+  if (!bounds.ok) {
+    return bounds;
+  }
+
+  const section = bounds.data[SCENES_INDEX];
+
+  return ok(text.slice(section?.start ?? 0, section?.end ?? text.length));
+}
+
+/**
+ * The scenes of an approved screenplay, placed on the episode timeline.
+ *
+ * Scene 1 starts at second 0 and each scene begins where the previous one
+ * ended: the screenplay's own durations are the timeline, which is what lets
+ * stage 3 check that its shots cover the episode without inventing a second
+ * source of truth about when anything happens.
+ */
+export function readScreenplayScenes(text: string): Result<readonly ScreenplayScene[]> {
+  const section = sceneSection(text);
+
+  if (!section.ok) {
+    return section;
+  }
+
+  const scenes = readScenes(section.data);
+
+  if (!scenes.ok) {
+    return scenes;
+  }
+
+  const placed: ScreenplayScene[] = [];
+  let cursor = 0;
+
+  for (const scene of scenes.data) {
+    const matches = [...scene.body.matchAll(TEXT_FIELD)];
+    const value = (matches[0]?.[1] ?? "").trim();
+
+    if (matches.length !== 1 || value === "") {
+      return err(
+        new ScreenplayFormatError(
+          "scene-field",
+          `scena S${scene.id}: wymagane dokładnie jedno niepuste pole Text`
+        )
+      );
+    }
+
+    placed.push({
+      end: cursor + scene.seconds,
+      hasText: !NO_TEXT.test(value),
+      id: `S${scene.id}`,
+      seconds: scene.seconds,
+      start: cursor,
+    });
+    cursor += scene.seconds;
+  }
+
+  return ok(placed);
+}
+
 /**
  * The structural contract, checked against the episode's own decisions.
  *
@@ -223,14 +304,13 @@ export function validateScreenplay(
     );
   }
 
-  const bounds = sectionBounds(text);
+  const section = sceneSection(text);
 
-  if (!bounds.ok) {
-    return bounds;
+  if (!section.ok) {
+    return section;
   }
 
-  const section = bounds.data[SCENES_INDEX];
-  const scenes = readScenes(text.slice(section?.start ?? 0, section?.end ?? text.length));
+  const scenes = readScenes(section.data);
 
   if (!scenes.ok) {
     return scenes;

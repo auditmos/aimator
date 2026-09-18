@@ -22,11 +22,12 @@ $AIMATOR_WORKSPACE/
     │   └── seedream/                 to samo, niezależnie
     └── episodes/<episode-id>/
         ├── source.md                 kopia bajtowa źródła (etap 0)
-        ├── episode.json              pięć decyzji odcinka
+        ├── episode.json              decyzje odcinka
         ├── prepare.stage.json
         ├── screenplay.md             ┐
         ├── screenplay.stage.json     │
         ├── shot-list.md              │ etapy tekstowe — wspólne dla obu torów
+        ├── shot-list.stage.json      │
         ├── prompt-package.json       │
         ├── prompts/                  ┘ opening-frame.md, references/, clips/, entry-frames/
         ├── runs/<runId>/             archiwum prób etapów tekstowych
@@ -155,18 +156,20 @@ Obowiązują we wszystkich etapach.
 | 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci | `project.md`, `project.json`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
 | 1 scenariusz | `project.json`, `project.md`, `source.md`, `episode.json` | `screenplay.md`, `screenplay.stage.json`, `runs/<runId>/` | zatwierdzony etap 0 przed wywołaniem; potem `aimator check`, `aimator approve … --stage screenplay` | **zaimplementowany** |
 | 2 postać | `project.json`, `project.md` i — przy podstawie `photographs` — `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
-| 3 lista ujęć | `screenplay.md` | `shot-list.md` | ocena użytkownika | niezaimplementowany |
+| 3 lista ujęć | `project.json`, `project.md`, `episode.json`, zatwierdzony `screenplay.md` | `shot-list.md`, `shot-list.stage.json`, `runs/<runId>/` | zatwierdzony etap 1 przed wywołaniem; potem `aimator check`, `aimator approve … --stage shot-list` | **zaimplementowany** |
 | 4 pakiet promptów | `shot-list.md`, zatwierdzony `hero.png` **każdej postaci obsady** | `prompt-package.json`, `prompts/**` | ocena pakietu | niezaimplementowany |
 | 5 obrazy referencyjne | pakiet, zatwierdzone zależności `dependsOn` | `<tor>/references/Rxx.png` | ocena każdego obrazu | niezaimplementowany |
 | 6 pierwsza klatka | pakiet, zatwierdzone referencje otwarcia | `<tor>/opening-frame.png` | ocena kadru | niezaimplementowany |
 | 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 3–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
+Etapy 4–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
 żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
-Jedyne, co je wiąże, to wspólna bramka etapu 0.
+Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2 — nazywa
+postacie identyfikatorami z **obsady etapu 0**, a nie ich obrazami; te są potrzebne dopiero
+w etapie 4.
 
 ## Etap 0 — szczegóły
 
@@ -210,22 +213,37 @@ jej na pierwszą zadeklarowaną osobę byłoby wymyśleniem odpowiedzi. Plik, kt
 zdjęcia, jest odrzucany wprost — te bajty należą do konkretnego człowieka, a narzędzie nie
 wie, do którego.
 
-Pięć decyzji odcinka — wszystkie jawne, żadna z domyślną wartością:
+Decyzje odcinka — wszystkie jawne, żadna z domyślną wartością:
 
-| Pole | Wartość |
-|---|---|
-| `durationSeconds` | liczba całkowita 1–3600 |
-| `audio` | `music-and-effects`, `dialogue`, `narration`, `dialogue-and-narration` — wszystkie zawierają muzykę i efekty |
-| `language` | kod języka scenariusza i wypowiedzi; wymagany także w filmie bez mowy |
-| `subtitles` | kod języka albo `none`; niezależny od `language` |
-| `sourceNature` | `law-or-idea`, `synopsis`, `screenplay` — etap 1 rozgałęzia się na tym polu |
+| Pole | Wartość | Bramkuje |
+|---|---|---|
+| `durationSeconds` | liczba całkowita 1–3600 | etap 0 |
+| `audio` | `music-and-effects`, `dialogue`, `narration`, `dialogue-and-narration` — wszystkie zawierają muzykę i efekty | etap 0 |
+| `language` | kod języka scenariusza i wypowiedzi; wymagany także w filmie bez mowy | etap 0 |
+| `subtitles` | kod języka albo `none`; niezależny od `language` | etap 0 |
+| `sourceNature` | `law-or-idea`, `synopsis`, `screenplay` — etap 1 rozgałęzia się na tym polu | etap 0 |
+| `maxClipSeconds` | liczba całkowita 1–60: najdłuższy klip, jaki etap 3 może zaplanować | etap 3 |
 
-Świeży `episode.json` ma wszystkie pięć jako `null` i jest celowo niegotowy do generacji.
+**Każdy etap bramkuje te decyzje, które sam konsumuje.** Pięć pierwszych blokuje etap 0,
+więc i etapy 1 i 2. `maxClipSeconds` blokuje wyłącznie etap 3 — i jest przechowywane
+w `episode.json`, a nie podawane flagą, bo `check` musi umieć **ponownie** zwalidować listę
+ujęć offline, długo po poleceniu, które ją wytworzyło; limit żyjący tylko we fladze
+trzeba by wpisywać drugi raz, a limit żyjący tylko w archiwum próby zamieniłby archiwum
+w stan. Jest per odcinek, nie per tor, bo oba tory planują z jednej listy ujęć, więc liczba
+jest dokładnie jedna. To plan montażowy: prawdziwy limit dostawcy wideo nie jest sprawdzony
+przed etapem 7.
+
+Świeży `episode.json` ma wszystkie sześć jako `null` i jest celowo niegotowy do generacji.
 Gotowość jest **wyliczana**, nie deklarowana: nie ma pola `status`, które plik mógłby
 podać niezgodnie z prawdą. `check` przepuszcza, gdy `project.md` nie zawiera już żadnego
 `TODO(etap-0)`, proporcje są ustalone, obsada jest niepusta i każda postać ma ustaloną
 podstawę wraz z materiałem, którego ta podstawa wymaga, hashe wyników — projektu i odcinków
-— zgadzają się, i żadne z pięciu pól nie jest `null`.
+— zgadzają się, i żadne z pięciu pól bramkowanych przez etap 0 nie jest `null`.
+
+**Projekt bez odcinka przechodzi.** Etap 2 nie czyta żadnego odcinka, a otwiera go
+akceptacja samego projektu — odmowa zatwierdzenia obsady, dopóki nie istnieje odcinek,
+trzymałaby etap postaci zakładnikiem pliku, którego nigdy nie otwiera. `check` mówi
+wprost, że odcinka jeszcze nie ma i że czeka na niego etap 1, ale nie blokuje.
 
 `check` niczego nie zapisuje i niczego nie przyjmuje. Etap 0 kończy `aimator approve
 <project-id>`, które powtarza całą weryfikację, dopisuje hash `project.md` i ustawia
@@ -360,3 +378,87 @@ niczego.
 Ramki są stałymi toru, nie decyzją: karta 1920×1920, widok 1536×1536, hero 1536×2304.
 Żadna z nich nie jest `aspectRatio` projektu — ten rządzi kadrem filmu od etapu 5, a karta
 postaci w 16:9 zmarnowałaby większość siebie.
+
+## Etap 3 — szczegóły
+
+Pierwszy etap tekstowy po scenariuszu i pierwszy artefakt **wspólny dla obu torów
+obrazowych** — nie ma w nim poziomu katalogu na tor. `shot-list.md` leży bezpośrednio pod
+odcinkiem, obok scenariusza, bo opisuje historię, a nie obrazy; rozejście torów zaczyna
+się dopiero przy pierwszym obrazie odcinka.
+
+Konsumuje zatwierdzony `screenplay.md` oraz te artefakty etapu 0, które czyta każdy etap:
+zasady i proporcje z `project.json` i `project.md`, decyzje odcinka z `episode.json`.
+**Nie konsumuje `source.md`** — etap 1 już zaadaptował źródło, więc etap 3 ani go nie czyta,
+ani nie wysyła, a zapisanie hasha bajtów, których nikt nie wysłał, opisywałoby pytanie,
+którego nie zadano. **Nie zależy od etapu 2**: nazywa postacie identyfikatorami z obsady,
+a obrazy postaci są wejściem etapu 4.
+
+**Bramka przed wydaniem pieniędzy.** `shot-list generate` odmawia płatnego wywołania,
+dopóki `screenplay.stage.json` tego odcinka nie ma `review.status = "approved"`. Ta jedna
+bramka obejmuje też etap 0: `project.md`, `project.json` i `episode.json` są zapisanymi
+wejściami etapu 1, więc ich edycja unieważnia jego akceptację arytmetycznie i etap 3
+blokuje bez osobnej reguły. Druga przeszkoda to brak decyzji `maxClipSeconds`.
+`--dry-run` żadnej z nich nie omija — raportuje je jako przeszkody i i tak pokazuje prompt,
+bo po to jest podgląd. Bez `maxClipSeconds` promptu nie da się złożyć, więc podgląd mówi
+to wprost, zamiast pokazać tekst z wymyśloną liczbą.
+
+**Skąd bierze się model.** `--model <id>`, a bez tej flagi `AIMATOR_SHOTLIST_MODEL`.
+Osobna zmienna, nie ta od scenariusza: wspólna znaczyłaby, że wybór modelu do etapu 1 po
+cichu wybrał też model do etapu 3, a tego nikt nie zdecydował. Wartości domyślnej nie ma.
+Limit tokenów ma domyślną 24 000 — to sufit bezpieczeństwa, nie decyzja kreatywna, a lista
+ujęć jest dwa do trzech razy dłuższa niż scenariusz, który planuje.
+
+**Trzy jednostki, nigdy utożsamiane.** Scena jest ciągłą jednostką miejsca i czasu i
+pochodzi ze scenariusza. Ujęcie to jedno spojrzenie kamery. Klip to jedna planowana
+generacja wideo, obejmująca jedno lub więcej kolejnych ujęć. Etap 3 nie przenumerowuje ani
+nie scala scen scenariusza.
+
+**Co sprawdza walidacja** — czysto i offline, jak w etapie 1:
+
+- cztery sekcje `Plan`, `Clips`, `Shots`, `Review`, w tej kolejności, żadna pusta, bez
+  bloku kodu;
+- klipy numerowane kolejno od `C01`, każdy nie dłuższy niż `maxClipSeconds`, kafelkujące
+  odcinek bez dziur, z polem `Shots` zgadzającym się co do znaku z ujęciami, które do nich
+  należą; pierwszy klip ma `Reference: opening-frame`, każdy kolejny
+  `previous-end-frame` albo `new-scene-frame`;
+- ujęcia numerowane kolejno od `U01`, każde zaczynające się dokładnie tam, gdzie skończyło
+  się poprzednie — jedno porównanie zakazujące naraz dziury, nakładki i przestawienia —
+  i sumujące się dokładnie do `durationSeconds`;
+- każde ujęcie w **dokładnie jednej scenie i jednym klipie**, mieszczące się w granicach
+  obu; pełne pokrycie każdej sceny wynika z tego arytmetycznie i nie jest osobną regułą;
+- dziesięć pól ujęcia, każde dokładnie raz i niepuste: `Purpose`, `Frame`, `Action`,
+  `Expression`, `Camera`, `Cast`, `Audio`, `Text`, `Start state`, `End state`;
+- tekst ekranowy **przeniesiony, nie wymyślony**: ujęcie nie może mieć napisu, którego jego
+  scena nie miała, przy `subtitles: none` każde `Text` brzmi `none`, a scena, która miała
+  napis, nie może stracić go w żadnym ze swoich ujęć.
+
+**`Cast` wiąże ujęcie z postacią.** Każde ujęcie wymienia widoczne postacie
+**identyfikatorami obsady** (`ewa`, `tata`) z zamkniętego słownika podanego w promptcie,
+albo `none`. Proza pól opisowych używa imion i odmienia je naturalnie — i właśnie dlatego
+imię nie może być wiązaniem: „Ewy" i „Ewie" to ten sam człowiek, a dopasowywanie tego
+w tekście byłoby zgadywaniem. Identyfikator jest jedyną drogą, którą etap 4 dojdzie od
+ujęcia do zatwierdzonego `hero.png`. Postać widziana raz nie należy do obsady: opisuje ją
+`Frame` i `Action`, a obrazem staje się w etapie 5.
+
+**Maszynowa postać listy ujęć to parser, nie drugi plik.** `validateShotList` rozbiera
+dokument w trakcie walidacji i zwraca to, co rozebrał — ujęcia, klipy, sceny, czasy
+i obsadę — więc etap 4 czyta je jako dane przez wejście modułu. Zapis `shot-list.json`
+obok `shot-list.md` dałby odcinkowi dwie wersje tej samej prawdy, a po pierwszej ręcznej
+poprawce w ocenie kreatywnej rozjechałyby się, przy czym poprawiany jest ten plik, który
+człowiek czyta.
+
+**Archiwum próby** trafia do tego samego `episodes/<id>/runs/<runId>/`, co etap 1 — `runId`
+jest unikalny, a `run.json` zapisuje, którego etapu dotyczy. Wejścia są referowane ścieżką
+i sha256, nigdy kopiowane; poprzednia lista ujęć trafia do `previous-shot-list.md` wyłącznie
+przy `--regenerate`. Wywołanie idzie ze `store: false`, więc obowiązuje ta sama zasada, co
+w etapie 1: rekord `submitted` bez zapisanej odpowiedzi otwiera wyłącznie `--regenerate`,
+a odpowiedź, która zdążyła trafić na dysk, jest już opłacona i powtórzenie polecenia
+dokańcza z niej próbę bez wysyłania czegokolwiek. Odmowa 4xx nie została rozliczona
+i wolno ją powtórzyć zwykłym przebiegiem.
+
+**Walidacja to nie akceptacja.** Wynik, który przeszedł walidację, ma
+`review.status = "pending"`. Przyjmuje go dopiero
+`aimator approve <project-id> <episode-id> --stage shot-list`, i tylko wtedy, gdy hash
+`shot-list.md` się zgadza, dokument nadal przechodzi walidację i żadne wejście nie zmieniło
+się od czasu generacji. `aimator check <project-id> <episode-id>` sprawdza to samo dla
+etapów 1 i 3 naraz i nie zapisuje niczego.

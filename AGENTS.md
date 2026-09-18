@@ -12,10 +12,12 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0, 1 and 2 are implemented. Stages 3–8 are a declared contract, not working code.
+Stages 0 through 3 are implemented. Stages 4–8 are a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
+Stage 3 is the first artifact both image tracks share, so it has no track directory level;
+it refuses to spend until the screenplay is approved, and does not depend on stage 2.
 
 ## Project Structure
 
@@ -32,6 +34,7 @@ src/
     ├── env.test.ts   # Co-located test for env validation
     ├── workspace.ts  # Single-file form — the ONLY module that knows the layout
     ├── workspace.test.ts
+    ├── text-model.ts # Single-file form — the paid text call, shared by stages 1 and 3
     ├── artifact/     # Folder form — provenance shared by every stage
     │   ├── index.ts      # Public: the stage-file shape, digests, writes, review
     │   ├── schema.ts     # Internal — <stage>.stage.json, one shape for all stages
@@ -46,11 +49,10 @@ src/
     │   ├── template.ts   # Internal — the project.md scaffold
     │   └── index.test.ts # Tests through the entry
     ├── screenplay/   # Folder form — index.ts is the only entry (stage 1)
-    │   ├── index.ts      # Public: generateScreenplay, checkScreenplay,
-    │   │                 #         approveScreenplay, validateScreenplay, buildPrompt
+    │   ├── index.ts      # Public: generateScreenplay, checkScreenplay, approveScreenplay,
+    │   │                 #         validateScreenplay, readScreenplayScenes, buildPrompt
     │   ├── prompt.ts     # Internal — the prompt constant and its declared version
     │   ├── validate.ts   # Internal — the structural verdict, pure and offline
-    │   ├── client.ts     # Internal — the paid call, fetch injected
     │   ├── review.ts     # Internal — verification and approval bound to digests
     │   ├── generate.ts   # Internal — order of operations around the paid call
     │   ├── index.test.ts    # Validator and prompt, through the entry
@@ -69,12 +71,25 @@ src/
     │   ├── review.ts     # Internal — per-image verification and approval
     │   ├── index.test.ts    # Validator, response reader and prompts, through the entry
     │   └── generate.test.ts # Gates/resume/approve, through the entry
+    ├── shot-list/    # Folder form — index.ts is the only entry (stage 3)
+    │   ├── index.ts      # Public: generateShotList, checkShotList,
+    │   │                 #         approveShotList, validateShotList, buildPrompt
+    │   ├── prompt.ts     # Internal — the prompt constant and its declared version
+    │   ├── validate.ts   # Internal — parses as it validates; returns the plan as data
+    │   ├── plan.ts       # Internal — what stage 3 reads, and whether it may pay
+    │   ├── review.ts     # Internal — verification and approval bound to digests
+    │   ├── generate.ts   # Internal — order of operations around the paid call
+    │   ├── index.test.ts    # Validator and prompt, through the entry
+    │   └── generate.test.ts # Gate/resume/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
 
-`lib/artifact` exists because three stages now write the same state file. A stage never
-reaches into another stage's internals: shared pieces are promoted here instead.
+`lib/artifact` exists because four stages now write the same state file, and
+`lib/text-model` because two stages make the same paid text call. A stage never reaches
+into another stage's internals: shared pieces are promoted out instead. `lib/text-model`
+carries only the transport today; when a third text stage needs the same submit / archive
+/ resume / publish dance around it, promote that lifecycle too rather than copying it.
 
 ## Pipeline rules
 
@@ -211,6 +226,9 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   `AIMATOR_IMAGE_MODEL_SEEDREAM`), because the two tracks are drawn side by side and a
   single shared variable would make running both from one shell an edit between commands.
   Neither has a default, for the same reason `AIMATOR_SCREENPLAY_MODEL` does not.
+- One model variable **per paid call site**, so `AIMATOR_SHOTLIST_MODEL` is stage 3's own
+  rather than a reuse of stage 1's: sharing one would mean that choosing a model for the
+  screenplay quietly chose one for the shot list, which nobody decided.
 
 ## Development Workflow
 

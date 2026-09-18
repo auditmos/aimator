@@ -101,6 +101,13 @@ export interface EpisodePaths {
    */
   readonly screenplayLock: string;
   readonly screenplayStage: string;
+  /**
+   * Stage 3. It sits directly under the episode, with no track level: the shot
+   * list describes the story, and the two image tracks plan the same one.
+   */
+  readonly shotList: string;
+  readonly shotListLock: string;
+  readonly shotListStage: string;
   readonly source: string;
 }
 
@@ -110,6 +117,8 @@ export interface EpisodePaths {
  */
 export interface RunPaths {
   readonly previousScreenplay: string;
+  /** The shot list being replaced. Written only by `--regenerate`. */
+  readonly previousShotList: string;
   readonly prompt: string;
   readonly request: string;
   readonly response: string;
@@ -305,6 +314,9 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
     screenplay: join(root, "screenplay.md"),
     screenplayLock: join(root, "screenplay.lock"),
     screenplayStage: join(root, "screenplay.stage.json"),
+    shotList: join(root, "shot-list.md"),
+    shotListLock: join(root, "shot-list.lock"),
+    shotListStage: join(root, "shot-list.stage.json"),
     source: join(root, "source.md"),
   });
 }
@@ -315,6 +327,7 @@ export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
 
   return {
     previousScreenplay: join(root, "previous-screenplay.md"),
+    previousShotList: join(root, "previous-shot-list.md"),
     prompt: join(root, "prompt.md"),
     request: join(root, "request.json"),
     response: join(root, "response.json"),

@@ -31,6 +31,14 @@ export const env = createEnv({
      * a model choice nobody made, on a command that spends money.
      */
     AIMATOR_SCREENPLAY_MODEL: z.string().min(1).optional(),
+    /**
+     * The text model stage 3 sends the shot-list prompt to. Separate from the
+     * screenplay's rather than shared with it: a shared variable would mean
+     * that choosing a model for stage 1 quietly chose one for stage 3 too, and
+     * nobody decided that. The shot list is also the longer and more mechanical
+     * of the two documents, so it is a reasonable place to spend differently.
+     */
+    AIMATOR_SHOTLIST_MODEL: z.string().min(1).optional(),
     // Optional on purpose: a missing workspace is a recoverable, actionable
     // condition that `run()` reports as a Result. Marking it required would
     // throw here, at import time, before the CLI could explain itself.

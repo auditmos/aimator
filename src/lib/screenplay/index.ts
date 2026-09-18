@@ -16,4 +16,8 @@
 export { generateScreenplay, type ScreenplayReport } from "./generate.js";
 export { buildPrompt, PROMPT_VERSION } from "./prompt.js";
 export { approveScreenplay, checkScreenplay, type ScreenplayStatus } from "./review.js";
-export { validateScreenplay } from "./validate.js";
+export {
+  readScreenplayScenes,
+  type ScreenplayScene,
+  validateScreenplay,
+} from "./validate.js";

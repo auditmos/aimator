@@ -142,6 +142,9 @@ describe("episodePaths", () => {
       screenplay: `${episode}/screenplay.md`,
       screenplayLock: `${episode}/screenplay.lock`,
       screenplayStage: `${episode}/screenplay.stage.json`,
+      shotList: `${episode}/shot-list.md`,
+      shotListLock: `${episode}/shot-list.lock`,
+      shotListStage: `${episode}/shot-list.stage.json`,
       source: `${episode}/source.md`,
     });
   });
