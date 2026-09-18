@@ -613,3 +613,86 @@ describe("checkCharacter", () => {
     );
   });
 });
+
+describe("generateCharacter refusals", () => {
+  function rejecting(status: number, body: unknown): typeof fetch {
+    return (() =>
+      Promise.resolve(
+        new Response(JSON.stringify(body), {
+          headers: { "content-type": "application/json" },
+          status,
+        })
+      )) as unknown as typeof fetch;
+  }
+
+  async function runDir(): Promise<string> {
+    const stage = await readStageFile();
+
+    return join(
+      root,
+      "projects",
+      PROJECT,
+      "characters",
+      CHARACTER,
+      "gpt-image",
+      "runs",
+      stage.artifacts.card.runId
+    );
+  }
+
+  /**
+   * The diagnostics are the whole value of a refusal. Judging the answer before
+   * archiving it threw the body away, which is how a 400 became "check the
+   * model, access and balance" and nothing else.
+   */
+  it("should archive the body of a rejected call before reporting it", async () => {
+    await makeStage0();
+    const result = await generate({
+      fetch: rejecting(400, { error: { code: "model_not_found", message: "no such model" } }),
+    });
+
+    expect(result.ok).toBe(false);
+    const dir = await runDir();
+    const saved = JSON.parse(await readFile(join(dir, "response.json"), "utf8"));
+    expect(saved.error.message).toBe("no such model");
+    expect(JSON.parse(await readFile(join(dir, "transport.json"), "utf8")).httpStatus).toBe(400);
+  });
+
+  it("should put the provider's own words in the error", async () => {
+    await makeStage0();
+    const result = await generate({
+      fetch: rejecting(400, { error: { code: "model_not_found", message: "no such model" } }),
+    });
+
+    expect(result.ok ? null : result.error.message).toContain("no such model");
+    expect(result.ok ? null : result.error.message).toContain("model_not_found");
+  });
+
+  /**
+   * A 4xx is the provider declining to do the work, so nothing was charged.
+   * Demanding `--regenerate` afterwards would make a rejected request look
+   * like a paid one.
+   */
+  it("should let a plain re-run follow a refusal that cannot have been billed", async () => {
+    await makeStage0();
+    await generate({ fetch: rejecting(400, { error: { message: "no such model" } }) });
+
+    const call = recorder();
+    const again = await generate({ fetch: call.fetch });
+
+    expect(call.calls).toHaveLength(1);
+    expect(again.ok && again.data.artifacts[0]?.state).toBe("published");
+  });
+
+  it("should keep the --regenerate rule after a status that may have been billed", async () => {
+    await makeStage0();
+    await generate({ fetch: rejecting(503, { error: { message: "overloaded" } }) });
+
+    const call = recorder();
+    const again = await generate({ fetch: call.fetch });
+
+    expect(call.calls).toHaveLength(0);
+    expect(again.ok ? null : again.error.message).toContain("HTTP 503");
+    expect(again.ok ? null : again.error.message).toContain("--regenerate");
+  });
+});

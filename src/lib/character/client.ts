@@ -183,21 +183,61 @@ export async function callImage(input: {
   }
 
   const raw = await response.text();
-  const transport: Transport = {
+
+  // Any answer that arrived is returned, including a rejection. Judging it here
+  // would mean discarding the body before the caller could archive it, and a
+  // refusal nobody can read is the one thing worse than a refusal.
+  return ok({
     body: raw.replaceAll(input.apiKey, REDACTED),
     httpStatus: response.status,
     receivedAt: new Date().toISOString(),
     requestId: response.headers.get("x-request-id") ?? response.headers.get("x-tt-logid"),
-  };
+  });
+}
 
-  return response.ok
-    ? ok(transport)
-    : err(
-        new ImageCallError(
-          response.status,
-          `API zwróciło HTTP ${response.status} — sprawdź model, dostęp i saldo; nie ponawiam wywołania`
-        )
-      );
+/**
+ * Whether an archived answer is a refusal, and what the provider said.
+ *
+ * `null` means the call succeeded. The message carries the provider's own
+ * words: "check the model, access and balance" is useless advice when the API
+ * already said which field it objected to.
+ */
+export function httpFailure(transport: Transport): Error | null {
+  if (transport.httpStatus < 400) {
+    return null;
+  }
+
+  return new ImageCallError(
+    transport.httpStatus,
+    `API zwróciło HTTP ${transport.httpStatus} — nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
+  );
+}
+
+/** The provider's error text, or the raw body when it is not the shape we know. */
+function providerMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: string; message?: string } };
+    const { code, message } = parsed.error ?? {};
+
+    if (typeof message === "string" && message !== "") {
+      return code === undefined ? message : `[${code}] ${message}`;
+    }
+  } catch {
+    // Not JSON: the raw text is the best diagnostic there is.
+  }
+
+  return body.slice(0, 600).trim() || "pusta";
+}
+
+/**
+ * Whether a refused request can have been billed.
+ *
+ * A 4xx is the provider declining to do the work, so nothing was charged and a
+ * plain re-run is safe. A 429 or a 5xx is different: the work may have started,
+ * so those keep the `--regenerate` rule that protects against paying twice.
+ */
+export function refusedWithoutCharge(httpStatus: number): boolean {
+  return httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
 }
 
 function headersOf(request: ImageRequest, apiKey: string): Record<string, string> {

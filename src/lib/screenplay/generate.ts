@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   applyWrites,
   emptyStage,
@@ -26,7 +27,14 @@ import {
   runPaths,
   type Workspace,
 } from "../workspace.js";
-import { buildRequest, callModel, ENDPOINT, readScreenplay } from "./client.js";
+import {
+  buildRequest,
+  callModel,
+  ENDPOINT,
+  httpFailure,
+  readScreenplay,
+  refusedWithoutCharge,
+} from "./client.js";
 import { buildPrompt, PROMPT_VERSION } from "./prompt.js";
 import { minimumScenes, type ScreenplayVerdict, validateScreenplay } from "./validate.js";
 
@@ -247,13 +255,20 @@ async function attempt(
 
   const transport = await callModel({ apiKey, fetch: input.fetch, request });
 
-  if (transport.ok) {
-    await writeNew(run.transport, serialize(transport.data));
-    await writeNew(run.response, transport.data.body);
-  }
-
+  // Nothing reached the provider, so there is nothing to archive.
   if (!transport.ok) {
     return transport;
+  }
+
+  // Archived before it is judged. A refusal nobody can read is worse than the
+  // refusal itself, and this stage promises the diagnostics are kept.
+  await writeNew(run.transport, serialize(transport.data));
+  await writeNew(run.response, transport.data.body);
+
+  const refused = httpFailure(transport.data);
+
+  if (refused !== null) {
+    return err(refused);
   }
 
   return await publish(input, paths, run, {
@@ -265,6 +280,16 @@ async function attempt(
     runId,
     settings: stage0.settings,
   });
+}
+
+/** Only the field that decides whether a rejected attempt can have been billed. */
+const transportSchema = z.object({ httpStatus: z.number() });
+
+/** The HTTP status an earlier attempt archived, or `null` if it archived none. */
+async function archivedStatus(run: RunPaths): Promise<number | null> {
+  const saved = await readJson(run.transport, transportSchema);
+
+  return saved.ok ? saved.data.httpStatus : null;
 }
 
 /**
@@ -293,12 +318,23 @@ async function resume(
   }
 
   const run = runPaths(paths, record.runId);
+  const status = await archivedStatus(run);
+
+  // The provider declined to do the work, so nothing was charged and there is
+  // nothing to finish. Starting over is safe and needs no `--regenerate`:
+  // demanding one would make a rejected request look like a paid one.
+  if (status !== null && refusedWithoutCharge(status)) {
+    return null;
+  }
+
   const saved = await readDigest(run.response);
 
-  if (!saved.ok) {
+  // A 429 or a 5xx may have started work that was billed, so those keep the
+  // rule that protects against paying twice.
+  if (!saved.ok || (status !== null && status >= 400)) {
     return err(
       new Stage1BlockedError([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma zapisanej odpowiedzi — mogła zostać rozliczona`,
+        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
         "wywołanie idzie ze store: false, więc nie ma zadania do odpytania; nową płatną próbę zaczyna wyłącznie --regenerate",
       ])
     );

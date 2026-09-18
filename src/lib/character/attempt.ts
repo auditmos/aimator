@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   applyWrites,
   modelProducer,
@@ -6,6 +7,7 @@ import {
   nowIso,
   type RecordedFile,
   readDigest,
+  readJson,
   type StageFile,
   serialize,
   sha256Of,
@@ -25,7 +27,9 @@ import {
   buildRequest,
   callImage,
   downloadImage,
+  httpFailure,
   type ImageRequest,
+  refusedWithoutCharge,
   sizeOf,
 } from "./client.js";
 import { buildPlan, outputPath, type Scope, Stage2BlockedError, withRecord } from "./plan.js";
@@ -86,6 +90,16 @@ function writeImage(path: string, bytes: Buffer): Promise<Result<readonly string
   return applyWrites([{ bytes, kind: "bytes", to: path }], "apply");
 }
 
+/** Only the field that decides whether a rejected attempt can have been billed. */
+const transportSchema = z.object({ httpStatus: z.number() });
+
+/** The HTTP status an earlier attempt archived, or `null` if it archived none. */
+async function archivedStatus(run: ImageRunPaths): Promise<number | null> {
+  const saved = await readJson(run.transport, transportSchema);
+
+  return saved.ok ? saved.data.httpStatus : null;
+}
+
 /**
  * Finishes an attempt that already reached the provider, without paying again.
  *
@@ -100,15 +114,27 @@ export async function resume(
   scope: Scope,
   artifact: CharacterArtifact,
   record: StageFile["artifacts"][string]
-): Promise<Result<OneResult>> {
+): Promise<Result<OneResult> | null> {
   const run = imageRunPaths(scope.paths, record.runId);
+  const status = await archivedStatus(run);
+
+  // The provider declined to do the work, so nothing was charged and there is
+  // nothing to finish. Starting over is safe and needs no `--regenerate`:
+  // demanding one would make a rejected request look like a paid one.
+  if (status !== null && refusedWithoutCharge(status)) {
+    return null;
+  }
+
   const saved = await readDigest(run.response);
 
-  if (!saved.ok) {
+  // An answer is only worth publishing when the provider actually answered.
+  // A 429 or a 5xx may have started work that was billed, so those keep the
+  // rule that protects against paying twice.
+  if (!saved.ok || (status !== null && status >= 400)) {
     return err(
       new Stage2BlockedError([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma zapisanej odpowiedzi — mogła zostać rozliczona`,
-        "nie ma czego wznowić; nową płatną próbę zaczyna wyłącznie --regenerate",
+        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
+        `sprawdź ${toWorkspacePath(input.workspace.root, run.root)}; nową płatną próbę zaczyna wyłącznie --regenerate`,
       ])
     );
   }
@@ -211,13 +237,20 @@ export async function attempt(
     request,
   });
 
-  if (transport.ok) {
-    await writeNew(run.transport, serialize(transport.data));
-    await writeNew(run.response, transport.data.body);
-  }
-
+  // Nothing reached the provider, so there is nothing to archive.
   if (!transport.ok) {
     return transport;
+  }
+
+  // Archived before it is judged. A refusal nobody can read is worse than the
+  // refusal itself, and this stage promises the diagnostics are kept.
+  await writeNew(run.transport, serialize(transport.data));
+  await writeNew(run.response, transport.data.body);
+
+  const refused = httpFailure(transport.data);
+
+  if (refused !== null) {
+    return err(refused);
   }
 
   const bytes = await imageBytes(input, run, transport.data.body);

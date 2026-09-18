@@ -379,7 +379,13 @@ async function runOne(
       });
     }
 
-    return await resume(input, scope, artifact, record);
+    // `null` means the archived attempt was refused rather than billed, so
+    // there is nothing to finish and starting over costs nothing.
+    const resumed = await resume(input, scope, artifact, record);
+
+    if (resumed !== null) {
+      return resumed;
+    }
   }
 
   return await attempt(input, scope, artifact);

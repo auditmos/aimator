@@ -552,3 +552,60 @@ describe("refusing to resume", () => {
     expect(await readFile(join(episodeDir(), "screenplay.md"), "utf8")).toContain("Text: none.");
   });
 });
+
+describe("generateScreenplay refusals", () => {
+  function rejecting(status: number, body: unknown): typeof fetch {
+    return (() => {
+      calls += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          headers: { "content-type": "application/json" },
+          status,
+        })
+      );
+    }) as unknown as typeof fetch;
+  }
+
+  /**
+   * The diagnostics are the whole value of a refusal. Judging the answer before
+   * archiving it threw the body away, which is how a 400 became "check the
+   * model, access and balance" and nothing else.
+   */
+  it("should archive the body of a rejected call before reporting it", async () => {
+    const result = await generate({
+      fetch: rejecting(400, { error: { code: "model_not_found", message: "nie ma modelu" } }),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? null : result.error.message).toContain("nie ma modelu");
+    expect(result.ok ? null : result.error.message).toContain("model_not_found");
+
+    const [runId] = await runDirs();
+    const saved = JSON.parse(
+      await readFile(join(episodeDir(), "runs", String(runId), "response.json"), "utf8")
+    );
+    expect(saved.error.code).toBe("model_not_found");
+  });
+
+  /**
+   * A 4xx is the provider declining to do the work, so nothing was charged.
+   * Demanding `--regenerate` afterwards would make a rejected request look
+   * like a paid one.
+   */
+  it("should let a plain re-run follow a refusal that cannot have been billed", async () => {
+    await generate({ fetch: rejecting(400, { error: { message: "nie ma modelu" } }) });
+
+    const result = await generate();
+
+    expect(result.ok && result.data.verdict?.scenes).toBe(3);
+  });
+
+  it("should keep the --regenerate rule after a status that may have been billed", async () => {
+    await generate({ fetch: rejecting(503, { error: { message: "przeciążenie" } }) });
+
+    const result = await generate();
+
+    expect(result.ok ? null : result.error.message).toContain("HTTP 503");
+    expect(result.ok ? null : result.error.message).toContain("--regenerate");
+  });
+});
