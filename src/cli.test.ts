@@ -222,7 +222,8 @@ describe("approve", () => {
     const approved = await cli("approve", "demo");
     expect(approved.ok).toBe(true);
     const result = await cli("check", "demo");
-    expect(result.text).toContain("Etap 1");
+    expect(result.text).toContain("screenplay generate");
+    expect(result.text).toContain("character generate");
   });
 
   it("should refuse to approve an incomplete stage 0", async () => {

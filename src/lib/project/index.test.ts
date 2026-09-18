@@ -746,7 +746,8 @@ describe("approveStage0", () => {
     await approve();
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? result.data.approved : null).toBe(true);
-    expect(result.ok ? result.data.nextStep : null).toContain("Etap 1");
+    expect(result.ok ? result.data.nextStep : null).toContain("screenplay generate");
+    expect(result.ok ? result.data.nextStep : null).toContain("character generate");
   });
 
   it("should write nothing in dry-run mode", async () => {

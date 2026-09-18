@@ -62,8 +62,15 @@ export type { ReadySettings as EpisodeSettings } from "./schema.js";
  */
 
 const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+/**
+ * Both stages stage 0 unblocks, not just the first one. They do not depend on
+ * each other and may run in either order or at once, so naming only the
+ * screenplay would read as a sequence the contract does not impose.
+ */
 const readyNext = (projectId: string): string =>
-  `etap 0 zatwierdzony. Etap 1 (scenariusz) wydaje pieniądze, więc zacznij od podglądu: aimator screenplay generate ${projectId} <episode-id> --dry-run`;
+  `etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:
+  aimator screenplay generate ${projectId} <episode-id> --dry-run
+  aimator character generate ${projectId} <character-id> --track <gpt-image|seedream> --dry-run`;
 const EMPTY_SETTINGS: DraftSettings = {
   audio: null,
   durationSeconds: null,
