@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { access, copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import type { ZodType } from "zod";
 import { z } from "zod";
@@ -212,4 +212,27 @@ async function runOp(op: WriteOp): Promise<Result<true>> {
 
 function dirOf(path: string): string {
   return path.slice(0, path.lastIndexOf("/")) || "/";
+}
+
+/**
+ * Writes a file only if it does not already exist.
+ *
+ * A paid stage archives its attempt as it goes, so the ordinary batch in
+ * `applyWrites` does not fit: the response cannot be written before the call
+ * that produces it. Refusing to overwrite is what keeps an interrupted attempt
+ * legible instead of being quietly buried by the next one.
+ */
+export async function writeNew(path: string, text: string): Promise<Result<true>> {
+  try {
+    await mkdir(dirOf(path), { recursive: true });
+    await writeFile(path, text, { encoding: "utf8", flag: "wx" });
+    return ok(true);
+  } catch (cause) {
+    return err(new FileError(path, `nie można zapisać ${path}`, { cause }));
+  }
+}
+
+/** Removes a file, tolerating its absence. Used to release a lock. */
+export async function removeFile(path: string): Promise<void> {
+  await rm(path, { force: true });
 }

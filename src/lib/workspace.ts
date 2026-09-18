@@ -41,7 +41,32 @@ export interface EpisodePaths {
   readonly file: string;
   readonly prepareStage: string;
   readonly root: string;
+  /** One archive directory per episode; the run id keeps stages from colliding. */
+  readonly runs: string;
+  readonly screenplay: string;
+  /**
+   * A file, not an empty directory. The layout rule says a directory appears
+   * when a stage writes into it and `check` reports the empty ones, so a lock
+   * held as a directory would trip the very check it sits beside.
+   */
+  readonly screenplayLock: string;
+  readonly screenplayStage: string;
   readonly source: string;
+}
+
+/**
+ * What a single attempt archives: only what cannot be reconstructed. The
+ * inputs are referenced by path and digest inside `run.json`, never copied.
+ */
+export interface RunPaths {
+  readonly previousScreenplay: string;
+  readonly prompt: string;
+  readonly request: string;
+  readonly response: string;
+  readonly root: string;
+  readonly run: string;
+  readonly transport: string;
+  readonly validation: string;
 }
 
 interface EpisodeIdentity {
@@ -146,8 +171,28 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
     file: join(root, "episode.json"),
     prepareStage: join(root, "prepare.stage.json"),
     root,
+    runs: join(root, "runs"),
+    screenplay: join(root, "screenplay.md"),
+    screenplayLock: join(root, "screenplay.lock"),
+    screenplayStage: join(root, "screenplay.stage.json"),
     source: join(root, "source.md"),
   });
+}
+
+/** The archive of one attempt. Run ids are minted by `lib/artifact`. */
+export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
+  const root = join(episode.runs, runId);
+
+  return {
+    previousScreenplay: join(root, "previous-screenplay.md"),
+    prompt: join(root, "prompt.md"),
+    request: join(root, "request.json"),
+    response: join(root, "response.json"),
+    root,
+    run: join(root, "run.json"),
+    transport: join(root, "transport.json"),
+    validation: join(root, "validation.json"),
+  };
 }
 
 /**

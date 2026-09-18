@@ -228,3 +228,100 @@ describe("approve", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+/**
+ * Only `--dry-run` is exercised here. Stage 1's real path posts with the
+ * process-wide `fetch` and a key from `.env`, so a CLI test that reached it
+ * would spend money; the paid behaviour is covered in the screenplay module,
+ * where `fetch` is injected.
+ */
+describe("screenplay generate", () => {
+  async function approvedProject(): Promise<void> {
+    await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
+    await cli("character", "describe", "demo");
+    await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nZasady serii.\n", "utf8");
+    const source = join(scratch, "01-Burza.md");
+    await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
+    await cli(
+      "episode",
+      "add",
+      "demo",
+      "--source",
+      source,
+      "--duration",
+      "90",
+      "--audio",
+      "narration",
+      "--language",
+      "pl",
+      "--subtitles",
+      "none",
+      "--nature",
+      "law-or-idea"
+    );
+    await cli("approve", "demo");
+  }
+
+  it("should print the exact prompt and the scene minimum", async () => {
+    await approvedProject();
+    const result = await cli("screenplay", "generate", "demo", "01-burza", "--dry-run");
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("wymagane co najmniej 6 scen");
+    expect(result.text).toContain("prompt wysłany do modelu");
+    expect(result.text).toContain("# Task: write a screenplay");
+    expect(result.text).toContain('"durationSeconds": 90');
+    expect(result.text).toContain("Ewa boi się burzy.");
+  });
+
+  it("should write nothing during a dry run", async () => {
+    await approvedProject();
+    await cli("screenplay", "generate", "demo", "01-burza", "--dry-run");
+
+    expect(await readdir(join(root, "projects/demo/episodes/01-burza"))).toEqual([
+      "episode.json",
+      "prepare.stage.json",
+      "source.md",
+    ]);
+  });
+
+  it("should name the missing approval as a blocker", async () => {
+    await approvedProject();
+    await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nInne zasady.\n", "utf8");
+    const result = await cli("screenplay", "generate", "demo", "01-burza", "--dry-run");
+
+    expect(result.text).toContain("approved");
+  });
+
+  it("should reject an unknown subcommand", async () => {
+    const result = await cli("screenplay", "rewrite", "demo", "01-burza");
+    expect(result.text).toContain("nieznane polecenie: screenplay rewrite");
+  });
+
+  it("should reject an out-of-range token limit", async () => {
+    await approvedProject();
+    const result = await cli(
+      "screenplay",
+      "generate",
+      "demo",
+      "01-burza",
+      "--max-output-tokens",
+      "1",
+      "--dry-run"
+    );
+
+    expect(result.text).toContain("--max-output-tokens");
+  });
+});
+
+describe("approve --stage", () => {
+  it("should reject an unknown stage", async () => {
+    const result = await cli("approve", "demo", "--stage", "montage");
+    expect(result.text).toContain("dozwolone: prepare, screenplay");
+  });
+
+  it("should require an episode for the screenplay stage", async () => {
+    const result = await cli("approve", "demo", "--stage", "screenplay");
+    expect(result.text).toContain("<episode-id>");
+  });
+});

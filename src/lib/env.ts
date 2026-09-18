@@ -18,9 +18,17 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
   runtimeEnv: process.env,
   server: {
+    /**
+     * The text model stage 1 sends the screenplay prompt to. Optional because
+     * `--dry-run` has to work without it — and because a default here would be
+     * a model choice nobody made, on a command that spends money.
+     */
+    AIMATOR_SCREENPLAY_MODEL: z.string().min(1).optional(),
     // Optional on purpose: a missing workspace is a recoverable, actionable
     // condition that `run()` reports as a Result. Marking it required would
     // throw here, at import time, before the CLI could explain itself.
     AIMATOR_WORKSPACE: z.string().min(1).optional(),
+    /** Read only on the paid path; `--dry-run` never asks for it. */
+    OPENAI_API_KEY: z.string().min(1).optional(),
   },
 });

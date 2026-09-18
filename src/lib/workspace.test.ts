@@ -1,6 +1,12 @@
 import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { episodeIdFromSource, episodePaths, projectPaths, resolveWorkspace } from "./workspace.js";
+import {
+  episodeIdFromSource,
+  episodePaths,
+  projectPaths,
+  resolveWorkspace,
+  runPaths,
+} from "./workspace.js";
 
 describe("resolveWorkspace", () => {
   it("should keep an absolute path", () => {
@@ -71,6 +77,10 @@ describe("episodePaths", () => {
       file: `${episode}/episode.json`,
       prepareStage: `${episode}/prepare.stage.json`,
       root: episode,
+      runs: `${episode}/runs`,
+      screenplay: `${episode}/screenplay.md`,
+      screenplayLock: `${episode}/screenplay.lock`,
+      screenplayStage: `${episode}/screenplay.stage.json`,
       source: `${episode}/source.md`,
     });
   });
@@ -78,6 +88,15 @@ describe("episodePaths", () => {
   it("should reject an episode id containing a path separator", () => {
     const result = project.ok ? episodePaths(project.data, "../../etc") : null;
     expect(result?.ok).toBe(false);
+  });
+
+  it("should archive an attempt under the episode's shared runs directory", () => {
+    const paths = project.ok ? episodePaths(project.data, "01-arrival") : null;
+    const run = paths?.ok ? runPaths(paths.data, "20260918T090000Z-abcd1234") : null;
+
+    expect(run?.root).toBe(`${episode}/runs/20260918T090000Z-abcd1234`);
+    expect(run?.prompt).toBe(`${run?.root}/prompt.md`);
+    expect(run?.run).toBe(`${run?.root}/run.json`);
   });
 });
 

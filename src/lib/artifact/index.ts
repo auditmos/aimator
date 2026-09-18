@@ -19,13 +19,17 @@ export {
   emptyDirectories,
   exists,
   listEntries,
+  newRunId,
+  nowIso,
   readDigest,
   readJson,
+  removeFile,
   serialize,
   sha256Of,
   toWorkspacePath,
   type WriteMode,
   type WriteOp,
+  writeNew,
 } from "./store.js";
 
 import type { ArtifactRecord, Producer, RecordedFile, StageFile, StageName } from "./schema.js";
@@ -49,6 +53,25 @@ export function emptyStage(stage: StageName): StageFile {
 /** What a person decided and the tool merely copied. No network behind it. */
 export function manualProducer(): Producer {
   return { endpoint: null, kind: "manual", model: null, promptVersion: null, tool: TOOL };
+}
+
+/**
+ * What a paid call produced. The endpoint, model and prompt version belong in
+ * the artifact because "which prompt produced this" has to stay answerable
+ * from the workspace, long after the source tree has moved on.
+ */
+export function modelProducer(input: {
+  readonly endpoint: string;
+  readonly model: string;
+  readonly promptVersion: number;
+}): Producer {
+  return {
+    endpoint: input.endpoint,
+    kind: "model",
+    model: input.model,
+    promptVersion: input.promptVersion,
+    tool: TOOL,
+  };
 }
 
 /**

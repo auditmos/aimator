@@ -39,7 +39,7 @@ const FIELDS = [
   { label: "End state", pattern: /^(?:- )?End state:([^\r\n]*)\r?$/gm },
 ] as const;
 
-interface ScreenplayVerdict {
+export interface ScreenplayVerdict {
   readonly durationSeconds: number;
   readonly longestSceneSeconds: number;
   readonly maxSceneSeconds: number;
@@ -65,7 +65,7 @@ interface Scene {
 }
 
 /** How many scenes the duration needs once no scene may exceed the limit. */
-function minimumScenes(durationSeconds: number): number {
+export function minimumScenes(durationSeconds: number): number {
   return Math.ceil(durationSeconds / MAX_SCENE_SECONDS);
 }
 

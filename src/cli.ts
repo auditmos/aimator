@@ -12,6 +12,13 @@ import {
   setEpisodeSettings,
 } from "./lib/project/index.js";
 import { err, ok, type Result } from "./lib/result.js";
+import {
+  approveScreenplay,
+  checkScreenplay,
+  generateScreenplay,
+  type ScreenplayReport,
+  type ScreenplayStatus,
+} from "./lib/screenplay/index.js";
 import { resolveWorkspace, type Workspace } from "./lib/workspace.js";
 
 const USAGE = `Usage: aimator <command>
@@ -23,17 +30,32 @@ Etap 0 — przygotowanie projektu i odcinka:
   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
   episode set <id> <episode-id> [te same flagi decyzji]
-  check <id>
-  approve <id> [--note <uzasadnienie>] [--reviewer <kto>]
+
+Etap 1 — scenariusz (jedyne polecenie, które wydaje pieniądze):
+  screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                                        [--dry-run] [--regenerate]
+
+Wspólne:
+  check <id> [<episode-id>]
+  approve <id> [<episode-id>] [--stage prepare|screenplay]
+               [--note <uzasadnienie>] [--reviewer <kto>]
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
   --character  photographs | description — skąd etap postaci bierze wygląd
+  --stage      zakres akceptacji; domyślnie prepare (etap 0)
 
 Globalne:
   --workspace <ścieżka>  katalog artefaktów (domyślnie AIMATOR_WORKSPACE)
   --dry-run              pokaż, co powstanie, nie zapisuj niczego
-  --help                 ten komunikat`;
+  --help                 ten komunikat
+
+Etap 1 odmawia płatnego wywołania, dopóki etap 0 tego projektu i odcinka nie ma
+review.status = "approved". Nic nie ponawia się samo; nową płatną próbę zaczyna
+wyłącznie --regenerate, zachowując poprzedni wynik.`;
+
+const DEFAULT_MAX_OUTPUT_TOKENS = 12_000;
+const MODEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 
 const SETTINGS_OPTIONS = {
   audio: { type: "string" },
@@ -164,6 +186,77 @@ function render(headline: string, report: Stage0Report, mode: "apply" | "dry-run
   return lines.join("\n");
 }
 
+/**
+ * `--dry-run` prints the prompt itself, not a byte count. The whole point of
+ * the preview is to let a person read what a paid call would send.
+ */
+function renderGenerate(
+  report: ScreenplayReport,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const lines =
+    mode === "dry-run"
+      ? [
+          `Próba na sucho — nic nie zapisano, nic nie wysłano. Scenariusz ${projectId}/${episodeId}`,
+          `  wymagane co najmniej ${report.minimumScenes} scen, każda 1–15 s, suma dokładnie równa durationSeconds`,
+          "  OPENAI_API_KEY nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+        ]
+      : [`Scenariusz ${projectId}/${episodeId} — próba ${report.runId ?? ""}`];
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  if (report.verdict !== null) {
+    lines.push(
+      `  sceny: ${report.verdict.scenes}, suma ${report.verdict.durationSeconds} s, najdłuższa ${report.verdict.longestSceneSeconds} s`
+    );
+    lines.push("  ! struktura i suma czasów się zgadzają — fabuła wymaga oceny człowieka");
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  if (report.prompt !== null) {
+    lines.push("", "--- prompt wysłany do modelu (dokładnie ten tekst) ---", report.prompt);
+  }
+
+  return lines.join("\n");
+}
+
+function renderScreenplay(
+  headline: string,
+  status: ScreenplayStatus,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+
+  if (status.verdict !== null) {
+    lines.push(
+      `  sceny: ${status.verdict.scenes}, suma ${status.verdict.durationSeconds} s, najdłuższa ${status.verdict.longestSceneSeconds} s`
+    );
+  }
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (status.status === "completed" && !status.approved && status.problems.length === 0) {
+    lines.push(
+      `  ! plik przeszedł walidację — to nie to samo co przyjęcie go przez człowieka: aimator approve ${projectId} ${episodeId} --stage screenplay`
+    );
+  }
+
+  return lines.join("\n");
+}
+
 async function runProject(argv: readonly string[]): Promise<Result<string>> {
   if (argv[0] !== "init") {
     return err(new UsageError(`nieznane polecenie: project ${argv[0] ?? ""}`.trim()));
@@ -287,7 +380,11 @@ async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
 }
 
 async function runApprove(argv: readonly string[]): Promise<Result<string>> {
-  const parsed = parse(argv, { note: { type: "string" }, reviewer: { type: "string" } });
+  const parsed = parse(argv, {
+    note: { type: "string" },
+    reviewer: { type: "string" },
+    stage: { type: "string" },
+  });
 
   if (!parsed.ok) {
     return parsed;
@@ -303,19 +400,129 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
     return workspace;
   }
 
-  const { note } = parsed.data.values;
+  const { note, stage } = parsed.data.values;
   const mode = modeOf(parsed.data);
-  const result = await approveStage0({
+  const approval = {
     mode,
     note: typeof note === "string" ? note : null,
     projectId: projectId.data,
     reviewer: reviewerOf(parsed.data),
     workspace: workspace.data,
-  });
+  };
+
+  if (stage === undefined || stage === "prepare") {
+    const result = await approveStage0(approval);
+
+    return result.ok
+      ? ok(render(`Etap 0 projektu "${projectId.data}" zatwierdzony`, result.data, mode))
+      : result;
+  }
+
+  if (stage !== "screenplay") {
+    return err(new UsageError(`--stage "${String(stage)}" — dozwolone: prepare, screenplay`));
+  }
+
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+
+  const result = await approveScreenplay({ ...approval, episodeId: episodeId.data });
 
   return result.ok
-    ? ok(render(`Etap 0 projektu "${projectId.data}" zatwierdzony`, result.data, mode))
+    ? ok(
+        renderScreenplay(
+          `Scenariusz odcinka "${episodeId.data}" zatwierdzony`,
+          result.data,
+          projectId.data,
+          episodeId.data,
+          mode
+        )
+      )
     : result;
+}
+
+async function runScreenplay(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] !== "generate") {
+    return err(new UsageError(`nieznane polecenie: screenplay ${argv[0] ?? ""}`.trim()));
+  }
+
+  const parsed = parse(argv.slice(1), {
+    "max-output-tokens": { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const model = modelOf(parsed.data);
+  const tokens = maxOutputTokensOf(parsed.data);
+
+  if (!model.ok) {
+    return model;
+  }
+  if (!tokens.ok) {
+    return tokens;
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generateScreenplay({
+    apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    episodeId: episodeId.data,
+    fetch,
+    maxOutputTokens: tokens.data,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    workspace: workspace.data,
+  });
+
+  return result.ok ? ok(renderGenerate(result.data, projectId.data, episodeId.data, mode)) : result;
+}
+
+/** `--model` wins over the environment; neither has a default. */
+function modelOf(parsed: Parsed): Result<string | null> {
+  const flag = parsed.values.model;
+  const value = typeof flag === "string" ? flag : (env.AIMATOR_SCREENPLAY_MODEL ?? null);
+
+  if (value !== null && !MODEL_ID.test(value)) {
+    return err(new UsageError(`niepoprawny identyfikator modelu "${value}"`));
+  }
+
+  return ok(value);
+}
+
+function maxOutputTokensOf(parsed: Parsed): Result<number> {
+  const flag = parsed.values["max-output-tokens"];
+
+  if (typeof flag !== "string") {
+    return ok(DEFAULT_MAX_OUTPUT_TOKENS);
+  }
+
+  const value = Number(flag);
+
+  return Number.isSafeInteger(value) && value >= 256 && value <= 100_000
+    ? ok(value)
+    : err(new UsageError("--max-output-tokens: liczba całkowita od 256 do 100000"));
 }
 
 async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
@@ -412,9 +619,36 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
   const result = await checkStage0({ projectId: projectId.data, workspace: workspace.data });
 
-  return result.ok
-    ? ok(render(`Projekt "${projectId.data}" — etap 0 gotowy`, result.data, "apply"))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  const stage0 = render(`Projekt "${projectId.data}" — etap 0 gotowy`, result.data, "apply");
+  const [, episodeId] = parsed.data.positionals;
+
+  if (episodeId === undefined) {
+    return ok(stage0);
+  }
+
+  // Naming an episode widens the check to its stage 1. Nothing is written —
+  // a check reports drift, it never records it.
+  const stage1 = await checkScreenplay({
+    episodeId,
+    projectId: projectId.data,
+    workspace: workspace.data,
+  });
+
+  return stage1.ok
+    ? ok(
+        `${stage0}\n${renderScreenplay(
+          `Odcinek "${episodeId}" — etap 1: ${stage1.data.status}${stage1.data.approved ? ", zatwierdzony" : ""}`,
+          stage1.data,
+          projectId.data,
+          episodeId,
+          "apply"
+        )}`
+      )
+    : stage1;
 }
 
 /**
@@ -439,6 +673,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "episode") {
     return await runEpisode(rest);
+  }
+
+  if (command === "screenplay") {
+    return await runScreenplay(rest);
   }
 
   if (command === "check") {

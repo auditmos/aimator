@@ -24,9 +24,11 @@ $AIMATOR_WORKSPACE/
         ├── episode.json              pięć decyzji odcinka
         ├── prepare.stage.json
         ├── screenplay.md             ┐
+        ├── screenplay.stage.json     │
         ├── shot-list.md              │ etapy tekstowe — wspólne dla obu torów
         ├── prompt-package.json       │
         ├── prompts/                  ┘ opening-frame.md, references/, clips/, entry-frames/
+        ├── runs/<runId>/             archiwum prób etapów tekstowych
         ├── gpt-image/                ┐ references/, opening-frame.png, clips/, frames/,
         └── seedream/                 ┘ edit-plan.json, episode.mp4, runs/
 ```
@@ -63,8 +65,16 @@ Jeden kształt dla wszystkich etapów. Klucz `artifacts` pozwala objąć zbiór 
   "artifacts": {
     "episode": {
       "runId": "20260917T170233Z-a1b2c3d4",
+      "status": "completed",
+      "jobId": null,
       "producedAt": "2026-09-17T17:02:33.412Z",
-      "producer": { "kind": "manual", "tool": "aimator" },
+      "producer": {
+        "kind": "manual",
+        "tool": "aimator",
+        "endpoint": null,
+        "model": null,
+        "promptVersion": null
+      },
       "inputs": [],
       "outputs": [
         { "path": "projects/demo/episodes/01-tytul/source.md", "sha256": "6ba5…" },
@@ -76,6 +86,14 @@ Jeden kształt dla wszystkich etapów. Klucz `artifacts` pozwala objąć zbiór 
   }
 }
 ```
+
+`stage` przyjmuje nazwę dowolnego etapu z tabeli poniżej i wyznacza nazwę pliku.
+`status` opisuje próbę, nie ocenę: `submitted` zapisuje się **przed** płatnym POST-em,
+`completed` dopiero wtedy, gdy wynik przeszedł walidację i został opublikowany. Rekord
+etapu ręcznego jest ukończony z konstrukcji, bo nie stoi za nim żadne wywołanie.
+`producer` przy etapie płatnym zapisuje endpoint, identyfikator modelu i **jawną wersję
+promptu** — nie hash pliku źródłowego, bo hash zmienia się od przeformatowania komentarza
+i nie mówi nic o tym, czy instrukcja się zmieniła.
 
 Ścieżki w artefaktach są **względne wobec katalogu roboczego**, więc całe drzewo można
 przenieść. `originPath` w `project.json` i `episode.json` jest bezwzględny, bo wskazuje
@@ -94,7 +112,7 @@ Obowiązują we wszystkich etapach.
 
 - **Ocena kreatywna jest osobna od walidacji.** Plik, który powstał, nie jest plikiem
   przyjętym. Przejście walidacji nie jest akceptacją — akceptację zapisuje wyłącznie jawne
-  polecenie (`aimator approve` dla etapu 0), nigdy polecenie kontrolne.
+  `aimator approve`, z zakresem etapu w `--stage`, nigdy polecenie kontrolne.
 - **Akceptacja jest związana z bajtami.** `review.status` dotyczy konkretnych
   `outputs[].sha256`. Zmiana pliku unieważnia akceptację; nie ma sposobu, by przeniosła
   się na inny wynik. Ponowny zapis pliku etapu przywraca `pending` i mówi o tym wprost.
@@ -103,8 +121,13 @@ Obowiązują we wszystkich etapach.
   kłamstwem, któremu kolejne etapy zaufałyby.
 - **`needsReview` nigdy nie czyści się samo.** Wpisuje go etap zależny w chwili
   uruchomienia. `check` tylko raportuje rozjazd — polecenie kontrolne niczego nie zapisuje.
-- **Stan `submitted` zapisuje się przed płatnym POST-em**, więc przerwane wywołanie
-  wznawia się przez odpytanie zapisanego identyfikatora zadania, a nie przez drugą opłatę.
+- **Stan `submitted` zapisuje się przed płatnym POST-em.** Przerwana próba zostawia więc
+  ślad mówiący, że opłata mogła już paść, zamiast wyglądać na niebyłą. Czy da się ją
+  wznowić bez drugiej opłaty, zależy od dostawcy: tam, gdzie zadanie jest przechowywane,
+  wznawia się przez zapisany identyfikator; tam, gdzie nie jest — jak przy `store: false`
+  w etapie 1 — odpowiedź istnieje tylko wtedy, gdy zdążyła trafić na dysk, a poza tym
+  jedyną drogą dalej jest jawne `--regenerate`. Narzędzie mówi to wprost, zamiast
+  milcząco płacić drugi raz.
 - **Nic nie ponawia się automatycznie.** Nową płatną próbę zaczyna wyłącznie jawne
   `--regenerate`, zachowując poprzedni wynik.
 - **Każde polecenie zapisujące ma `--dry-run`** — pełna walidacja, bez sieci, sekretów
@@ -122,7 +145,7 @@ Obowiązują we wszystkich etapach.
 | Etap | Konsumuje | Produkuje | Bramka | Stan |
 |---|---|---|---|---|
 | 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci | `project.md`, `project.json`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
-| 1 scenariusz | `source.md`, `episode.json` | `screenplay.md` | ocena użytkownika | niezaimplementowany |
+| 1 scenariusz | `project.json`, `project.md`, `source.md`, `episode.json` | `screenplay.md`, `screenplay.stage.json`, `runs/<runId>/` | zatwierdzony etap 0 przed wywołaniem; potem `aimator check`, `aimator approve … --stage screenplay` | **zaimplementowany** |
 | 2 postać | `characterBasis`: `character/sources/` albo opis wyglądu z `project.md` | `card.png` → 8 widoków → `hero.png`, per tor | ocena każdego obrazu | niezaimplementowany |
 | 3 lista ujęć | `screenplay.md` | `shot-list.md` | ocena użytkownika | niezaimplementowany |
 | 4 pakiet promptów | `shot-list.md`, zatwierdzony `hero.png` | `prompt-package.json`, `prompts/**` | ocena pakietu | niezaimplementowany |
@@ -131,7 +154,7 @@ Obowiązują we wszystkich etapach.
 | 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 1–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
+Etapy 2–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
 żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
 
 ## Etap 0 — szczegóły
@@ -178,3 +201,49 @@ zgadzają się, i żadne z pięciu pól nie jest `null`.
 <project-id>`, które powtarza całą weryfikację, dopisuje hash `project.md` i ustawia
 `review.status` na `approved` we wszystkich plikach etapu — projektu i każdego odcinka —
 razem z tym, kto i kiedy to zrobił. Dopiero wtedy `check` odsyła do etapu 1.
+
+## Etap 1 — szczegóły
+
+Pierwszy etap, który wydaje pieniądze, i jedyny, którego wynik jest tekstem napisanym
+przez model. Konsumuje wyłącznie artefakty etapu 0 — zasady projektu i proporcje obrazu
+z `project.json` i `project.md`, źródło i pięć decyzji z `source.md` i `episode.json` —
+i zapisuje hash każdego z nich w chwili, gdy je czyta.
+
+**Bramka przed wydaniem pieniędzy.** `screenplay generate` odmawia płatnego wywołania,
+dopóki `prepare.stage.json` projektu **i** odcinka nie mają `review.status = "approved"`,
+a hashe ich wyników się zgadzają. Edycja `project.md` po akceptacji unieważnia ją
+arytmetycznie i etap 1 znów blokuje. `--dry-run` tej bramki nie omija — raportuje ją jako
+przeszkodę, ale i tak pokazuje prompt, bo po to jest podgląd.
+
+**Skąd bierze się model.** `--model <id>`, a bez tej flagi `AIMATOR_SCREENPLAY_MODEL`.
+Wartości domyślnej nie ma i nie będzie: model, którego nikt nie wybrał, nie jest decyzją.
+Klucz czytany jest wyłącznie na ścieżce płatnej, z `OPENAI_API_KEY`; `--dry-run` nie
+sięga po sekret ani po sieć.
+
+**Archiwum próby.** `episodes/<id>/runs/<runId>/` trzyma `prompt.md`, `request.json`,
+`response.json`, `transport.json`, `run.json` i `validation.json` — czyli to, czego nie da
+się odtworzyć. Wejścia są w `run.json` referowane ścieżką i sha256, nigdy kopiowane. Jeden
+katalog `runs/` na odcinek wystarczy wszystkim etapom tekstowym, bo `runId` jest unikalny
+i prefiksowany czasem. Poprzedni scenariusz trafia do `previous-screenplay.md` nowej próby
+wyłącznie przy `--regenerate`.
+
+**Wywołanie idzie z `store: false`**, więc dostawca nic nie przechowuje i przerwanej próby
+nie da się odpytać po identyfikatorze. Rekord ze statusem `submitted` bez zapisanej
+odpowiedzi jest więc ślepym zaułkiem: `check` mówi wprost, że próba mogła zostać
+rozliczona, i jedyną drogą dalej jest `--regenerate`. Nic nie ponawia się samo.
+
+**Walidacja strukturalna.** Siedem sekcji w ustalonej kolejności, żadnej pustej, nagłówki
+`### S01 | 15s | miejsce i pora dnia` numerowane kolejno od S01, każda scena 1–15 s, suma
+czasów dokładnie równa `durationSeconds`, w każdej scenie dokładnie jedno niepuste pole
+Action, Audio, Text i End state. Przy `subtitles: none` każde pole Text musi brzmieć
+`none`; przy zamówionych napisach co najmniej jedno nie może. Minimalna liczba scen,
+`ceil(durationSeconds / 15)`, jest **raportowana, nie sprawdzana osobno** — przy twardym
+limicie sceny poprawna suma nie da się osiągnąć mniejszą liczbą scen.
+
+**Walidacja to nie akceptacja.** Wynik, który przeszedł walidację, ma
+`review.status = "pending"`. Przyjmuje go dopiero
+`aimator approve <project-id> <episode-id> --stage screenplay`, i tylko wtedy, gdy hash
+`screenplay.md` się zgadza, dokument nadal przechodzi walidację i żadne wejście etapu 0
+nie zmieniło się od czasu generacji. `aimator check <project-id> <episode-id>` sprawdza to
+samo i nie zapisuje niczego — rozjazd wejść raportuje, `needsReview` wpisze dopiero etap
+zależny w chwili uruchomienia.

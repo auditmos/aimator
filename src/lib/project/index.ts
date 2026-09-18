@@ -40,6 +40,7 @@ import {
   episodeFileSchema,
   type ProjectFile,
   projectFileSchema,
+  type ReadySettings,
   readySettingsSchema,
   sourceNatures,
 } from "./schema.js";
@@ -58,8 +59,8 @@ export type { ReadySettings as EpisodeSettings } from "./schema.js";
  */
 
 const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
-const READY_NEXT =
-  "etap 0 zatwierdzony. Etap 1 (scenariusz) nie jest jeszcze zaimplementowany — to zakres kroku 2 migracji.";
+const readyNext = (projectId: string): string =>
+  `etap 0 zatwierdzony. Etap 1 (scenariusz) wydaje pieniądze, więc zacznij od podglądu: aimator screenplay generate ${projectId} <episode-id> --dry-run`;
 const EMPTY_SETTINGS: DraftSettings = {
   audio: null,
   durationSeconds: null,
@@ -67,6 +68,22 @@ const EMPTY_SETTINGS: DraftSettings = {
   sourceNature: null,
   subtitles: null,
 };
+
+/** Everything stage 1 is allowed to read, with the digests of the bytes it read. */
+export interface Stage0Inputs {
+  /** Whether a human accepted stage 0 for this project *and* this episode. */
+  readonly approved: boolean;
+  readonly aspectRatio: string;
+  readonly inputs: readonly RecordedFile[];
+  /** Why the approval does not hold, when it does not. */
+  readonly problems: readonly string[];
+  /** `project.md`, verbatim. */
+  readonly rules: string;
+  readonly settings: ReadySettings;
+  /** `source.md`, verbatim. */
+  readonly source: string;
+  readonly title: string;
+}
 
 export interface Stage0Report {
   /** Creative acceptance, which validation never implies on its own. */
@@ -102,6 +119,9 @@ type AddSourcesInput = ProjectInput & { readonly sourcePaths: readonly string[] 
 interface CheckInput {
   readonly projectId: string;
   readonly workspace: Workspace;
+}
+interface EpisodeRef {
+  readonly episodeId: string;
 }
 
 class ProjectStateError extends Error {
@@ -699,6 +719,148 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
     : written;
 }
 
+/**
+ * Everything a later stage may read from stage 0, in one call.
+ *
+ * It exists so no other module has to know that the rules are in `project.md`,
+ * the decisions in `episode.json` and the ingested text in `source.md` — the
+ * layout stays stage 0's business. The four digests come back with the bytes,
+ * because a stage that records what it consumed must record the same bytes it
+ * actually read.
+ *
+ * Missing decisions are an error: without them there is nothing to ask a model
+ * for. A missing *approval* is not — it comes back as `approved: false` with
+ * the reasons, so a dry run can still show what would be sent while the paid
+ * path refuses.
+ */
+export async function readStage0Inputs(
+  input: CheckInput & EpisodeRef
+): Promise<Result<Stage0Inputs>> {
+  const project = await resolveProject({ ...input, mode: "dry-run" });
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const paths = episodePaths(project.data, input.episodeId);
+
+  if (!paths.ok) {
+    return paths;
+  }
+
+  const file = await readJson(project.data.file, projectFileSchema);
+  const episode = await readJson(paths.data.file, episodeFileSchema);
+
+  if (!file.ok) {
+    return file;
+  }
+
+  if (!episode.ok) {
+    return err(
+      new ProjectStateError(
+        "missing-episode",
+        `odcinek "${input.episodeId}" nie istnieje w projekcie "${input.projectId}"`
+      )
+    );
+  }
+
+  const settings = readySettingsSchema.safeParse(episode.data.settings);
+
+  if (!settings.success || file.data.aspectRatio === null) {
+    return err(
+      new NotReadyError([
+        ...missingSettings(episode.data.settings).map(
+          (field) => `odcinek "${input.episodeId}": brak decyzji — ${field}`
+        ),
+        ...(file.data.aspectRatio === null ? ["project.json: aspectRatio nie jest ustalony"] : []),
+      ])
+    );
+  }
+
+  const rules = await readDigest(project.data.rules);
+  const source = await readDigest(paths.data.source);
+
+  if (!rules.ok) {
+    return rules;
+  }
+
+  if (!source.ok) {
+    return source;
+  }
+
+  const projectJson = await readDigest(project.data.file);
+  const episodeJson = await readDigest(paths.data.file);
+
+  if (!projectJson.ok) {
+    return projectJson;
+  }
+
+  if (!episodeJson.ok) {
+    return episodeJson;
+  }
+
+  const relative = (path: string): string => toWorkspacePath(input.workspace.root, path);
+  const approval = await approvalOf(input.workspace, project.data, paths.data);
+
+  return ok({
+    approved: approval.approved,
+    aspectRatio: file.data.aspectRatio,
+    inputs: [
+      { path: relative(project.data.file), sha256: projectJson.data.sha256 },
+      { path: relative(project.data.rules), sha256: rules.data.sha256 },
+      { path: relative(paths.data.file), sha256: episodeJson.data.sha256 },
+      { path: relative(paths.data.source), sha256: source.data.sha256 },
+    ],
+    problems: approval.problems,
+    rules: rules.data.bytes.toString("utf8"),
+    settings: settings.data,
+    source: source.data.bytes.toString("utf8"),
+    title: file.data.title,
+  });
+}
+
+/**
+ * Stage 0 counts as approved for one episode when the project *and* that
+ * episode carry an explicit approval and every digest still matches. Editing
+ * an artifact after the fact therefore revokes it by arithmetic, which is the
+ * only reason a later stage can trust the word at all.
+ */
+async function approvalOf(
+  workspace: Workspace,
+  project: ProjectPaths,
+  episode: EpisodePaths
+): Promise<{ approved: boolean; problems: readonly string[] }> {
+  const problems: string[] = [];
+  const stages = [
+    { label: "projekt", path: project.prepareStage },
+    { label: `odcinek "${basename(episode.root)}"`, path: episode.prepareStage },
+  ];
+  const files = await Promise.all(stages.map((entry) => readJson(entry.path, stageFileSchema)));
+  const verdicts = await Promise.all(
+    files.map(async (stage, index) => {
+      const label = stages[index]?.label ?? "";
+
+      if (!stage.ok) {
+        return { problems: [`${label}: brak zapisu etapu 0 (prepare.stage.json)`] };
+      }
+
+      const found: string[] = [];
+
+      await verifyOutputs(workspace, stage.data, label, found);
+
+      if (!isApproved(stage.data)) {
+        found.push(`${label}: etap 0 nie ma akceptacji (review.status ≠ approved)`);
+      }
+
+      return { problems: found };
+    })
+  );
+
+  problems.push(...verdicts.flatMap((verdict) => verdict.problems));
+
+  return { approved: problems.length === 0, problems };
+}
+
 export async function checkStage0(input: CheckInput): Promise<Result<Stage0Report>> {
   const project = await resolveProject({ ...input, mode: "dry-run" });
 
@@ -716,7 +878,7 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
     approved: verdict.approved,
     created: [],
     nextStep: verdict.approved
-      ? READY_NEXT
+      ? readyNext(input.projectId)
       : `pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve ${input.projectId}`,
     problems: [],
     ready: true,
@@ -755,7 +917,7 @@ export async function approveStage0(input: ApproveInput): Promise<Result<Stage0R
     ? ok({
         approved: true,
         created: [],
-        nextStep: READY_NEXT,
+        nextStep: readyNext(input.projectId),
         problems: [],
         ready: true,
         reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
