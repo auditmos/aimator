@@ -32,16 +32,16 @@ export interface ProjectPaths {
   readonly characterSources: string;
   readonly episodes: string;
   readonly file: string;
+  readonly prepareStage: string;
   readonly root: string;
   readonly rules: string;
-  readonly stage: string;
 }
 
 export interface EpisodePaths {
   readonly file: string;
+  readonly prepareStage: string;
   readonly root: string;
   readonly source: string;
-  readonly stage: string;
 }
 
 interface EpisodeIdentity {
@@ -124,9 +124,9 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
     characterSources: join(root, "character", "sources"),
     episodes: join(root, "episodes"),
     file: join(root, "project.json"),
+    prepareStage: join(root, "prepare.stage.json"),
     root,
     rules: join(root, "project.md"),
-    stage: join(root, "prepare.stage.json"),
   });
 }
 
@@ -144,9 +144,9 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
 
   return ok({
     file: join(root, "episode.json"),
+    prepareStage: join(root, "prepare.stage.json"),
     root,
     source: join(root, "source.md"),
-    stage: join(root, "prepare.stage.json"),
   });
 }
 

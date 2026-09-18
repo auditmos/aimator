@@ -37,9 +37,9 @@ describe("projectPaths", () => {
       characterSources: "/srv/aimator/projects/48-praw-wladzy/character/sources",
       episodes: "/srv/aimator/projects/48-praw-wladzy/episodes",
       file: "/srv/aimator/projects/48-praw-wladzy/project.json",
+      prepareStage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
       root: "/srv/aimator/projects/48-praw-wladzy",
       rules: "/srv/aimator/projects/48-praw-wladzy/project.md",
-      stage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
     });
   });
 
@@ -63,14 +63,15 @@ describe("projectPaths", () => {
 
 describe("episodePaths", () => {
   const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const episode = "/srv/aimator/projects/demo/episodes/01-arrival";
 
   it("should place every episode artifact under the episode directory", () => {
     const result = project.ok ? episodePaths(project.data, "01-arrival") : null;
     expect(result?.ok ? result.data : null).toEqual({
-      file: "/srv/aimator/projects/demo/episodes/01-arrival/episode.json",
-      root: "/srv/aimator/projects/demo/episodes/01-arrival",
-      source: "/srv/aimator/projects/demo/episodes/01-arrival/source.md",
-      stage: "/srv/aimator/projects/demo/episodes/01-arrival/prepare.stage.json",
+      file: `${episode}/episode.json`,
+      prepareStage: `${episode}/prepare.stage.json`,
+      root: episode,
+      source: `${episode}/source.md`,
     });
   });
 

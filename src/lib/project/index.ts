@@ -1,4 +1,27 @@
 import { basename, join } from "node:path";
+import {
+  applyWrites,
+  approveAll,
+  emptyDirectories,
+  emptyStage,
+  exists,
+  isApproved,
+  listEntries,
+  manualProducer,
+  newRecord,
+  type RecordedFile,
+  readDigest,
+  readJson,
+  type StageFile,
+  serialize,
+  sha256Of,
+  stageFileSchema,
+  toWorkspacePath,
+  verifyOutputs,
+  type WriteMode,
+  type WriteOp,
+  withOutputs,
+} from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
   type EpisodePaths,
@@ -8,7 +31,6 @@ import {
   projectPaths,
   type Workspace,
 } from "../workspace.js";
-import { approveAll, isApproved, verifyOutputs, withOutputs } from "./review.js";
 import {
   audioModes,
   characterBases,
@@ -18,27 +40,9 @@ import {
   episodeFileSchema,
   type ProjectFile,
   projectFileSchema,
-  type RecordedFile,
   readySettingsSchema,
-  type StageFile,
   sourceNatures,
-  stageFileSchema,
 } from "./schema.js";
-import {
-  applyWrites,
-  emptyDirectories,
-  exists,
-  listEntries,
-  newRunId,
-  nowIso,
-  readDigest,
-  readJson,
-  serialize,
-  sha256Of,
-  toWorkspacePath,
-  type WriteMode,
-  type WriteOp,
-} from "./store.js";
 import { PLACEHOLDER, renderRules } from "./template.js";
 
 /**
@@ -50,7 +54,6 @@ import { PLACEHOLDER, renderRules } from "./template.js";
  * Nothing here calls a paid API.
  */
 
-const TOOL = "aimator";
 const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 const READY_NEXT =
   "etap 0 zatwierdzony. Etap 1 (scenariusz) nie jest jeszcze zaimplementowany — to zakres kroku 2 migracji.";
@@ -128,23 +131,15 @@ class NotReadyError extends Error {
   }
 }
 
-function emptyStage(): StageFile {
-  return { artifacts: {}, stage: "prepare", version: 1 };
+function prepareStageFile(artifacts: StageFile["artifacts"]): StageFile {
+  return { ...emptyStage("prepare"), artifacts };
 }
 
 function record(
   inputs: readonly RecordedFile[],
   outputs: readonly RecordedFile[]
 ): StageFile["artifacts"][string] {
-  return {
-    inputs: [...inputs],
-    needsReview: [],
-    outputs: [...outputs],
-    producedAt: nowIso(),
-    producer: { kind: "manual", tool: TOOL },
-    review: { note: null, reviewedAt: null, reviewer: null, status: "pending" },
-    runId: newRunId(),
-  };
+  return newRecord({ inputs, outputs, producer: manualProducer() });
 }
 
 async function resolveProject(input: ProjectInput): Promise<Result<ProjectPaths>> {
@@ -217,9 +212,8 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
     { kind: "text", text, to: paths.data.file },
     {
       kind: "text",
-      text: serialize({
-        ...emptyStage(),
-        artifacts: {
+      text: serialize(
+        prepareStageFile({
           project: record(
             [],
             [
@@ -229,9 +223,9 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
               },
             ]
           ),
-        },
-      }),
-      to: paths.data.stage,
+        })
+      ),
+      to: paths.data.prepareStage,
     },
   ];
 
@@ -360,9 +354,8 @@ function episodeWriteOps(
     { kind: "text", text, to: paths.file },
     {
       kind: "text",
-      text: serialize({
-        ...emptyStage(),
-        artifacts: {
+      text: serialize(
+        prepareStageFile({
           episode: record(
             [],
             [
@@ -373,9 +366,9 @@ function episodeWriteOps(
               },
             ]
           ),
-        },
-      }),
-      to: paths.stage,
+        })
+      ),
+      to: paths.prepareStage,
     },
   ];
 }
@@ -491,7 +484,7 @@ export async function setEpisodeSettings(input: SetSettingsInput): Promise<Resul
     paths.data.source
   ).filter((op) => op.kind !== "copy");
 
-  const lapsed = await approvalLapses(paths.data.stage);
+  const lapsed = await approvalLapses(paths.data.prepareStage);
   const written = await applyWrites(ops, input.mode);
   const missing = missingSettings(settings.data);
   const problems = missing.map((field) => `${field}: brak decyzji`);
@@ -581,9 +574,8 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
   ops.push({ kind: "text", text, to: project.data.file });
   ops.push({
     kind: "text",
-    text: serialize({
-      ...emptyStage(),
-      artifacts: {
+    text: serialize(
+      prepareStageFile({
         project: record(
           recorded.map((asset) => ({ path: asset.path, sha256: asset.sha256 })),
           [
@@ -593,12 +585,12 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
             },
           ]
         ),
-      },
-    }),
-    to: project.data.stage,
+      })
+    ),
+    to: project.data.prepareStage,
   });
 
-  const lapsed = await approvalLapses(project.data.stage);
+  const lapsed = await approvalLapses(project.data.prepareStage);
   const written = await applyWrites(ops, input.mode);
   const problems: string[] = [];
 
@@ -657,15 +649,14 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
 
   const file: ProjectFile = { ...current.data, characterBasis: input.basis };
   const text = serialize(file);
-  const lapsed = await approvalLapses(project.data.stage);
+  const lapsed = await approvalLapses(project.data.prepareStage);
   const written = await applyWrites(
     [
       { kind: "text", text, to: project.data.file },
       {
         kind: "text",
-        text: serialize({
-          ...emptyStage(),
-          artifacts: {
+        text: serialize(
+          prepareStageFile({
             project: record(
               current.data.characterSources.map((asset) => ({
                 path: asset.path,
@@ -678,9 +669,9 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
                 },
               ]
             ),
-          },
-        }),
-        to: project.data.stage,
+          })
+        ),
+        to: project.data.prepareStage,
       },
     ],
     input.mode
@@ -785,7 +776,7 @@ async function approvalWrites(
     return rules;
   }
 
-  const stage = await readJson(project.stage, stageFileSchema);
+  const stage = await readJson(project.prepareStage, stageFileSchema);
 
   if (!stage.ok) {
     return stage;
@@ -796,7 +787,7 @@ async function approvalWrites(
     { path: toWorkspacePath(input.workspace.root, project.rules), sha256: rules.data.sha256 },
   ]);
   const ops: WriteOp[] = [
-    { kind: "text", text: serialize(approveAll(bound, approval)), to: project.stage },
+    { kind: "text", text: serialize(approveAll(bound, approval)), to: project.prepareStage },
   ];
   const stages = await Promise.all(episodeIds.map((id) => readEpisodeStage(project, id)));
 
@@ -826,9 +817,9 @@ async function readEpisodeStage(
     return null;
   }
 
-  const stage = await readJson(paths.data.stage, stageFileSchema);
+  const stage = await readJson(paths.data.prepareStage, stageFileSchema);
 
-  return stage.ok ? { path: paths.data.stage, stage: stage.data } : null;
+  return stage.ok ? { path: paths.data.prepareStage, stage: stage.data } : null;
 }
 
 async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promise<Stage0Verdict> {
@@ -840,7 +831,7 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
 
   const problems: string[] = [];
   const checked: string[] = [];
-  const stage = await readJson(project.stage, stageFileSchema);
+  const stage = await readJson(project.prepareStage, stageFileSchema);
   let approved = false;
 
   await checkRules(project, problems);
@@ -971,7 +962,7 @@ async function checkEpisode(
     problems.push(`odcinek "${episodeId}": ustawienia nie przechodzą walidacji`);
   }
 
-  const stage = await readJson(paths.data.stage, stageFileSchema);
+  const stage = await readJson(paths.data.prepareStage, stageFileSchema);
 
   if (!stage.ok) {
     problems.push(`odcinek "${episodeId}": brak zapisu etapu (prepare.stage.json)`);

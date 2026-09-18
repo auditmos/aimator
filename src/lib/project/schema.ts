@@ -1,17 +1,19 @@
 import { z } from "zod";
+import { sha256Schema } from "../artifact/index.js";
 
 /**
  * Internal to the project module. Two shapes exist for every settings block:
  * a draft that tolerates nulls (what `episode add` writes) and a ready shape
  * that does not (what stage 1 requires). Readiness is therefore computed by
  * parsing, never declared by a `status` field a file could lie about.
+ *
+ * The shape of `prepare.stage.json` itself is not here: provenance is the same
+ * for every stage and lives in `lib/artifact`.
  */
 
-const SHA256 = /^[0-9a-f]{64}$/;
 const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 const ASPECT_RATIO = /^\d{1,2}:\d{1,2}$/;
 
-const sha256Schema = z.string().regex(SHA256, "expected a lowercase sha256 hex digest");
 const languageSchema = z.string().regex(LANGUAGE, "expected a language code such as pl or en-GB");
 
 export const audioModes = [
@@ -81,37 +83,6 @@ export const episodeFileSchema = z.strictObject({
   source: assetSchema,
 });
 
-const reviewSchema = z.strictObject({
-  note: z.string().nullable(),
-  reviewedAt: z.iso.datetime().nullable(),
-  reviewer: z.string().nullable(),
-  status: z.enum(["approved", "pending", "rejected"]),
-});
-
-const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });
-
-const artifactRecordSchema = z.strictObject({
-  inputs: z.array(recordedFileSchema),
-  needsReview: z.array(z.string()),
-  outputs: z.array(recordedFileSchema),
-  producedAt: z.iso.datetime(),
-  producer: z.strictObject({ kind: z.literal("manual"), tool: z.string().min(1) }),
-  review: reviewSchema,
-  runId: z.string().min(1),
-});
-
-/**
- * One shape for every stage. `artifacts` is keyed so a single stage can own a
- * set of results (R01..R10, C01..C06) without multiplying state files.
- */
-export const stageFileSchema = z.strictObject({
-  artifacts: z.record(z.string(), artifactRecordSchema),
-  stage: z.literal("prepare"),
-  version: z.literal(1),
-});
-
 export type DraftSettings = z.infer<typeof draftSettingsSchema>;
 export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;
-export type RecordedFile = z.infer<typeof recordedFileSchema>;
-export type StageFile = z.infer<typeof stageFileSchema>;
