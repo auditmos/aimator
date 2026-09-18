@@ -206,14 +206,14 @@ async function attempt(
 ): Promise<Result<ScreenplayReport>> {
   const previousStage = await readJson(paths.screenplayStage, stageFileSchema);
   const previous = await readDigest(paths.screenplay);
+  const record = previousStage.ok ? previousStage.data.artifacts[ARTIFACT] : undefined;
 
-  if (previousStage.ok && !input.regenerate) {
-    return err(
-      new Stage1BlockedError([
-        `scenariusz dla tego odcinka już istnieje (${toWorkspacePath(input.workspace.root, paths.screenplay)})`,
-        "zachowano poprzedni wynik; nową płatną próbę zaczyna wyłącznie --regenerate",
-      ])
-    );
+  if (record !== undefined && !input.regenerate) {
+    const resumed = await resume(input, paths, stage0, record, required);
+
+    if (resumed !== null) {
+      return resumed;
+    }
   }
 
   const runId = newRunId();
@@ -263,6 +263,69 @@ async function attempt(
     previous: previous.ok ? previous.data.bytes.toString("utf8") : null,
     producer,
     runId,
+    settings: stage0.settings,
+  });
+}
+
+/**
+ * What to do with an attempt that already exists. `null` means "nothing —
+ * go ahead and pay".
+ *
+ * A `submitted` record whose archive still holds the response is the case this
+ * exists for: that answer is bought and paid for, so re-deriving a verdict from
+ * it must cost nothing. Otherwise a bug in the validator would be billable, and
+ * the first one was. This is not an automatic retry — nothing is sent.
+ */
+async function resume(
+  input: GenerateInput,
+  paths: EpisodePaths,
+  stage0: Stage0Inputs,
+  record: StageFile["artifacts"][string],
+  required: number
+): Promise<Result<ScreenplayReport> | null> {
+  if (record.status === "completed") {
+    return err(
+      new Stage1BlockedError([
+        `scenariusz dla tego odcinka już istnieje (${toWorkspacePath(input.workspace.root, paths.screenplay)})`,
+        "zachowano poprzedni wynik; nową płatną próbę zaczyna wyłącznie --regenerate",
+      ])
+    );
+  }
+
+  const run = runPaths(paths, record.runId);
+  const saved = await readDigest(run.response);
+
+  if (!saved.ok) {
+    return err(
+      new Stage1BlockedError([
+        `próba ${record.runId} zapisała status "submitted", ale nie ma zapisanej odpowiedzi — mogła zostać rozliczona`,
+        "wywołanie idzie ze store: false, więc nie ma zadania do odpytania; nową płatną próbę zaczyna wyłącznie --regenerate",
+      ])
+    );
+  }
+
+  // The saved answer was written for the inputs recorded beside it. Publishing
+  // it against changed inputs would attach a result to a question nobody asked.
+  const changed = record.inputs.filter(
+    (entry) => !stage0.inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
+  );
+
+  if (changed.length > 0) {
+    return err(
+      new Stage1BlockedError([
+        ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
+        "zapisana odpowiedź opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
+      ])
+    );
+  }
+
+  return await publish(input, paths, run, {
+    body: saved.data.bytes.toString("utf8"),
+    inputs: stage0.inputs,
+    minimumScenes: required,
+    previous: null,
+    producer: record.producer,
+    runId: record.runId,
     settings: stage0.settings,
   });
 }

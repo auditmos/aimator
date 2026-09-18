@@ -137,6 +137,12 @@ describe("validateScreenplay", () => {
     expect(reject(valid("BURZA"))).toContain("subtitles=none");
   });
 
+  // A full stop after `none` is punctuation, not on-screen text. Rejecting it
+  // threw away a paid response that had obeyed the rule in every scene.
+  it.each(["none.", "None", "NONE", "none;"])("should accept `%s` as no text", (written) => {
+    expect(validateScreenplay(valid(written), SETTINGS).ok).toBe(true);
+  });
+
   it("should reject a draft with no on-screen text when subtitles were ordered", () => {
     const settings = { ...SETTINGS, subtitles: "pl" };
     expect(reject(valid(), settings)).toContain("napis");

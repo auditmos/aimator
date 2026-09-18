@@ -27,6 +27,17 @@ const SECTIONS = [
 
 const SCENES_INDEX = SECTIONS.indexOf("Scenes");
 
+/**
+ * What "this scene has no on-screen text" is allowed to look like.
+ *
+ * A model writing prose ends a sentence with a full stop, and `none.` is
+ * punctuation rather than text on screen. An exact match threw away a paid
+ * response that had obeyed the rule in all eight scenes. Still narrow: a
+ * translated "brak" stays a failure, because the output contract says this
+ * one word stays English.
+ */
+const NO_TEXT = /^none[.;]?$/i;
+
 const SECTION_HEADING = /^## (.+)\r?$/gm;
 const SCENE_HEADING = /^### S(\d{2,}) \| ([1-9]\d*)s \| (.+)\r?$/gm;
 const ANY_SCENE_HEADING = /^### /gm;
@@ -173,7 +184,7 @@ function readFields(scene: Scene, settings: EpisodeSettings): Result<boolean> {
       );
     }
 
-    if (field.label !== "Text" || value === "none") {
+    if (field.label !== "Text" || NO_TEXT.test(value)) {
       continue;
     }
 

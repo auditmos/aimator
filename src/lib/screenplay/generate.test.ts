@@ -21,7 +21,7 @@ function episodeDir(): string {
 }
 
 /** A structurally valid 30-second draft: three scenes, no on-screen text. */
-function draft(seconds: readonly number[] = [10, 10, 10]): string {
+function draft(seconds: readonly number[] = [10, 10, 10], text = "none"): string {
   const sections = [
     "Premise",
     "Logline",
@@ -38,7 +38,7 @@ function draft(seconds: readonly number[] = [10, 10, 10]): string {
         "",
         "- Action: Ewa siada przy stole i patrzy w okno.",
         "- Audio: Narrator opisuje ciszę przed burzą.",
-        "- Text: none",
+        `- Text: ${text}`,
         "- End state: Ewa przy stole, dłonie na kolanach.",
         "",
       ].join("\n")
@@ -452,5 +452,64 @@ describe("checkScreenplay and approveScreenplay", () => {
     const result = await checkScreenplay(scope());
 
     expect(result.ok ? result.data.inputsChanged : []).toContain(`projects/${PROJECT}/project.md`);
+  });
+});
+
+describe("resuming a submitted attempt", () => {
+  // The response is already paid for and archived. Re-deriving a verdict from
+  // it must never cost a second call — otherwise a validator bug is billable.
+  it("should re-validate a saved response instead of calling the API again", async () => {
+    await generate({ fetch: respondWith(completion(draft([10, 10]))) });
+    expect(calls).toBe(1);
+
+    const result = await generate();
+
+    expect(calls).toBe(1);
+    expect(result.ok ? "" : result.error.message).toContain("20");
+  });
+});
+
+describe("refusing to resume", () => {
+  it("should say the attempt may have been billed when no response was saved", async () => {
+    await generate({ fetch: respondWith(completion(draft([10, 10]))) });
+    const [runId = ""] = await runDirs();
+    await rm(join(episodeDir(), "runs", runId, "response.json"));
+
+    const result = await generate();
+
+    expect(calls).toBe(1);
+    expect(result.ok ? "" : result.error.message).toContain("mogła zostać rozliczona");
+  });
+
+  it("should block on the approval gate when an input changed", async () => {
+    await generate({ fetch: respondWith(completion(draft([10, 10]))) });
+    await writeFile(join(root, "projects", PROJECT, "project.md"), "# Ewa\n\nInne.\n", "utf8");
+
+    const result = await generate();
+
+    expect(calls).toBe(1);
+    expect(result.ok ? "" : result.error.message).toContain("approved");
+  });
+
+  /**
+   * The case that actually happened: the archived answer was fine all along and
+   * the validator was wrong. Swapping the archived body stands in for fixing
+   * the validator, because the bug it caught is now fixed in the code.
+   */
+  it("should publish a saved response the validator now accepts, without paying", async () => {
+    await generate({ fetch: respondWith(completion(draft([10, 10]))) });
+    const [runId = ""] = await runDirs();
+    await writeFile(
+      join(episodeDir(), "runs", runId, "response.json"),
+      completion(draft([10, 10, 10], "none.")),
+      "utf8"
+    );
+
+    const result = await generate();
+
+    expect(result.ok).toBe(true);
+    expect(calls).toBe(1);
+    expect((await readStage()).artifacts.screenplay.status).toBe("completed");
+    expect(await readFile(join(episodeDir(), "screenplay.md"), "utf8")).toContain("Text: none.");
   });
 });
