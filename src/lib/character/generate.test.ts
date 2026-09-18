@@ -754,3 +754,52 @@ describe("generateCharacter wire format", () => {
     expect("image" in body).toBe(false);
   });
 });
+
+describe("checkCharacter input drift", () => {
+  it("should not call an untouched card drifted after it draws a view", async () => {
+    await makeStage0();
+    await generate({ fetch: recorder().fetch });
+    await accept(["card"]);
+    await generate({ artifacts: ["front"], fetch: recorder({ order: ["front"] }).fetch });
+    await accept(["front"]);
+
+    const status = await checkCharacter({
+      characterId: CHARACTER,
+      projectId: PROJECT,
+      track: "gpt-image",
+      workspace,
+    });
+
+    expect(status.ok && status.data.inputsChanged).toEqual([]);
+    expect(status.ok && status.data.problems).toEqual([]);
+    expect(
+      status.ok && status.data.artifacts.find((entry) => entry.artifact === "front")?.approved
+    ).toBe(true);
+  });
+
+  it("should call the card drifted once it is redrawn under a view", async () => {
+    await makeStage0();
+    await generate({ fetch: recorder().fetch });
+    await accept(["card"]);
+    await generate({ artifacts: ["front"], fetch: recorder({ order: ["front"] }).fetch });
+    await accept(["front"]);
+
+    // Same frame, different bytes: a redrawn card, not an edited record.
+    const redrawn = png(1920, 1920, 2);
+    redrawn.writeUInt8(7, 30);
+
+    await writeFile(
+      join(root, "projects", PROJECT, "characters", CHARACTER, "gpt-image", "card.png"),
+      redrawn
+    );
+
+    const status = await checkCharacter({
+      characterId: CHARACTER,
+      projectId: PROJECT,
+      track: "gpt-image",
+      workspace,
+    });
+
+    expect(status.ok && status.data.inputsChanged.join(" ")).toContain("card.png");
+  });
+});

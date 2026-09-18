@@ -183,6 +183,17 @@ export function resolveWorkspace(root: string | undefined): Result<Workspace> {
   return ok({ root: isAbsolute(expanded) ? expanded : resolve(expanded) });
 }
 
+/**
+ * Turns a path recorded in an artifact back into one that can be read.
+ *
+ * Records store workspace-relative paths so the whole tree can be moved, which
+ * means verifying a recorded input means resolving it again here — this module
+ * is the only one allowed to join a segment, including in this direction.
+ */
+export function workspacePath(workspace: Workspace, recorded: string): string {
+  return join(workspace.root, ...recorded.split("/"));
+}
+
 export function projectPaths(workspace: Workspace, projectId: string): Result<ProjectPaths> {
   if (!PROJECT_ID.test(projectId)) {
     return err(

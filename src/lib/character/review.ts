@@ -16,6 +16,7 @@ import {
   type ImageTrack,
   projectPaths,
   type Workspace,
+  workspacePath,
 } from "../workspace.js";
 import { sizeOf } from "./client.js";
 import { accepted, nextGroup, outputPath, readStage, sequenceGate } from "./plan.js";
@@ -44,7 +45,7 @@ export interface CharacterStatus {
   /** True once every one of the ten carries an explicit, still-valid approval. */
   readonly approved: boolean;
   readonly artifacts: readonly ArtifactStatus[];
-  /** Stage-0 artifacts whose bytes no longer match what a run consumed. */
+  /** Recorded inputs whose bytes on disk no longer match what a run consumed. */
   readonly inputsChanged: readonly string[];
   readonly name: string;
   readonly nextStep: string;
@@ -85,15 +86,40 @@ interface Inspection {
   readonly status: CharacterStatus;
 }
 
-function changedInputs(
+/**
+ * Which recorded inputs no longer match the bytes on disk.
+ *
+ * Read from the file rather than from stage 0's input list: half of what a
+ * stage-2 run consumes is drawn by stage 2 itself — a view is drawn from the
+ * card, the hero from all nine — and none of that appears among stage 0's
+ * inputs. Comparing against that list called every image drift, which made the
+ * card the only artifact that could ever read as approved.
+ *
+ * Reading the file also catches the case that matters most: a card redrawn by
+ * `--regenerate` after its views exist. The views then really do describe an
+ * image that is gone, and no list of stage-0 inputs would ever say so.
+ */
+async function changedInputs(
+  workspace: Workspace,
   recorded: readonly RecordedFile[],
-  current: readonly RecordedFile[]
-): readonly string[] {
-  return recorded
-    .filter(
-      (entry) => !current.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
-    )
-    .map((entry) => entry.path);
+  seen: Map<string, string | null>
+): Promise<readonly string[]> {
+  const changed: string[] = [];
+
+  for (const entry of recorded) {
+    if (!seen.has(entry.path)) {
+      // biome-ignore lint/performance/noAwaitInLoops: each input read once per check
+      const digest = await readDigest(workspacePath(workspace, entry.path));
+
+      seen.set(entry.path, digest.ok ? digest.data.sha256 : null);
+    }
+
+    if (seen.get(entry.path) !== entry.sha256) {
+      changed.push(entry.path);
+    }
+  }
+
+  return changed;
 }
 
 async function inspect(input: TrackScope): Promise<Result<Inspection>> {
@@ -120,10 +146,13 @@ async function inspect(input: TrackScope): Promise<Result<Inspection>> {
   const problems: string[] = [];
   const changed = new Set<string>();
   const artifacts: ArtifactStatus[] = [];
+  // The ten records name overlapping inputs — the card appears nine times — so
+  // each file is hashed once per check rather than once per artifact.
+  const seen = new Map<string, string | null>();
 
   for (const artifact of CHARACTER_ARTIFACTS) {
     // biome-ignore lint/performance/noAwaitInLoops: ten reads, reported in order
-    const status = await inspectOne(input, { paths, stage, stage0: stage0.data }, artifact);
+    const status = await inspectOne(input, { paths, seen, stage, stage0: stage0.data }, artifact);
 
     artifacts.push(status.status);
     problems.push(...status.problems);
@@ -172,7 +201,12 @@ interface OneStatus {
 
 async function inspectOne(
   input: TrackScope,
-  scope: { paths: CharacterTrackPaths; stage: StageFile; stage0: Stage0Character },
+  scope: {
+    paths: CharacterTrackPaths;
+    seen: Map<string, string | null>;
+    stage: StageFile;
+    stage0: Stage0Character;
+  },
   artifact: CharacterArtifact
 ): Promise<OneStatus> {
   const record = scope.stage.artifacts[artifact];
@@ -233,7 +267,7 @@ async function inspectOne(
     );
   }
 
-  const changed = changedInputs(record.inputs, scope.stage0.inputs);
+  const changed = await changedInputs(input.workspace, record.inputs, scope.seen);
 
   for (const path of changed) {
     problems.push(
