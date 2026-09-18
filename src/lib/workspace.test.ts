@@ -137,6 +137,10 @@ describe("episodePaths", () => {
     expect(result?.ok ? result.data : null).toEqual({
       file: `${episode}/episode.json`,
       prepareStage: `${episode}/prepare.stage.json`,
+      promptPackage: `${episode}/prompt-package.json`,
+      promptPackageLock: `${episode}/prompt-package.lock`,
+      promptPackageStage: `${episode}/prompt-package.stage.json`,
+      prompts: `${episode}/prompts`,
       root: episode,
       runs: `${episode}/runs`,
       screenplay: `${episode}/screenplay.md`,

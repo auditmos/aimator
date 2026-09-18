@@ -385,10 +385,10 @@ describe("generateShotList", () => {
     await generate({ regenerate: true });
     const runs = await runDirs();
     const previous = await Promise.all(
-      runs.map((runId) => readdir(join(episodeDir(), "runs", runId)))
+      runs.map((runId) => readdir(join(episodeDir(), "runs", runId, "previous")).catch(() => []))
     );
 
-    expect(previous.flat()).toContain("previous-shot-list.md");
+    expect(previous.flat()).toContain("shot-list.md");
   });
 
   it("should not publish a plan that fails validation", async () => {

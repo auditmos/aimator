@@ -22,6 +22,13 @@ import {
   setCharacterBasis,
   setEpisodeSettings,
 } from "./lib/project/index.js";
+import {
+  approvePromptPackage,
+  checkPromptPackage,
+  generatePromptPackage,
+  type PromptPackageReport,
+  type PromptPackageStatus,
+} from "./lib/prompt-package/index.js";
 import { err, ok, type Result } from "./lib/result.js";
 import {
   approveScreenplay,
@@ -64,10 +71,14 @@ Etap 3 — lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu 
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                                        [--dry-run] [--regenerate]
 
+Etap 4 — pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
+  prompt-package generate <id> <episode-id> [--model <id>]
+                          [--max-output-tokens <n>] [--dry-run] [--regenerate]
+
 Wspólne:
   check <id> [<episode-id>]
   check <id> <character-id> --stage character --track <tor>
-  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list]
+  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>]
   approve <id> <character-id> --stage character --track <tor>
                --artifact <klucz>[,<klucz>...]
@@ -94,8 +105,10 @@ Globalne:
 Etapy 1 i 2 odmawiają płatnego wywołania, dopóki etap 0 nie ma review.status =
 "approved". W etapie 2 osiem widoków czeka na zatwierdzoną kartę, a hero na
 zatwierdzone widoki. Etap 3 czeka na zatwierdzony scenariusz i nie zależy od
-etapu 2. Nic nie ponawia się samo; nową płatną próbę zaczyna wyłącznie
---regenerate, zachowując poprzedni wynik.`;
+etapu 2. Etap 4 czeka na zatwierdzoną listę ujęć i na zatwierdzony hero.png
+każdej postaci, którą lista ujęć stawia w kadrze — na obu torach naraz, bo
+pakiet jest jeden dla obu. Nic nie ponawia się samo; nową płatną próbę zaczyna
+wyłącznie --regenerate, zachowując poprzedni wynik.`;
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 12_000;
 /**
@@ -104,6 +117,12 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 12_000;
  * a ceiling rather than a creative decision, so unlike the model it has one.
  */
 const DEFAULT_SHOT_LIST_MAX_OUTPUT_TOKENS = 24_000;
+/**
+ * The package is one direction per reference, per clip and per entry frame, so
+ * it is the longest answer any text stage asks for. A ceiling, not a creative
+ * decision, which is why it has a default where the model does not.
+ */
+const DEFAULT_PROMPT_PACKAGE_MAX_OUTPUT_TOKENS = 32_000;
 const MODEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 
 const SETTINGS_OPTIONS = {
@@ -707,11 +726,11 @@ async function approveCharacterStage(parsed: Parsed, approval: Approval): Promis
     : result;
 }
 
-/** The two text stages an episode carries. Both accept the whole document. */
+/** The three text stages an episode carries. Each accepts its whole result. */
 async function approveEpisodeStage(
   parsed: Parsed,
   approval: Approval,
-  stage: "screenplay" | "shot-list"
+  stage: "prompt-package" | "screenplay" | "shot-list"
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
 
@@ -720,6 +739,22 @@ async function approveEpisodeStage(
   }
 
   const scope = { ...approval, episodeId: episodeId.data };
+
+  if (stage === "prompt-package") {
+    const packaged = await approvePromptPackage(scope);
+
+    return packaged.ok
+      ? ok(
+          renderPackageStatus(
+            `Pakiet promptów odcinka "${episodeId.data}" zatwierdzony`,
+            packaged.data,
+            approval.projectId,
+            episodeId.data,
+            approval.mode
+          )
+        )
+      : packaged;
+  }
 
   if (stage === "shot-list") {
     const planned = await approveShotList(scope);
@@ -801,10 +836,10 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
     return await approveCharacterStage(parsed.data, approval);
   }
 
-  if (stage !== "screenplay" && stage !== "shot-list") {
+  if (stage !== "screenplay" && stage !== "shot-list" && stage !== "prompt-package") {
     return err(
       new UsageError(
-        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list`
+        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package`
       )
     );
   }
@@ -1039,6 +1074,161 @@ async function runShotList(argv: readonly string[]): Promise<Result<string>> {
     : result;
 }
 
+/**
+ * `--dry-run` prints the prompt itself, not a byte count — the same promise
+ * stages 1 and 3 make. It also names the gate stage 4 alone has: the canonical
+ * images, which are checked on both tracks and never sent.
+ */
+function renderPackageGenerate(
+  report: PromptPackageReport,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const lines =
+    mode === "dry-run"
+      ? [
+          `Próba na sucho — nic nie zapisano, nic nie wysłano. Pakiet promptów ${projectId}/${episodeId}`,
+          "  OPENAI_API_KEY nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+          "  obrazy postaci nie są wysyłane: pakiet jest wspólny dla obu torów, więc niesie same identyfikatory hero:<id>",
+        ]
+      : [`Pakiet promptów ${projectId}/${episodeId} — próba ${report.runId ?? ""}`];
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  if (report.verdict !== null) {
+    lines.push(...describePackage(report.verdict));
+    lines.push("  ! graf i przypisania się zgadzają — kierunek wymaga oceny człowieka");
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  if (report.prompt !== null) {
+    lines.push("", "--- prompt wysłany do modelu (dokładnie ten tekst) ---", report.prompt);
+  }
+
+  return lines.join("\n");
+}
+
+/** The package as a person reads it: what exists, and what depends on what. */
+function describePackage(verdict: PromptPackageStatus["verdict"]): readonly string[] {
+  if (verdict === null) {
+    return [];
+  }
+
+  const lines = [
+    `  referencje: ${verdict.references.length}, klipy: ${verdict.clips.length}, obrazy postaci: ${verdict.heroes.join(", ") || "brak"}`,
+  ];
+
+  for (const reference of verdict.references) {
+    lines.push(
+      `    ${reference.id} (${reference.kind}) ${reference.subject} ← ${reference.dependsOn.join(", ")}`
+    );
+  }
+
+  return lines;
+}
+
+function renderPackageStatus(
+  headline: string,
+  status: PromptPackageStatus,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+
+  lines.push(...describePackage(status.verdict));
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (status.status === "completed" && !status.approved && status.problems.length === 0) {
+    lines.push(
+      `  ! pliki przeszły walidację — to nie to samo co przyjęcie ich przez człowieka: aimator approve ${projectId} ${episodeId} --stage prompt-package`
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/** `--model` wins over the environment; neither has a default. */
+function promptsModelOf(parsed: Parsed): Result<string | null> {
+  const flag = parsed.values.model;
+  const value = typeof flag === "string" ? flag : (env.AIMATOR_PROMPTS_MODEL ?? null);
+
+  if (value !== null && !MODEL_ID.test(value)) {
+    return err(new UsageError(`niepoprawny identyfikator modelu "${value}"`));
+  }
+
+  return ok(value);
+}
+
+async function runPromptPackage(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] !== "generate") {
+    return err(new UsageError(`nieznane polecenie: prompt-package ${argv[0] ?? ""}`.trim()));
+  }
+
+  const parsed = parse(argv.slice(1), {
+    "max-output-tokens": { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const model = promptsModelOf(parsed.data);
+  const tokens = maxOutputTokensOf(parsed.data, DEFAULT_PROMPT_PACKAGE_MAX_OUTPUT_TOKENS);
+
+  if (!model.ok) {
+    return model;
+  }
+  if (!tokens.ok) {
+    return tokens;
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generatePromptPackage({
+    apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    episodeId: episodeId.data,
+    fetch,
+    maxOutputTokens: tokens.data,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(renderPackageGenerate(result.data, projectId.data, episodeId.data, mode))
+    : result;
+}
+
 async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
   const projectId = requirePositional(parsed, 0, "project-id");
   const source = requireFlag(parsed, "source");
@@ -1184,6 +1374,22 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
     )
   );
 
+  const stage4 = await checkPromptPackage(scope);
+
+  if (!stage4.ok) {
+    return stage4;
+  }
+
+  lines.push(
+    renderPackageStatus(
+      `Odcinek "${episodeId}" — etap 4: ${stage4.data.status}${stage4.data.approved ? ", zatwierdzony" : ""}`,
+      stage4.data,
+      projectId.data,
+      episodeId,
+      "apply"
+    )
+  );
+
   return ok(lines.join("\n"));
 }
 
@@ -1217,6 +1423,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "shot-list") {
     return await runShotList(rest);
+  }
+
+  if (command === "prompt-package") {
+    return await runPromptPackage(rest);
   }
 
   if (command === "check") {

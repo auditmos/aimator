@@ -1,18 +1,10 @@
-import { z } from "zod";
 import {
   applyWrites,
-  emptyStage,
-  modelProducer,
-  newRecord,
-  newRunId,
   nowIso,
+  type RecordedFile,
   readDigest,
-  readJson,
-  removeFile,
-  type StageFile,
   serialize,
   sha256Of,
-  stageFileSchema,
   toWorkspacePath,
   type WriteMode,
   writeNew,
@@ -20,19 +12,17 @@ import {
 import { readStage0Inputs, type Stage0Inputs } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
-  buildRequest,
-  callModel,
-  ENDPOINT,
-  httpFailure,
-  readOutputText,
-  refusedWithoutCharge,
-} from "../text-model.js";
+  type Publication,
+  type Published,
+  runTextStage,
+  type TextStage,
+} from "../text-model/index.js";
 import {
   type EpisodePaths,
   episodePaths,
+  previousFile,
   projectPaths,
   type RunPaths,
-  runPaths,
   type Workspace,
 } from "../workspace.js";
 import { buildPrompt, PROMPT_VERSION } from "./prompt.js";
@@ -41,10 +31,11 @@ import { minimumScenes, type ScreenplayVerdict, validateScreenplay } from "./val
 /**
  * Internal to the screenplay module: the one command that spends money.
  *
- * The order of operations is the contract. Nothing is written in `--dry-run`.
- * In a real run the stage file records `submitted` *before* the POST, so an
- * interrupted attempt leaves a trace that says a charge may have happened,
- * rather than looking like it never ran. Nothing retries on its own.
+ * The order of operations is the contract, and it now lives in
+ * `lib/text-model`: nothing is written in `--dry-run`, the stage file records
+ * `submitted` *before* the POST, and nothing retries on its own. What stays
+ * here is what is about a screenplay — the gate, the prompt, the structural
+ * verdict, and the one file this stage publishes.
  */
 
 const ARTIFACT = "screenplay";
@@ -87,22 +78,6 @@ class Stage1BlockedError extends Error {
   }
 }
 
-class LockError extends Error {
-  readonly path: string;
-
-  constructor(path: string) {
-    super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
-    );
-    this.name = "LockError";
-    this.path = path;
-  }
-}
-
-function write(path: string, text: string): Promise<Result<readonly string[]>> {
-  return applyWrites([{ kind: "text", text, to: path }], "apply");
-}
-
 /**
  * Why a paid call may not happen. Empty means it may.
  *
@@ -130,10 +105,6 @@ function blockers(input: GenerateInput, stage0: Stage0Inputs): readonly string[]
   }
 
   return problems;
-}
-
-function stageFile(record: StageFile["artifacts"][string]): string {
-  return serialize({ ...emptyStage(ARTIFACT), artifacts: { [ARTIFACT]: record } });
 }
 
 export async function generateScreenplay(input: GenerateInput): Promise<Result<ScreenplayReport>> {
@@ -189,249 +160,81 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
     return err(new Stage1BlockedError(problems));
   }
 
-  const lock = await writeNew(
-    paths.data.screenplayLock,
-    serialize({ pid: process.pid, startedAt: nowIso() })
+  const attempt = await runTextStage(
+    {
+      apiKey: input.apiKey ?? "",
+      episode: paths.data,
+      fetch: input.fetch,
+      format: null,
+      maxOutputTokens: input.maxOutputTokens,
+      model: input.model ?? "",
+      regenerate: input.regenerate,
+      workspace: input.workspace,
+    },
+    stage(input, paths.data, stage0.data, prompt)
   );
 
-  if (!lock.ok) {
-    return err(new LockError(paths.data.screenplayLock));
+  if (!attempt.ok) {
+    return attempt;
   }
 
-  try {
-    return await attempt(input, paths.data, stage0.data, prompt, required);
-  } finally {
-    await removeFile(paths.data.screenplayLock);
-  }
+  return ok({
+    approved: false,
+    created: attempt.data.created,
+    minimumScenes: required,
+    nextStep: `oceń scenariusz, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`,
+    problems: [],
+    prompt: null,
+    ready: true,
+    runId: attempt.data.runId,
+    verdict: attempt.data.value,
+  });
 }
 
-async function attempt(
+/** The half of the attempt that is about a screenplay rather than about paying. */
+function stage(
   input: GenerateInput,
   paths: EpisodePaths,
   stage0: Stage0Inputs,
-  prompt: string,
-  required: number
-): Promise<Result<ScreenplayReport>> {
-  const previousStage = await readJson(paths.screenplayStage, stageFileSchema);
-  const previous = await readDigest(paths.screenplay);
-  const record = previousStage.ok ? previousStage.data.artifacts[ARTIFACT] : undefined;
-
-  if (record !== undefined && !input.regenerate) {
-    const resumed = await resume(input, paths, stage0, record, required);
-
-    if (resumed !== null) {
-      return resumed;
-    }
-  }
-
-  const runId = newRunId();
-  const run = runPaths(paths, runId);
-  const model = input.model ?? "";
-  const apiKey = input.apiKey ?? "";
-  const request = buildRequest({ maxOutputTokens: input.maxOutputTokens, model, prompt });
-  const producer = modelProducer({ endpoint: ENDPOINT, model, promptVersion: PROMPT_VERSION });
-
-  const prepared = await prepare(run, {
+  prompt: string
+): TextStage<ScreenplayVerdict> {
+  return {
+    artifact: ARTIFACT,
+    blocked: (problems) => new Stage1BlockedError(problems),
     inputs: stage0.inputs,
-    maxOutputTokens: input.maxOutputTokens,
-    model,
+    lock: paths.screenplayLock,
+    preserve: (archive) => preserve(paths, archive),
     prompt,
-    request: serialize(request),
-    runId,
-  });
-
-  if (!prepared.ok) {
-    return prepared;
-  }
-
-  // Submitted lands on disk before the POST. An attempt that dies mid-call is
-  // then visibly an attempt that may already have been billed.
-  await write(
-    paths.screenplayStage,
-    stageFile(
-      newRecord({ inputs: stage0.inputs, outputs: [], producer, runId, status: "submitted" })
-    )
-  );
-
-  const transport = await callModel({ apiKey, fetch: input.fetch, request });
-
-  // Nothing reached the provider, so there is nothing to archive.
-  if (!transport.ok) {
-    return transport;
-  }
-
-  // Archived before it is judged. A refusal nobody can read is worse than the
-  // refusal itself, and this stage promises the diagnostics are kept.
-  await writeNew(run.transport, serialize(transport.data));
-  await writeNew(run.response, transport.data.body);
-
-  const refused = httpFailure(transport.data);
-
-  if (refused !== null) {
-    return err(refused);
-  }
-
-  return await publish(input, paths, run, {
-    body: transport.data.body,
-    inputs: stage0.inputs,
-    minimumScenes: required,
-    previous: previous.ok ? previous.data.bytes.toString("utf8") : null,
-    producer,
-    runId,
-    settings: stage0.settings,
-  });
+    promptVersion: PROMPT_VERSION,
+    publish: (publication) => publish(input, paths, stage0, publication),
+    result: paths.screenplay,
+    stagePath: paths.screenplayStage,
+    what: "scenariusz",
+  };
 }
 
-/** Only the field that decides whether a rejected attempt can have been billed. */
-const transportSchema = z.object({ httpStatus: z.number() });
+/** Keeps the screenplay a regeneration is about to replace. */
+async function preserve(paths: EpisodePaths, archive: RunPaths): Promise<void> {
+  const previous = await readDigest(paths.screenplay);
+  const to = previousFile(archive, "screenplay.md");
 
-/** The HTTP status an earlier attempt archived, or `null` if it archived none. */
-async function archivedStatus(run: RunPaths): Promise<number | null> {
-  const saved = await readJson(run.transport, transportSchema);
-
-  return saved.ok ? saved.data.httpStatus : null;
-}
-
-/**
- * What to do with an attempt that already exists. `null` means "nothing —
- * go ahead and pay".
- *
- * A `submitted` record whose archive still holds the response is the case this
- * exists for: that answer is bought and paid for, so re-deriving a verdict from
- * it must cost nothing. Otherwise a bug in the validator would be billable, and
- * the first one was. This is not an automatic retry — nothing is sent.
- */
-async function resume(
-  input: GenerateInput,
-  paths: EpisodePaths,
-  stage0: Stage0Inputs,
-  record: StageFile["artifacts"][string],
-  required: number
-): Promise<Result<ScreenplayReport> | null> {
-  if (record.status === "completed") {
-    return err(
-      new Stage1BlockedError([
-        `scenariusz dla tego odcinka już istnieje (${toWorkspacePath(input.workspace.root, paths.screenplay)})`,
-        "zachowano poprzedni wynik; nową płatną próbę zaczyna wyłącznie --regenerate",
-      ])
-    );
+  if (previous.ok && to.ok) {
+    await writeNew(to.data, previous.data.bytes.toString("utf8"));
   }
-
-  const run = runPaths(paths, record.runId);
-  const status = await archivedStatus(run);
-
-  // The provider declined to do the work, so nothing was charged and there is
-  // nothing to finish. Starting over is safe and needs no `--regenerate`:
-  // demanding one would make a rejected request look like a paid one.
-  if (status !== null && refusedWithoutCharge(status)) {
-    return null;
-  }
-
-  const saved = await readDigest(run.response);
-
-  // A 429 or a 5xx may have started work that was billed, so those keep the
-  // rule that protects against paying twice.
-  if (!saved.ok || (status !== null && status >= 400)) {
-    return err(
-      new Stage1BlockedError([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
-        "wywołanie idzie ze store: false, więc nie ma zadania do odpytania; nową płatną próbę zaczyna wyłącznie --regenerate",
-      ])
-    );
-  }
-
-  // The saved answer was written for the inputs recorded beside it. Publishing
-  // it against changed inputs would attach a result to a question nobody asked.
-  const changed = record.inputs.filter(
-    (entry) => !stage0.inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
-  );
-
-  if (changed.length > 0) {
-    return err(
-      new Stage1BlockedError([
-        ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "zapisana odpowiedź opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
-      ])
-    );
-  }
-
-  return await publish(input, paths, run, {
-    body: saved.data.bytes.toString("utf8"),
-    inputs: stage0.inputs,
-    minimumScenes: required,
-    previous: null,
-    producer: record.producer,
-    runId: record.runId,
-    settings: stage0.settings,
-  });
-}
-
-async function prepare(
-  run: RunPaths,
-  data: {
-    readonly inputs: Stage0Inputs["inputs"];
-    readonly maxOutputTokens: number;
-    readonly model: string;
-    readonly prompt: string;
-    readonly request: string;
-    readonly runId: string;
-  }
-): Promise<Result<true>> {
-  const written = await writeNew(run.prompt, data.prompt);
-
-  if (!written.ok) {
-    return written;
-  }
-
-  const request = await writeNew(run.request, data.request);
-
-  if (!request.ok) {
-    return request;
-  }
-
-  // The inputs are referenced, never copied: a run archive that duplicated
-  // them would double every source file for every attempt.
-  return await writeNew(
-    run.run,
-    serialize({
-      endpoint: ENDPOINT,
-      inputs: data.inputs,
-      maxOutputTokens: data.maxOutputTokens,
-      model: data.model,
-      promptVersion: PROMPT_VERSION,
-      runId: data.runId,
-      stage: ARTIFACT,
-      startedAt: nowIso(),
-      status: "submitted",
-    })
-  );
 }
 
 async function publish(
   input: GenerateInput,
   paths: EpisodePaths,
-  run: RunPaths,
-  data: {
-    readonly body: string;
-    readonly inputs: Stage0Inputs["inputs"];
-    readonly previous: string | null;
-    readonly producer: ReturnType<typeof modelProducer>;
-    readonly minimumScenes: number;
-    readonly runId: string;
-    readonly settings: Stage0Inputs["settings"];
-  }
-): Promise<Result<ScreenplayReport>> {
-  const parsed = readOutputText(data.body, "scenariusz");
-
-  if (!parsed.ok) {
-    return parsed;
-  }
-
-  const verdict = validateScreenplay(parsed.data.text, data.settings);
+  stage0: Stage0Inputs,
+  publication: Publication
+): Promise<Result<Published<ScreenplayVerdict>>> {
+  const { archive, text } = publication;
+  const verdict = validateScreenplay(text, stage0.settings);
 
   if (!verdict.ok) {
     await writeNew(
-      run.validation,
+      archive.validation,
       serialize({
         checkedAt: nowIso(),
         promptVersion: PROMPT_VERSION,
@@ -442,13 +245,13 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, run.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }
 
   await writeNew(
-    run.validation,
+    archive.validation,
     serialize({
       ...verdict.data,
       checkedAt: nowIso(),
@@ -457,47 +260,25 @@ async function publish(
     })
   );
 
-  // The previous result is kept only when a regeneration replaces it.
-  if (data.previous !== null) {
-    await writeNew(run.previousScreenplay, data.previous);
-  }
-
-  const { jobId, text } = parsed.data;
-  const outputs = [
+  const outputs: RecordedFile[] = [
     {
       path: toWorkspacePath(input.workspace.root, paths.screenplay),
       sha256: sha256Of(Buffer.from(text)),
     },
   ];
+  const written = await write(paths.screenplay, text);
 
-  await write(paths.screenplay, text);
-  await write(
-    paths.screenplayStage,
-    stageFile(
-      newRecord({
-        inputs: data.inputs,
-        jobId,
+  return written.ok
+    ? ok({
+        created: [toWorkspacePath(input.workspace.root, paths.screenplay)],
         outputs,
-        producer: data.producer,
-        runId: data.runId,
-        status: "completed",
+        value: verdict.data,
       })
-    )
-  );
+    : written;
+}
 
-  return ok({
-    approved: false,
-    created: [
-      toWorkspacePath(input.workspace.root, paths.screenplay),
-      toWorkspacePath(input.workspace.root, paths.screenplayStage),
-      toWorkspacePath(input.workspace.root, run.root),
-    ],
-    minimumScenes: data.minimumScenes,
-    nextStep: `oceń scenariusz, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`,
-    problems: [],
-    prompt: null,
-    ready: true,
-    runId: data.runId,
-    verdict: verdict.data,
-  });
+async function write(path: string, text: string): Promise<Result<true>> {
+  const done = await applyWrites([{ kind: "text", text, to: path }], "apply");
+
+  return done.ok ? ok(true) : done;
 }

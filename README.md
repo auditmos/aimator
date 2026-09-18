@@ -7,8 +7,9 @@ Artefakty są grupowane **per projekt i per model obrazu**. Jeden projekt może 
 komplet assetów w `gpt-image` i w `seedream` — to dwa niezależne byty dające dwie różne
 animacje z tej samej historii. Ujęcia i klipy w obu torach robi Seedance 2.5.
 
-**Stan: zaimplementowany jest etap 0 (przygotowanie projektu i odcinka).** Etapy 1–8 mają
-zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md), ale nie mają jeszcze kodu.
+**Stan: zaimplementowane są etapy 0–4** — przygotowanie, scenariusz, postać, lista ujęć
+i pakiet promptów. Etapy 5–8 mają zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md),
+ale nie mają jeszcze kodu.
 
 ## Wymagania
 
@@ -35,6 +36,8 @@ AIMATOR_WORKSPACE=~/Documents/Video/aimator-workspace
 # Etapy płatne. Żaden model nie ma wartości domyślnej: model, którego nikt nie
 # wybrał, nie jest decyzją. Klucze czytane są wyłącznie na ścieżce płatnej.
 AIMATOR_SCREENPLAY_MODEL=…            # etap 1
+AIMATOR_SHOTLIST_MODEL=…              # etap 3
+AIMATOR_PROMPTS_MODEL=…               # etap 4
 AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
 AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream
 OPENAI_API_KEY=…

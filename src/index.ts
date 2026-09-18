@@ -19,6 +19,15 @@ export {
   setCharacterBasis,
   setEpisodeSettings,
 } from "./lib/project/index.js";
+export {
+  approvePromptPackage,
+  checkPromptPackage,
+  generatePromptPackage,
+  type PromptPackage,
+  type PromptPackageReport,
+  type PromptPackageStatus,
+  validatePromptPackage,
+} from "./lib/prompt-package/index.js";
 export { err, ok, type Result } from "./lib/result.js";
 export {
   approveScreenplay,

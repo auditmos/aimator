@@ -382,7 +382,9 @@ describe("generateScreenplay", () => {
 
     const kept = await Promise.all(
       runs.map((id) =>
-        readFile(join(episodeDir(), "runs", id, "previous-screenplay.md"), "utf8").catch(() => "")
+        readFile(join(episodeDir(), "runs", id, "previous", "screenplay.md"), "utf8").catch(
+          () => ""
+        )
       )
     );
 

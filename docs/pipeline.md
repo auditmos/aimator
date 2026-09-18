@@ -29,8 +29,10 @@ $AIMATOR_WORKSPACE/
         ├── shot-list.md              │ etapy tekstowe — wspólne dla obu torów
         ├── shot-list.stage.json      │
         ├── prompt-package.json       │
+        ├── prompt-package.stage.json │
         ├── prompts/                  ┘ opening-frame.md, references/, clips/, entry-frames/
-        ├── runs/<runId>/             archiwum prób etapów tekstowych
+        ├── runs/<runId>/             archiwum prób etapów tekstowych;
+        │                             previous/ tylko przy --regenerate
         ├── gpt-image/                ┐ references/, opening-frame.png, clips/, frames/,
         └── seedream/                 ┘ edit-plan.json, episode.mp4, runs/
 ```
@@ -168,13 +170,13 @@ Obowiązują we wszystkich etapach.
 | 1 scenariusz | `project.json`, `project.md`, `source.md`, `episode.json` | `screenplay.md`, `screenplay.stage.json`, `runs/<runId>/` | zatwierdzony etap 0 przed wywołaniem; potem `aimator check`, `aimator approve … --stage screenplay` | **zaimplementowany** |
 | 2 postać | `project.json`, `project.md` i — przy podstawie `photographs` — `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 3 lista ujęć | `project.json`, `project.md`, `episode.json`, zatwierdzony `screenplay.md` | `shot-list.md`, `shot-list.stage.json`, `runs/<runId>/` | zatwierdzony etap 1 przed wywołaniem; potem `aimator check`, `aimator approve … --stage shot-list` | **zaimplementowany** |
-| 4 pakiet promptów | `shot-list.md`, zatwierdzony `hero.png` **każdej postaci obsady** | `prompt-package.json`, `prompts/**` | ocena pakietu | niezaimplementowany |
+| 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
 | 5 obrazy referencyjne | pakiet, zatwierdzone zależności `dependsOn` | `<tor>/references/Rxx.png` | ocena każdego obrazu | niezaimplementowany |
 | 6 pierwsza klatka | pakiet, zatwierdzone referencje otwarcia | `<tor>/opening-frame.png` | ocena kadru | niezaimplementowany |
 | 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 4–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
+Etapy 5–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
 żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
@@ -283,7 +285,7 @@ sięga po sekret ani po sieć.
 `response.json`, `transport.json`, `run.json` i `validation.json` — czyli to, czego nie da
 się odtworzyć. Wejścia są w `run.json` referowane ścieżką i sha256, nigdy kopiowane. Jeden
 katalog `runs/` na odcinek wystarczy wszystkim etapom tekstowym, bo `runId` jest unikalny
-i prefiksowany czasem. Poprzedni scenariusz trafia do `previous-screenplay.md` nowej próby
+i prefiksowany czasem. Poprzedni scenariusz trafia do `previous/screenplay.md` nowej próby
 wyłącznie przy `--regenerate`.
 
 **Wywołanie idzie z `store: false`**, więc dostawca nic nie przechowuje i przerwanej próby
@@ -385,6 +387,26 @@ Kanał alfa jest **raportowany, nie egzekwowany**: seedream nie ma przełącznik
 przezroczystość widoku jest proszona wyłącznie w promptcie, a jej brak to uwaga dla
 oceniającego, nie powód do wyrzucenia obrazu, za który już zapłacono.
 
+**Brak alfy na torze seedream nie blokuje niczego dalej, i to jest rozstrzygnięcie, nie
+przeoczenie.** Żaden etap nie kompozytuje widoku: widoki są wejściem, z którego etap 2
+rysuje `hero.png`, a od etapu 4 w dół referencją jest wyłącznie `hero.png` — obraz, który
+i tak ma tło. Etapy 5–7 dołączają referencje do żądania generacji, a nie wklejają ich do
+kadru, i oba tory przyjmują nieprzezroczysty PNG. Dlatego nie ma osobnego kroku wycinania
+tła i nie rezygnujemy z seedream dla widoków: automatyczne przetworzenie obrazu po ocenie
+podmieniłoby bajty, które ktoś przyjął, na bajty, których nie przyjął nikt, a to łamie
+niezmiennik o akceptacji związanej z bajtami. Gdyby któryś z późniejszych etapów naprawdę
+potrzebował wycinanki, będzie to jego własny, jawny i oceniany krok — nie cicha poprawka
+dopisana wstecz do etapu 2.
+
+**Komplet dziesięciu artefaktów obowiązuje każdą postać obsady, bez wyjątku dla
+drugoplanowych.** Kryterium wejścia do obsady jest jedno — tożsamość musi przetrwać między
+odcinkami — więc nie ma drugiego kryterium, po którym można by komuś odjąć widoki; „mniej
+ważna postać" nie jest zapisaną decyzją i nie ma pola, które by ją niosło. Osiem widoków
+nie jest zresztą wejściem żadnego późniejszego etapu: są wejściem `hero.png`, a hero postaci
+drugoplanowej jest dokładnie tak samo nośny co hero głównej, bo etap 4 przypisuje go do
+każdego kadru, w którym lista ujęć ją stawia. Tańszy poziom dla postaci epizodycznej już
+istnieje i nazywa się referencją etapu 5.
+
 **Akceptacja dotyczy jednego obrazu naraz.** `aimator approve <project-id> <character-id>
 --stage character --track <tor> --artifact <klucz>[,...]` odmawia bez jawnego wskazania, co
 jest przyjmowane: przyjęcie karty uruchamia osiem płatnych wywołań, więc musi być czymś,
@@ -466,7 +488,7 @@ człowiek czyta.
 
 **Archiwum próby** trafia do tego samego `episodes/<id>/runs/<runId>/`, co etap 1 — `runId`
 jest unikalny, a `run.json` zapisuje, którego etapu dotyczy. Wejścia są referowane ścieżką
-i sha256, nigdy kopiowane; poprzednia lista ujęć trafia do `previous-shot-list.md` wyłącznie
+i sha256, nigdy kopiowane; poprzednia lista ujęć trafia do `previous/shot-list.md` wyłącznie
 przy `--regenerate`. Wywołanie idzie ze `store: false`, więc obowiązuje ta sama zasada, co
 w etapie 1: rekord `submitted` bez zapisanej odpowiedzi otwiera wyłącznie `--regenerate`,
 a odpowiedź, która zdążyła trafić na dysk, jest już opłacona i powtórzenie polecenia
@@ -485,3 +507,151 @@ wobec **bieżącego** scenariusza, więc scenariusz, któremu naprawdę zmienił
 inny czas sceny, inna scena — zostawia ujęcia poza granicami i walidacja odmawia.
 `aimator check <project-id> <episode-id>` sprawdza to samo dla etapów 1 i 3 naraz i nie
 zapisuje niczego.
+
+## Etap 4 — szczegóły
+
+Pierwszy etap, który łączy tor tekstowy z obrazowym: wynik jest tekstem, ale bramka pyta
+o obraz. Konsumuje zatwierdzony `shot-list.md` oraz te artefakty etapu 0, które czyta każdy
+etap — zasady i proporcje z `project.json` i `project.md`, decyzje odcinka z `episode.json`.
+**Nie konsumuje `source.md` ani `screenplay.md`**: lista ujęć już je zaadaptowała, a zapisanie
+hasha bajtów, których nikt nie wysłał, opisywałoby pytanie, którego nie zadano.
+
+**Pakiet jest wspólny dla obu torów, a bramka pyta o oba.** `prompt-package.json` i `prompts/`
+leżą bezpośrednio pod odcinkiem, bez poziomu katalogu na tor, i nic w nich nie nazywa toru:
+kadr przypisuje sobie identyfikatory `hero:<id>` i `Rnn`, a w jaki plik się one zamieniają,
+rozstrzyga dopiero etap, który je dołącza — `characters/<id>/<tor>/hero.png` albo
+`episodes/<id>/<tor>/references/Rnn.png`. To jest cały powód, dla którego jeden manifest
+obsługuje dwie produkcje. Ponieważ obsługuje obie, obie muszą być gotowe: płatne wywołanie
+odmawia, dopóki każda postać, którą lista ujęć stawia w kadrze, nie ma zatwierdzonego
+`hero.png` **na torze gpt-image i na torze seedream**. Wspólny artefakt, którego bramkę
+spełnił jeden tor, byłby planem, na który połowa potoku nie zapracowała. Alternatywa —
+zapisać w pakiecie, wobec którego toru był sprawdzany — jest tym samym błędem co prefiks
+nazwy zamiast poziomu katalogu, tylko piętro wyżej.
+
+Bramka pyta o postacie **w kadrze**, nie o całą obsadę: `castSeen` z listy ujęć mówi, kto
+w tym odcinku występuje, a hero postaci, której pakiet nigdy nie wymieni, nie jest jego
+wejściem. To ta sama zasada, co „projekt bez odcinka przechodzi" — etap nie jest zakładnikiem
+pliku, którego nie otwiera.
+
+**Obrazy postaci są zapisanym wejściem, choć nie są wysyłane.** Do modelu idzie to samo, z
+czego te obrazy powstały: `project.md`. Dołączenie hero jednego toru uczyniłoby plan drugiego
+toru pochodną tamtego rysunku. Hashe jednak są zapisane, bo to, co ten etap z nich konsumuje,
+to dokładnie fakt „te bajty niosą zgodę człowieka" — czyli to, na czym stoi bramka. Dzięki
+temu hero narysowany ponownie po wydaniu pakietu jest rozjazdem wejścia: `check` go zgłasza,
+a `approve` przepisuje hashe i zapisuje nową zgodę.
+
+**Skąd bierze się model.** `--model <id>`, a bez tej flagi `AIMATOR_PROMPTS_MODEL` — własna
+zmienna, jak przy każdym innym płatnym wywołaniu. Wartości domyślnej nie ma. Limit tokenów ma
+domyślną 32 000: pakiet to jedna instrukcja na referencję, na klip i na klatkę wejściową,
+więc jest najdłuższą odpowiedzią, o jaką prosi którykolwiek etap tekstowy. To sufit
+bezpieczeństwa, nie decyzja kreatywna.
+
+**Odpowiedź ma wymuszony schemat.** Wywołanie idzie z `text.format: json_schema`, `strict`,
+bo wynikiem nie jest dokument czytany od góry do dołu, tylko graf zależności i około
+dwudziestu osobnych instrukcji; tablica jest jednoznaczna tam, gdzie pole Markdown po
+przecinkach byłoby parserem nad prozą. Schemat JSON powstaje z tego samego schematu Zod,
+którym etap potem sprawdza manifest — drugi, ręcznie utrzymywany opis tego samego kształtu
+rozjechałby się z tym, którego nikt nie uruchamia.
+
+### Dwa pliki, dwie prawdy, zero pokrycia
+
+`prompts/**` to **jeden plik na jedno przyszłe płatne wywołanie**:
+`opening-frame.md`, `references/Rnn.md`, `clips/Cnn.md` i `entry-frames/Cnn.md` — ta ostatnia
+dla każdego klipu poza pierwszym, bo klatką wejściową C01 jest klatka otwarcia. Każdy z nich
+niesie **wyłącznie kierunek twórczy dla tego jednego kadru**: nagłówek i prozę. To jest plik,
+który człowiek czyta i poprawia przy ocenie, i to jego wysyła etap 5, 6 albo 7.
+
+`prompt-package.json` to **okablowanie**: identyfikatory, `kind`, jednoliniowy `subject`,
+`dependsOn`, `referenceIds` każdego kadru i własna ocena modelu w polu `review`. Graf zapisany
+prozą jest grafem, którego nikt nie sprawdzi, więc mieszka tu, a nie w promptach.
+
+Żaden z tych plików nie trzyma tego, co mówi drugi, i **żaden nie trzyma kopii listy ujęć**.
+Prompt nie powtarza czasów, akcji, dźwięku ani tekstu ekranowego, i nie wylicza swoich
+referencji: numerowany blok referencji, zasady projektu i dosłowne ujęcia z listy dokleja
+etap wysyłający, w chwili wysyłki, czytając listę przez `validateShotList`. Dokładnie tak,
+jak `character/prompt.ts` numeruje referencje przy wywołaniu zamiast przechowywać listę,
+która kiedyś opisze pozycję nieistniejącą w żądaniu. Rozstrzygnięcie z etapu 3 obowiązuje
+tu bez zmian: dwa pliki opisujące tę samą prawdę rozjeżdżają się przy pierwszej ręcznej
+poprawce, a poprawiany jest ten, który człowiek czyta.
+
+Zabezpieczeniem jest to, że **wszystkie te pliki są wynikami związanymi z hashem**. Ręczna
+edycja promptu albo manifestu wywraca `check` i blokuje `approve`, więc rozjazd między nimi
+nie może być cichy. Pakiet nie jest jednym dokumentem właśnie dlatego, że jednostka, którą
+człowiek przyjmuje, musi być jednostką, którą etap wysyła; jeden dokument znaczyłby albo
+wysyłanie całości przy każdym wywołaniu, albo krojenie prozy parserem.
+
+`--regenerate`, który planuje mniej referencji niż poprzedni pakiet, **usuwa osierocone pliki
+promptów** — ale wyłącznie te, które ten etap sam zapisał jako swoje wyniki. `prompts/` czyta
+się jako listę tego, czego odcinek jeszcze potrzebuje, a `R07.md` po pakiecie bez R07 opisywałby
+obraz, na który już nic nie wskazuje.
+
+### Skąd bierze się graf `dependsOn`
+
+Graf ma dwie połowy i tylko jedna jest zapisana.
+
+**Łańcuch klipów nie jest zapisany.** Że C03 kontynuuje końcówkę C02, mówi pole `Reference`
+listy ujęć, a `validateShotList` zwraca je jako dane. Jest więc wyliczany przy każdym odczycie,
+bo jest wnioskiem z pliku, który już istnieje i który człowiek poprawia — przepisany do pakietu
+stałby się drugą wersją tej samej prawdy i rozjechałby się przy pierwszej takiej poprawce.
+
+**Zależności obrazów referencyjnych są zapisane**, bo nie da się ich wyprowadzić: to, że
+klatka otwarcia potrzebuje obrazu Ewy, układu salonu i alpaki, a alpaka nie potrzebuje niczego
+poza stylem, jest decyzją twórczą, której żaden parser nie odtworzy z listy ujęć. Zapisane są
+`references[].dependsOn`, `opening.referenceIds` i `clips[].referenceIds` — same identyfikatory,
+nigdy ścieżki, właśnie po to, żeby rozwiązywały się per tor.
+
+Różnica wobec parsera listy ujęć jest więc prosta: parser odpowiada „co mówi lista ujęć",
+a pakiet „co ktoś zdecydował, czego lista ujęć nie mówi".
+
+**Walidacja grafu** jest czysta, offline i uruchamiana ponownie przy każdym `check`, wobec
+listy ujęć w takim kształcie, w jakim leży:
+
+- referencje numerowane kolejno od `R01`, `kind` z zamkniętego zbioru `character`, `location`,
+  `prop`, `subject` jednoliniowy i niepusty;
+- `dependsOn` niepuste, bez powtórzeń, i wskazujące wyłącznie `hero:<id>` albo referencję
+  o niższym numerze. Acykliczność wynika z tej reguły, a nie z osobnego przeszukiwania: cykl
+  nie da się zapisać, więc nie ma go czego szukać;
+- klipy pakietu to dokładnie klipy listy ujęć, w tej samej kolejności;
+- każdy kadr niesie `hero:<id>` **każdej postaci, którą lista ujęć stawia w jego ujęciach**,
+  i co najmniej jedną referencję `location`. Pierwsza reguła jest właściwym wiązaniem etapu 4
+  z etapem 3; druga jest wnioskiem z produkcji źródłowej — zbliżenie samo nie ustawi szerszego
+  kadru, więc kadr bez przestrzeni nie ma do czego się rozszerzyć;
+- każda referencja jest osiągalna: coś od niej zależy albo któryś kadr ją przypisuje.
+  Referencja, na którą nic nie wskazuje, to obraz, za który etap 5 zapłaciłby bez odbiorcy.
+
+### Kto nazywa referencje nieosobowe
+
+Lista ujęć nazywa identyfikatorami wyłącznie obsadę. Alpaka, salon i niska kanapa istnieją
+tylko w prozie pól `Frame`, `Action` i `Start state`, a etap 5 produkuje ponumerowane `Rxx.png`
+— ktoś musi je nazwać i policzyć. Robi to **model w etapie 4**, a człowiek przyjmuje tę listę;
+ocena pakietu jest głównie oceną właśnie jej.
+
+Reguła 7 tego nie łamie. Mówi ona, że decyzja bez wartości domyślnej jest przechowywana, a nie
+zgadywana — i każda decyzja, z której ta lista powstaje, **jest** przechowywana: alpaka jest
+opisana w `project.md` jako stały rekwizyt, salon, niska kanapa, okno i oś kamery są ustalone
+w zatwierdzonym scenariuszu i w sekcji `Plan` zatwierdzonej listy ujęć, a wieczorny komplet
+Ewy jest jednym z dwóch kompletów zapisanych w zasadach. „Jakie referencje nieosobowe ma ten
+odcinek" jest więc **wnioskiem z zapisanych decyzji**, nie nową decyzją — tak samo jak
+scenariusz jest wnioskiem ze źródła. Czego reguła 7 zabrania, to żeby brak odpowiedzi udawał
+odpowiedź, i tego tu nie ma: pusta lista referencji nie przechodzi walidacji, a referencja
+opisująca coś, czego żaden zatwierdzony artefakt nie wspomina, jest tym, co ocenia człowiek
+przed `approve`.
+
+Postać widziana raz też jest taką referencją, nie członkiem obsady — kryterium jest
+powracalność, a tańszy poziom dla epizodu to właśnie `Rxx`.
+
+**Walidacja to nie akceptacja.** Wynik, który przeszedł walidację, ma `review.status = "pending"`.
+Przyjmuje go dopiero `aimator approve <project-id> <episode-id> --stage prompt-package`, i tylko
+wtedy, gdy hashe manifestu i wszystkich plików promptów się zgadzają, a graf nadal waliduje się
+wobec bieżącej listy ujęć. Rozjazd wejścia działa jak w etapach 1 i 3: unieważnia akceptację,
+`approve` przepisuje hashe i zapisuje nową zgodę. `aimator check <project-id> <episode-id>`
+sprawdza to samo dla etapów 1, 3 i 4 naraz i nie zapisuje niczego.
+
+**Archiwum próby** trafia do tego samego `episodes/<id>/runs/<runId>/`, co etapy 1 i 3.
+Wejścia są referowane ścieżką i sha256, nigdy kopiowane; poprzedni pakiet — manifest razem
+z całym drzewem `prompts/` — trafia do `previous/` wyłącznie przy `--regenerate`, pod własnymi
+nazwami. Wywołanie idzie ze `store: false`, więc obowiązuje ta sama zasada, co wyżej: rekord
+`submitted` bez zapisanej odpowiedzi otwiera wyłącznie `--regenerate`, a odpowiedź, która
+zdążyła trafić na dysk, jest już opłacona i powtórzenie polecenia dokańcza z niej próbę bez
+wysyłania czegokolwiek. Odmowa 4xx nie została rozliczona i wolno ją powtórzyć zwykłym
+przebiegiem.

@@ -26,6 +26,14 @@ export const env = createEnv({
     AIMATOR_IMAGE_MODEL_GPT_IMAGE: z.string().min(1).optional(),
     AIMATOR_IMAGE_MODEL_SEEDREAM: z.string().min(1).optional(),
     /**
+     * The text model stage 4 sends the prompt-package prompt to. Its own
+     * variable, like every other paid call site: one shared with stage 1 or 3
+     * would mean that choosing a model for the screenplay quietly chose one for
+     * the package too, and nobody decided that. No default, for the same reason
+     * none of the others has one.
+     */
+    AIMATOR_PROMPTS_MODEL: z.string().min(1).optional(),
+    /**
      * The text model stage 1 sends the screenplay prompt to. Optional because
      * `--dry-run` has to work without it — and because a default here would be
      * a model choice nobody made, on a command that spends money.

@@ -1,7 +1,7 @@
-import { err, ok, type Result } from "./result.js";
+import { err, ok, type Result } from "../result.js";
 
 /**
- * The paid text call, and nothing else.
+ * Internal to the text-model module: the paid text call, and nothing else.
  *
  * Promoted out of `lib/screenplay` when the shot list became the second stage
  * to make it: the transport, the redaction, the single-attempt rule and the
@@ -27,11 +27,33 @@ const REDACTED = "[UKRYTY KLUCZ]";
 
 const TIMEOUT_MS = 10 * 60_000;
 
+/**
+ * A schema the provider itself enforces on the answer.
+ *
+ * Stage 4 asks for one, because its result is a dependency graph plus twenty
+ * separate prompts rather than a document somebody reads top to bottom: an
+ * array is unambiguous where a comma-separated Markdown field would be a parser
+ * over prose. Stages 1 and 3 ask for none — their result *is* the document, so
+ * the shape a person reads and the shape the tool checks are the same thing.
+ */
+export interface ResponseFormat {
+  readonly name: string;
+  readonly schema: Readonly<Record<string, unknown>>;
+}
+
 interface ModelRequest {
   readonly input: string;
   readonly max_output_tokens: number;
   readonly model: string;
   readonly store: false;
+  readonly text?: {
+    readonly format: {
+      readonly name: string;
+      readonly schema: Readonly<Record<string, unknown>>;
+      readonly strict: true;
+      readonly type: "json_schema";
+    };
+  };
 }
 
 interface Transport {
@@ -75,16 +97,31 @@ class ModelOutputError extends Error {
 }
 
 export function buildRequest(input: {
+  readonly format?: ResponseFormat | null;
   readonly maxOutputTokens: number;
   readonly model: string;
   readonly prompt: string;
 }): ModelRequest {
-  return {
+  const request = {
     input: input.prompt,
     max_output_tokens: input.maxOutputTokens,
     model: input.model,
     store: false,
-  };
+  } as const;
+
+  return input.format === undefined || input.format === null
+    ? request
+    : {
+        ...request,
+        text: {
+          format: {
+            name: input.format.name,
+            schema: input.format.schema,
+            strict: true,
+            type: "json_schema",
+          },
+        },
+      };
 }
 
 /**

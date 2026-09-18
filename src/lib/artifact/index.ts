@@ -20,7 +20,13 @@ export {
   withInputs,
   withOutputs,
 } from "./review.js";
-export { type RecordedFile, type StageFile, sha256Schema, stageFileSchema } from "./schema.js";
+export {
+  type RecordedFile,
+  type StageFile,
+  type StageName,
+  sha256Schema,
+  stageFileSchema,
+} from "./schema.js";
 export {
   applyWrites,
   emptyDirectories,

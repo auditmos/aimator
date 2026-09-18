@@ -12,12 +12,15 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 3 are implemented. Stages 4–8 are a declared contract, not working code.
+Stages 0 through 4 are implemented. Stages 5–8 are a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
 Stage 3 is the first artifact both image tracks share, so it has no track directory level;
 it refuses to spend until the screenplay is approved, and does not depend on stage 2.
+Stage 4 is the first to join the text side to the image side: it is shared by both tracks
+and names none of them, and it refuses to spend until the shot list is approved **and**
+every character that list puts on screen has an accepted `hero.png` on both tracks.
 
 ## Project Structure
 
@@ -34,7 +37,10 @@ src/
     ├── env.test.ts   # Co-located test for env validation
     ├── workspace.ts  # Single-file form — the ONLY module that knows the layout
     ├── workspace.test.ts
-    ├── text-model.ts # Single-file form — the paid text call, shared by stages 1 and 3
+    ├── text-model/    # Folder form — one billed text call, shared by stages 1, 3 and 4
+    │   ├── index.ts       # Public: runTextStage and what a stage brings to it
+    │   ├── client.ts      # Internal — transport, redaction, refusal classification
+    │   └── attempt.ts     # Internal — lock, submitted, archive, resume, publish
     ├── artifact/     # Folder form — provenance shared by every stage
     │   ├── index.ts      # Public: the stage-file shape, digests, writes, review
     │   ├── schema.ts     # Internal — <stage>.stage.json, one shape for all stages
@@ -81,15 +87,29 @@ src/
     │   ├── generate.ts   # Internal — order of operations around the paid call
     │   ├── index.test.ts    # Validator and prompt, through the entry
     │   └── generate.test.ts # Gate/resume/approve, through the entry
+    ├── prompt-package/ # Folder form — index.ts is the only entry (stage 4)
+    │   ├── index.ts      # Public: generatePromptPackage, checkPromptPackage,
+    │   │                 #         approvePromptPackage, validatePromptPackage, buildPrompt
+    │   ├── prompt.ts     # Internal — the prompt, the answer schema, the declared version
+    │   ├── validate.ts   # Internal — the wiring verdict; never reads a prompt
+    │   ├── render.ts     # Internal — the answer split into manifest and prompt files
+    │   ├── plan.ts       # Internal — the two gates, and what stage 4 reads
+    │   ├── review.ts     # Internal — verification and approval bound to digests
+    │   ├── generate.ts   # Internal — the command: publish, preserve, sweep
+    │   ├── index.test.ts    # Wiring verdict and prompt, through the entry
+    │   └── generate.test.ts # Gates/resume/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
 
-`lib/artifact` exists because four stages now write the same state file, and
-`lib/text-model` because two stages make the same paid text call. A stage never reaches
-into another stage's internals: shared pieces are promoted out instead. `lib/text-model`
-carries only the transport today; when a third text stage needs the same submit / archive
-/ resume / publish dance around it, promote that lifecycle too rather than copying it.
+`lib/artifact` exists because five stages now write the same state file, and
+`lib/text-model` because three stages make the same paid text call. A stage never reaches
+into another stage's internals: shared pieces are promoted out instead. When stage 4 became
+the third text stage, `lib/text-model` grew from transport alone to the whole lifecycle —
+lock, `submitted` before the POST, archive, resume from a saved answer, publish only what
+validates — because that order *is* the contract and three copies of it would have made an
+invariant into a coincidence. A stage now brings its prompt, its verdict and its files;
+the sequence is not its business. Do the same with the next thing two stages copy.
 
 ## Pipeline rules
 
@@ -227,8 +247,9 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   single shared variable would make running both from one shell an edit between commands.
   Neither has a default, for the same reason `AIMATOR_SCREENPLAY_MODEL` does not.
 - One model variable **per paid call site**, so `AIMATOR_SHOTLIST_MODEL` is stage 3's own
-  rather than a reuse of stage 1's: sharing one would mean that choosing a model for the
-  screenplay quietly chose one for the shot list, which nobody decided.
+  and `AIMATOR_PROMPTS_MODEL` is stage 4's, rather than a reuse of stage 1's: sharing one
+  would mean that choosing a model for the screenplay quietly chose one for the shot list
+  and for the prompt package, which nobody decided.
 
 ## Development Workflow
 

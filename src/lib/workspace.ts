@@ -12,6 +12,10 @@ import { err, ok, type Result } from "./result.js";
  */
 
 const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/** `R01`, `C01`: a numbered artifact of one episode, and its own file name. */
+const ARTIFACT_ID = /^[A-Z]\d{2,}$/;
+/** One path segment that cannot escape the directory it is joined onto. */
+const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const EPISODE_SOURCE = /^(\d{1,3})[-_](.+)\.md$/;
 const COMBINING_MARKS = /\p{M}+/gu;
 const NON_SLUG = /[^a-z0-9]+/g;
@@ -90,6 +94,17 @@ export interface ImageRunPaths {
 export interface EpisodePaths {
   readonly file: string;
   readonly prepareStage: string;
+  /**
+   * Stage 4. Like the shot list it has no track level: the package describes
+   * what every image of this episode must contain, and the two tracks draw the
+   * same one. Its reference ids resolve to a track only when a stage attaches
+   * them, which is what lets one manifest serve both.
+   */
+  readonly promptPackage: string;
+  readonly promptPackageLock: string;
+  readonly promptPackageStage: string;
+  /** The tree of prompt files stage 4 publishes; see `promptPaths`. */
+  readonly prompts: string;
   readonly root: string;
   /** One archive directory per episode; the run id keeps stages from colliding. */
   readonly runs: string;
@@ -116,9 +131,16 @@ export interface EpisodePaths {
  * inputs are referenced by path and digest inside `run.json`, never copied.
  */
 export interface RunPaths {
-  readonly previousScreenplay: string;
-  /** The shot list being replaced. Written only by `--regenerate`. */
-  readonly previousShotList: string;
+  /**
+   * The results being replaced, under their own names. Written only by
+   * `--regenerate`.
+   *
+   * A directory rather than one field per stage: stage 4 replaces a manifest
+   * and a tree of prompt files at once, so a `previous-<stage>.md` field would
+   * have had to become a field per file. What a stage preserves here is its own
+   * business; that it goes under `previous/` is this module's.
+   */
+  readonly previous: string;
   readonly prompt: string;
   readonly request: string;
   readonly response: string;
@@ -309,6 +331,10 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
   return ok({
     file: join(root, "episode.json"),
     prepareStage: join(root, "prepare.stage.json"),
+    promptPackage: join(root, "prompt-package.json"),
+    promptPackageLock: join(root, "prompt-package.lock"),
+    promptPackageStage: join(root, "prompt-package.stage.json"),
+    prompts: join(root, "prompts"),
     root,
     runs: join(root, "runs"),
     screenplay: join(root, "screenplay.md"),
@@ -326,8 +352,7 @@ export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
   const root = join(episode.runs, runId);
 
   return {
-    previousScreenplay: join(root, "previous-screenplay.md"),
-    previousShotList: join(root, "previous-shot-list.md"),
+    previous: join(root, "previous"),
     prompt: join(root, "prompt.md"),
     request: join(root, "request.json"),
     response: join(root, "response.json"),
@@ -336,6 +361,70 @@ export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
     transport: join(root, "transport.json"),
     validation: join(root, "validation.json"),
   };
+}
+
+/**
+ * A file inside a run's `previous/`, named as the artifact itself is named.
+ *
+ * A stage preserving its own result knows the names it uses; it does not get to
+ * join them onto a path, so it asks here — the same direction `workspacePath`
+ * already covers. A name that escapes the archive is refused rather than
+ * normalised, because a `--regenerate` that wrote outside its own run
+ * directory would be a backup that overwrote something.
+ */
+export function previousFile(run: RunPaths, name: string): Result<string> {
+  const segments = name.split("/");
+
+  return segments.length > 0 && segments.every((segment) => SAFE_SEGMENT.test(segment))
+    ? ok(join(run.previous, ...segments))
+    : err(new IdentifierError(name, `invalid archive name "${name}"`));
+}
+
+/**
+ * Where stage 4 publishes the prompt files, one per future paid call.
+ *
+ * One file per call rather than one document with sections, because the unit a
+ * human accepts has to be the unit a later stage sends: stage 5 makes one call
+ * per reference, stage 6 one for the opening frame, stage 7 one per clip. A
+ * single document would force every one of those calls either to send the whole
+ * thing or to cut a slice out of prose a human is invited to rewrite.
+ */
+interface PromptPaths {
+  readonly clips: string;
+  readonly entryFrames: string;
+  readonly openingFrame: string;
+  readonly references: string;
+  readonly root: string;
+}
+
+/** Which of the three numbered prompt kinds a file is. */
+export type PromptKind = "clip" | "entry-frame" | "reference";
+
+export function promptPaths(episode: EpisodePaths): PromptPaths {
+  return {
+    clips: join(episode.prompts, "clips"),
+    entryFrames: join(episode.prompts, "entry-frames"),
+    openingFrame: join(episode.prompts, "opening-frame.md"),
+    references: join(episode.prompts, "references"),
+    root: episode.prompts,
+  };
+}
+
+/**
+ * One numbered prompt file. The identifier is both the artifact key and the
+ * file name, so it is checked here rather than trusted into a path — the same
+ * reason `characterViewImage` checks a view name.
+ */
+export function promptFile(paths: PromptPaths, kind: PromptKind, id: string): Result<string> {
+  if (!ARTIFACT_ID.test(id)) {
+    return err(new IdentifierError(id, `invalid artifact id "${id}": expected a form like R01`));
+  }
+
+  if (kind === "reference") {
+    return ok(join(paths.references, `${id}.md`));
+  }
+
+  return ok(join(kind === "clip" ? paths.clips : paths.entryFrames, `${id}.md`));
 }
 
 /**
