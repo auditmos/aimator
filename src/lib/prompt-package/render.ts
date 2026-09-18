@@ -106,7 +106,7 @@ export function readPackageAnswer(text: string): Result<PackageAnswer> {
 /** The answer, split into the manifest and the files, with nothing shared. */
 export function renderPackage(answer: PackageAnswer): Rendered {
   const files: PromptFile[] = [
-    { id: null, kind: "opening", text: document("Klatka otwarcia", answer.opening.prompt) },
+    { id: null, kind: "opening", text: document("Opening frame", answer.opening.prompt) },
     ...answer.references.map((one) => ({
       id: one.id,
       kind: "reference" as const,
@@ -120,7 +120,7 @@ export function renderPackage(answer: PackageAnswer): Rendered {
     ...answer.entryFrames.map((frame) => ({
       id: frame.clipId,
       kind: "entry-frame" as const,
-      text: document(`${frame.clipId} — klatka wejściowa`, frame.prompt),
+      text: document(`${frame.clipId} — entry frame`, frame.prompt),
     })),
   ];
 
@@ -147,6 +147,12 @@ export function renderPackage(answer: PackageAnswer): Rendered {
  * authoritative shots are added by the stage that sends this text, exactly as
  * `character/prompt.ts` numbers its references at call time rather than storing
  * a list that would eventually describe a position the request does not hold.
+ *
+ * The heading is English for the same reason the direction is: this whole file
+ * is sent to an image or video model, and the heading is the first line it
+ * reads. Instructing the model to write English while this function wrote
+ * Polish into the same file would have left half the rule unenforced — the half
+ * nobody could see by reading the prompt.
  */
 function document(heading: string, prompt: string): string {
   return `# ${heading}\n\n${prompt.trim()}\n`;

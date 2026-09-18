@@ -469,6 +469,22 @@ describe("generatePromptPackage", () => {
     ]);
   });
 
+  /**
+   * The whole file is sent to an image model, heading included. Instructing the
+   * model to write English while the renderer wrote Polish into the same file
+   * left half the rule unenforced.
+   */
+  it("should write every published prompt in English, heading included", async () => {
+    await makeUpstream();
+    await generate();
+
+    const opening = await readFile(join(episodeDir(), "prompts", "opening-frame.md"), "utf8");
+    const entry = await readFile(join(episodeDir(), "prompts", "entry-frames", "C02.md"), "utf8");
+
+    expect(opening.split("\n")[0]).toBe("# Opening frame");
+    expect(entry.split("\n")[0]).toBe("# C02 — entry frame");
+  });
+
   it("should keep the prose out of the manifest and the wiring out of the prompts", async () => {
     await makeUpstream();
     await generate();
