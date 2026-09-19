@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sha256Of } from "../lib/artifact/index.js";
+import { approveClips, generateClips } from "../lib/clips/index.js";
+import { approveOpeningFrame, generateOpeningFrame } from "../lib/opening-frame/index.js";
 import {
   addCharacter,
   addEpisode,
@@ -10,9 +12,10 @@ import {
   setEpisodeSettings,
 } from "../lib/project/index.js";
 import { approvePromptPackage, generatePromptPackage } from "../lib/prompt-package/index.js";
+import { approveReferences, generateReferences } from "../lib/references/index.js";
 import { approveScreenplay, generateScreenplay } from "../lib/screenplay/index.js";
 import { approveShotList, generateShotList } from "../lib/shot-list/index.js";
-import { imageTracks, type Workspace } from "../lib/workspace.js";
+import { type ImageTrack, imageTracks, type Workspace } from "../lib/workspace.js";
 
 /**
  * The pipeline a stage-5-and-later test needs before it can test anything.
@@ -657,4 +660,209 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
       workspace,
     });
   }
+}
+
+/**
+ * A finished image-and-video track: stages 5, 6 and 7, all of them accepted.
+ *
+ * It exists for the stages *below* stage 7, which need a track that is done
+ * rather than a track they are testing. The build-up is the same three calls
+ * and three approvals every time, and stage 8 would have been the fourth copy
+ * of the stage 5-to-6 chain — the threshold this repository promotes at.
+ *
+ * It deliberately does **not** replace the instrumented transports stages 5, 6
+ * and 7 bring to their own tests. Those count calls, because the count is the
+ * assertion; this one only has to leave a correct track on disk. That is the
+ * same line the fixture already draws around the manifest: what a stage tests,
+ * it owns.
+ */
+export async function makeTrack(options: {
+  /** How long each clip comes back, by id. Anything absent runs its planned length. */
+  readonly clipSeconds?: Readonly<Record<string, number>>;
+  /** Clips left unapproved, so a downstream gate has something to refuse. */
+  readonly pending?: readonly string[];
+  readonly root: string;
+  readonly track: ImageTrack;
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { clipSeconds = {}, pending = [], track, workspace } = options;
+
+  await generateReferences({
+    apiKey: API_KEY,
+    artifacts: [],
+    episodeId: EPISODE,
+    fetch: recorder().fetch,
+    mode: "apply",
+    model: "gpt-image-2.5-sunburst",
+    projectId: PROJECT,
+    regenerate: false,
+    track,
+    workspace,
+  });
+  await approveReferences({
+    artifacts: ["R01"],
+    episodeId: EPISODE,
+    mode: "apply",
+    note: "ok",
+    projectId: PROJECT,
+    reviewer: "fixture",
+    track,
+    workspace,
+  });
+  await generateOpeningFrame({
+    apiKey: API_KEY,
+    artifacts: [],
+    episodeId: EPISODE,
+    fetch: recorder().fetch,
+    mode: "apply",
+    model: "gpt-image-2.5-sunburst",
+    projectId: PROJECT,
+    regenerate: false,
+    track,
+    workspace,
+  });
+  await approveOpeningFrame({
+    artifacts: [],
+    episodeId: EPISODE,
+    mode: "apply",
+    note: "ok",
+    projectId: PROJECT,
+    reviewer: "fixture",
+    track,
+    workspace,
+  });
+
+  // Stage 7 is a chain, so it takes as many passes as there are links: one
+  // command buys what the gates allow, a human accepts it, and that acceptance
+  // is what opens the next one. Looping until nothing new appears is what a
+  // person does by hand, and it keeps the fixture free of a clip count.
+  for (let pass = 0; pass < MAX_CHAIN_PASSES; pass += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: the chain is sequential
+    const bought = await buyAndAccept({ clipSeconds, pending, track, workspace });
+
+    if (bought.length === 0) {
+      return;
+    }
+  }
+}
+
+/** How many times the stage-7 chain is pumped before the fixture gives up. */
+const MAX_CHAIN_PASSES = 32;
+
+/** One pass of stage 7: buy what the gates allow, then accept all of it. */
+async function buyAndAccept(options: {
+  readonly clipSeconds: Readonly<Record<string, number>>;
+  readonly pending: readonly string[];
+  readonly track: ImageTrack;
+  readonly workspace: Workspace;
+}): Promise<readonly string[]> {
+  const { clipSeconds, pending, track, workspace } = options;
+  const result = await generateClips({
+    artifacts: [],
+    episodeId: EPISODE,
+    fetch: videoProvider(clipSeconds),
+    imageKey: API_KEY,
+    imageModel: "gpt-image-2.5-sunburst",
+    mode: "apply",
+    projectId: PROJECT,
+    regenerate: false,
+    republish: false,
+    track,
+    videoKey: API_KEY,
+    videoModel: "dreamina-seedance-2-5-260628",
+    wait: () => Promise.resolve(),
+    workspace,
+  });
+
+  if (!result.ok) {
+    return [];
+  }
+
+  const bought = result.data.artifacts
+    .filter((one) => one.state === "published" && !pending.includes(one.id))
+    .map((one) => one.id);
+
+  if (bought.length > 0) {
+    await approveClips({
+      artifacts: bought,
+      episodeId: EPISODE,
+      mode: "apply",
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "fixture",
+      track,
+      workspace,
+    });
+  }
+
+  return bought;
+}
+
+/**
+ * Both providers behind one transport: the image API an entry frame is drawn
+ * with, and the video API a clip is rendered by.
+ *
+ * Clips come back at the length `clipSeconds` names, or at the length the plan
+ * ordered. The distinction is what a downstream stage needs in order to see a
+ * drifting cut at all: a provider that always answers to the second would make
+ * the drift untestable, and the drift is the honest behaviour of a renderer
+ * working at 24 frames per second.
+ */
+function videoProvider(clipSeconds: Readonly<Record<string, number>>): typeof fetch {
+  const images = recorder();
+  let clip = CLIP_FALLBACK;
+  let jobs = 0;
+
+  return ((url: string | URL, init?: RequestInit) => {
+    const href = String(url);
+
+    if (href === "https://download/clip") {
+      return Promise.resolve(new Response(clip, { status: 200 }));
+    }
+
+    if (href === "https://download/end") {
+      return Promise.resolve(new Response(png(1920, 1080, 3), { status: 200 }));
+    }
+
+    if (!href.includes("/contents/generations/tasks")) {
+      return images.fetch(url, init);
+    }
+
+    if ((init?.method ?? "GET") === "POST") {
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+      const planned = Number((body as { duration?: number }).duration ?? 0);
+      const id = clipIdOf(body);
+
+      jobs += 1;
+      clip = mp4({ height: 1080, seconds: clipSeconds[id] ?? planned, width: 1920 });
+
+      return Promise.resolve(Response.json({ id: `cgt-${jobs}` }));
+    }
+
+    return Promise.resolve(
+      Response.json({
+        content: { last_frame_url: "https://download/end", video_url: "https://download/clip" },
+        id: href.slice(href.lastIndexOf("/") + 1),
+        status: "succeeded",
+      })
+    );
+  }) as unknown as typeof fetch;
+}
+
+/** A clip of a length no plan orders, so an unmapped call is visibly wrong. */
+const CLIP_FALLBACK = mp4({ height: 1080, seconds: 1, width: 1920 });
+const CLIP_HEADING = /### (C\d{2,}) \|/;
+
+/**
+ * Which clip a video request is for, read from the shots the prompt quotes.
+ *
+ * The request carries no identifier of its own — rule 8 keeps ids out of a
+ * model's instructions — so the fixture reads the one place the clip's name
+ * legitimately appears: the verbatim shot-list entries the composer attaches.
+ */
+function clipIdOf(body: unknown): string {
+  const content = body as { content?: readonly { text?: string }[] };
+  const text = content.content?.map((one) => one.text ?? "").join("\n") ?? "";
+
+  return CLIP_HEADING.exec(text)?.[1] ?? "";
 }

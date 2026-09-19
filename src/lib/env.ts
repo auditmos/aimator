@@ -19,6 +19,17 @@ export const env = createEnv({
   runtimeEnv: process.env,
   server: {
     /**
+     * Where stage 8's muxer lives, when it is not simply `ffmpeg` on PATH.
+     *
+     * The only variable here that names a program rather than a model or a
+     * key, and the only one whose absence has a sensible answer: every other
+     * one refuses a default because a model nobody chose is not a decision,
+     * while "the ffmpeg on PATH" is not a choice between engines — it is the
+     * engine, wherever this machine keeps it. The escape hatch exists for a
+     * build that is not on PATH, not for picking a different tool.
+     */
+    AIMATOR_FFMPEG: z.string().min(1).optional(),
+    /**
      * One image model per track, because the two tracks are drawn side by side
      * and a single shared variable would make running both from one shell a
      * matter of editing a file between commands.

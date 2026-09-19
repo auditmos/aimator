@@ -7,14 +7,19 @@ Artefakty są grupowane **per projekt i per model obrazu**. Jeden projekt może 
 komplet assetów w `gpt-image` i w `seedream` — to dwa niezależne byty dające dwie różne
 animacje z tej samej historii. Ujęcia i klipy w obu torach robi Seedance 2.5.
 
-**Stan: zaimplementowane są etapy 0–7** — przygotowanie, scenariusz, postać, lista ujęć,
-pakiet promptów, obrazy referencyjne, klatka otwarcia i klipy. Etap 8 — montaż — ma
-zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md), ale nie ma jeszcze kodu.
+**Stan: zaimplementowane są etapy 0–8** — przygotowanie, scenariusz, postać, lista ujęć,
+pakiet promptów, obrazy referencyjne, klatka otwarcia, klipy i montaż. Etap 9 — dźwięk —
+ma zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md), ale nie ma jeszcze kodu,
+więc `episode.mp4` jest **niemy**: ścieżkę dźwiękową trzeba pisać wobec sklejonego
+filmu, a nie wobec planu, więc należy do etapu po montażu.
 
 ## Wymagania
 
 - [Node.js](https://nodejs.org/) >= 22
 - [pnpm](https://pnpm.io/)
+- [ffmpeg](https://ffmpeg.org/) — tylko dla etapu 8. Skleja klipy bez przekodowania;
+  gdy go nie ma, montaż odmawia zamiast szukać objazdu. Reszta narzędzia, razem
+  z `check`, działa bez niego — werdykty czytają pudełka MP4, nie wołają dekodera.
 
 ## Instalacja
 
@@ -41,6 +46,7 @@ AIMATOR_PROMPTS_MODEL=…               # etap 4
 AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
 AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream
 AIMATOR_VIDEO_MODEL=…                 # etap 7, JEDEN dla obu torów
+AIMATOR_FFMPEG=ffmpeg                 # etap 8; program, nie model — tylko gdy nie jest w PATH
 OPENAI_API_KEY=…
 BYTEPLUS_MODELARK=…                   # także klucz wideo, na obu torach
 ```
@@ -278,11 +284,50 @@ Referencje, które manifest przypisał klipowi, są tym, z czego narysowano tę 
 narzędzie nie zaokrągli: odmówi przed wysyłką i wskaże poprawkę w `maxClipSeconds` i etapie 3.
 Raport podaje liczbę płatnych wywołań **osobno dla obrazów i dla wideo**, zanim cokolwiek
 wyśle. Dźwięku nie generujemy — ścieżka dźwiękowa jest ciągła przez cięcia, więc należy do
-etapu 8.
+etapu **poniżej montażu**, a klipy są proszone o ciszę jawnie.
 
 Model wideo jest **jeden dla obu torów** (`AIMATOR_VIDEO_MODEL`, klucz `BYTEPLUS_MODELARK`),
 a klatki wejściowe rysuje ten sam model obrazowy co referencje na tym torze. Dlatego zamiast
 `--model` są dwie flagi: `--image-model` i `--video-model`.
+
+## Etap 8 — montaż
+
+Pierwszy etap, który **niczego nie kupuje**. Skleja zatwierdzone klipy w `<tor>/episode.mp4`.
+
+```bash
+pnpm dev assembly generate dzielna-ewa 01-burza --track gpt-image --dry-run
+pnpm dev assembly generate dzielna-ewa 01-burza --track gpt-image
+pnpm dev check dzielna-ewa 01-burza --stage assembly --track gpt-image
+pnpm dev approve dzielna-ewa 01-burza --stage assembly --track gpt-image \
+  --note "rytm trzyma, szwy niewidoczne"
+```
+
+**Planu montażowego nie ma jako pliku.** Kolejność, sekundy i kafelkowanie bez dziur są już
+w zatwierdzonej `shot-list.md`, a drugi plik byłby `shot-list.json` pod inną nazwą — czyli
+tym, co etapy 3 i 4 już raz odrzuciły. Jeśli plan montażowy jest zły, poprawka należy do
+etapu 3.
+
+**Bramką są zatwierdzone klipy** — wszystkie, które planuje lista ujęć, **na tym torze**.
+Klatek wejściowych ani końcówek bramka nie dotyka: klatka wejściowa jest już pierwszą
+klatką swojego klipu.
+
+**Skleja to, co wróciło, i melduje różnicę.** Klip zamówiony na 6 s wraca jako 6,04 s przy
+24 klatkach, a etap 7 publikuje go bez przycinania — to są bajty, które przyjął człowiek.
+Przycięcie ich tutaj złożyłoby film z klatek, których nie przyjął nikt. Raport podaje sumę
+planu, sumę klipów i odchyłkę; werdykt na gotowym pliku porównuje go z **sumą jego własnych
+klipów**, nie z `durationSeconds`.
+
+**ffmpeg, bez przekodowania, bez objazdu.** Strumieniowe kopiowanie (`-c copy`) jest możliwe,
+bo oba tory renderują jednym modelem w jednej rozdzielczości i tempie klatek. Gdy ffmpeg nie
+ma w `PATH` ani w `AIMATOR_FFMPEG`, montaż odmawia. `check` go nie potrzebuje.
+
+**„Ocena całości" to nie powtórka ocen klipów.** Tamte mówią, że każde ujęcie jest dobre; ta
+mówi, że te klipy w tej kolejności to film. Rytm przez cięcia, ciągłość na szwach i
+rzeczywista długość istnieją wyłącznie w całości. Jeden artefakt na tor, więc `--artifact`
+nie jest wymagane nigdzie; `--regenerate` jest — nie dlatego, że coś kosztuje, tylko dlatego,
+że gotowy montaż nosi czyjąś zgodę.
+
+**`episode.mp4` jest niemy** i `check` mówi to przy każdym uruchomieniu.
 
 ## Zasady, na których stoi całe narzędzie
 

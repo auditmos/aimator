@@ -28,6 +28,7 @@ export const stageNames = [
   "opening-frame",
   "clips",
   "assembly",
+  "soundtrack",
 ] as const;
 
 const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });
@@ -44,10 +45,20 @@ const reviewSchema = z.strictObject({
  * merely copied; `model` records the exact endpoint, model id and prompt
  * version that produced a paid result, because "which prompt was this" has
  * to be answerable from the file rather than from the source tree.
+ *
+ * `local` is the third and it arrived with stage 8, which is neither: nobody
+ * typed a cut and no model rendered one. It exists because this record answers
+ * one question — what would have to run again to get these bytes — and for a
+ * locally muxed file the honest answer is the engine and its version. Two
+ * releases of a muxer do not necessarily write the same container out of the
+ * same clips, and a record saying `manual` would make that unanswerable from
+ * the file, which is precisely the failure `producer` was built to prevent.
+ * `model` then reads as "which engine produced these bytes"; `endpoint` and
+ * `promptVersion` stay null, as they already do for `manual`.
  */
 const producerSchema = z.strictObject({
   endpoint: z.string().nullable().default(null),
-  kind: z.enum(["manual", "model"]),
+  kind: z.enum(["local", "manual", "model"]),
   model: z.string().nullable().default(null),
   promptVersion: z.int().nullable().default(null),
   tool: z.string().min(1),

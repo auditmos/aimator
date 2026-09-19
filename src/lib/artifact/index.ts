@@ -70,6 +70,19 @@ export function manualProducer(): Producer {
 }
 
 /**
+ * What a local engine produced: bytes nobody typed and no model drew.
+ *
+ * `engine` is the name and version of the program that wrote them — `ffmpeg
+ * 7.1.1`, not `ffmpeg` — because the version is the half that decides whether
+ * the same inputs give the same file back. It lands in `model` for the reason
+ * the schema gives: this field is "which engine produced these bytes", and a
+ * paid stage happens to answer it with a model id.
+ */
+export function localProducer(engine: string): Producer {
+  return { endpoint: null, kind: "local", model: engine, promptVersion: null, tool: TOOL };
+}
+
+/**
  * What a paid call produced. The endpoint, model and prompt version belong in
  * the artifact because "which prompt produced this" has to stay answerable
  * from the workspace, long after the source tree has moved on.

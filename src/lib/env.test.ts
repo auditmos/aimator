@@ -28,4 +28,14 @@ describe("env", () => {
   it("should expose one video model, shared by both tracks", () => {
     expect(["string", "undefined"]).toContain(typeof env.AIMATOR_VIDEO_MODEL);
   });
+
+  /**
+   * Stage 8's engine, and the only variable in this file that is not a model
+   * or a key: it points at a program on this machine. Optional because the
+   * usual answer is `ffmpeg` on PATH — and unlike a model, a name that is
+   * simply "the one everybody installs" is not a decision anybody has to make.
+   */
+  it("should expose the muxer path as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_FFMPEG);
+  });
 });

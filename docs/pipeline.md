@@ -38,9 +38,9 @@ $AIMATOR_WORKSPACE/
                                         opening-frame.stage.json, opening-frame.lock,
                                         clips/Cxx.mp4, frames/Cxx/entry.png,
                                         frames/Cxx/end.jpg (format dostawcy),
-                                        clips.stage.json,
-                                        clips.lock, runs/ — a dalej, per kontrakt:
-                                        edit-plan.json, episode.mp4
+                                        clips.stage.json, clips.lock,
+                                        episode.mp4, assembly.stage.json,
+                                        assembly.lock, runs/
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -204,10 +204,25 @@ Obowiązują we wszystkich etapach.
 | 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
 | 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` (format oddaje dostawca), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
-| 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
+| 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
+| 9 dźwięk | zatwierdzony `<tor>/episode.mp4` | ścieżka dźwiękowa odcinka | ocena odsłuchu | niezaimplementowany |
 
-Etap 8 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
-żeby kolejny krok wpiął się w ustalony układ zamiast wymyślać własny.
+Etap 9 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
+żeby kolejny krok wpiął się w ustalony układ zamiast wymyślać własny — dokładnie tak, jak
+wiersz etapu 8 istniał, zanim etap 8 powstał.
+
+**Jego wejściem jest zmontowany odcinek, nie lista ujęć, i to nie jest szczegół.** Ścieżka
+dźwiękowa musi być pisana wobec osi czasu, na której zagra. Klipy nie wracają co do sekundy
+(zobacz „Etap 8"), więc narracja rozpisana na sekundy z planu rozjeżdżałaby się z obrazem
+tym bardziej, im dalej od początku. Wobec `episode.mp4` dryf przestaje istnieć jako pojęcie:
+oś, pod którą się pisze, jest tą, nad którą się słucha. To także drugi, niezależny powód,
+dla którego dźwięk nie mieści się w etapie 8 — potrzebuje jego **wyniku** jako wejścia.
+
+Dwóch rzeczy ten wiersz jeszcze nie rozstrzyga i nie udaje, że rozstrzyga: skąd bierze się
+tekst narratora (pole `Audio` scenariusza **opisuje** dźwięk, nie jest kwestią do
+przeczytania, więc jest to nowa decyzja twórcza, która musi mieć własny artefakt i własne
+`approve`) oraz czy ścieżka jest kupowana, czy przynoszona. Reguła 7 obowiązuje: brak
+odpowiedzi nie udaje odpowiedzi.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
 Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2 — nazywa
@@ -961,8 +976,12 @@ a ta jest rysowana w kadrze filmu z `aspectRatio`. Rozdzielczość to najwyższy
 model oferuje — rozdzielczości oddanej tutaj nie odzyska się w montażu.
 
 **Dźwięk nie jest generowany.** Ścieżka dźwiękowa odcinka jest ciągła przez cięcia, więc
-należy do etapu 8; model, który słyszy jeden klip naraz, nie ma jak jej zrobić. Pole
-`generate_audio` domyślnie jest włączone u dostawcy, więc cisza jest proszona jawnie.
+należy do etapu **poniżej montażu**; model, który słyszy jeden klip naraz, nie ma jak jej
+zrobić. Pole `generate_audio` domyślnie jest włączone u dostawcy, więc cisza jest proszona
+jawnie. Nie jest to etap 8: montaż sklejający obraz nie ma czym napisać narracji — nie ma
+ani jej tekstu, ani promptu, bo `prompts/**` to jeden plik na jedno przyszłe płatne
+wywołanie i żaden z czterech rodzajów nie dotyczy dźwięku. Etap 8 wytwarza natomiast oś
+czasu, wobec której ścieżkę w ogóle da się napisać, więc dźwięk jest wierszem **po nim**.
 
 ### Model i klucz
 
@@ -1041,3 +1060,141 @@ Akceptacja, której nikt nie napisał, wydawałaby pieniądze, na które nikt si
 `aimator check <project-id> <episode-id> --stage clips --track <tor>` sprawdza to samo i nie
 zapisuje niczego. Rozjazd wejścia unieważnia akceptację i `check` to zgłasza — a `approve`
 przepisuje hashe wejść i zapisuje nową zgodę, jak wszędzie indziej.
+
+## Etap 8 — szczegóły
+
+Ostatni wiersz obrazu, pierwszy etap, który **niczego nie kupuje**, i pierwszy, którego
+bajty wytwarza program lokalny — ani człowiek, ani model. Konsumuje zatwierdzoną
+`shot-list.md` i każdy klip, który ta lista planuje, **zatwierdzony na tym torze**, oraz
+`project.json` i `episode.json`, z których czyta proporcje i zadeklarowany tryb dźwięku.
+Produkuje `episodes/<id>/<tor>/episode.mp4`, obok niego `assembly.stage.json` z jednym
+rekordem, i jedno cienkie archiwum w `runs/` tego toru.
+
+**Nie konsumuje pakietu promptów.** Montaż nie niesie instrukcji do żadnego modelu, więc
+zapisanie hasha bajtów, których nikt nie wysłał, opisywałoby pytanie, którego nie zadano —
+ta sama zasada, dla której etap 3 nie czyta `source.md`.
+
+### Planu montażowego nie ma jako pliku
+
+Kontrakt wymieniał kiedyś `edit-plan.json` wśród wejść tego etapu i żaden etap go nie
+pisał. Słusznie nie pisał: **wszystko, co ten plik mógłby nieść, jest już w zatwierdzonej
+liście ujęć** — kolejność klipów, ich bezwzględne sekundy i zagwarantowane kafelkowanie
+odcinka bez dziur. Drugi plik byłby `shot-list.json` pod inną nazwą, a etapy 3 i 4 odrzuciły
+to dwukrotnie z tego samego powodu: dwa pliki opisujące jedną prawdę rozjeżdżają się przy
+pierwszej ręcznej poprawce, a poprawiany jest ten, który człowiek czyta.
+
+Reguła 7 jest tu spełniona, a nie naginana. Cięcie na styk między klipami, które kafelkują
+bez dziur, jest **tym, co plan mówi**, a nie wartością domyślną podstawioną za odpowiedź,
+której nikt nie dał. Przenikanie, plansza tytułowa albo przestawienie klipów **byłyby** nową
+decyzją — i właśnie dlatego etap 8 ich nie podejmuje: nie ma pola, które by je niosło.
+Jeśli plan montażowy jest zły, poprawka należy do etapu 3.
+
+### Bramka: zatwierdzone klipy, i nic poza nimi
+
+Sklejenie odmawia, dopóki każdy klip z listy ujęć nie ma na tym torze rekordu `completed`
+z `review.status = "approved"` i zgodnym hashem. Ta jedna bramka obejmuje też etapy 0 i 1:
+pliki projektu są zapisanymi wejściami listy ujęć, więc ich edycja unieważnia jej akceptację
+arytmetycznie i montaż blokuje bez osobnej reguły.
+
+**Klatek wejściowych ani końcówek bramka nie dotyka.** Klatka wejściowa jest już pierwszą
+klatką swojego klipu, a końcówka była materiałem łańcucha etapu 7, nie kadrem filmu. Pytanie
+o plik, którego ten etap nigdy nie otwiera, byłoby trzymaniem etapu zakładnikiem — tak samo
+jak odmowa zatwierdzenia obsady, dopóki nie istnieje odcinek.
+
+Zgoda wydana na jednym torze nie otwiera drugiego. Dwa tory to dwa filmy z jednej historii
+i żaden z nich nie jest „odcinkiem".
+
+### Dryf długości: skleja się to, co wróciło
+
+Klipy nie wracają co do sekundy — renderer przy 24 klatkach zostawia ułamek — a walidator
+etapu 7 przyjmuje odchyłkę **mniejszą niż sekunda** i publikuje klip w takiej długości, w
+jakiej przyszedł: „zachowano oryginał, niczego nie przycinam". To są bajty, które przyjął
+człowiek, więc przycięcie ich tutaj złożyłoby film z klatek, których nie przyjął nikt —
+dokładnie ten sam zarzut, którym etap 2 broni się przed wycinaniem tła, a etap 7 przed
+przekodowaniem końcówki.
+
+Dlatego montaż **melduje różnicę, zamiast ją korygować**: raport podaje sumę z planu, sumę
+tego, co wróciło, i odchyłkę, per klip i łącznie. Werdykt na gotowym pliku porównuje go
+z **sumą jego własnych klipów**, nigdy z `durationSeconds` odcinka — poprawne sklejenie
+dryfujących klipów nie może się wywracać z powodu, którego niżej nikt nie naprawi.
+Osobnego progu nie ma i nie będzie: cokolwiek odstawało o sekundę albo więcej, nie przeszło
+już walidacji etapu 7.
+
+### Czym to jest sklejone
+
+**ffmpeg, znaleziony w `PATH` albo wskazany przez `AIMATOR_FFMPEG`, wywołany raz, ze
+strumieniowym kopiowaniem (`-c copy`).** Bez przekodowania, bo klipy to bajty, które ktoś
+przyjął; warunek konkatenacji — identyczne parametry strumienia — jest spełniony
+z konstrukcji, bo oba tory renderują jednym modelem wideo w jednej rozdzielczości i jednym
+tempie klatek. Gdzie nie jest spełniony, narzędzie odmawia; nigdy po cichu nie przechodzi
+na przekodowanie.
+
+**Brak ffmpeg jest odmową, nie objazdem.** Innej drogi nie ma: mikser napisany w tym
+repozytorium byłby zapisywaczem kontenera, któremu trzeba by potem ufać — czyli tym, czego
+etap 7 uniknął, czytając pudełka zamiast wołać dekoder. Odmowa pada razem z bramką, przed
+jakimkolwiek zapisem, i nic nie kosztuje. Komunikat wskazuje poprawkę: zainstaluj albo
+wskaż ścieżkę.
+
+**`check` zostaje offline i bez ffmpeg.** Czyta pudełka `episode.mp4` tym samym czystym
+werdyktem, którym etap 7 czyta klip, więc montaż da się zweryfikować na maszynie bez
+jakichkolwiek narzędzi multimedialnych — po to ten czytnik pudełek w ogóle powstał.
+
+### Etap, który niczego nie kupuje
+
+`producer.kind` ma tu **trzecią wartość, `local`**, i nie jest to wygoda. Rekord pochodzenia
+odpowiada na jedno pytanie: co trzeba by uruchomić ponownie, żeby dostać te bajty. Dla
+`manual` odpowiedzią są decyzje człowieka, już zapisane w wynikach; dla `model` — endpoint,
+model i wersja promptu. Dla montażu odpowiedzią jest **silnik i jego wersja**: dwa wydania
+miksera nie muszą zapisać tego samego kontenera z tych samych klipów, a rekord mówiący
+`manual` czyniłby to nieodpowiadalnym z pliku — czyli dokładnie tę awarię, przed którą
+`producer` powstał. Wersja ląduje w polu `model`, które czyta się jako „jaki silnik
+wyprodukował te bajty"; `endpoint` i `promptVersion` zostają puste, jak przy `manual`.
+`status` to `completed` z konstrukcji: rekord bez sieci jest ukończony w chwili zapisu.
+
+**Archiwum próby jest najcieńsze w całym potoku i taka jest prawda o nim.** Nic nie zostało
+wysłane, więc nie ma `request.json`, `response.json` ani `prompt.md`. `runs/<runId>/` trzyma
+to, czego nie da się odtworzyć: `transport.json` — argv, zgłoszoną wersję silnika, kod
+wyjścia i stderr — oraz `concat.txt`, czyli listę, którą mikser dostał. Do tego `run.json`
+z wejściami przez ścieżkę i sha256 i `validation.json` z werdyktem tamtej chwili. Samego
+cięcia archiwum nie kopiuje: jest czystą funkcją klipów, których hashe są zapisane, a
+powtórzenie go nic nie kosztuje. Poprzedni odcinek trafia do `previous.mp4` wyłącznie przy
+`--regenerate` — i to on jest wracany na miejsce, gdy nowe cięcie nie przejdzie walidacji.
+
+**Zły montaż jest kasowany, nie zachowywany.** Etap 7 trzyma niepoprawny klip, bo ktoś za
+niego zapłacił; tutaj ten sam plik powstaje ponownie za darmo, więc „nie publikuj" znaczy
+„nie zostawiaj".
+
+### Bramka wyjściowa, `--artifact` i co znaczy „ocena całości"
+
+**`--artifact` nie jest wymagane nigdzie w tym etapie** — ani przy `assembly generate`, ani
+przy `--regenerate`, ani przy `approve`. Flaga wymuszająca cel istnieje z dwóch powodów:
+kandydatów jest wielu, więc gołe polecenie jest niejednoznaczne, albo akt otwiera bramkę,
+która kosztuje. Tutaj nie zachodzi żaden: jeden klucz `episode` na tor i nic poniżej.
+Napisana flaga jest nadal sprawdzana — `--artifact C01` to odmowa, nie ciche zignorowanie.
+
+**`--regenerate` jest wymagane do ponownego cięcia, i tu broni czegoś innego niż wyżej.**
+We wszystkich wcześniejszych etapach ta flaga chroniła portfel. Tutaj nic się nie kupuje, ale
+gotowy montaż nosi zgodę człowieka, a ciche nadpisanie wycofałoby ją bez niczyjej decyzji.
+„Nic nie ponawia się samo" obowiązuje także wtedy, gdy powtórzenie jest darmowe.
+
+**„Ocena całości" nie jest powtórką ośmiu ocen klipów.** Tamte mówią, że każde ujęcie jest
+dobre; ta mówi, że **te klipy, w tej kolejności, to jest film**. Trzy rzeczy istnieją
+wyłącznie w całości i w żadnej części: rytm przez cięcia, ciągłość na szwach — łańcuch
+etapu 7 gwarantuje, z czego klatka wejściowa została **narysowana**, a nie gdzie czternaście
+sekund renderu faktycznie się skończyło — i rzeczywista długość filmu. To dwa poziomy oceny,
+nie jeden powtórzony, dokładnie jak karta postaci nie jest implikowana przez osiem widoków.
+
+`aimator approve <project-id> <episode-id> --stage assembly --track <tor>` zapisuje ją,
+związaną z bajtami odcinka. `aimator check <project-id> <episode-id> --stage assembly
+--track <tor>` sprawdza to samo i nie zapisuje niczego. Rozjazd wejścia — przerysowany klip
+— unieważnia akceptację i `check` to zgłasza, a `approve` przepisuje hashe i zapisuje nową
+zgodę: zabezpieczeniem nie jest tu parser, tylko człowiek, który obejrzy odcinek jeszcze raz.
+
+### `episode.mp4` jest niemy, i mówi o tym wprost
+
+Odcinek zapisał w etapie 0 tryb dźwięku, a żaden etap nie produkuje ścieżki. Montaż jest
+więc **cięciem obrazu** — całością tego, co ten wiersz kontraktuje — a nie skończonym
+filmem. Niespełniona deklaracja jest **raportowana, nie egzekwowana**, dokładnie jak brak
+kanału alfa na torze seedream: `check` i raport z generacji mówią, że odcinek deklaruje
+`audio: <tryb>`, a `episode.mp4` jest niemy. Dalej prowadzi etap 9, który jako jedyny może
+tę ścieżkę napisać — wobec filmu, który już istnieje.

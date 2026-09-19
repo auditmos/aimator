@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  assemblyRunPaths,
   characterPaths,
   characterTrackPaths,
   characterViewImage,
@@ -181,9 +182,12 @@ describe("episodeTrackPaths", () => {
 
   it("should place every per-track artifact under the track directory", () => {
     expect(track).toEqual({
+      assemblyLock: `${root}/assembly.lock`,
+      assemblyStage: `${root}/assembly.stage.json`,
       clips: `${root}/clips`,
       clipsLock: `${root}/clips.lock`,
       clipsStage: `${root}/clips.stage.json`,
+      episodeVideo: `${root}/episode.mp4`,
       frames: `${root}/frames`,
       openingFrameImage: `${root}/opening-frame.png`,
       openingFrameLock: `${root}/opening-frame.lock`,
@@ -318,5 +322,38 @@ describe("stage 7 paths", () => {
     expect(run?.endFrameJpeg).toBe(`${run?.root}/last-frame.jpg`);
     expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
     expect(run?.response).toBe(`${run?.root}/response.json`);
+  });
+});
+
+describe("stage 8 paths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const paths = project.ok ? episodePaths(project.data, "01-arrival") : null;
+  const track = paths?.ok ? episodeTrackPaths(paths.data, "seedream") : null;
+  const root = "/srv/aimator/projects/demo/episodes/01-arrival/seedream";
+
+  /**
+   * The cut is a per-track artifact for the same reason every image below stage
+   * 4 is: the two productions hold identically named files and neither needs a
+   * prefix to stay out of the other's way.
+   */
+  it("should place the episode cut and its state file inside the track", () => {
+    expect(track?.episodeVideo).toBe(`${root}/episode.mp4`);
+    expect(track?.assemblyStage).toBe(`${root}/assembly.stage.json`);
+    expect(track?.assemblyLock).toBe(`${root}/assembly.lock`);
+  });
+
+  /**
+   * Nothing is sent, so the archive holds neither a request nor a response. It
+   * holds the two things a re-run cannot reconstruct — which muxer ran, with
+   * which arguments, and what it said — plus the verdict of the moment.
+   */
+  it("should archive a local attempt without a request or a response", () => {
+    const run = track === null ? null : assemblyRunPaths(track, "20260919T110000Z-abcd1234");
+    expect(run?.root).toBe(`${root}/runs/20260919T110000Z-abcd1234`);
+    expect(run?.run).toBe(`${run?.root}/run.json`);
+    expect(run?.transport).toBe(`${run?.root}/transport.json`);
+    expect(run?.validation).toBe(`${run?.root}/validation.json`);
+    expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
+    expect(run?.list).toBe(`${run?.root}/concat.txt`);
   });
 });

@@ -12,7 +12,7 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 7 are implemented. Stage 8 is a declared contract, not working code.
+Stages 0 through 8 are implemented. Stage 9 is a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -37,6 +37,12 @@ the accepted end of the clip before it, that clip waits for its own entry frame,
 link is a human saying yes. It is also where an asynchronous job first appears, so the
 provider's task id lands on disk before the first poll and an interrupted attempt is
 finished by asking rather than by paying again.
+Stage 8 is the first that **buys nothing** and the first whose bytes come from a local
+engine, which is why `producer.kind` grew a third value; its input the contract called
+`edit-plan.json` turned out to be the approved shot list already, so it is derived rather
+than stored; and its result is the picture cut — silent by declaration and loudly so,
+because a soundtrack has to be written against the film that exists rather than the plan,
+which makes it a row *below* this one rather than a half of it.
 
 ## Project Structure
 
@@ -151,6 +157,16 @@ src/
     │   ├── generate.ts   # Internal — the command: two media, one lock, one bill
     │   ├── review.ts     # Internal — per-artifact verification, in both media
     │   └── index.test.ts    # Chain/two media/duration refusal, through the entry
+    ├── assembly/     # Folder form — index.ts is the only entry (stage 8)
+    │   ├── index.ts      # Public: generateAssembly, checkAssembly, approveAssembly,
+    │   │                 #         ffmpeg — the engine a caller injects
+    │   ├── plan.ts       # Internal — the cut derived from the shot list, and the
+    │   │                 #            gate over another stage's approved clips
+    │   ├── mux.ts        # Internal — everything known about ffmpeg: where, which
+    │   │                 #            version, how a stream copy is spelled
+    │   ├── generate.ts   # Internal — the command: one lock, one cut, no bill
+    │   ├── review.ts     # Internal — the verdict on the whole, and the approval
+    │   └── index.test.ts    # Gate/derived plan/drift/no-engine, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
@@ -198,6 +214,22 @@ the verdict on it are one question asked once. Stage 2 keeps its own numbering: 
 the *position*, and what follows the equals sign is each stage's vocabulary, which for stage
 2 is file names because its references never had manifest ids.
 
+`lib/assembly` keeps ffmpeg **inside** it, in `mux.ts`, and that is the rule read correctly
+rather than an exception to it. `lib/image-model` was promoted at the second caller because
+stage 6 was a contracted certainty that would draw one image exactly as stage 5 does; no row
+of the table promises a second muxer, and a module promoted for one caller is a widened
+interface bought with nothing. If stage 9 turns out to mix audio with the same program, that
+is the second caller and the promotion happens then — at the caller, not at the guess.
+
+The same module is also why `producer.kind` has three values instead of two. It is worth
+saying plainly, because a schema change in a shared module is the kind of thing that looks
+like convenience: `manual` means a person decided and the tool copied, `model` means a paid
+call, and neither is true of a file a local program wrote. The record exists to answer "what
+would have to run again to get these bytes", and for a muxed file the honest answer is the
+engine and its version — two releases do not necessarily write the same container from the
+same clips. `manual` would have made that unanswerable from the file, which is the exact
+failure `producer` was built to prevent.
+
 It **grew** with stage 7 rather than being copied: resolving `opening-frame`, `entry:Cnn`
 and `end:Cnn` per track is the same question it already answered for `hero:ewa` and `Rnn`,
 against the same three stage files. `end:Cnn` is also the first id no planning stage wrote —
@@ -228,7 +260,11 @@ Full contract in [docs/pipeline.md](docs/pipeline.md).
    only bound to their current digests. Never let a passing check imply a human said yes.
 7. **A decision with no default is stored, never inferred.** An absent file, an empty
    directory or a missing flag means undecided, and the gate blocks — it never stands in
-   for an answer the user did not give.
+   for an answer the user did not give. The mirror of this is just as binding: what an
+   approved artifact already says is **derived, never re-stored**. Stage 8's edit plan is
+   the approved shot list read in order, not an `edit-plan.json`, for the reason stage 3
+   refuses a `shot-list.json` and stage 4 refuses to write down the clip chain — two files
+   holding one truth drift at the first hand correction.
 8. **A prompt to an image or video model is text *plus* ordered attachments, and the text
    addresses them by position.** The sending stage prints `Image N = <id> — <role>` ahead
    of the task, generated at call time and never stored; a planning stage may write an id
@@ -320,6 +356,7 @@ function parsePort(raw: string): Result<number> {
 | `pnpm test` | Run tests with Vitest |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm unused` | Detect unused code with Knip |
+| `ffmpeg` | Not a script — a **system** dependency stage 8 needs on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes so a cut can be verified on a machine with no media tools. Absent, stage 8 refuses rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
 
 ## Testing Conventions
@@ -333,9 +370,17 @@ function parsePort(raw: string): Result<number> {
 ### The shared fixture
 
 `src/test/fixture.ts` builds an episode through stages 0 to 4 — the pipeline every image
-stage needs before it can test anything. It is **not a domain**: nothing under `src/lib`
-imports it, `src/index.ts` does not re-export it and `tsup` does not bundle it, which is
-why it sits outside the layer table rather than inside it.
+stage needs before it can test anything — and, through `makeTrack`, a finished one through
+stages 5, 6 and 7. It is **not a domain**: nothing under `src/lib` imports it,
+`src/index.ts` does not re-export it and `tsup` does not bundle it, which is why it sits
+outside the layer table rather than inside it.
+
+`makeTrack` was promoted for the same reason and at the same threshold as the rest of it:
+stage 8 would have been the fourth copy of the stage 5-to-6 build-up and the second of stage
+7's. It deliberately does **not** replace the instrumented transports stages 5, 6 and 7
+bring to their own tests. Those count calls, because for a stage that bills per call the
+count *is* the assertion; `makeTrack` only has to leave a correct track on disk. That is the
+same line the fixture already draws around the manifest — what a stage tests, it owns.
 
 It was promoted at the third copy, not the second. Stages 5 and 6 and `media-prompt` each
 carried the same two hundred lines, byte-identical in `screenplay()`, `shot()` and
@@ -402,6 +447,11 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   follows the model rather than the directory it writes into. Stage 7's entry frames reuse
   `AIMATOR_IMAGE_MODEL_<TRACK>` for the opposite reason: a different image model inside one
   track would put two hands on the same drawing.
+- `AIMATOR_FFMPEG` is the only variable here that names a **program** rather than a model or
+  a key, and the only one whose absence has a sensible answer. Every other one refuses a
+  default because a model nobody chose is not a decision; "the ffmpeg on this machine" is
+  not a choice between engines, it is the engine. The variable exists for a build that is
+  not on `PATH`, never for picking a different tool.
 
 ## Development Workflow
 

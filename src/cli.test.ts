@@ -560,3 +560,82 @@ describe("--stage clips", () => {
     expect(result.text).not.toContain("unknown command");
   });
 });
+
+describe("assembly", () => {
+  it("should be dispatched rather than read as an unknown command", async () => {
+    const result = await cli("assembly", "generate", "demo", "01-burza", "--track", "seedream");
+    expect(result.text).not.toContain("unknown command");
+  });
+
+  it("should reject a subcommand it does not have", async () => {
+    const result = await cli("assembly", "cut", "demo", "01-burza");
+    expect(result.text).toContain("nieznane polecenie: assembly cut");
+  });
+
+  /** Two tracks are two films; neither one is "the" episode. */
+  it("should require the track", async () => {
+    const result = await cli("assembly", "generate", "demo", "01-burza");
+    expect(result.text).toContain("--track");
+  });
+
+  /**
+   * The only generate command with no model flag, because it is the only one
+   * that buys nothing. A flag that named a model here would be describing a
+   * decision nobody has to make.
+   */
+  it("should not offer a model flag", async () => {
+    const result = await cli(
+      "assembly",
+      "generate",
+      "demo",
+      "01-burza",
+      "--track",
+      "seedream",
+      "--model",
+      "gpt-6"
+    );
+
+    expect(result.text).toContain("Unknown option");
+  });
+
+  it("should document itself in the usage text", async () => {
+    const result = await run(["--help"]);
+    expect(result.ok && result.data).toContain("assembly generate");
+  });
+});
+
+describe("--stage assembly", () => {
+  /** One artifact per track, so the approval needs nothing to disambiguate. */
+  it("should be an allowed approve stage with no --artifact", async () => {
+    const result = await cli(
+      "approve",
+      "demo",
+      "01-burza",
+      "--stage",
+      "assembly",
+      "--track",
+      "seedream"
+    );
+
+    expect(result.text).not.toContain("dozwolone:");
+  });
+
+  it("should name itself among the allowed stages when another is wrong", async () => {
+    const result = await cli("approve", "demo", "--stage", "montage");
+    expect(result.text).toContain("assembly");
+  });
+
+  it("should be an allowed check stage", async () => {
+    const result = await cli(
+      "check",
+      "demo",
+      "01-burza",
+      "--stage",
+      "assembly",
+      "--track",
+      "seedream"
+    );
+
+    expect(result.text).not.toContain("unknown command");
+  });
+});

@@ -1,6 +1,14 @@
 import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import {
+  type AssemblyReport,
+  type AssemblyStatus,
+  approveAssembly,
+  checkAssembly,
+  ffmpeg,
+  generateAssembly,
+} from "./lib/assembly/index.js";
+import {
   approveCharacter,
   CHARACTER_ARTIFACTS,
   type CharacterArtifact,
@@ -131,12 +139,27 @@ Etap 7 — klipy (płatny; per tor, dwa media w jednym poleceniu):
     Długość klipu bierze się z listy ujęć; klipu, którego model nie renderuje,
     narzędzie nie zaokrągli — odmówi i wskaże poprawkę w etapie 3.
 
+Etap 8 — montaż (darmowy; per tor, jeden artefakt):
+  assembly generate <id> <episode-id> --track <gpt-image|seedream>
+                    [--dry-run] [--regenerate]
+    Skleja zatwierdzone klipy w <tor>/episode.mp4 bez przekodowania, w
+    kolejności z zatwierdzonej listy ujęć — planu montażowego nie ma jako pliku,
+    bo lista ujęć już go niesie. Nic nie kupuje i nie potrzebuje modelu ani
+    klucza; potrzebuje ffmpeg (PATH albo AIMATOR_FFMPEG), a gdy go nie ma,
+    odmawia zamiast przekodowywać. Klipy nie wracają co do sekundy, więc skleja
+    to, co wróciło, i melduje różnicę wobec planu — nigdy nie przycina.
+    Jeden artefakt na tor, więc --artifact niczego nie zawęża i nie jest
+    wymagane; --regenerate jest, bo gotowy montaż nosi zgodę człowieka.
+    episode.mp4 jest NIEMY: ścieżka dźwiękowa musi powstać wobec sklejonego
+    filmu, a nie wobec planu, więc należy do etapu poniżej montażu.
+
 Wspólne:
   check <id> [<episode-id>]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
   check <id> <episode-id> --stage opening-frame --track <tor>
   check <id> <episode-id> --stage clips --track <tor>
+  check <id> <episode-id> --stage assembly --track <tor>
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>]
   approve <id> <character-id> --stage character --track <tor>
@@ -144,6 +167,7 @@ Wspólne:
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
   approve <id> <episode-id> --stage opening-frame --track <tor>
   approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
+  approve <id> <episode-id> --stage assembly --track <tor>
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
@@ -852,6 +876,39 @@ async function checkClipsStage(
     : result;
 }
 
+/** `check --stage assembly` reports one episode's cut, per track. */
+async function checkAssemblyStage(
+  parsed: Parsed,
+  projectId: string,
+  workspace: Workspace
+): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const track = trackOf(parsed);
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const result = await checkAssembly({
+    episodeId: episodeId.data,
+    projectId,
+    track: track.data,
+    workspace,
+  });
+
+  return result.ok
+    ? ok(
+        renderAssemblyStatus(
+          `Odcinek "${episodeId.data}", tor ${track.data} — etap 8${result.data.approved ? ", przyjęty w całości" : ""}`,
+          result.data
+        )
+      )
+    : result;
+}
+
 /** Who is accepting what, and where. The stage decides the rest. */
 interface Approval {
   readonly mode: "apply" | "dry-run";
@@ -996,6 +1053,42 @@ async function approveClipsStage(parsed: Parsed, approval: Approval): Promise<Re
     : result;
 }
 
+/**
+ * Stage 8's approval, and the only one with no `--artifact` to demand.
+ *
+ * A flag is required upstream for two reasons: several candidates exist, so a
+ * bare command is ambiguous, and accepting one of them opens a gate that spends
+ * money. Neither holds at the last row — one artifact per track, and nothing
+ * below it to buy. Written anyway, it is still checked.
+ */
+async function approveAssemblyStage(parsed: Parsed, approval: Approval): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const track = trackOf(parsed);
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const result = await approveAssembly({
+    ...approval,
+    artifacts: referenceIdsOf(parsed),
+    episodeId: episodeId.data,
+    track: track.data,
+  });
+
+  return result.ok
+    ? ok(
+        renderAssemblyStatus(
+          `Odcinek "${episodeId.data}", tor ${track.data} — całość przyjęta`,
+          result.data
+        )
+      )
+    : result;
+}
+
 /** The three text stages an episode carries. Each accepts its whole result. */
 async function approveEpisodeStage(
   parsed: Parsed,
@@ -1118,10 +1211,14 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
     return await approveClipsStage(parsed.data, approval);
   }
 
+  if (stage === "assembly") {
+    return await approveAssemblyStage(parsed.data, approval);
+  }
+
   if (stage !== "screenplay" && stage !== "shot-list" && stage !== "prompt-package") {
     return err(
       new UsageError(
-        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package, references, opening-frame, clips`
+        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package, references, opening-frame, clips, assembly`
       )
     );
   }
@@ -1930,6 +2027,62 @@ function renderClips(
   return lines.join("\n");
 }
 
+/**
+ * Stage 8 reports no bill and one arithmetic instead: what the approved plan
+ * asked for, what the clips actually run, and the difference between them. That
+ * difference is the number a person is being asked to accept, because nothing
+ * here trims a frame to make it go away.
+ */
+function renderAssembly(
+  report: AssemblyReport,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const headline = `Montaż ${projectId}/${episodeId}, tor ${report.track}`;
+  const lines = [
+    mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline,
+    `  silnik: ${report.engine ?? "nieustalony"}`,
+    `  plan ${report.plannedSeconds}s, klipy ${report.actualSeconds}s`,
+    `  ${report.artifact.id}: ${report.artifact.state} — ${report.artifact.note}`,
+  ];
+
+  for (const clip of report.cut) {
+    lines.push(`      ${clip.id}: plan ${clip.plannedSeconds}s, wynik ${clip.seconds ?? "?"}s`);
+  }
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (report.artifact.state === "published") {
+    lines.push("  ! odcinek przeszedł walidację — to nie to samo co obejrzenie go przez człowieka");
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  return lines.join("\n");
+}
+
+function renderAssemblyStatus(headline: string, status: AssemblyStatus): string {
+  const lines = [
+    headline,
+    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state} — ${status.artifact.note}`,
+  ];
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${status.nextStep}`);
+
+  return lines.join("\n");
+}
+
 function renderClipsStatus(headline: string, status: ClipsStatus): string {
   const lines = [headline];
 
@@ -2054,6 +2207,63 @@ async function runClip(argv: readonly string[]): Promise<Result<string>> {
   return result.ok ? ok(renderClips(result.data, projectId.data, episodeId.data, mode)) : result;
 }
 
+/**
+ * Stage 8 — the only generate command with no model flag and no key.
+ *
+ * It buys nothing, so there is nothing to choose a model for; what it needs is
+ * a program on this machine, which `AIMATOR_FFMPEG` points at when it is not
+ * simply `ffmpeg` on PATH. `--artifact` narrows nothing either, because the
+ * stage makes one file per track — but a wrong value is still refused rather
+ * than ignored.
+ */
+async function runAssembly(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] !== "generate") {
+    return err(new UsageError(`nieznane polecenie: assembly ${argv[0] ?? ""}`.trim()));
+  }
+
+  const parsed = parse(argv.slice(1), {
+    artifact: { type: "string" },
+    regenerate: { type: "boolean" },
+    track: { type: "string" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+  const track = trackOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const mode = modeOf(parsed.data);
+  const result = await generateAssembly({
+    artifacts: referenceIdsOf(parsed.data),
+    episodeId: episodeId.data,
+    mode,
+    mux: ffmpeg(env.AIMATOR_FFMPEG ?? "ffmpeg"),
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    track: track.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok ? ok(renderAssembly(result.data, projectId.data, episodeId.data, mode)) : result;
+}
+
 async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
   const projectId = requirePositional(parsed, 0, "project-id");
   const source = requireFlag(parsed, "source");
@@ -2160,6 +2370,10 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
   if (parsed.data.values.stage === "clips") {
     return await checkClipsStage(parsed.data, projectId.data, workspace.data);
+  }
+
+  if (parsed.data.values.stage === "assembly") {
+    return await checkAssemblyStage(parsed.data, projectId.data, workspace.data);
   }
 
   const result = await checkStage0({ projectId: projectId.data, workspace: workspace.data });
@@ -2276,6 +2490,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "clip") {
     return await runClip(rest);
+  }
+
+  if (command === "assembly") {
+    return await runAssembly(rest);
   }
 
   if (command === "check") {

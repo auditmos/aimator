@@ -83,6 +83,13 @@ export interface CharacterTrackPaths {
  * sit directly under the episode, while everything below is drawn twice.
  */
 export interface EpisodeTrackPaths {
+  readonly assemblyLock: string;
+  /**
+   * Stage 8's one state file. It sits beside the clips it is cut from rather
+   * than above them, because the cut is a per-track artifact: two tracks hold
+   * two different films of the same story, and neither is the episode.
+   */
+  readonly assemblyStage: string;
   /** Stage 7's videos, one file per clip. */
   readonly clips: string;
   readonly clipsLock: string;
@@ -92,6 +99,14 @@ export interface EpisodeTrackPaths {
    * stage, and stage 7 is one stage however many kinds of file it writes.
    */
   readonly clipsStage: string;
+  /**
+   * Stage 8's one output: this track's whole episode, cut from its own clips.
+   *
+   * A file rather than a directory, for the reason `openingFrameImage` is one —
+   * there is exactly one of it — and named `episode.mp4` rather than after the
+   * stage, because what it holds is the film, not the assembling of it.
+   */
+  readonly episodeVideo: string;
   /**
    * Stage 7's stills, one directory per clip. A directory rather than a file
    * because a clip has two of them: the entry frame it is drawn from and the
@@ -168,6 +183,32 @@ export interface VideoRunPaths {
   readonly validation: string;
   /** Exactly what the provider returned, before anything was published. */
   readonly video: string;
+}
+
+/**
+ * What one local attempt archives.
+ *
+ * It is the thinnest archive in the pipeline, and deliberately so: stage 8
+ * sends nothing, so there is no request, no response and no prompt. What it
+ * keeps is exactly what the invariant asks for — the part that cannot be
+ * reconstructed. The cut itself can: it is a pure function of clips whose
+ * digests are recorded. Which muxer produced these bytes, with which arguments,
+ * and what it said while doing it, cannot — not after the next upgrade.
+ */
+interface AssemblyRunPaths {
+  /** The concat list handed to the muxer: the clips, in the plan's order. */
+  readonly list: string;
+  /** The cut being replaced. Written only by `--regenerate`. */
+  readonly previousVideo: string;
+  readonly root: string;
+  readonly run: string;
+  /**
+   * How the bytes travelled. For a paid stage that is HTTP; here it is the
+   * process — argv, the version it reported, its exit code and its stderr.
+   * The same word, because it answers the same question.
+   */
+  readonly transport: string;
+  readonly validation: string;
 }
 
 export interface EpisodePaths {
@@ -448,9 +489,12 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
   const root = join(episode.root, track);
 
   return {
+    assemblyLock: join(root, "assembly.lock"),
+    assemblyStage: join(root, "assembly.stage.json"),
     clips: join(root, "clips"),
     clipsLock: join(root, "clips.lock"),
     clipsStage: join(root, "clips.stage.json"),
+    episodeVideo: join(root, "episode.mp4"),
     frames: join(root, "frames"),
     openingFrameImage: join(root, "opening-frame.png"),
     openingFrameLock: join(root, "opening-frame.lock"),
@@ -545,6 +589,28 @@ export function videoRunPaths(paths: { readonly runs: string }, runId: string): 
     transport: join(root, "transport.json"),
     validation: join(root, "validation.json"),
     video: join(root, "original.mp4"),
+  };
+}
+
+/**
+ * The archive of one local attempt — stage 8's, and the first with no network
+ * behind it. It shares this track's `runs/` with the paid stages above it, for
+ * the reason they share it with each other: a run id is unique and `run.json`
+ * records which stage minted it.
+ */
+export function assemblyRunPaths(
+  paths: { readonly runs: string },
+  runId: string
+): AssemblyRunPaths {
+  const root = join(paths.runs, runId);
+
+  return {
+    list: join(root, "concat.txt"),
+    previousVideo: join(root, "previous.mp4"),
+    root,
+    run: join(root, "run.json"),
+    transport: join(root, "transport.json"),
+    validation: join(root, "validation.json"),
   };
 }
 
