@@ -34,9 +34,10 @@ $AIMATOR_WORKSPACE/
         ├── runs/<runId>/             archiwum prób etapów tekstowych;
         │                             previous/ tylko przy --regenerate
         ├── gpt-image/                ┐ references/Rxx.png, references.stage.json,
-        └── seedream/                 ┘ references.lock, runs/ — a dalej, per kontrakt:
-                                        opening-frame.png, clips/, frames/,
-                                        edit-plan.json, episode.mp4
+        └── seedream/                 ┘ references.lock, opening-frame.png,
+                                        opening-frame.stage.json, opening-frame.lock,
+                                        runs/ — a dalej, per kontrakt:
+                                        clips/, frames/, edit-plan.json, episode.mp4
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -198,11 +199,11 @@ Obowiązują we wszystkich etapach.
 | 3 lista ujęć | `project.json`, `project.md`, `episode.json`, zatwierdzony `screenplay.md` | `shot-list.md`, `shot-list.stage.json`, `runs/<runId>/` | zatwierdzony etap 1 przed wywołaniem; potem `aimator check`, `aimator approve … --stage shot-list` | **zaimplementowany** |
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
 | 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
-| 6 pierwsza klatka | pakiet, zatwierdzone referencje otwarcia | `<tor>/opening-frame.png` | ocena kadru | niezaimplementowany |
+| 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
 | 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 6–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
+Etapy 7–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
 żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
@@ -813,3 +814,75 @@ walidacja strukturalna, bo żaden parser nie orzeknie, czy R04 nadal pasuje do p
 R03; zabezpieczeniem jest to, że **oceną obrazu jest człowiek, który na niego patrzy** —
 a komunikat mówi wprost, żeby obejrzeć obraz obok nowej wersji jego wejścia albo przerysować
 go jawnym `--regenerate --artifact`.
+
+## Etap 6 — szczegóły
+
+Pierwsza klatka filmu i pierwszy etap, którego bramka czyta **wyniki innego etapu, per
+tor**. Konsumuje zatwierdzony `prompt-package.json` razem z `prompts/opening-frame.md`,
+zasady i proporcje z `project.json` i `project.md`, zatwierdzoną `shot-list.md` oraz
+zatwierdzone obrazy, które manifest wpisał w `opening.referenceIds` — **na tym torze**.
+Produkuje `episodes/<id>/<tor>/opening-frame.png`, obok niego `opening-frame.stage.json`
+z jednym rekordem, i jedno archiwum próby w `runs/` tego toru.
+
+**Konsumuje listę ujęć, w odróżnieniu od etapu 5.** Klatka otwarcia jest kadrem filmu, więc
+niesie dosłowne ujęcia pierwszego klipu — a referencja nie jest kadrem i nie ma ujęcia,
+które można by do niej dołączyć. Hash `shot-list.md` jest więc zapisanym wejściem tego
+etapu, choć nie był wejściem poprzedniego.
+
+**Bramka pyta o cudze wyniki, ale na własnym torze.** Płatne wywołanie odmawia, dopóki
+`prompt-package.stage.json` nie ma `review.status = "approved"`, a każda pozycja
+`opening.referenceIds` nie jest zatwierdzona na tym torze: `hero:<id>`
+w `character.stage.json` tej postaci, `Rnn` w `references.stage.json` tego odcinka i toru.
+Etap 5 czekał na referencje, które sam narysował; tutaj zależność przekracza granicę etapu,
+nie przekraczając granicy toru — dlatego zgoda wydana na gpt-image nie otwiera niczego na
+seedream. `--dry-run` bramki nie omija: raportuje ją jako przeszkodę i i tak pokazuje prompt
+w całości.
+
+**Jeden artefakt, więc `--artifact` niczego nie zawęża i nie jest wymagane.** Ani przy
+`--regenerate`, które ma dokładnie jeden obraz, który mógłby znaczyć, ani przy `approve`,
+gdzie `aimator approve <project-id> <episode-id> --stage opening-frame --track <tor>` samo
+w sobie jest wskazaniem. Etap 5 wymaga tej flagi, bo ma sześciu kandydatów i przyjęcie
+niewłaściwego kupuje obraz; flaga o jednej dozwolonej wartości byłaby ceremonią stojącą tam,
+gdzie kiedyś była decyzja. Reguła 7 mówi o decyzji **bez wartości domyślnej** — tu nie ma
+drugiej możliwości, więc nie ma decyzji. Flagę nadal wolno napisać i nadal jest sprawdzana:
+`--artifact R01` w tym etapie jest odmową, nie cichym zignorowaniem.
+
+**Ramka jest ta sama co w etapie 5** — największy kadr o proporcjach `aspectRatio`, którego
+oba boki są wielokrotnością 16 i który mieści się w limitach obu torów; dla `16:9` wychodzi
+2816×1584. Liczy ją ta sama arytmetyka, bo jest to ta sama decyzja projektu, a nie nowa.
+Klatka jest nieprzezroczysta: żaden późniejszy etap jej nie kompozytuje, tylko dołącza ją do
+generacji.
+
+**Liczba płatnych wywołań jest podawana przed wysyłką**, choć wynosi zero albo jeden.
+Właśnie dlatego warto ją drukować: człowiek, który uruchamia `--dry-run`, pyta, czy to
+polecenie zaraz kupi obraz, czy powie mu, że nie może. Podgląd nie liczy jako płatnego
+wyniku, który prawdziwy przebieg pominie — gotowa klatka bez `--regenerate` to zero wywołań,
+nie jedno.
+
+**Archiwum próby** trafia do `episodes/<id>/<tor>/runs/<runId>/`, tego samego, w którym
+archiwizuje etap 5: `runId` jest unikalny, a `run.json` zapisuje, którego etapu dotyczy —
+dokładnie tak, jak etapy tekstowe dzielą jedno `runs/` pod odcinkiem. Trzyma `prompt.md`,
+`request.json`, `response.json`, `transport.json`, `run.json`, `validation.json` oraz, na
+torze seedream, `original.png`. `request.json` niesie prompt i ustawienia, ale **nigdy bajtów
+referencji**: te są wejściami, identyfikowanymi ścieżką i sha256. Poprzednia klatka trafia do
+`previous.png` wyłącznie przy `--regenerate`.
+
+**Wznowienie bez drugiej opłaty** działa jak w etapach 2 i 5: rekord `submitted` bez
+zapisanej odpowiedzi to ślepy zaułek, który otwiera tylko `--regenerate`, ale odpowiedź,
+która zdążyła trafić na dysk, jest już opłacona i powtórzenie polecenia dokańcza próbę bez
+wysyłania czegokolwiek. Obraz w złym rozmiarze nie jest publikowany ani skalowany: rekord
+zostaje `submitted`, odpowiedź zostaje w archiwum, a poprawka walidatora jest darmowa.
+**Nie ma `--republish`** — ten etap publikuje dokładnie te bajty, które zwrócił dostawca,
+więc nie ma czego naprawiać po stronie publikacji.
+
+**Akceptacja jest osobna od walidacji**, jak wszędzie. Klatka, która przeszła walidację, ma
+`review.status = "pending"`; przyjmuje ją dopiero `aimator approve <project-id> <episode-id>
+--stage opening-frame --track <tor>`. `aimator check <project-id> <episode-id> --stage
+opening-frame --track <tor>` sprawdza to samo i nie zapisuje niczego.
+
+Rozjazd wejścia unieważnia akceptację i `check` to zgłasza — a `approve` przepisuje hashe
+wejść i zapisuje nową zgodę. Zabezpieczeniem nie jest ponowna walidacja strukturalna, bo
+żaden parser nie orzeknie, czy klatka nadal pasuje do przerysowanej `R01`; zabezpieczeniem
+jest to, że **oceną obrazu jest człowiek, który na niego patrzy** — a komunikat mówi wprost,
+żeby obejrzeć klatkę obok nowej wersji jej wejścia albo przerysować ją jawnym
+`--regenerate`.

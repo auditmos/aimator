@@ -13,6 +13,13 @@ import {
 import { env } from "./lib/env.js";
 import { type Attachment, readSendPlan, type SendPlan } from "./lib/media-prompt/index.js";
 import {
+  approveOpeningFrame,
+  checkOpeningFrame,
+  generateOpeningFrame,
+  type OpeningFrameReport,
+  type OpeningFrameStatus,
+} from "./lib/opening-frame/index.js";
+import {
   addCharacter,
   addCharacterSources,
   addEpisode,
@@ -96,15 +103,24 @@ Etap 5 — obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
     Bez --artifact rysuje wszystkie referencje, których zależności są już
     zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.
 
+Etap 6 — klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
+  opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
+                         [--model <id>] [--dry-run] [--regenerate]
+    Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
+    każdej postaci w kadrze — zatwierdzone NA TYM TORZE. Jeden artefakt, więc
+    --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.
+
 Wspólne:
   check <id> [<episode-id>]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
+  check <id> <episode-id> --stage opening-frame --track <tor>
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>]
   approve <id> <character-id> --stage character --track <tor>
                --artifact <klucz>[,<klucz>...]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
+  approve <id> <episode-id> --stage opening-frame --track <tor>
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
@@ -744,6 +760,42 @@ async function checkReferencesStage(
     : result;
 }
 
+/**
+ * `check --stage opening-frame` reports one episode on one track, and writes
+ * nothing. Stage 6 has one artifact, so there is no `--artifact` to narrow it.
+ */
+async function checkOpeningFrameStage(
+  parsed: Parsed,
+  projectId: string,
+  workspace: Workspace
+): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const track = trackOf(parsed);
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const result = await checkOpeningFrame({
+    episodeId: episodeId.data,
+    projectId,
+    track: track.data,
+    workspace,
+  });
+
+  return result.ok
+    ? ok(
+        renderOpeningFrameStatus(
+          `Odcinek "${episodeId.data}", tor ${track.data} — etap 6${result.data.approved ? ", zatwierdzony" : ""}`,
+          result.data
+        )
+      )
+    : result;
+}
+
 /** Who is accepting what, and where. The stage decides the rest. */
 interface Approval {
   readonly mode: "apply" | "dry-run";
@@ -815,6 +867,45 @@ async function approveReferencesStage(parsed: Parsed, approval: Approval): Promi
     ? ok(
         renderReferencesStatus(
           `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono: ${artifacts.join(", ")}`,
+          result.data
+        )
+      )
+    : result;
+}
+
+/**
+ * Stage 6 accepts its one frame, bound to its bytes.
+ *
+ * No `--artifact` is required, and that is not a relaxation of the rule stage 5
+ * follows. Stage 5 demands the flag because it has six candidates and accepting
+ * the wrong one buys an image; here the command already says which stage and
+ * which track, and there is nothing else it could mean.
+ */
+async function approveOpeningFrameStage(
+  parsed: Parsed,
+  approval: Approval
+): Promise<Result<string>> {
+  const episodeId = requirePositional(parsed, 1, "episode-id");
+  const track = trackOf(parsed);
+
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const result = await approveOpeningFrame({
+    ...approval,
+    artifacts: referenceIdsOf(parsed),
+    episodeId: episodeId.data,
+    track: track.data,
+  });
+
+  return result.ok
+    ? ok(
+        renderOpeningFrameStatus(
+          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono klatkę otwarcia`,
           result.data
         )
       )
@@ -935,10 +1026,14 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
     return await approveReferencesStage(parsed.data, approval);
   }
 
+  if (stage === "opening-frame") {
+    return await approveOpeningFrameStage(parsed.data, approval);
+  }
+
   if (stage !== "screenplay" && stage !== "shot-list" && stage !== "prompt-package") {
     return err(
       new UsageError(
-        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package, references`
+        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package, references, opening-frame`
       )
     );
   }
@@ -1571,6 +1666,130 @@ async function runReference(argv: readonly string[]): Promise<Result<string>> {
     : result;
 }
 
+/**
+ * Stage 6 prints one artifact instead of a set, and still prints the count.
+ *
+ * It is always zero or one, which is exactly why it is worth printing: the
+ * person running `--dry-run` is asking whether this command is about to buy an
+ * image or tell them it cannot.
+ */
+function renderOpeningFrame(
+  report: OpeningFrameReport,
+  projectId: string,
+  episodeId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const headline = `Klatka otwarcia ${projectId}/${episodeId}, tor ${report.track}, kadr ${report.size}`;
+  const lines = [
+    mode === "dry-run"
+      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      : headline,
+    mode === "dry-run"
+      ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
+      : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+    `  ${report.artifact.id}: ${report.artifact.state} — ${report.artifact.note}`,
+  ];
+
+  for (const attachment of report.artifact.attachments) {
+    lines.push(`      ← ${attachment.path}  ${attachment.sha256.slice(0, 12)}`);
+  }
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  if (report.created.length > 0) {
+    lines.push("  ! klatka przeszła walidację — to nie to samo co przyjęcie jej przez człowieka");
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  if (report.artifact.prompt !== null) {
+    lines.push("", "--- prompt klatki otwarcia (dokładnie ten tekst) ---", report.artifact.prompt);
+  }
+
+  return lines.join("\n");
+}
+
+function renderOpeningFrameStatus(headline: string, status: OpeningFrameStatus): string {
+  const lines = [
+    headline,
+    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzona" : status.artifact.state} — ${status.artifact.note}`,
+  ];
+
+  for (const problem of status.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${status.nextStep}`);
+
+  return lines.join("\n");
+}
+
+async function runOpeningFrame(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] !== "generate") {
+    return err(new UsageError(`nieznane polecenie: opening-frame ${argv[0] ?? ""}`.trim()));
+  }
+
+  const parsed = parse(argv.slice(1), {
+    artifact: { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+    track: { type: "string" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+  const track = trackOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  if (!track.ok) {
+    return track;
+  }
+
+  const model = imageModelOf(parsed.data, track.data);
+
+  if (!model.ok) {
+    return model;
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generateOpeningFrame({
+    apiKey: mode === "dry-run" ? null : (keyFor(track.data) ?? null),
+    artifacts: referenceIdsOf(parsed.data),
+    episodeId: episodeId.data,
+    fetch,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    track: track.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(renderOpeningFrame(result.data, projectId.data, episodeId.data, mode))
+    : result;
+}
+
 async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
   const projectId = requirePositional(parsed, 0, "project-id");
   const source = requireFlag(parsed, "source");
@@ -1669,6 +1888,10 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
   if (parsed.data.values.stage === "references") {
     return await checkReferencesStage(parsed.data, projectId.data, workspace.data);
+  }
+
+  if (parsed.data.values.stage === "opening-frame") {
+    return await checkOpeningFrameStage(parsed.data, projectId.data, workspace.data);
   }
 
   const result = await checkStage0({ projectId: projectId.data, workspace: workspace.data });
@@ -1777,6 +2000,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "reference") {
     return await runReference(rest);
+  }
+
+  if (command === "opening-frame") {
+    return await runOpeningFrame(rest);
   }
 
   if (command === "check") {

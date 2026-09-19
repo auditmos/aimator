@@ -376,3 +376,93 @@ describe("project init flags", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("opening-frame", () => {
+  it("should be dispatched rather than read as an unknown command", async () => {
+    const result = await cli(
+      "opening-frame",
+      "generate",
+      "demo",
+      "01-burza",
+      "--track",
+      "seedream"
+    );
+    expect(result.text).not.toContain("unknown command");
+  });
+
+  it("should reject a subcommand it does not have", async () => {
+    const result = await cli("opening-frame", "redraw", "demo", "01-burza");
+    expect(result.text).toContain("nieznane polecenie: opening-frame redraw");
+  });
+
+  it("should require the track, because each one costs separately", async () => {
+    const result = await cli("opening-frame", "generate", "demo", "01-burza");
+    expect(result.text).toContain("--track");
+  });
+
+  it("should require the episode", async () => {
+    const result = await cli("opening-frame", "generate", "demo", "--track", "seedream");
+    expect(result.text).toContain("<episode-id>");
+  });
+
+  /** One artifact, so the flag is optional — but it must still parse. */
+  it("should accept --artifact opening-frame without calling it unknown", async () => {
+    const result = await cli(
+      "opening-frame",
+      "generate",
+      "demo",
+      "01-burza",
+      "--track",
+      "seedream",
+      "--artifact",
+      "opening-frame"
+    );
+
+    expect(result.text).not.toContain("Unknown option");
+  });
+
+  it("should document itself in the usage text", async () => {
+    const result = await run(["--help"]);
+    expect(result.ok && result.data).toContain("opening-frame generate");
+  });
+});
+
+describe("--stage opening-frame", () => {
+  it("should be an allowed approve stage", async () => {
+    const result = await cli(
+      "approve",
+      "demo",
+      "01-burza",
+      "--stage",
+      "opening-frame",
+      "--track",
+      "seedream"
+    );
+
+    expect(result.text).not.toContain("dozwolone:");
+  });
+
+  it("should name itself among the allowed stages when another is wrong", async () => {
+    const result = await cli("approve", "demo", "--stage", "montage");
+    expect(result.text).toContain("opening-frame");
+  });
+
+  it("should require the track on approve", async () => {
+    const result = await cli("approve", "demo", "01-burza", "--stage", "opening-frame");
+    expect(result.text).toContain("--track");
+  });
+
+  it("should be an allowed check stage", async () => {
+    const result = await cli(
+      "check",
+      "demo",
+      "01-burza",
+      "--stage",
+      "opening-frame",
+      "--track",
+      "seedream"
+    );
+
+    expect(result.text).not.toContain("unknown command");
+  });
+});

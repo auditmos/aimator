@@ -186,18 +186,18 @@ export async function generateReferences(input: GenerateInput): Promise<Result<R
   }
 
   const lock = await writeNew(
-    stage5.data.paths.track.lock,
+    stage5.data.paths.track.referencesLock,
     serialize({ pid: process.pid, startedAt: nowIso() })
   );
 
   if (!lock.ok) {
-    return err(new LockError(stage5.data.paths.track.lock));
+    return err(new LockError(stage5.data.paths.track.referencesLock));
   }
 
   try {
     return await runAll(input, stage5.data, targets);
   } finally {
-    await removeFile(stage5.data.paths.track.lock);
+    await removeFile(stage5.data.paths.track.referencesLock);
   }
 }
 
@@ -413,7 +413,7 @@ async function runOne(
       promptVersion: stage5.plan.promptVersion,
       size: stage5.plan.size,
       stage: STAGE,
-      stagePath: stage5.paths.track.stage,
+      stagePath: stage5.paths.track.referencesStage,
       target: path.data,
     }
   );

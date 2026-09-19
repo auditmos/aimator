@@ -538,7 +538,7 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     );
   }
 
-  const stage = await readJson(paths.data.trackPaths.stage, stageFileSchema);
+  const stage = await readJson(paths.data.trackPaths.referencesStage, stageFileSchema);
   const scope: Scope = {
     aspectRatio: stage0.data.aspectRatio,
     cast: stage0.data.cast,

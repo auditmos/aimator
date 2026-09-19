@@ -84,16 +84,30 @@ export interface CharacterTrackPaths {
  */
 export interface EpisodeTrackPaths {
   /**
+   * Stage 6's one output. It is a file rather than a directory because the
+   * opening frame is a single image, so there is no set for a directory to
+   * hold — and it is `openingFrameImage` rather than `openingFrame` because
+   * `PromptPaths` already owns that word for the direction stage 4 published.
+   */
+  readonly openingFrameImage: string;
+  readonly openingFrameLock: string;
+  readonly openingFrameStage: string;
+  readonly references: string;
+  /**
    * A file, not an empty directory, for the reason `screenplayLock` gives: the
    * layout check reports empty directories, so a lock held as one would trip
    * the very check it sits beside.
    */
-  readonly lock: string;
-  readonly references: string;
+  readonly referencesLock: string;
+  readonly referencesStage: string;
   readonly root: string;
-  /** This track's own archive, distinct from the episode's text-stage `runs/`. */
+  /**
+   * This track's own archive, distinct from the episode's text-stage `runs/`.
+   * Every stage that draws on this track archives here: a run id is unique and
+   * `run.json` records which stage minted it, exactly as the text stages share
+   * one `runs/` under the episode.
+   */
   readonly runs: string;
-  readonly stage: string;
 }
 
 /**
@@ -383,16 +397,24 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
  * Stage 5 is the first to write here. It needs no validation of its own: the
  * episode id was already checked by `episodePaths` and the track is a closed
  * set, so there is nothing left that could escape the directory.
+ *
+ * Every state file and every lock is named after the stage that owns it. While
+ * stage 5 was the only writer a bare `stage` read correctly, but it encoded
+ * "there is one stage down here" — which stage 6 makes false. Rule 1 asks for
+ * `<stage>.stage.json`, and that is only unambiguous if the field says which.
  */
 export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): EpisodeTrackPaths {
   const root = join(episode.root, track);
 
   return {
-    lock: join(root, "references.lock"),
+    openingFrameImage: join(root, "opening-frame.png"),
+    openingFrameLock: join(root, "opening-frame.lock"),
+    openingFrameStage: join(root, "opening-frame.stage.json"),
     references: join(root, "references"),
+    referencesLock: join(root, "references.lock"),
+    referencesStage: join(root, "references.stage.json"),
     root,
     runs: join(root, "runs"),
-    stage: join(root, "references.stage.json"),
   };
 }
 

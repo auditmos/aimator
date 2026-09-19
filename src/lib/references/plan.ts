@@ -114,7 +114,7 @@ export async function readStage5Inputs(
     return plan;
   }
 
-  const stage = await readJson(paths.data.track.stage, stageFileSchema);
+  const stage = await readJson(paths.data.track.referencesStage, stageFileSchema);
 
   return ok({
     gate: plan.data.problems,

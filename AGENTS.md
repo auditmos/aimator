@@ -12,7 +12,7 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 5 are implemented. Stages 6–8 are a declared contract, not working code.
+Stages 0 through 6 are implemented. Stages 7–8 are a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -25,6 +25,12 @@ Stage 5 is the first where the two tracks really part company — one package, t
 independent sets of images, two separate reviews — and the first whose gate sits inside its
 own results: R04 waits for an accepted R03 *on that track*. It is therefore also the first
 where one command can buy several images, so it states how many before it sends any.
+Stage 6 is the first frame of the film and the first whose gate reads *another* stage's
+per-track results: it waits for the references its manifest entry names, accepted on that
+track. It is also the first stage with exactly one artifact, which is why `--artifact` is
+required nowhere in it — not on `--regenerate`, not on `approve`. Stage 5 needs that flag
+because it has six candidates and accepting the wrong one buys an image; a flag with one
+legal value is ceremony standing where a decision used to be.
 
 ## Project Structure
 
@@ -118,6 +124,13 @@ src/
     │   ├── generate.ts   # Internal — the command: targets, lock, preview, series
     │   ├── review.ts     # Internal — per-image verification and approval
     │   └── index.test.ts    # Graph gate/series/resume/approve, through the entry
+    ├── opening-frame/ # Folder form — index.ts is the only entry (stage 6)
+    │   ├── index.ts      # Public: generateOpeningFrame, checkOpeningFrame,
+    │   │                 #         approveOpeningFrame
+    │   ├── plan.ts       # Internal — the cross-stage gate, and whether it may pay
+    │   ├── generate.ts   # Internal — the command: one lock, one preview, one call
+    │   ├── review.ts     # Internal — verification and approval of the one frame
+    │   └── index.test.ts    # Gate per track/resume/regenerate/approve, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```

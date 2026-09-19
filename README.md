@@ -214,6 +214,32 @@ Kadr wynika z `aspectRatio` projektu i jest ten sam na obu torach — dla `16:9`
 2816×1584, czyli największa ramka o dokładnie tej proporcji, którą przyjmują oba tory.
 Obraz w innym rozmiarze nie jest publikowany ani skalowany.
 
+## Etap 6 — klatka otwarcia
+
+Pierwsza klatka filmu. Jedno polecenie, jedno płatne wywołanie, jeden obraz do oceny.
+
+```bash
+pnpm dev prompt-package show dzielna-ewa 01-burza --track seedream --artifact opening-frame
+pnpm dev opening-frame generate dzielna-ewa 01-burza --track seedream --dry-run
+pnpm dev opening-frame generate dzielna-ewa 01-burza --track seedream
+pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track seedream \
+  --note "pozycja alpaki bez ucisku ucha"
+```
+
+Bramka czeka na to, co pakiet wpisał w `opening.referenceIds` — `hero:<id>` każdej postaci
+w kadrze i wskazane `Rnn` — **zatwierdzone na tym torze**. Zgoda wydana na gpt-image nie
+otwiera niczego na seedream. To pierwszy etap, którego zależność przekracza granicę etapu,
+nie przekraczając granicy toru.
+
+**`--artifact` nie jest tu wymagane nigdzie** — ani przy `--regenerate`, ani przy
+`approve`. Etap ma jeden artefakt, więc samo polecenie już mówi, o co chodzi; flaga
+o jednej dozwolonej wartości byłaby ceremonią, nie zabezpieczeniem. Napisana i tak jest
+sprawdzana: `--artifact R01` w tym etapie to odmowa, nie ciche zignorowanie.
+
+W odróżnieniu od etapu 5 klatka otwarcia **niesie dosłowne ujęcia** pierwszego klipu, bo
+jest kadrem filmu, a nie referencją — więc `shot-list.md` jest jej zapisanym wejściem.
+Kadr jest ten sam co w etapie 5.
+
 ## Zasady, na których stoi całe narzędzie
 
 - Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy — nigdy

@@ -224,7 +224,7 @@ async function inspect(input: Stage5Scope): Promise<Result<Inspection>> {
     blocking,
     inputs,
     stage: stage5.data.stage,
-    stagePath: stage5.data.paths.track.stage,
+    stagePath: stage5.data.paths.track.referencesStage,
     status: {
       approved: artifacts.length > 0 && artifacts.every((one) => one.approved),
       artifacts,

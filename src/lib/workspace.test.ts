@@ -176,21 +176,37 @@ describe("episodeTrackPaths", () => {
   const track = paths?.ok ? episodeTrackPaths(paths.data, "seedream") : null;
   const root = "/srv/aimator/projects/demo/episodes/01-arrival/seedream";
 
-  it("should place every stage-5 artifact under the track directory", () => {
+  it("should place every per-track artifact under the track directory", () => {
     expect(track).toEqual({
-      lock: `${root}/references.lock`,
+      openingFrameImage: `${root}/opening-frame.png`,
+      openingFrameLock: `${root}/opening-frame.lock`,
+      openingFrameStage: `${root}/opening-frame.stage.json`,
       references: `${root}/references`,
+      referencesLock: `${root}/references.lock`,
+      referencesStage: `${root}/references.stage.json`,
       root,
       runs: `${root}/runs`,
-      stage: `${root}/references.stage.json`,
     });
+  });
+
+  /**
+   * Rule 1: one state filename per stage, `<stage>.stage.json`. The track
+   * directory holds more than one stage from stage 6 on, so neither file may be
+   * the unqualified `stage` it was when stage 5 was the only writer here.
+   */
+  it("should give each stage its own state file and lock", () => {
+    expect(track?.referencesStage.endsWith("/references.stage.json")).toBe(true);
+    expect(track?.openingFrameStage.endsWith("/opening-frame.stage.json")).toBe(true);
+    expect(track?.referencesLock).not.toBe(track?.openingFrameLock);
   });
 
   /** Rule 2: the track is a directory level, never a filename prefix. */
   it("should name the two tracks identically inside their own directories", () => {
     const other = paths?.ok ? episodeTrackPaths(paths.data, "gpt-image") : null;
-    expect(other?.stage.endsWith("/gpt-image/references.stage.json")).toBe(true);
-    expect(track?.stage.endsWith("/seedream/references.stage.json")).toBe(true);
+    expect(other?.referencesStage.endsWith("/gpt-image/references.stage.json")).toBe(true);
+    expect(track?.referencesStage.endsWith("/seedream/references.stage.json")).toBe(true);
+    expect(other?.openingFrameImage.endsWith("/gpt-image/opening-frame.png")).toBe(true);
+    expect(track?.openingFrameImage.endsWith("/seedream/opening-frame.png")).toBe(true);
   });
 
   it("should give a reference its own file inside the track", () => {
