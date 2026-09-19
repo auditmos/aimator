@@ -47,6 +47,22 @@ export const env = createEnv({
      * of the two documents, so it is a reasonable place to spend differently.
      */
     AIMATOR_SHOTLIST_MODEL: z.string().min(1).optional(),
+    /**
+     * The video model stage 7 renders every clip with — **one variable, not one
+     * per track**, unlike the image models above.
+     *
+     * The per-track rule exists because the two tracks are *drawn* side by side
+     * by two different image models, and a shared variable would make running
+     * both from one shell an edit between commands. A clip is not drawn: it is
+     * rendered from a frame that track already produced, by a model chosen
+     * once. So the axis here is the call site, as it is for every text stage,
+     * and the tracks still differ in the only way that matters — a clip starts
+     * on its own track's entry frame.
+     *
+     * Optional because `--dry-run` has to work without it, and without a
+     * default because a model nobody chose is not a decision.
+     */
+    AIMATOR_VIDEO_MODEL: z.string().min(1).optional(),
     // Optional on purpose: a missing workspace is a recoverable, actionable
     // condition that `run()` reports as a Result. Marking it required would
     // throw here, at import time, before the CLI could explain itself.

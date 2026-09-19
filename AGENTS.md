@@ -12,7 +12,7 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 6 are implemented. Stages 7–8 are a declared contract, not working code.
+Stages 0 through 7 are implemented. Stage 8 is a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -31,6 +31,12 @@ track. It is also the first stage with exactly one artifact, which is why `--art
 required nowhere in it — not on `--regenerate`, not on `approve`. Stage 5 needs that flag
 because it has six candidates and accepting the wrong one buys an image; a flag with one
 legal value is ceremony standing where a decision used to be.
+Stage 7 is the first that buys **two media** — an entry frame is an image, a clip is a
+video — and the first whose gate is a **chain**: a continuing clip's entry frame waits for
+the accepted end of the clip before it, that clip waits for its own entry frame, and every
+link is a human saying yes. It is also where an asynchronous job first appears, so the
+provider's task id lands on disk before the first poll and an interrupted attempt is
+finished by asking rather than by paying again.
 
 ## Project Structure
 
@@ -131,6 +137,20 @@ src/
     │   ├── generate.ts   # Internal — the command: one lock, one preview, one call
     │   ├── review.ts     # Internal — verification and approval of the one frame
     │   └── index.test.ts    # Gate per track/resume/regenerate/approve, through the entry
+    ├── video-model/   # Folder form — one billed video job, shared by stage 7 and on
+    │   ├── index.ts       # Public: runVideoStage, clipDuration, validateVideo
+    │   ├── client.ts      # Internal — submit, poll, download; redaction
+    │   ├── attempt.ts     # Internal — submitted + jobId before the poll, archive,
+    │   │                  #            resume by asking, publish both files
+    │   ├── validate.ts    # Internal — the MP4 verdict and the task's three shapes
+    │   └── index.test.ts  # The order of operations around a paid job
+    ├── clips/        # Folder form — index.ts is the only entry (stage 7)
+    │   ├── index.ts      # Public: generateClips, checkClips, approveClips
+    │   ├── plan.ts       # Internal — the chain, and the one refusal that is
+    │   │                 #            stage 7's own: a duration nobody renders
+    │   ├── generate.ts   # Internal — the command: two media, one lock, one bill
+    │   ├── review.ts     # Internal — per-artifact verification, in both media
+    │   └── index.test.ts    # Chain/two media/duration refusal, through the entry
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
@@ -143,6 +163,20 @@ lock, `submitted` before the POST, archive, resume from a saved answer, publish 
 validates — because that order *is* the contract and three copies of it would have made an
 invariant into a coincidence. A stage now brings its prompt, its verdict and its files;
 the sequence is not its business. Do the same with the next thing two stages copy.
+
+`lib/video-model` exists because that promise came due. A clip is an asynchronous job: the
+POST answers with an id, the work happens somewhere else, and the result arrives through
+polling and two signed URLs. That is a different order of operations from a request that
+answers with the picture, and the order of operations *is* the contract of a billed call —
+so it is a module, not a flag. It also holds what is true of any clip: how long one may be,
+and the verdict on the bytes, read from the MP4's own boxes rather than from a decoder, so
+that `check` works on a machine with no media tools on it.
+
+`lib/clips` therefore buys from **two** media modules, and that is the honest shape of the
+stage rather than a compromise: stage 7 produces an image and a video, the stage brings its
+artifacts, and each medium brings its own lifecycle. Splitting the stage in two instead —
+one module for entry frames, one for clips — would have put the chain that binds them
+across a module boundary, and the chain is the stage.
 
 `lib/image-model` was promoted at the **second** caller, not the third, and the difference
 is deliberate. With `text-model` the third stage was a discovery; here stage 6 is a
@@ -163,6 +197,16 @@ the gate — an attachment nobody accepted is not one this pipeline sends — so
 the verdict on it are one question asked once. Stage 2 keeps its own numbering: rule 8 fixes
 the *position*, and what follows the equals sign is each stage's vocabulary, which for stage
 2 is file names because its references never had manifest ids.
+
+It **grew** with stage 7 rather than being copied: resolving `opening-frame`, `entry:Cnn`
+and `end:Cnn` per track is the same question it already answered for `hero:ewa` and `Rnn`,
+against the same three stage files. `end:Cnn` is also the first id no planning stage wrote —
+stage 4 has no word for a frame that does not exist until a clip has been rendered and
+accepted — so the sender mints it and prints it in the list. Rule 8 binds the planner to
+ids the sender will list; it does not stop the sender from carrying one the planner could
+not have known. The composer learned the same lesson one level down: a clip is told to
+continue from its first image, not to compose one, and the free preview says exactly what
+the paid call will.
 
 ## Pipeline rules
 
@@ -295,8 +339,15 @@ why it sits outside the layer table rather than inside it.
 
 It was promoted at the third copy, not the second. Stages 5 and 6 and `media-prompt` each
 carried the same two hundred lines, byte-identical in `screenplay()`, `shot()` and
-`shotList()`, and stage 7 would have been the fourth — the same threshold `lib/text-model`
-was promoted at, and the same reasoning: three copies make an invariant into a coincidence.
+`shotList()`, and stage 7 was the fourth — the same threshold `lib/text-model` was promoted
+at, and the same reasoning: three copies make an invariant into a coincidence.
+
+It owns the **shot list**, and `shotList` chooses between three cuts of the same thirty
+seconds. Two clips is the default; `three-clips` exists because two can only show one way
+of seeding a later clip and stage 7 needs both; `unrenderable-clip` cuts the first one to
+three seconds, which stage 3 accepts and no video model renders, so the refusal that
+protects the film's timing has something to refuse. They are options rather than one shape
+because the manifest each test brings has to name exactly the clips the shot list plans.
 
 Two rules keep it from becoming a second place where behaviour hides.
 
@@ -342,6 +393,15 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   and `AIMATOR_PROMPTS_MODEL` is stage 4's, rather than a reuse of stage 1's: sharing one
   would mean that choosing a model for the screenplay quietly chose one for the shot list
   and for the prompt package, which nobody decided.
+- `AIMATOR_VIDEO_MODEL` is **one variable for both tracks**, which is not an exception to
+  the per-track rule but the same rule read correctly. The image models are per track
+  because the two tracks are *drawn* side by side and a shared variable would make running
+  both from one shell an edit between commands. A clip is not drawn: it is rendered from a
+  frame that track already produced, by a model chosen once — so the axis is the call site.
+  Its key is `BYTEPLUS_MODELARK` on both tracks, including `gpt-image`, because the key
+  follows the model rather than the directory it writes into. Stage 7's entry frames reuse
+  `AIMATOR_IMAGE_MODEL_<TRACK>` for the opposite reason: a different image model inside one
+  track would put two hands on the same drawing.
 
 ## Development Workflow
 

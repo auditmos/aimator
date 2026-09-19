@@ -15,6 +15,7 @@ import { checkShotList, type ShotList } from "../shot-list/index.js";
 import {
   characterPaths,
   characterTrackPaths,
+  clipFrame,
   type EpisodePaths,
   type EpisodeTrackPaths,
   episodePaths,
@@ -52,6 +53,14 @@ import { type AttachmentSlot, composePrompt, PROMPT_VERSION } from "./prompt.js"
 const HERO = "hero:";
 const OPENING = "opening-frame";
 const ENTRY = "entry:";
+/**
+ * The frame a clip ends on. Stage 4 never writes this id — it has no word for a
+ * frame that does not exist until a clip has been rendered and accepted — so it
+ * is minted here, by the sender, and printed in the attachment list like any
+ * other. Rule 8 binds the planning stage to ids the sender will list; it does
+ * not stop the sender from carrying one the planner could not have known.
+ */
+const END = "end:";
 
 export type TargetKind = "clip" | "entry-frame" | "opening" | "reference";
 
@@ -80,6 +89,13 @@ export interface PlannedArtifact {
   readonly kind: TargetKind;
   /** What `--artifact` accepts for this one; an entry frame is `entry:C03`. */
   readonly name: string;
+  /**
+   * How many seconds a clip runs, straight from the approved shot list, or
+   * `null` for anything that is a single instant. It travels with the plan
+   * because it is both what the request orders and what the verdict compares
+   * the answer against.
+   */
+  readonly seconds: number | null;
   /** The exact text a paid call would send, or `null` when only summarised. */
   readonly text: string | null;
 }
@@ -149,8 +165,20 @@ interface Scope {
   readonly shared: readonly RecordedFile[];
   readonly shotList: ShotList;
   readonly size: string;
-  /** This track's stage-5 file, or `null` when it has drawn nothing yet. */
-  readonly stage: StageFile | null;
+  /**
+   * This track's own results, per stage that writes any: stage 5's references,
+   * stage 6's opening frame and stage 7's clips and entry frames. `null` means
+   * that stage has drawn nothing here yet.
+   *
+   * Three files rather than one because rule 1 gives each stage its own, and
+   * this module is the one place that has to read all of them: whether an
+   * attachment may be carried is the same question whichever stage produced it.
+   */
+  readonly stages: {
+    readonly clips: StageFile | null;
+    readonly openingFrame: StageFile | null;
+    readonly references: StageFile | null;
+  };
 }
 
 function resolvePaths(input: SendPlanInput): Result<Paths> {
@@ -224,69 +252,142 @@ function heroPath(scope: Scope, characterId: string): Result<string> {
   return character.ok ? ok(characterTrackPaths(character.data, scope.input.track).hero) : character;
 }
 
-/** What a reference's stage record says about the bytes on disk right now. */
-function referenceState(scope: Scope, id: string, sha256: string | null): Attachment["state"] {
+/**
+ * What a stage record says about the bytes on disk right now.
+ *
+ * The output is matched by path rather than by position, because a record can
+ * own more than one file: a clip's record holds the video and the frame it
+ * ended on, and only one of those is ever an attachment.
+ */
+function stateOf(
+  record: StageFile["artifacts"][string] | undefined,
+  relative: string,
+  sha256: string | null
+): Attachment["state"] {
   if (sha256 === null) {
     return "absent";
   }
-
-  const record = scope.stage?.artifacts[id];
 
   if (record === undefined || record.status !== "completed") {
     return "pending";
   }
 
-  if (record.outputs[0]?.sha256 !== sha256) {
+  const output = record.outputs.find((one) => one.path === relative);
+
+  if (output === undefined) {
+    return "pending";
+  }
+
+  if (output.sha256 !== sha256) {
     return "changed";
   }
 
   return record.review.status === "approved" ? "approved" : "pending";
 }
 
+/** Which file an identifier names on this track, and what states its acceptance. */
+function locate(
+  scope: Scope,
+  id: string
+): Result<{ record: StageFile["artifacts"][string] | undefined; path: string; role: string }> {
+  const paths = scope.paths.trackPaths;
+
+  if (id === OPENING) {
+    return ok({
+      path: paths.openingFrameImage,
+      record: scope.stages.openingFrame?.artifacts[OPENING],
+      role: "the accepted opening frame of this episode — the exact instant this clip starts on",
+    });
+  }
+
+  if (id.startsWith(ENTRY) || id.startsWith(END)) {
+    const entry = id.startsWith(ENTRY);
+    const clipId = id.slice((entry ? ENTRY : END).length);
+    const file = clipFrame(paths, clipId, entry ? "entry" : "end");
+
+    if (!file.ok) {
+      return file;
+    }
+
+    return ok({
+      path: file.data,
+      // An end frame belongs to the clip that produced it, so its acceptance is
+      // the clip's; an entry frame is an artifact of its own.
+      record: scope.stages.clips?.artifacts[entry ? id : clipId],
+      role: entry
+        ? `the accepted entry frame of ${clipId} — the exact instant this clip starts on`
+        : `the accepted final frame of ${clipId} — reproduce this instant exactly, advancing nothing`,
+    });
+  }
+
+  const reference = scope.manifest.references.find((one) => one.id === id);
+
+  if (reference === undefined) {
+    return err(new SendPlanError(`pakiet nie zna referencji "${id}"`));
+  }
+
+  const file = referenceImage(paths, id);
+
+  return file.ok
+    ? ok({
+        path: file.data,
+        record: scope.stages.references?.artifacts[id],
+        role: `${reference.kind} reference: ${reference.subject}`,
+      })
+    : file;
+}
+
 /** One identifier, turned into the file this track will attach for it. */
 async function resolveAttachment(scope: Scope, id: string): Promise<Result<Attachment>> {
-  const reference = scope.manifest.references.find((one) => one.id === id);
   const characterId = id.startsWith(HERO) ? id.slice(HERO.length) : null;
-  const path = characterId === null ? referenceOf(scope, id) : heroPath(scope, characterId);
+
+  if (characterId !== null) {
+    return await resolveHero(scope, id, characterId);
+  }
+
+  const located = locate(scope, id);
+
+  if (!located.ok) {
+    return located;
+  }
+
+  const digest = await digestOf(scope, located.data.path);
+  const sha256 = digest?.sha256 ?? null;
+  const relative = toWorkspacePath(scope.input.workspace.root, located.data.path);
+
+  return ok({
+    bytes: digest?.bytes ?? null,
+    id,
+    path: relative,
+    role: located.data.role,
+    sha256,
+    state: stateOf(located.data.record, relative, sha256),
+  });
+}
+
+async function resolveHero(
+  scope: Scope,
+  id: string,
+  characterId: string
+): Promise<Result<Attachment>> {
+  const path = heroPath(scope, characterId);
 
   if (!path.ok) {
     return path;
   }
 
   const digest = await digestOf(scope, path.data);
-  const sha256 = digest?.sha256 ?? null;
-  const relative = toWorkspacePath(scope.input.workspace.root, path.data);
-
-  if (characterId !== null) {
-    const name = scope.cast.find((member) => member.id === characterId)?.name ?? characterId;
-    const accepted = await heroAccepted(scope, characterId);
-
-    return ok({
-      bytes: digest?.bytes ?? null,
-      id,
-      path: relative,
-      role: `the canonical image of ${name}; binding for that character's identity`,
-      sha256,
-      state: digest === null ? "absent" : (accepted && "approved") || "pending",
-    });
-  }
-
-  if (reference === undefined) {
-    return err(new SendPlanError(`pakiet nie zna referencji "${id}"`));
-  }
+  const name = scope.cast.find((member) => member.id === characterId)?.name ?? characterId;
+  const accepted = await heroAccepted(scope, characterId);
 
   return ok({
     bytes: digest?.bytes ?? null,
     id,
-    path: relative,
-    role: `${reference.kind} reference: ${reference.subject}`,
-    sha256,
-    state: referenceState(scope, id, sha256),
+    path: toWorkspacePath(scope.input.workspace.root, path.data),
+    role: `the canonical image of ${name}; binding for that character's identity`,
+    sha256: digest?.sha256 ?? null,
+    state: digest === null ? "absent" : (accepted && "approved") || "pending",
   });
-}
-
-function referenceOf(scope: Scope, id: string): Result<string> {
-  return referenceImage(scope.paths.trackPaths, id);
 }
 
 /** Why one attachment cannot be carried yet, in the words a person reads. */
@@ -304,12 +405,27 @@ function attachmentBlocker(scope: Scope, attachment: Attachment): string | null 
   }
 
   if (attachment.state === "absent") {
-    return `${where}: jeszcze nie powstał na torze ${scope.input.track}`;
+    return `${where}: ${missing(attachment.id, scope.input.track)}`;
   }
 
   return attachment.state === "changed"
     ? `${where}: bajty nie zgadzają się z zapisanym hashem — plik zmieniono poza narzędziem`
     : `${where}: powstał, ale nikt go jeszcze nie przyjął — oceń go i zatwierdź`;
+}
+
+/** What is missing, in the words of the stage that has to produce it. */
+function missing(id: string, track: ImageTrack): string {
+  if (id === OPENING) {
+    return `klatka otwarcia nie powstała na torze ${track} — to etap 6`;
+  }
+
+  if (id.startsWith(ENTRY)) {
+    return `klatka wejściowa ${id.slice(ENTRY.length)} nie powstała na torze ${track}`;
+  }
+
+  return id.startsWith(END)
+    ? `końcówka klipu ${id.slice(END.length)} jeszcze nie istnieje na torze ${track} — powstaje razem z tym klipem`
+    : `jeszcze nie powstał na torze ${track}`;
 }
 
 interface Artifact {
@@ -318,6 +434,8 @@ interface Artifact {
   readonly kind: TargetKind;
   readonly name: string;
   readonly referenceIds: readonly string[];
+  /** How long a clip runs. `null` for everything that is one instant. */
+  readonly seconds: number | null;
   /** Verbatim shot-list entries, or empty for a reference, which is in no shot. */
   readonly shots: readonly string[];
 }
@@ -342,6 +460,7 @@ function enumerate(scope: Scope): readonly Artifact[] {
     kind: "reference" as const,
     name: one.id,
     referenceIds: one.dependsOn,
+    seconds: null,
     shots: [] as readonly string[],
   }));
   const [firstClip] = scope.manifest.clips;
@@ -351,35 +470,58 @@ function enumerate(scope: Scope): readonly Artifact[] {
     kind: "opening" as const,
     name: OPENING,
     referenceIds: scope.manifest.opening.referenceIds,
+    seconds: null,
     shots: firstClip === undefined ? [] : clipEntries(scope, firstClip.id),
   };
   const clips = scope.manifest.clips.flatMap((clip, index) => {
     const shots = clipEntries(scope, clip.id);
+    const previous = scope.manifest.clips[index - 1];
+    const planned = scope.shotList.clips.find((one) => one.id === clip.id);
     const body = {
       direction: "",
       id: clip.id,
       kind: "clip" as const,
       name: clip.id,
-      referenceIds: clip.referenceIds,
+      // A video request carries the frame it starts on and nothing else: the
+      // provider treats a pinned first frame and reference images as mutually
+      // exclusive modes. The clip's own reference list is not lost — it is what
+      // the entry frame below was drawn from, which is where those images do
+      // their work.
+      referenceIds: [index === 0 ? OPENING : `${ENTRY}${clip.id}`],
+      seconds: planned === undefined ? null : planned.end - planned.start,
       shots,
     };
 
     // The first clip's entry frame is the opening frame, so it has none of its
     // own. Every later one inherits its clip's references: the manifest gives
     // an entry frame no list, because it is that clip's first instant.
-    return index === 0
-      ? [body]
-      : [
-          {
-            direction: "",
-            id: clip.id,
-            kind: "entry-frame" as const,
-            name: `${ENTRY}${clip.id}`,
-            referenceIds: clip.referenceIds,
-            shots,
-          },
-          body,
-        ];
+    if (index === 0) {
+      return [body];
+    }
+
+    // What the shot list says this clip is seeded from decides what its entry
+    // frame is drawn from — not whether it is drawn. A clip that continues the
+    // action starts from the accepted end of the one before it, so that frame
+    // leads the attachment list and the direction says to advance nothing; a
+    // clip that opens a new scene continues nothing and carries only its own
+    // references.
+    const continues =
+      previous !== undefined && planned?.reference === "previous-end-frame"
+        ? [`${END}${previous.id}`]
+        : [];
+
+    return [
+      {
+        direction: "",
+        id: clip.id,
+        kind: "entry-frame" as const,
+        name: `${ENTRY}${clip.id}`,
+        referenceIds: [...continues, ...clip.referenceIds],
+        seconds: null,
+        shots,
+      },
+      body,
+    ];
   });
 
   return [...references, opening, ...clips];
@@ -434,7 +576,10 @@ async function planOne(
     blockers.push(`brakuje ${relative} — etap 4 nie opublikował promptu dla ${artifact.name}`);
   }
 
-  if (attachments.length > scope.limit) {
+  // The limit is an image track's: how many references one drawing request
+  // carries. A clip carries exactly one attachment by construction, so there is
+  // nothing here for that limit to be about.
+  if (artifact.kind !== "clip" && attachments.length > scope.limit) {
     blockers.push(
       `${artifact.name}: ${attachments.length} referencji, a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit} — zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
     );
@@ -457,11 +602,16 @@ async function planOne(
     ],
     kind: artifact.kind,
     name: artifact.name,
+    seconds: artifact.seconds,
     text:
       compose && direction !== null
         ? composePrompt({
             aspectRatio: scope.aspectRatio,
             direction: direction.bytes.toString("utf8"),
+            output:
+              artifact.kind === "clip" && artifact.seconds !== null
+                ? { kind: "video", seconds: artifact.seconds }
+                : { kind: "image" },
             rules: scope.rules,
             shots: artifact.shots,
             size: scope.size,
@@ -538,7 +688,9 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     );
   }
 
-  const stage = await readJson(paths.data.trackPaths.referencesStage, stageFileSchema);
+  const references = await readJson(paths.data.trackPaths.referencesStage, stageFileSchema);
+  const openingFrame = await readJson(paths.data.trackPaths.openingFrameStage, stageFileSchema);
+  const clips = await readJson(paths.data.trackPaths.clipsStage, stageFileSchema);
   const scope: Scope = {
     aspectRatio: stage0.data.aspectRatio,
     cast: stage0.data.cast,
@@ -552,7 +704,11 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     shared: [],
     shotList: plan.data.verdict,
     size: frame.data,
-    stage: stage.ok ? stage.data : null,
+    stages: {
+      clips: clips.ok ? clips.data : null,
+      openingFrame: openingFrame.ok ? openingFrame.data : null,
+      references: references.ok ? references.data : null,
+    },
   };
   const shared = [
     ...(await recordFile(scope, paths.data.project.file)),

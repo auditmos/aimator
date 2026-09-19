@@ -36,8 +36,10 @@ $AIMATOR_WORKSPACE/
         ├── gpt-image/                ┐ references/Rxx.png, references.stage.json,
         └── seedream/                 ┘ references.lock, opening-frame.png,
                                         opening-frame.stage.json, opening-frame.lock,
-                                        runs/ — a dalej, per kontrakt:
-                                        clips/, frames/, edit-plan.json, episode.mp4
+                                        clips/Cxx.mp4, frames/Cxx/entry.png,
+                                        frames/Cxx/end.png, clips.stage.json,
+                                        clips.lock, runs/ — a dalej, per kontrakt:
+                                        edit-plan.json, episode.mp4
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -200,11 +202,11 @@ Obowiązują we wszystkich etapach.
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
 | 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
-| 7 klipy | pakiet, zatwierdzone referencje i klatka, zatwierdzona końcówka poprzednika | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/` | ocena klipu i klatek | niezaimplementowany |
+| 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.png`, `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
-Etapy 7–8 są **zadeklarowanym kontraktem**, nie działającym kodem. Wiersze istnieją po to,
-żeby kolejne kroki wpinały się w ustalony układ zamiast wymyślać własny.
+Etap 8 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
+żeby kolejny krok wpiął się w ustalony układ zamiast wymyślać własny.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
 Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2 — nazywa
@@ -886,3 +888,139 @@ wejść i zapisuje nową zgodę. Zabezpieczeniem nie jest ponowna walidacja stru
 jest to, że **oceną obrazu jest człowiek, który na niego patrzy** — a komunikat mówi wprost,
 żeby obejrzeć klatkę obok nowej wersji jej wejścia albo przerysować ją jawnym
 `--regenerate`.
+
+## Etap 7 — szczegóły
+
+Pierwszy etap, który kupuje **dwa rodzaje mediów**, i pierwszy, którego bramka jest
+**łańcuchem**. Konsumuje zatwierdzony `prompt-package.json` razem z `prompts/clips/Cnn.md`
+i `prompts/entry-frames/Cnn.md`, zasady i proporcje z `project.json` i `project.md`,
+zatwierdzoną `shot-list.md` — z której bierze dosłowne ujęcia i **planowaną długość klipu** —
+oraz zatwierdzoną klatkę, od której klip się zaczyna, na tym torze. Produkuje
+`episodes/<id>/<tor>/clips/Cnn.mp4` i `episodes/<id>/<tor>/frames/Cnn/`, obok nich jeden
+`clips.stage.json` na oba media, i jedno archiwum próby w `runs/` tego toru.
+
+**Jeden plik stanu na oba media**, z kluczami `C01`, `entry:C02`, `C02`… — czyli dokładnie
+tym słownictwem, którego używa `prompt-package show --artifact`. Reguła 1 mówi „jeden
+`<stage>.stage.json` na etap", a etap 7 jest jednym etapem, niezależnie od tego, ile
+rodzajów plików zapisuje. `entry-frames.stage.json` nie istnieje i nie powstanie: nie ma
+takiego etapu w słowniku nazw.
+
+### Co jest rysowane, a co dziedziczone
+
+Lista ujęć mówi per klip `Reference: opening-frame`, `previous-end-frame` albo
+`new-scene-frame`. To pole nie rozstrzyga, **czy** klatka wejściowa powstaje — rozstrzyga,
+**z czego** jest rysowana:
+
+| `Reference` | Klatka wejściowa klipu | Załączniki jej wywołania | Bramka |
+|---|---|---|---|
+| `opening-frame` | brak własnej — jest nią `<tor>/opening-frame.png` z etapu 6 | — | zatwierdzona klatka otwarcia na tym torze |
+| `new-scene-frame` | rysowana do `frames/Cnn/entry.png` | `clips[].referenceIds` z manifestu | jak w etapie 6 |
+| `previous-end-frame` | rysowana do `frames/Cnn/entry.png` | **Image 1 = `end:C(n-1)`**, potem `clips[].referenceIds` | zatwierdzona końcówka poprzednika na tym torze |
+
+Wynika to wprost z etapu 4, nie z upodobania: `prompts/**` to **jeden plik na jedno
+przyszłe płatne wywołanie**, a `entry-frames/Cnn.md` powstaje dla każdego klipu poza
+pierwszym — więc klip kontynuujący, którego klatki nikt by nie rysował, zostawiałby plik
+bez odbiorcy. Prompt etapu 4 opisuje zresztą oba przypadki wprost: klatka klipu
+kontynuującego ma odtwarzać przyjętą końcówkę poprzednika i **niczego nie posuwać do
+przodu**.
+
+**Końcówka wraca razem z klipem.** Zadanie wideo jest uruchamiane z prośbą o ostatnią
+klatkę, więc `frames/Cnn/end.png` publikuje się w tym samym kroku, z tej samej opłaconej
+próby, jako drugie wyjście **tego samego rekordu**. Dlatego jedna ocena obejmuje klip i
+klatkę, którą kontynuuje następny — i dlatego nie ma tu osobnego kroku wycinania, przed
+którym broni etap 2: bajty, które ktoś przyjmuje, powstają przed oceną, nie po niej.
+Końcówka powstaje dla **każdego** klipu, nie tylko dla tych, których następnik jej
+potrzebuje: gdyby zależała od pola następnego klipu, edycja listy ujęć zmieniałaby wstecz
+to, co dawno opublikowany rekord powinien był zawierać.
+
+### Płatne wywołanie klipu niesie dokładnie jeden obraz
+
+I to jest reguła dostawcy, nie wybór: przypięcie pierwszej klatki i dołączanie referencji
+to **wykluczające się tryby** API. Klip niesie więc swoją klatkę wejściową i nic więcej.
+Referencje, które manifest przypisał klipowi, nie giną — to z nich narysowana jest ta
+klatka, i tam robią swoją robotę. Blok załączników mówi to modelowi wprost: to nie jest
+referencja, to jest pierwsza klatka, zacznij dokładnie tam i animuj do przodu.
+
+Z tego samego powodu `clips[].referenceIds` pierwszego klipu nie ma odbiorcy w etapie 7:
+klatką wejściową C01 jest klatka otwarcia, która ma własną listę w `opening.referenceIds`.
+
+### Długość klipu
+
+Bierze się z zatwierdzonej listy ujęć — `end - start` klipu — i jest tym, co zamawia
+żądanie oraz z czym walidator porównuje odpowiedź. Model renderuje węższy zakres, niż
+dopuszcza etap 3 (`maxClipSeconds` to 1–60). Klip o długości, której model nie renderuje,
+jest **odmową przed wysyłką**, nigdy zaokrągleniem: plan zatwierdził człowiek, a narzędzie,
+które po cichu zamówiłoby inną długość, zmieniłoby czas filmu bez niczyjej zgody. Komunikat
+wskazuje poprawkę tam, gdzie ona należy — `maxClipSeconds` odcinka i przeplanowanie
+etapu 3. To ta sama odmowa, którą `frameSize` stosuje do proporcji, których żaden tor nie
+renderuje.
+
+Kadr wideo nie jest osobną decyzją: klip dziedziczy proporcje po swojej pierwszej klatce,
+a ta jest rysowana w kadrze filmu z `aspectRatio`. Rozdzielczość to najwyższy poziom, jaki
+model oferuje — rozdzielczości oddanej tutaj nie odzyska się w montażu.
+
+**Dźwięk nie jest generowany.** Ścieżka dźwiękowa odcinka jest ciągła przez cięcia, więc
+należy do etapu 8; model, który słyszy jeden klip naraz, nie ma jak jej zrobić. Pole
+`generate_audio` domyślnie jest włączone u dostawcy, więc cisza jest proszona jawnie.
+
+### Model i klucz
+
+`--video-model <id>`, a bez tej flagi `AIMATOR_VIDEO_MODEL` — **jedna zmienna na oba
+tory**, w odróżnieniu od modeli obrazowych. Reguła „jedna zmienna na tor" istnieje dlatego,
+że dwa tory są *rysowane* obok siebie dwoma różnymi modelami obrazu; klip nie jest
+rysowany, tylko renderowany z klatki, którą ten tor już wyprodukował. Osią jest więc
+miejsce wywołania, jak przy każdym etapie tekstowym, a tory nadal się różnią w jedyny
+sposób, który tu cokolwiek znaczy: klip zaczyna się na klatce swojego toru. Klucz wideo to
+`BYTEPLUS_MODELARK` na obu torach, również na gpt-image.
+
+Klatki wejściowe rysuje ten sam model obrazowy co referencje i klatkę otwarcia:
+`--image-model <id>`, a bez flagi `AIMATOR_IMAGE_MODEL_<TOR>`. Inny model dla klatki
+wejściowej znaczyłby inną kreskę w środku jednego toru. Samo `--model` jest odmową: dwa
+płatne miejsca wywołania to dwie flagi, a flaga, która nie mówi, o który model chodzi, jest
+gorsza niż jej brak.
+
+### Zadanie asynchroniczne, czyli nowy rodzaj wznowienia
+
+Wideo nie wraca w odpowiedzi na POST — wraca identyfikator zadania. Dlatego `submitted`
+zapisuje się **przed** POST-em, jak wszędzie, a `jobId` dopisuje się w chwili, gdy
+istnieje: **przed pierwszym odpytaniem**. Od tego momentu przerwana próba jest próbą, którą
+da się dokończyć pytaniem, a nie kupić drugi raz. Odpytywanie nie jest ponawianiem: zadanie
+jest już opłacone i renderuje się po stronie dostawcy.
+
+Zadanie, które dostawca oznaczył jako nieudane, nie zostało wyrenderowane ani rozliczone —
+wolno więc uruchomić nowe zwykłym przebiegiem, bez `--regenerate`; wymaganie flagi robiłoby
+z odmowy zakup. Przekroczenie czasu oczekiwania (trzydzieści minut) też nie jest stratą:
+rekord zachowuje `jobId`, a powtórzenie tego samego polecenia odbiera gotowy klip.
+
+**Archiwum próby** trafia do `episodes/<id>/<tor>/runs/<runId>/`, tego samego, w którym
+archiwizują etapy 5 i 6. Trzyma `prompt.md`, `request.json`, `response.json`,
+`transport.json`, `run.json`, `validation.json`, `original.mp4` i `last-frame.png`.
+`request.json` niesie prompt i ustawienia, ale **nigdy bajtów klatki**: ta jest wejściem,
+identyfikowanym ścieżką i sha256. Poprzedni klip trafia do `previous.mp4` wyłącznie przy
+`--regenerate`. **Nie ma `--republish`** — ten etap publikuje dokładnie te bajty, które
+zwrócił dostawca.
+
+**Walidacja jest czysta i offline**, jak wszędzie: czyta pudełka MP4 — `ftyp`, `moov`,
+`mvhd`, `tkhd` — i sprawdza, czy klip trwa tyle, ile zamówił plan, i czy ma proporcje
+odcinka. Klip w złej długości nie jest publikowany ani przycinany: rekord zostaje
+`submitted`, odpowiedź zostaje w archiwum, a poprawka walidatora jest darmowa. Dzięki temu
+`check` działa bez żadnego dekodera na maszynie.
+
+### Seria, liczby i akceptacja
+
+**Jedno polecenie kupuje wszystko, na co bramki pozwalają**, jedno płatne wywołanie naraz,
+a seria zatrzymuje się na pierwszym błędzie z zachowaniem wcześniejszych wyników — jak
+w etapie 5. Na łańcuchu jest tego zwykle niewiele: klip otwierający nową scenę nie
+potrzebuje niczego od poprzednika, więc może powstać, kiedy wcześniejszy czeka na człowieka.
+Raport podaje liczbę płatnych wywołań **osobno dla obrazów i dla wideo**, zanim cokolwiek
+wyśle: klip jest najdroższą rzeczą, jaką ten potok kupuje, a podgląd ma pozwolić przeczytać
+i tekst, i rachunek.
+
+`--artifact C02` albo `--artifact entry:C02` zawęża przebieg. `--regenerate` **wymaga**
+jawnego `--artifact`, i `approve` też — tu ostrzej niż w etapie 5: przyjęcie klipu otwiera
+rysowanie następnej klatki wejściowej, a przyjęcie tej klatki kupuje następny klip.
+Akceptacja, której nikt nie napisał, wydawałaby pieniądze, na które nikt się nie zgodził.
+
+`aimator check <project-id> <episode-id> --stage clips --track <tor>` sprawdza to samo i nie
+zapisuje niczego. Rozjazd wejścia unieważnia akceptację i `check` to zgłasza — a `approve`
+przepisuje hashe wejść i zapisuje nową zgodę, jak wszędzie indziej.

@@ -22,7 +22,7 @@ let scratch = "";
 let workspace: Workspace = { root: "" };
 
 /** A package the validator accepts, as the model would return it. */
-function answer(extraReferences = 0): string {
+function answer(extraReferences = 0, clips: 2 | 3 = 2): string {
   const extra = Array.from({ length: extraReferences }, (_, index) => ({
     dependsOn: ["R01"],
     id: `R${String(index + 3).padStart(2, "0")}`,
@@ -32,20 +32,32 @@ function answer(extraReferences = 0): string {
   }));
   const ids = ["R01", "R02", ...extra.map((one) => one.id)];
 
+  const third =
+    clips === 2
+      ? []
+      : [{ id: "C03", prompt: "Tata zostaje sam.", referenceIds: ["hero:tata", "R01"] }];
+
   return JSON.stringify({
     clips: [
       {
         id: "C01",
         prompt: "Salon wieczorem, Ewa po lewej, tata na kanapie.",
-        referenceIds: ["hero:ewa", "hero:tata", ...ids],
-      },
-      {
-        id: "C02",
-        prompt: "Oboje na dywanie, alpaka przy policzku Ewy.",
         referenceIds: ["hero:ewa", "hero:tata", "R01"],
       },
+      {
+        // The extras ride here because a clip's reference list is what its
+        // entry frame is drawn from, and the entry frame is the image whose
+        // attachment count a track can refuse to carry.
+        id: "C02",
+        prompt: "Oboje na dywanie, alpaka przy policzku Ewy.",
+        referenceIds: ["hero:ewa", "hero:tata", ...ids],
+      },
+      ...third,
     ],
-    entryFrames: [{ clipId: "C02", prompt: "Dokładnie końcowe położenie z C01." }],
+    entryFrames: [
+      { clipId: "C02", prompt: "Dokładnie końcowe położenie z C01." },
+      ...(clips === 2 ? [] : [{ clipId: "C03", prompt: "Dokładnie końcowe położenie z C02." }]),
+    ],
     opening: {
       prompt: "Ewa centralnie na bursztynowym tle, cała sylwetka.",
       referenceIds: ["hero:ewa", "R01"],
@@ -77,13 +89,14 @@ function answer(extraReferences = 0): string {
  * only reachable once somebody has accepted the package.
  */
 function upstream(
-  options: { approvePackage?: boolean; extraReferences?: number } = {}
+  options: { approvePackage?: boolean; clips?: 2 | 3; extraReferences?: number } = {}
 ): Promise<void> {
   return makeUpstream({
-    answer: answer(options.extraReferences ?? 0),
+    answer: answer(options.extraReferences ?? 0, options.clips ?? 2),
     approvePackage: options.approvePackage !== false,
     root,
     scratch,
+    shotList: options.clips === 3 ? "three-clips" : "two-clips",
     workspace,
   });
 }
@@ -215,8 +228,76 @@ describe("readSendPlan", () => {
     await upstream();
     const entry = artifact(await plan("gpt-image", ["entry:C02"]), "entry:C02");
 
-    expect(entry.attachments.map((one) => one.id)).toEqual(["hero:ewa", "hero:tata", "R01"]);
+    expect(entry.attachments.map((one) => one.id)).toEqual([
+      "end:C01",
+      "hero:ewa",
+      "hero:tata",
+      "R01",
+      "R02",
+    ]);
     expect(entry.text).toContain("### C02 | 15-30s");
+  });
+
+  /**
+   * A video request carries the frame it starts on and nothing else, and that
+   * is the provider's rule rather than a preference: pinning a first frame and
+   * attaching reference images are mutually exclusive modes. The references a
+   * clip names are what its *entry frame* was drawn from.
+   */
+  it("should carry exactly one attachment on a clip: the frame it starts on", async () => {
+    await upstream();
+    const sent = await plan();
+
+    expect(artifact(sent, "C01").attachments.map((one) => one.id)).toEqual(["opening-frame"]);
+    expect(artifact(sent, "C02").attachments.map((one) => one.id)).toEqual(["entry:C02"]);
+  });
+
+  /** The first clip has no entry frame of its own: the opening frame is it. */
+  it("should start the first clip on the opening frame of this track", async () => {
+    await upstream();
+    const [first] = artifact(await plan("seedream"), "C01").attachments;
+
+    expect(first?.path).toContain("/seedream/opening-frame.png");
+  });
+
+  it("should seed a continuing clip's entry frame from the end of the one before", async () => {
+    await upstream();
+    const [first] = artifact(await plan("gpt-image"), "entry:C02").attachments;
+
+    expect(first?.id).toBe("end:C01");
+    expect(first?.path).toContain("/gpt-image/frames/C01/end.png");
+  });
+
+  it("should seed a new scene's entry frame from its own references alone", async () => {
+    await upstream({ clips: 3 });
+    const entry = artifact(await plan("gpt-image"), "entry:C02");
+
+    expect(entry.attachments.map((one) => one.id)).not.toContain("end:C01");
+    expect(artifact(await plan("gpt-image"), "entry:C03").attachments[0]?.id).toBe("end:C02");
+  });
+
+  it("should carry the duration the approved shot list planned for a clip", async () => {
+    await upstream();
+    const sent = await plan();
+
+    expect(artifact(sent, "C01").seconds).toBe(15);
+    expect(artifact(sent, "entry:C02").seconds).toBe(null);
+  });
+
+  it("should tell a video model it is making a clip, not an image", async () => {
+    await upstream();
+    const { text } = artifact(await plan("gpt-image", ["C01"]), "C01");
+
+    expect(text).toContain("OUTPUT CLIP");
+    expect(text).toContain("15 seconds");
+    expect(text).not.toContain("Return exactly one image");
+  });
+
+  it("should block a clip until the frame it starts on is accepted on this track", async () => {
+    await upstream();
+    const { blockers } = artifact(await plan("gpt-image"), "C01");
+
+    expect(blockers.join("\n")).toContain("opening-frame");
   });
 
   /** Rule 2, at the last possible moment: one manifest, two sets of files. */
@@ -258,10 +339,10 @@ describe("readSendPlan", () => {
    */
   it("should refuse an over-long reference set on the track that cannot carry it", async () => {
     await upstream({ extraReferences: 9 });
-    const seed = artifact(await plan("seedream"), "C01");
-    const gpt = artifact(await plan("gpt-image"), "C01");
+    const seed = artifact(await plan("seedream"), "entry:C02");
+    const gpt = artifact(await plan("gpt-image"), "entry:C02");
 
-    expect(seed.attachments.length).toBe(13);
+    expect(seed.attachments.length).toBe(14);
     expect(seed.blockers.join("\n")).toContain("tor seedream przyjmuje najwyżej 10");
     expect(gpt.blockers.join("\n")).not.toContain("przyjmuje najwyżej");
   });

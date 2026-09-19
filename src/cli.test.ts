@@ -466,3 +466,97 @@ describe("--stage opening-frame", () => {
     expect(result.text).not.toContain("unknown command");
   });
 });
+
+describe("clip", () => {
+  it("should be dispatched rather than read as an unknown command", async () => {
+    const result = await cli("clip", "generate", "demo", "01-burza", "--track", "seedream");
+    expect(result.text).not.toContain("unknown command");
+  });
+
+  it("should reject a subcommand it does not have", async () => {
+    const result = await cli("clip", "render", "demo", "01-burza");
+    expect(result.text).toContain("nieznane polecenie: clip render");
+  });
+
+  it("should require the track, because each one is a separate production", async () => {
+    const result = await cli("clip", "generate", "demo", "01-burza");
+    expect(result.text).toContain("--track");
+  });
+
+  /**
+   * Two media in one command, so `--model` would not say which. Both flags are
+   * named, and the bare one is refused rather than guessed at.
+   */
+  it("should refuse a bare --model and name the two it has", async () => {
+    const result = await cli(
+      "clip",
+      "generate",
+      "demo",
+      "01-burza",
+      "--track",
+      "seedream",
+      "--model",
+      "sora"
+    );
+
+    expect(result.text).toContain("--image-model");
+    expect(result.text).toContain("--video-model");
+  });
+
+  it("should accept --artifact for a clip and for an entry frame", async () => {
+    const result = await cli(
+      "clip",
+      "generate",
+      "demo",
+      "01-burza",
+      "--track",
+      "seedream",
+      "--artifact",
+      "C01,entry:C02"
+    );
+
+    expect(result.text).not.toContain("Unknown option");
+  });
+
+  it("should document itself in the usage text", async () => {
+    const result = await run(["--help"]);
+    expect(result.ok && result.data).toContain("clip generate");
+  });
+});
+
+describe("--stage clips", () => {
+  it("should be an allowed approve stage", async () => {
+    const result = await cli(
+      "approve",
+      "demo",
+      "01-burza",
+      "--stage",
+      "clips",
+      "--track",
+      "seedream",
+      "--artifact",
+      "C01"
+    );
+
+    expect(result.text).not.toContain("dozwolone:");
+  });
+
+  it("should name itself among the allowed stages when another is wrong", async () => {
+    const result = await cli("approve", "demo", "--stage", "montage");
+    expect(result.text).toContain("clips");
+  });
+
+  it("should be an allowed check stage", async () => {
+    const result = await cli(
+      "check",
+      "demo",
+      "01-burza",
+      "--stage",
+      "clips",
+      "--track",
+      "seedream"
+    );
+
+    expect(result.text).not.toContain("unknown command");
+  });
+});

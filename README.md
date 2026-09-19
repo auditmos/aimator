@@ -7,9 +7,9 @@ Artefakty są grupowane **per projekt i per model obrazu**. Jeden projekt może 
 komplet assetów w `gpt-image` i w `seedream` — to dwa niezależne byty dające dwie różne
 animacje z tej samej historii. Ujęcia i klipy w obu torach robi Seedance 2.5.
 
-**Stan: zaimplementowane są etapy 0–5** — przygotowanie, scenariusz, postać, lista ujęć,
-pakiet promptów i obrazy referencyjne. Etapy 6–8 mają zapisany kontrakt
-w [docs/pipeline.md](docs/pipeline.md), ale nie mają jeszcze kodu.
+**Stan: zaimplementowane są etapy 0–7** — przygotowanie, scenariusz, postać, lista ujęć,
+pakiet promptów, obrazy referencyjne, klatka otwarcia i klipy. Etap 8 — montaż — ma
+zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md), ale nie ma jeszcze kodu.
 
 ## Wymagania
 
@@ -40,8 +40,9 @@ AIMATOR_SHOTLIST_MODEL=…              # etap 3
 AIMATOR_PROMPTS_MODEL=…               # etap 4
 AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
 AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream
+AIMATOR_VIDEO_MODEL=…                 # etap 7, JEDEN dla obu torów
 OPENAI_API_KEY=…
-BYTEPLUS_MODELARK=…
+BYTEPLUS_MODELARK=…                   # także klucz wideo, na obu torach
 ```
 
 Wiodące `~/` jest rozwijane. Kolejność ma znaczenie: `.env.local` wygrywa z `.env`,
@@ -239,6 +240,42 @@ sprawdzana: `--artifact R01` w tym etapie to odmowa, nie ciche zignorowanie.
 W odróżnieniu od etapu 5 klatka otwarcia **niesie dosłowne ujęcia** pierwszego klipu, bo
 jest kadrem filmu, a nie referencją — więc `shot-list.md` jest jej zapisanym wejściem.
 Kadr jest ten sam co w etapie 5.
+
+## Etap 7 — klipy
+
+Pierwszy etap, który kupuje dwa rodzaje mediów: klatki wejściowe (obraz) i klipy (wideo).
+
+```bash
+pnpm dev prompt-package show dzielna-ewa 01-burza --track seedream --artifact C01
+pnpm dev clip generate dzielna-ewa 01-burza --track seedream --dry-run
+pnpm dev clip generate dzielna-ewa 01-burza --track seedream
+pnpm dev check dzielna-ewa 01-burza --stage clips --track seedream
+pnpm dev approve dzielna-ewa 01-burza --stage clips --track seedream --artifact C01 \
+  --note "ruch ręki czytelny, końcówka nadaje się na wejście C02"
+```
+
+**Bramka jest łańcuchem.** Klip C01 czeka na zatwierdzoną klatkę otwarcia. Klatka wejściowa
+C02 — na zatwierdzoną **końcówkę** C01, jeśli lista ujęć mówi `previous-end-frame`; jeśli
+mówi `new-scene-frame`, czeka tylko na swoje referencje. Klip C02 czeka na swoją klatkę
+wejściową. Każde ogniwo to zgoda człowieka, nie sama walidacja.
+
+**Końcówka klipu wraca razem z klipem** — zadanie jest uruchamiane z prośbą o ostatnią
+klatkę, więc `frames/Cnn/end.png` powstaje z tej samej opłaconej próby i jest drugim
+wyjściem tego samego rekordu. Jedna ocena obejmuje klip i klatkę, z której wyjdzie następny.
+
+**Płatne wywołanie klipu niesie dokładnie jeden obraz: swoją pierwszą klatkę.** To reguła
+API, nie wybór — przypięcie pierwszej klatki wyklucza się z dołączaniem referencji.
+Referencje, które manifest przypisał klipowi, są tym, z czego narysowano tę klatkę.
+
+**Długość klipu bierze się z listy ujęć.** Klipu o długości, której model nie renderuje,
+narzędzie nie zaokrągli: odmówi przed wysyłką i wskaże poprawkę w `maxClipSeconds` i etapie 3.
+Raport podaje liczbę płatnych wywołań **osobno dla obrazów i dla wideo**, zanim cokolwiek
+wyśle. Dźwięku nie generujemy — ścieżka dźwiękowa jest ciągła przez cięcia, więc należy do
+etapu 8.
+
+Model wideo jest **jeden dla obu torów** (`AIMATOR_VIDEO_MODEL`, klucz `BYTEPLUS_MODELARK`),
+a klatki wejściowe rysuje ten sam model obrazowy co referencje na tym torze. Dlatego zamiast
+`--model` są dwie flagi: `--image-model` i `--video-model`.
 
 ## Zasady, na których stoi całe narzędzie
 

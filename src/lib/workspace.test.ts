@@ -4,6 +4,8 @@ import {
   characterPaths,
   characterTrackPaths,
   characterViewImage,
+  clipFrame,
+  clipVideo,
   episodeIdFromSource,
   episodePaths,
   episodeTrackPaths,
@@ -12,6 +14,7 @@ import {
   referenceImage,
   resolveWorkspace,
   runPaths,
+  videoRunPaths,
 } from "./workspace.js";
 
 describe("resolveWorkspace", () => {
@@ -178,6 +181,10 @@ describe("episodeTrackPaths", () => {
 
   it("should place every per-track artifact under the track directory", () => {
     expect(track).toEqual({
+      clips: `${root}/clips`,
+      clipsLock: `${root}/clips.lock`,
+      clipsStage: `${root}/clips.stage.json`,
+      frames: `${root}/frames`,
       openingFrameImage: `${root}/opening-frame.png`,
       openingFrameLock: `${root}/opening-frame.lock`,
       openingFrameStage: `${root}/opening-frame.stage.json`,
@@ -263,5 +270,52 @@ describe("episodeIdFromSource", () => {
 
   it("should reject a title that slugifies to nothing", () => {
     expect(episodeIdFromSource("01-!!!.md").ok).toBe(false);
+  });
+});
+
+describe("stage 7 paths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const paths = project.ok ? episodePaths(project.data, "01-arrival") : null;
+  const track = paths?.ok ? episodeTrackPaths(paths.data, "seedream") : null;
+  const root = "/srv/aimator/projects/demo/episodes/01-arrival/seedream";
+
+  /** Rule 1: one state file per stage, and stage 7 writes both media into it. */
+  it("should give the clips stage its own state file and lock", () => {
+    expect(track?.clipsStage).toBe(`${root}/clips.stage.json`);
+    expect(track?.clipsLock).toBe(`${root}/clips.lock`);
+  });
+
+  it("should place a clip's video under the track's clips directory", () => {
+    const video = track === null ? null : clipVideo(track, "C03");
+    expect(video?.ok ? video.data : null).toBe(`${root}/clips/C03.mp4`);
+  });
+
+  /**
+   * A clip's frames are a directory because there are two of them: the entry
+   * frame stage 7 draws and the end frame the finished clip hands back.
+   */
+  it("should give each clip its own frame directory", () => {
+    const entry = track === null ? null : clipFrame(track, "C03", "entry");
+    const end = track === null ? null : clipFrame(track, "C03", "end");
+    expect(entry?.ok ? entry.data : null).toBe(`${root}/frames/C03/entry.png`);
+    expect(end?.ok ? end.data : null).toBe(`${root}/frames/C03/end.png`);
+  });
+
+  it("should reject a clip id that is not a numbered artifact", () => {
+    expect(track === null ? null : clipVideo(track, "../C03").ok).toBe(false);
+    expect(track === null ? null : clipFrame(track, "entry:C03", "entry").ok).toBe(false);
+  });
+
+  /**
+   * A video attempt archives the same six files an image attempt does, plus the
+   * two the provider hands back: the clip itself and its final frame.
+   */
+  it("should archive a video attempt beside the image attempts of this track", () => {
+    const run = track === null ? null : videoRunPaths(track, "20260919T110000Z-abcd1234");
+    expect(run?.root).toBe(`${root}/runs/20260919T110000Z-abcd1234`);
+    expect(run?.video).toBe(`${run?.root}/original.mp4`);
+    expect(run?.endFrame).toBe(`${run?.root}/last-frame.png`);
+    expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
+    expect(run?.response).toBe(`${run?.root}/response.json`);
   });
 });

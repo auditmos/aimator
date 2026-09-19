@@ -76,6 +76,58 @@ export function png(width: number, height: number, fill = 0): Buffer {
   return Buffer.concat([head, Buffer.alloc(64, fill), tail]);
 }
 
+/**
+ * A structurally valid MP4 of a given frame and duration, built rather than
+ * committed as a binary — the same reason `png` is built.
+ *
+ * It carries exactly what the verdict reads: an `ftyp`, an `mvhd` holding the
+ * timescale and duration, and one `trak` whose `tkhd` holds the frame. `audio`
+ * adds a second, frameless track, which is what a real clip with a soundtrack
+ * looks like and what stops the parser from reading `0x0` as the picture.
+ */
+export function mp4(options: {
+  readonly audio?: boolean;
+  readonly height: number;
+  readonly seconds: number;
+  readonly width: number;
+}): Buffer {
+  const { audio = false, height, seconds, width } = options;
+  const tracks = [trak(width, height), ...(audio ? [trak(0, 0)] : [])];
+
+  return Buffer.concat([
+    box("ftyp", Buffer.concat([Buffer.from("isomiso2mp41", "ascii")])),
+    box("moov", Buffer.concat([mvhd(seconds), ...tracks])),
+    box("mdat", Buffer.alloc(32, 7)),
+  ]);
+}
+
+function box(type: string, payload: Buffer): Buffer {
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(payload.length + 8, 0);
+  head.write(type, 4, "ascii");
+
+  return Buffer.concat([head, payload]);
+}
+
+/** A version-0 movie header. The timescale is 1000, so duration is in ms. */
+function mvhd(seconds: number): Buffer {
+  const payload = Buffer.alloc(100);
+  payload.writeUInt32BE(1000, 12);
+  payload.writeUInt32BE(Math.round(seconds * 1000), 16);
+  payload.writeUInt32BE(1, 96);
+
+  return box("mvhd", payload);
+}
+
+/** A version-0 track header, with the frame in the 16.16 fields at the end. */
+function trak(width: number, height: number): Buffer {
+  const payload = Buffer.alloc(84);
+  payload.writeUInt32BE(width * 0x1_00_00, 76);
+  payload.writeUInt32BE(height * 0x1_00_00, 80);
+
+  return box("trak", box("tkhd", payload));
+}
+
 /** The canonical image of a character: what stage 2 hands to stages 4 and on. */
 const HERO = png(1536, 2304);
 
@@ -126,8 +178,30 @@ function shot(id: string, scene: string, clip: string, range: string, cast: stri
  * characters on screen. `castSeen` is what stage 4's gate reads, so both members
  * of the roster appear — a fixture with one would make the two-track hero gate
  * untestable.
+ *
+ * `three-clips` is the same episode cut three ways instead of two, and it exists
+ * because two clips can only show one way of seeding a later one. Stage 7 needs
+ * both: a clip that continues the previous one out of its end frame, and a clip
+ * that opens a new scene and continues nothing. `unrenderable-clip` is that same
+ * cut with a first clip of three seconds — legal for stage 3, which only caps
+ * the longest clip, and shorter than any video model renders, which is what
+ * stage 7 has to refuse before it spends anything.
+ *
+ * These are options rather than the only shape because the manifest a test
+ * brings has to name exactly the clips the shot list plans — so switching
+ * everybody to three clips would silently rewrite what stages 5 and 6 assert.
  */
-function shotList(): string {
+export type ShotListShape = "three-clips" | "two-clips" | "unrenderable-clip";
+
+function shotList(shape: ShotListShape): string {
+  if (shape === "two-clips") {
+    return twoClips();
+  }
+
+  return shape === "three-clips" ? threeClips() : unrenderableClips();
+}
+
+function twoClips(): string {
   return [
     "## Plan\n\nDwa klipy, kadr 16:9.\n",
     [
@@ -153,6 +227,94 @@ function shotList(): string {
       shot("U02", "S02", "C01", "10-15s", "ewa,tata"),
       shot("U03", "S02", "C02", "15-20s", "tata"),
       shot("U04", "S03", "C02", "20-30s", "ewa,tata"),
+    ].join("\n"),
+    "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
+  ].join("\n");
+}
+
+/** The same thirty seconds, cut so that every way of seeding a clip appears. */
+function threeClips(): string {
+  return [
+    "## Plan\n\nTrzy klipy, kadr 16:9.\n",
+    [
+      "## Clips",
+      "",
+      "### C01 | 0-10s",
+      "",
+      "- Shots: U01",
+      "- Reference: opening-frame",
+      "- Continuity: Ewa przy stole.",
+      "",
+      "### C02 | 10-20s",
+      "",
+      "- Shots: U02",
+      "- Reference: new-scene-frame",
+      "- Continuity: Nowa scena: oboje na dywanie.",
+      "",
+      "### C03 | 20-30s",
+      "",
+      "- Shots: U03",
+      "- Reference: previous-end-frame",
+      "- Continuity: Dokładnie końcowe położenie z C02.",
+      "",
+    ].join("\n"),
+    [
+      "## Shots",
+      "",
+      shot("U01", "S01", "C01", "0-10s", "ewa"),
+      shot("U02", "S02", "C02", "10-20s", "ewa,tata"),
+      shot("U03", "S03", "C03", "20-30s", "tata"),
+    ].join("\n"),
+    "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
+  ].join("\n");
+}
+
+/**
+ * Four clips, the first of them three seconds long.
+ *
+ * Stage 3 accepts it: `maxClipSeconds` caps the longest clip and says nothing
+ * about the shortest, and every shot still sits inside one scene and sums to
+ * the episode's duration. The video model does not render anything under four
+ * seconds, so this is the plan stage 7 has to refuse — before it spends.
+ */
+function unrenderableClips(): string {
+  return [
+    "## Plan\n\nCztery klipy, pierwszy bardzo krótki, kadr 16:9.\n",
+    [
+      "## Clips",
+      "",
+      "### C01 | 0-3s",
+      "",
+      "- Shots: U01",
+      "- Reference: opening-frame",
+      "- Continuity: Ewa przy stole.",
+      "",
+      "### C02 | 3-10s",
+      "",
+      "- Shots: U02",
+      "- Reference: previous-end-frame",
+      "- Continuity: Ewa siada.",
+      "",
+      "### C03 | 10-20s",
+      "",
+      "- Shots: U03",
+      "- Reference: new-scene-frame",
+      "- Continuity: Nowa scena: oboje na dywanie.",
+      "",
+      "### C04 | 20-30s",
+      "",
+      "- Shots: U04",
+      "- Reference: previous-end-frame",
+      "- Continuity: Dokładnie końcowe położenie z C03.",
+      "",
+    ].join("\n"),
+    [
+      "## Shots",
+      "",
+      shot("U01", "S01", "C01", "0-3s", "ewa"),
+      shot("U02", "S01", "C02", "3-10s", "ewa,tata"),
+      shot("U03", "S02", "C03", "10-20s", "ewa,tata"),
+      shot("U04", "S03", "C04", "20-30s", "tata"),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
@@ -315,12 +477,27 @@ interface UpstreamOptions {
   readonly root: string;
   readonly rules?: string;
   readonly scratch: string;
+  /**
+   * Which cut of the same thirty seconds the shot list plans. Two clips by
+   * default; three when a test needs both ways of seeding a later clip, which
+   * only a third one can show; and one cut so short no video model renders it,
+   * for the stage that has to refuse it before spending anything.
+   */
+  readonly shotList?: ShotListShape;
   readonly workspace: Workspace;
 }
 
 /** Stages 0 to 4, with a canonical image for every character on every track. */
 export async function makeUpstream(options: UpstreamOptions): Promise<void> {
-  const { answer, approvePackage, root, rules = RULES, scratch, workspace } = options;
+  const {
+    answer,
+    approvePackage,
+    root,
+    rules = RULES,
+    scratch,
+    shotList: shape = "two-clips",
+    workspace,
+  } = options;
   const source = join(scratch, "01-Burza.md");
   await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
 
@@ -410,7 +587,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
   await generateShotList({
     apiKey: API_KEY,
     episodeId: EPISODE,
-    fetch: respondWith(completion(shotList())),
+    fetch: respondWith(completion(shotList(shape))),
     maxOutputTokens: 24_000,
     mode: "apply",
     model: "gpt-6-astra",

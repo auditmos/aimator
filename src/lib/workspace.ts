@@ -83,6 +83,21 @@ export interface CharacterTrackPaths {
  * sit directly under the episode, while everything below is drawn twice.
  */
 export interface EpisodeTrackPaths {
+  /** Stage 7's videos, one file per clip. */
+  readonly clips: string;
+  readonly clipsLock: string;
+  /**
+   * Stage 7's one state file, holding both media it buys: a record per clip and
+   * a record per entry frame. Rule 1 asks for one `<stage>.stage.json` per
+   * stage, and stage 7 is one stage however many kinds of file it writes.
+   */
+  readonly clipsStage: string;
+  /**
+   * Stage 7's stills, one directory per clip. A directory rather than a file
+   * because a clip has two of them: the entry frame it is drawn from and the
+   * end frame it hands back, which is what the next clip continues out of.
+   */
+  readonly frames: string;
   /**
    * Stage 6's one output. It is a file rather than a directory because the
    * opening frame is a single image, so there is no set for a directory to
@@ -127,6 +142,26 @@ export interface ImageRunPaths {
   readonly run: string;
   readonly transport: string;
   readonly validation: string;
+}
+
+/**
+ * What one video attempt archives. Like an image attempt, it never copies an
+ * input: the entry frame the request carried is referenced by path and digest.
+ */
+export interface VideoRunPaths {
+  /** The final frame the provider returned, before it was published. */
+  readonly endFrame: string;
+  /** The clip being replaced. Written only by `--regenerate`. */
+  readonly previousVideo: string;
+  readonly prompt: string;
+  readonly request: string;
+  readonly response: string;
+  readonly root: string;
+  readonly run: string;
+  readonly transport: string;
+  readonly validation: string;
+  /** Exactly what the provider returned, before anything was published. */
+  readonly video: string;
 }
 
 export interface EpisodePaths {
@@ -407,6 +442,10 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
   const root = join(episode.root, track);
 
   return {
+    clips: join(root, "clips"),
+    clipsLock: join(root, "clips.lock"),
+    clipsStage: join(root, "clips.stage.json"),
+    frames: join(root, "frames"),
     openingFrameImage: join(root, "opening-frame.png"),
     openingFrameLock: join(root, "opening-frame.lock"),
     openingFrameStage: join(root, "opening-frame.stage.json"),
@@ -427,6 +466,64 @@ export function referenceImage(paths: EpisodeTrackPaths, id: string): Result<str
   return ARTIFACT_ID.test(id)
     ? ok(join(paths.references, `${id}.png`))
     : err(new IdentifierError(id, `invalid reference id "${id}": expected a form like R01`));
+}
+
+/**
+ * One clip's video. The identifier is the artifact key and the file name at
+ * once, so it is checked here rather than trusted into a path — the same
+ * reason `referenceImage` checks a reference id.
+ */
+export function clipVideo(paths: EpisodeTrackPaths, id: string): Result<string> {
+  return ARTIFACT_ID.test(id)
+    ? ok(join(paths.clips, `${id}.mp4`))
+    : err(new IdentifierError(id, `invalid clip id "${id}": expected a form like C01`));
+}
+
+/**
+ * One of a clip's two stills.
+ *
+ * The clip id is a directory level here rather than a filename prefix, for the
+ * reason rule 2 gives about tracks and characters: `frames/C03/entry.png` and
+ * `frames/C03/end.png` belong to one clip, and nothing else has to know how
+ * many stills a clip turns out to have.
+ *
+ * The entry frame is an artifact of stage 7 even though stage 7 does not draw
+ * every one of them: C01's entry frame is the opening frame, which lives at the
+ * track root because stage 6 owns it.
+ */
+export function clipFrame(
+  paths: EpisodeTrackPaths,
+  id: string,
+  kind: "end" | "entry"
+): Result<string> {
+  return ARTIFACT_ID.test(id)
+    ? ok(join(paths.frames, id, `${kind}.png`))
+    : err(new IdentifierError(id, `invalid clip id "${id}": expected a form like C01`));
+}
+
+/**
+ * The archive of one video attempt.
+ *
+ * It is an image attempt plus the two files the provider hands back: the clip
+ * itself, and the final frame it ended on. Both are downloaded from signed URLs
+ * that live 24 hours, so keeping them here is what makes a resume free — the
+ * same reason a seedream image attempt keeps `original.png`.
+ */
+export function videoRunPaths(paths: { readonly runs: string }, runId: string): VideoRunPaths {
+  const root = join(paths.runs, runId);
+
+  return {
+    endFrame: join(root, "last-frame.png"),
+    previousVideo: join(root, "previous.mp4"),
+    prompt: join(root, "prompt.md"),
+    request: join(root, "request.json"),
+    response: join(root, "response.json"),
+    root,
+    run: join(root, "run.json"),
+    transport: join(root, "transport.json"),
+    validation: join(root, "validation.json"),
+    video: join(root, "original.mp4"),
+  };
 }
 
 /** The archive of one attempt. Run ids are minted by `lib/artifact`. */
