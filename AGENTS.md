@@ -286,6 +286,31 @@ function parsePort(raw: string): Result<number> {
 - If a test needs to import an internal file, the module boundary is wrong — test through its `index.ts`
 - Run tests: `pnpm test`
 
+### The shared fixture
+
+`src/test/fixture.ts` builds an episode through stages 0 to 4 — the pipeline every image
+stage needs before it can test anything. It is **not a domain**: nothing under `src/lib`
+imports it, `src/index.ts` does not re-export it and `tsup` does not bundle it, which is
+why it sits outside the layer table rather than inside it.
+
+It was promoted at the third copy, not the second. Stages 5 and 6 and `media-prompt` each
+carried the same two hundred lines, byte-identical in `screenplay()`, `shot()` and
+`shotList()`, and stage 7 would have been the fourth — the same threshold `lib/text-model`
+was promoted at, and the same reasoning: three copies make an invariant into a coincidence.
+
+Two rules keep it from becoming a second place where behaviour hides.
+
+**It builds through each stage's public entry**, never by writing artifacts. The one
+exception is `makeHero`, which forges a stage-2 result because running the real stage would
+mean a hundred fake HTTP calls before any test could start.
+
+**It does not own the manifest.** Each test brings its own `answer()`, because the graph it
+describes is the thing under test — stage 5 wants two roots and a dependent, stage 6 wants
+one reference to wait for, `media-prompt` wants more attachments than a track will carry.
+For the same reason `approvePackage` is a **required** field with no default: stage 5's
+tests leave the package pending so they can test the refusal, stage 6's want it accepted,
+and a default would have silently changed what one of them asserted.
+
 ## Commit Format
 
 Conventional Commits enforced via commitlint:
