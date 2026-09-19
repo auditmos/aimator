@@ -149,8 +149,14 @@ export interface ImageRunPaths {
  * input: the entry frame the request carried is referenced by path and digest.
  */
 export interface VideoRunPaths {
-  /** The final frame the provider returned, before it was published. */
-  readonly endFrame: string;
+  /**
+   * The final frame the provider returned, before it was published, under the
+   * name of whatever format it arrived in. Both are declared because the
+   * format is the provider's choice and a resume has to find the file again
+   * without having seen the bytes yet.
+   */
+  readonly endFrameJpeg: string;
+  readonly endFramePng: string;
   /** The clip being replaced. Written only by `--regenerate`. */
   readonly previousVideo: string;
   readonly prompt: string;
@@ -480,6 +486,20 @@ export function clipVideo(paths: EpisodeTrackPaths, id: string): Result<string> 
 }
 
 /**
+ * The two formats a still is published in, and the extension each one gets.
+ *
+ * An entry frame is drawn by an image model this pipeline asks for PNG, so it
+ * is always a PNG. The frame a clip ended on is whatever the video provider
+ * handed back — a JPEG, in practice — and it is published under a name that
+ * says so rather than re-encoded into the format the rest of the tree happens
+ * to use: approving one picture and attaching another is the thing rule 6 and
+ * the bytes-bound approval exist to prevent.
+ */
+export type StillFormat = "jpeg" | "png";
+
+const EXTENSION: Record<StillFormat, string> = { jpeg: "jpg", png: "png" };
+
+/**
  * One of a clip's two stills.
  *
  * The clip id is a directory level here rather than a filename prefix, for the
@@ -494,10 +514,11 @@ export function clipVideo(paths: EpisodeTrackPaths, id: string): Result<string> 
 export function clipFrame(
   paths: EpisodeTrackPaths,
   id: string,
-  kind: "end" | "entry"
+  kind: "end" | "entry",
+  format: StillFormat = "png"
 ): Result<string> {
   return ARTIFACT_ID.test(id)
-    ? ok(join(paths.frames, id, `${kind}.png`))
+    ? ok(join(paths.frames, id, `${kind}.${EXTENSION[format]}`))
     : err(new IdentifierError(id, `invalid clip id "${id}": expected a form like C01`));
 }
 
@@ -513,7 +534,8 @@ export function videoRunPaths(paths: { readonly runs: string }, runId: string): 
   const root = join(paths.runs, runId);
 
   return {
-    endFrame: join(root, "last-frame.png"),
+    endFrameJpeg: join(root, "last-frame.jpg"),
+    endFramePng: join(root, "last-frame.png"),
     previousVideo: join(root, "previous.mp4"),
     prompt: join(root, "prompt.md"),
     request: join(root, "request.json"),

@@ -28,6 +28,7 @@ import {
   promptPaths,
   referenceImage,
   type Workspace,
+  workspacePath,
 } from "../workspace.js";
 import { type AttachmentSlot, composePrompt, PROMPT_VERSION } from "./prompt.js";
 
@@ -285,6 +286,36 @@ function stateOf(
   return record.review.status === "approved" ? "approved" : "pending";
 }
 
+/**
+ * The frame a clip ended on, read from that clip's own record.
+ *
+ * Asked of the record rather than built from a name, because the still is
+ * published in whatever format the video provider handed back — a JPEG, in
+ * practice — and the record is the one place that says which file it actually
+ * is. A path guessed from an extension would report a frame that exists as
+ * missing, which is the worst kind of gate: one that blocks over a spelling.
+ *
+ * Its acceptance is the clip's: the frame is that clip's last instant, bought
+ * and reviewed in the same breath.
+ */
+function endFrameOf(
+  scope: Scope,
+  clipId: string
+): { record: StageFile["artifacts"][string] | undefined; path: string; role: string } {
+  const record = scope.stages.clips?.artifacts[clipId];
+  const recorded = record?.outputs.find((one) => one.path.includes(`/frames/${clipId}/end.`));
+  // With no record there is no file yet, and the name the clip *would* write is
+  // the honest thing to report as missing.
+  const wouldWrite = clipFrame(scope.paths.trackPaths, clipId, "end");
+  const absent = wouldWrite.ok ? wouldWrite.data : scope.paths.trackPaths.frames;
+
+  return {
+    path: recorded === undefined ? absent : workspacePath(scope.input.workspace, recorded.path),
+    record,
+    role: `the accepted final frame of ${clipId} — reproduce this instant exactly, advancing nothing`,
+  };
+}
+
 /** Which file an identifier names on this track, and what states its acceptance. */
 function locate(
   scope: Scope,
@@ -300,24 +331,21 @@ function locate(
     });
   }
 
-  if (id.startsWith(ENTRY) || id.startsWith(END)) {
-    const entry = id.startsWith(ENTRY);
-    const clipId = id.slice((entry ? ENTRY : END).length);
-    const file = clipFrame(paths, clipId, entry ? "entry" : "end");
+  if (id.startsWith(ENTRY)) {
+    const clipId = id.slice(ENTRY.length);
+    const file = clipFrame(paths, clipId, "entry");
 
-    if (!file.ok) {
-      return file;
-    }
+    return file.ok
+      ? ok({
+          path: file.data,
+          record: scope.stages.clips?.artifacts[id],
+          role: `the accepted entry frame of ${clipId} — the exact instant this clip starts on`,
+        })
+      : file;
+  }
 
-    return ok({
-      path: file.data,
-      // An end frame belongs to the clip that produced it, so its acceptance is
-      // the clip's; an entry frame is an artifact of its own.
-      record: scope.stages.clips?.artifacts[entry ? id : clipId],
-      role: entry
-        ? `the accepted entry frame of ${clipId} — the exact instant this clip starts on`
-        : `the accepted final frame of ${clipId} — reproduce this instant exactly, advancing nothing`,
-    });
+  if (id.startsWith(END)) {
+    return ok(endFrameOf(scope, id.slice(END.length)));
   }
 
   const reference = scope.manifest.references.find((one) => one.id === id);

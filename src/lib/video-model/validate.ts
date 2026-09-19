@@ -1,4 +1,5 @@
 import { err, ok, type Result } from "../result.js";
+import type { StillFormat } from "../workspace.js";
 
 /**
  * Internal to the video-model module: the verdict on bytes and on a provider's
@@ -169,6 +170,106 @@ export function validateVideo(
 
 function round(seconds: number): number {
   return Math.round(seconds * 100) / 100;
+}
+
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
+/** The frame-carrying JPEG start-of-frame markers; the rest are not pictures. */
+const SOF_MARKERS = new Set([
+  0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
+]);
+
+interface EndFrameVerdict {
+  readonly bytes: number;
+  readonly format: StillFormat;
+  readonly height: number;
+  readonly width: number;
+}
+
+/**
+ * The frame the clip ended on, as the provider handed it back.
+ *
+ * Its format is the provider's choice and not ours — ModelArk returns a JPEG
+ * beside an MP4 — so this reads whichever of the two it is rather than
+ * insisting on the one the rest of the pipeline draws in. The bytes are
+ * published exactly as they arrived, under a name that says what they are:
+ * re-encoding a still somebody is about to accept would mean approving one
+ * picture and attaching another.
+ *
+ * The frame is compared against the clip it came out of, because that is the
+ * only size it can honestly be: it is the last instant of that video.
+ */
+export function validateEndFrame(
+  bytes: Buffer,
+  clip: { readonly height: number; readonly width: number }
+): Result<EndFrameVerdict> {
+  const frame = readStill(bytes);
+
+  if (frame === null) {
+    return err(new VideoError("malformed", "ostatnia klatka nie jest ani plikiem PNG, ani JPEG"));
+  }
+
+  return frame.width === clip.width && frame.height === clip.height
+    ? ok({ bytes: bytes.length, ...frame })
+    : err(
+        new VideoError(
+          "ratio",
+          `ostatnia klatka ma ${frame.width}x${frame.height}, a klip ${clip.width}x${clip.height}`
+        )
+      );
+}
+
+/**
+ * Which of the two formats a still is, or `null` for neither.
+ *
+ * It exists so the archive can name the file after what it holds before
+ * anything has judged whether it is the right picture — naming and judging are
+ * two questions, and a file named `.png` holding a JPEG is a lie either way.
+ */
+export function stillFormat(bytes: Buffer): StillFormat | null {
+  return readStill(bytes)?.format ?? null;
+}
+
+function readStill(bytes: Buffer): { format: StillFormat; height: number; width: number } | null {
+  if (bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    return bytes.length < 24 || bytes.toString("ascii", 12, 16) !== "IHDR"
+      ? null
+      : { format: "png", height: bytes.readUInt32BE(20), width: bytes.readUInt32BE(16) };
+  }
+
+  return bytes.subarray(0, JPEG_SIGNATURE.length).equals(JPEG_SIGNATURE) ? readJpeg(bytes) : null;
+}
+
+/**
+ * A JPEG's frame, from the first start-of-frame segment.
+ *
+ * A JPEG is a chain of marker segments and only the SOF one states the
+ * picture's size, so the chain is walked rather than guessed at: the
+ * thumbnails, colour profiles and EXIF blocks that come first say nothing
+ * about the frame.
+ */
+function readJpeg(bytes: Buffer): { format: StillFormat; height: number; width: number } | null {
+  let at = 2;
+
+  while (at + 9 < bytes.length) {
+    if (bytes.readUInt8(at) !== 0xff) {
+      return null;
+    }
+
+    const marker = bytes.readUInt8(at + 1);
+
+    if (SOF_MARKERS.has(marker)) {
+      return {
+        format: "jpeg",
+        height: bytes.readUInt16BE(at + 5),
+        width: bytes.readUInt16BE(at + 7),
+      };
+    }
+
+    at += 2 + bytes.readUInt16BE(at + 2);
+  }
+
+  return null;
 }
 
 /** Where a job stands, in the only three shapes a caller can act on. */

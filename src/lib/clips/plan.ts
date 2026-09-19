@@ -38,7 +38,7 @@ import {
 export const STAGE = "clips";
 
 /** What `--artifact` accepts here: a clip, or the entry frame of one. */
-const CLIP_ID = /^C\d{2,}$/;
+export const CLIP_ID = /^C\d{2,}$/;
 const ENTRY_ID = /^entry:C\d{2,}$/;
 
 export function isClipArtifact(name: string): boolean {

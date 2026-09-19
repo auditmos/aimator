@@ -260,8 +260,15 @@ mówi `new-scene-frame`, czeka tylko na swoje referencje. Klip C02 czeka na swoj
 wejściową. Każde ogniwo to zgoda człowieka, nie sama walidacja.
 
 **Końcówka klipu wraca razem z klipem** — zadanie jest uruchamiane z prośbą o ostatnią
-klatkę, więc `frames/Cnn/end.png` powstaje z tej samej opłaconej próby i jest drugim
-wyjściem tego samego rekordu. Jedna ocena obejmuje klip i klatkę, z której wyjdzie następny.
+klatkę, więc powstaje z tej samej opłaconej próby i jest drugim wyjściem tego samego
+rekordu. Jedna ocena obejmuje klip i klatkę, z której wyjdzie następny. Format wybiera
+dostawca: ModelArk oddaje JPEG, więc plik nazywa się `frames/Cnn/end.jpg`. Nazwa idzie za
+bajtami, bo przekodowanie oznaczałoby przyjęcie jednego obrazu i dołączenie innego.
+
+**`--republish --artifact C01` publikuje klip jeszcze raz z archiwum**, nie wysyłając
+niczego i nie wymagając modelu ani klucza. To jedyny etap obrazowo-wideo, który tej flagi
+potrzebuje: obok klipu rozstrzyga jeszcze, czym jest końcówka — a pomyłka w rozstrzygnięciu
+wychodzi na jaw po publikacji i nie może kosztować drugiego wideo.
 
 **Płatne wywołanie klipu niesie dokładnie jeden obraz: swoją pierwszą klatkę.** To reguła
 API, nie wybór — przypięcie pierwszej klatki wyklucza się z dołączaniem referencji.

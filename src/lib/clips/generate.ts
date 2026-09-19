@@ -12,6 +12,7 @@ import { err, ok, type Result } from "../result.js";
 import { runVideoStage } from "../video-model/index.js";
 import { clipFrame, clipVideo, type ImageTrack, type Workspace } from "../workspace.js";
 import {
+  CLIP_ID,
   isClipArtifact,
   readStage7Inputs,
   readyTargets,
@@ -101,6 +102,14 @@ interface GenerateInput {
   readonly mode: WriteMode;
   readonly projectId: string;
   readonly regenerate: boolean;
+  /**
+   * Publishes a clip again from its archive, sending nothing and paying
+   * nothing. It names the clips it republishes, because it rewrites a record a
+   * human may already have accepted — and it covers clips only: an entry frame
+   * is published exactly as the provider drew it, so there is no renderer there
+   * whose mistake would need undoing.
+   */
+  readonly republish: boolean;
   readonly track: ImageTrack;
   readonly videoKey: string | null;
   readonly videoModel: string | null;
@@ -135,6 +144,14 @@ function blockers(
   targets: readonly Stage7Target[]
 ): readonly string[] {
   const problems = [...stage7.gate];
+
+  // A republication sends nothing, so it needs neither a model nor a key. It
+  // still answers to the package gate: what it writes into the workspace is a
+  // result of a plan, and an unapproved plan is a loud problem either way.
+  if (input.republish) {
+    return problems;
+  }
+
   const images = targets.some((one) => one.kind === "entry-frame");
   const videos = targets.some((one) => one.kind === "clip");
 
@@ -163,6 +180,29 @@ function blockers(
   return problems;
 }
 
+/**
+ * Why a republication may not happen, or `null` when it may.
+ *
+ * It costs nothing, which is exactly why it still has to be aimed: it rewrites
+ * a record and sends its review back to pending, so a bare `--republish` would
+ * quietly withdraw approvals nobody meant to withdraw.
+ */
+function republishProblem(input: GenerateInput): string | null {
+  if (input.regenerate) {
+    return "--republish i --regenerate wykluczają się: jedno publikuje zapisaną odpowiedź, drugie kupuje nową";
+  }
+
+  if (input.artifacts.length === 0) {
+    return "--republish wymaga jawnego celu: --artifact C01[,C02]";
+  }
+
+  const frames = input.artifacts.filter((id) => !CLIP_ID.test(id));
+
+  return frames.length === 0
+    ? null
+    : `--republish "${frames.join(", ")}" — dotyczy wyłącznie klipów; klatka wejściowa jest publikowana dokładnie tak, jak narysował ją model, więc nie ma tam czego naprawiać po stronie publikacji`;
+}
+
 export async function generateClips(input: GenerateInput): Promise<Result<ClipsReport>> {
   const named = input.artifacts.filter((id) => !isClipArtifact(id));
 
@@ -173,6 +213,14 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
         "referencje należą do etapu 5, a klatka otwarcia do etapu 6",
       ])
     );
+  }
+
+  if (input.republish) {
+    const problem = republishProblem(input);
+
+    if (problem !== null) {
+      return err(new Stage7BlockedError([problem]));
+    }
   }
 
   // A new charge names its target. Without a flag the gates decide what runs,
@@ -427,7 +475,7 @@ async function runOne(
 
   const record = stage7.stage.artifacts[target.name];
 
-  if (record?.status === "completed" && !input.regenerate) {
+  if (record?.status === "completed" && !(input.regenerate || input.republish)) {
     return ok(
       idleOne(
         target,
@@ -457,15 +505,10 @@ async function runClip(
   prompt: string
 ): Promise<Result<OneResult>> {
   const video = clipVideo(stage7.paths.track, target.name);
-  const endFrame = clipFrame(stage7.paths.track, target.name, "end");
   const [first] = target.artifact.attachments;
 
   if (!video.ok) {
     return video;
-  }
-
-  if (!endFrame.ok) {
-    return endFrame;
   }
 
   if (first === undefined || first.bytes === null) {
@@ -480,6 +523,7 @@ async function runClip(
       fetch: input.fetch,
       model: input.videoModel ?? "",
       regenerate: input.regenerate,
+      republish: input.republish,
       runs: stage7.paths.track.runs,
       // Passed only when it was given: an absent wait means the real one, and
       // an explicit `undefined` is not the same thing under this tsconfig.
@@ -489,7 +533,7 @@ async function runClip(
     {
       aspectRatio: stage7.plan.aspectRatio,
       blocked: (problems) => new Stage7BlockedError(problems),
-      endFrameTarget: endFrame.data,
+      endFrameTarget: (format) => clipFrame(stage7.paths.track, target.name, "end", format),
       firstFrame: attach(first.id, first.bytes),
       inputs: target.artifact.inputs,
       key: target.name,

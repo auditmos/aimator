@@ -2,10 +2,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mp4, png } from "../../test/fixture.js";
+import { jpeg, mp4, png } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { attach } from "../image-model/index.js";
-import { clipDuration, runVideoStage, validateVideo } from "./index.js";
+import { ok } from "../result.js";
+import { clipDuration, runVideoStage, validateEndFrame, validateVideo } from "./index.js";
 
 const FRAME = { aspectRatio: "16:9", seconds: 14 };
 
@@ -60,6 +61,31 @@ describe("validateVideo", () => {
   });
 });
 
+describe("validateEndFrame", () => {
+  const CLIP_FRAME = { height: 1080, width: 1920 };
+
+  /** The provider hands back a JPEG, whatever the rest of the pipeline draws in. */
+  it("should accept the JPEG the provider actually returns", () => {
+    const result = validateEndFrame(jpeg(1920, 1080), CLIP_FRAME);
+
+    expect(result.ok ? result.data.format : reason(result)).toBe("jpeg");
+  });
+
+  it("should accept a PNG just as readily", () => {
+    const result = validateEndFrame(png(1920, 1080), CLIP_FRAME);
+
+    expect(result.ok ? result.data.format : reason(result)).toBe("png");
+  });
+
+  it("should refuse a still that is not the last frame of this clip", () => {
+    expect(reason(validateEndFrame(jpeg(1280, 720), CLIP_FRAME))).toContain("1280x720");
+  });
+
+  it("should refuse bytes that are neither format", () => {
+    expect(reason(validateEndFrame(Buffer.from("not a picture"), CLIP_FRAME))).toContain("JPEG");
+  });
+});
+
 describe("clipDuration", () => {
   it("should accept a whole number of seconds the model renders", () => {
     expect(clipDuration(14).ok).toBe(true);
@@ -94,7 +120,9 @@ describe("clipDuration", () => {
  */
 describe("runVideoStage", () => {
   const CLIP = mp4({ height: 1080, seconds: 14, width: 1920 });
-  const END = png(1920, 1080);
+  /** What ModelArk actually hands back beside the clip: a JPEG, not a PNG. */
+  const END = jpeg(1920, 1080);
+  const END_AS_PNG = png(1920, 1080);
   const FIRST = png(2816, 1584);
 
   let dir = "";
@@ -124,9 +152,9 @@ describe("runVideoStage", () => {
    * nobody was watching — which is what a resumed attempt actually meets.
    */
   function provider(
-    options: { endFrame?: boolean; fail?: boolean; polls?: number } = {}
+    options: { endFrame?: boolean; fail?: boolean; polls?: number; still?: Buffer } = {}
   ): Provider {
-    const { endFrame = true, fail = false, polls = 1 } = options;
+    const { endFrame = true, fail = false, polls = 1, still = END } = options;
     const calls: { body: unknown; method: string; url: string }[] = [];
     const failed = new Set<string>();
     const seen = new Map<string, number>();
@@ -144,7 +172,7 @@ describe("runVideoStage", () => {
       }
 
       if (href === "https://download/frame") {
-        return Promise.resolve(new Response(END, { status: 200 }));
+        return Promise.resolve(new Response(still, { status: 200 }));
       }
 
       if (method === "POST") {
@@ -210,6 +238,36 @@ describe("runVideoStage", () => {
     };
   }
 
+  function callOf(fetchImpl: typeof fetch, impatient = false) {
+    return {
+      apiKey: "ark-test-key",
+      fetch: fetchImpl,
+      model: "dreamina-seedance-2-5-260628",
+      regenerate: false,
+      runs: join(dir, "runs"),
+      wait: waiting(impatient),
+      workspace: { root: dir },
+    };
+  }
+
+  function artifactOf(seconds = 14) {
+    return {
+      aspectRatio: "16:9",
+      blocked: (problems: readonly string[]) => new Error(problems.join("; ")),
+      endFrameTarget: (format: "jpeg" | "png") =>
+        ok(join(dir, "frames", "C01", format === "jpeg" ? "end.jpg" : "end.png")),
+      firstFrame: attach("opening-frame", FIRST),
+      inputs: [{ path: "projects/demo/gpt-image/opening-frame.png", sha256: sha256Of(FIRST) }],
+      key: "C01",
+      prompt: "Ewa siada przy stole.",
+      promptVersion: 1,
+      seconds,
+      stage: "clips" as const,
+      stagePath: join(dir, "clips.stage.json"),
+      target: join(dir, "clips", "C01.mp4"),
+    };
+  }
+
   function run(
     fetchImpl: typeof fetch,
     overrides: { impatient?: boolean; regenerate?: boolean; seconds?: number } = {}
@@ -227,7 +285,8 @@ describe("runVideoStage", () => {
       {
         aspectRatio: "16:9",
         blocked: (problems) => new Error(problems.join("; ")),
-        endFrameTarget: join(dir, "frames", "C01", "end.png"),
+        endFrameTarget: (format: "jpeg" | "png") =>
+          ok(join(dir, "frames", "C01", format === "jpeg" ? "end.jpg" : "end.png")),
         firstFrame: attach("opening-frame", FIRST),
         inputs: [{ path: "projects/demo/gpt-image/opening-frame.png", sha256: sha256Of(FIRST) }],
         key: "C01",
@@ -249,13 +308,24 @@ describe("runVideoStage", () => {
     return stage.artifacts.C01 ?? {};
   }
 
+  /**
+   * The still is published in the format it arrived in, under a name that says
+   * so. Re-encoding it would mean approving one picture and attaching another;
+   * naming a JPEG `.png` would mean the workspace lying about its own bytes.
+   */
   it("should publish the clip and the end frame it will be continued from", async () => {
     const api = provider();
     const result = await run(api.fetch);
 
     expect(result.ok ? result.data.state : reason(result)).toBe("published");
     expect((await readFile(join(dir, "clips", "C01.mp4"))).equals(CLIP)).toBe(true);
-    expect((await readFile(join(dir, "frames", "C01", "end.png"))).equals(END)).toBe(true);
+    expect((await readFile(join(dir, "frames", "C01", "end.jpg"))).equals(END)).toBe(true);
+  });
+
+  it("should publish a PNG still under its own name instead", async () => {
+    await run(provider({ still: END_AS_PNG }).fetch);
+
+    expect((await readFile(join(dir, "frames", "C01", "end.png"))).equals(END_AS_PNG)).toBe(true);
   });
 
   it("should record both files as outputs of the one attempt that bought them", async () => {
@@ -263,7 +333,7 @@ describe("runVideoStage", () => {
 
     const outputs = (await record()).outputs as { path: string }[];
 
-    expect(outputs.map((one) => one.path)).toEqual(["clips/C01.mp4", "frames/C01/end.png"]);
+    expect(outputs.map((one) => one.path)).toEqual(["clips/C01.mp4", "frames/C01/end.jpg"]);
   });
 
   /** `jobId` is what makes a resume free, so it lands as soon as it exists. */
@@ -376,6 +446,32 @@ describe("runVideoStage", () => {
 
     expect(reason(again)).toContain("--regenerate");
     expect(api.calls.filter((call) => call.method === "POST")).toHaveLength(1);
+  });
+
+  /**
+   * The one thing this module renders rather than saves is the still: what it
+   * is and what to call it. A mistake there surfaces after publication, on a
+   * record that already says `completed`, so it has to be fixable for nothing.
+   */
+  it("should publish again from its archive, sending nothing", async () => {
+    const api = provider();
+    await run(api.fetch);
+    const before = api.calls.length;
+
+    const again = await runVideoStage({ ...callOf(api.fetch), republish: true }, artifactOf());
+
+    expect(again.ok ? again.data.state : reason(again)).toBe("resumed");
+    expect(api.calls).toHaveLength(before);
+    expect((await record()).status).toBe("completed");
+  });
+
+  it("should refuse to republish an attempt that never happened", async () => {
+    const again = await runVideoStage(
+      { ...callOf(provider().fetch), republish: true },
+      artifactOf()
+    );
+
+    expect(reason(again)).toContain("nie ma próby");
   });
 
   it("should publish a clip whose provider returned no end frame, and say so", async () => {

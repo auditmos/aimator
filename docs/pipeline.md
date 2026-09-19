@@ -37,7 +37,8 @@ $AIMATOR_WORKSPACE/
         └── seedream/                 ┘ references.lock, opening-frame.png,
                                         opening-frame.stage.json, opening-frame.lock,
                                         clips/Cxx.mp4, frames/Cxx/entry.png,
-                                        frames/Cxx/end.png, clips.stage.json,
+                                        frames/Cxx/end.jpg (format dostawcy),
+                                        clips.stage.json,
                                         clips.lock, runs/ — a dalej, per kontrakt:
                                         edit-plan.json, episode.mp4
 ```
@@ -202,7 +203,7 @@ Obowiązują we wszystkich etapach.
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
 | 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
-| 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.png`, `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
+| 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` (format oddaje dostawca), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzone klipy, `edit-plan.json` | `<tor>/episode.mp4` | ocena całości | niezaimplementowany |
 
 Etap 8 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
@@ -997,8 +998,24 @@ archiwizują etapy 5 i 6. Trzyma `prompt.md`, `request.json`, `response.json`,
 `transport.json`, `run.json`, `validation.json`, `original.mp4` i `last-frame.png`.
 `request.json` niesie prompt i ustawienia, ale **nigdy bajtów klatki**: ta jest wejściem,
 identyfikowanym ścieżką i sha256. Poprzedni klip trafia do `previous.mp4` wyłącznie przy
-`--regenerate`. **Nie ma `--republish`** — ten etap publikuje dokładnie te bajty, które
-zwrócił dostawca.
+`--regenerate`.
+
+**`--republish` istnieje tutaj i dotyczy wyłącznie klipów.** Etapy 5 i 6 jej nie mają, bo
+publikują dokładnie te bajty, które zwrócił dostawca. Ten etap dodatkowo **rozstrzyga**:
+czym jest końcówka, która przyszła razem z klipem, i jak ma się nazywać. Pomyłka w tym
+rozstrzygnięciu wychodzi na jaw po publikacji, przy rekordzie `completed`, a kontrakt mówi
+wprost, że kupiona odpowiedź musi dać się ponownie wyprowadzić za darmo. `--republish
+--artifact C01` publikuje więc klip jeszcze raz z `runs/<runId>/`, nie wysyłając niczego i
+nie wymagając ani modelu, ani klucza; zachowuje `runId` i `producer`, bo to ta sama próba,
+a ocena wraca do `pending`, bo pliki nie są tymi, które ktoś przyjął. Wymaga jawnego
+`--artifact` i wyklucza się z `--regenerate`. Klatki wejściowej nie obejmuje: tam nie ma
+czego naprawiać po stronie publikacji.
+
+**Format końcówki wybiera dostawca, nie my.** ModelArk oddaje ostatnią klatkę jako JPEG,
+więc plik nazywa się `end.jpg`, a `end.png` powstaje tylko wtedy, gdy dostawca odda PNG.
+Przekodowanie jej byłoby przyjęciem jednego obrazu i dołączeniem innego — dlatego nazwa
+idzie za bajtami, a nie odwrotnie. Z tego samego powodu identyfikator `end:Cnn` rozwiązuje
+się przez **rekord klipu**, a nie przez zgadnięcie rozszerzenia.
 
 **Walidacja jest czysta i offline**, jak wszędzie: czyta pudełka MP4 — `ftyp`, `moov`,
 `mvhd`, `tkhd` — i sprawdza, czy klip trwa tyle, ile zamówił plan, i czy ma proporcje

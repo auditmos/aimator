@@ -121,6 +121,7 @@ Etap 7 — klipy (płatny; per tor, dwa media w jednym poleceniu):
   clip generate <id> <episode-id> --track <gpt-image|seedream>
                [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
                [--dry-run] [--regenerate]
+               [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
     i klipy (wideo, jednym modelem dla obu torów — AIMATOR_VIDEO_MODEL, klucz
     BYTEPLUS_MODELARK). Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną
@@ -1984,6 +1985,7 @@ async function runClip(argv: readonly string[]): Promise<Result<string>> {
     "image-model": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
+    republish: { type: "boolean" },
     track: { type: "string" },
     "video-model": { type: "string" },
   });
@@ -2042,6 +2044,7 @@ async function runClip(argv: readonly string[]): Promise<Result<string>> {
     mode,
     projectId: projectId.data,
     regenerate: parsed.data.values.regenerate === true,
+    republish: parsed.data.values.republish === true,
     track: track.data,
     videoKey: mode === "dry-run" ? null : (env.BYTEPLUS_MODELARK ?? null),
     videoModel: videoModel.data,

@@ -314,7 +314,8 @@ describe("stage 7 paths", () => {
     const run = track === null ? null : videoRunPaths(track, "20260919T110000Z-abcd1234");
     expect(run?.root).toBe(`${root}/runs/20260919T110000Z-abcd1234`);
     expect(run?.video).toBe(`${run?.root}/original.mp4`);
-    expect(run?.endFrame).toBe(`${run?.root}/last-frame.png`);
+    expect(run?.endFramePng).toBe(`${run?.root}/last-frame.png`);
+    expect(run?.endFrameJpeg).toBe(`${run?.root}/last-frame.jpg`);
     expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
     expect(run?.response).toBe(`${run?.root}/response.json`);
   });

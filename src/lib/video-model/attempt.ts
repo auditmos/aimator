@@ -18,9 +18,14 @@ import {
   writeNew,
   writeNewBytes,
 } from "../artifact/index.js";
-import { type ImageAttachment, validateImage } from "../image-model/index.js";
+import type { ImageAttachment } from "../image-model/index.js";
 import { err, ok, type Result } from "../result.js";
-import { type VideoRunPaths, videoRunPaths, type Workspace } from "../workspace.js";
+import {
+  type StillFormat,
+  type VideoRunPaths,
+  videoRunPaths,
+  type Workspace,
+} from "../workspace.js";
 import {
   archiveRequest,
   buildRequest,
@@ -35,7 +40,9 @@ import {
 import {
   readSubmitResponse,
   readTaskResponse,
+  stillFormat,
   type VideoVerdict,
+  validateEndFrame,
   validateVideo,
 } from "./validate.js";
 
@@ -66,6 +73,18 @@ interface VideoCall {
   readonly model: string;
   /** The only road to a second charge. Nothing here retries on its own. */
   readonly regenerate: boolean;
+  /**
+   * Publishes an archived answer again, sending nothing and needing neither a
+   * model nor a key.
+   *
+   * It exists because this module has a renderer: it does not only save what
+   * the provider sent, it decides what the still that came with the clip is and
+   * what to call it. A mistake there shows up *after* publication, on a record
+   * that already says `completed`, and the contract is explicit that a bought
+   * answer must stay re-derivable for free — otherwise a bug in this file would
+   * be billable at the price of a video.
+   */
+  readonly republish?: boolean;
   /** Where this stage archives: the episode track's `runs/`. */
   readonly runs: string;
   /** Injected so a test never sleeps; the default is the real wait. */
@@ -79,8 +98,13 @@ interface VideoArtifact {
   readonly aspectRatio: string;
   /** Why a paid call may not happen, in this stage's own error type. */
   readonly blocked: (problems: readonly string[]) => Error;
-  /** Where the frame the clip ends on goes, once the provider hands it back. */
-  readonly endFrameTarget: string;
+  /**
+   * Where the frame the clip ends on goes, once the provider hands it back.
+   *
+   * A function of the format rather than a path, because the format is the
+   * provider's choice and only `workspace.ts` may turn it into a file name.
+   */
+  readonly endFrameTarget: (format: StillFormat) => Result<string>;
   /** The one image the request carries: the instant the clip starts on. */
   readonly firstFrame: ImageAttachment;
   readonly inputs: readonly RecordedFile[];
@@ -161,6 +185,14 @@ export async function runVideoStage(
 ): Promise<Result<VideoAttempt>> {
   const stage = await readStage(artifact.stagePath, artifact.stage);
   const record = stage.artifacts[artifact.key];
+
+  if (call.republish === true) {
+    return record === undefined
+      ? err(
+          artifact.blocked([`${artifact.key}: nie ma próby, którą można by opublikować ponownie`])
+        )
+      : await fromArchive(call, artifact, stage, record);
+  }
 
   if (record !== undefined && !call.regenerate) {
     const resumed = await resume(call, artifact, stage, record);
@@ -256,6 +288,56 @@ async function resume(
     run,
     runId: record.runId,
     task: finished.data.done,
+  });
+}
+
+/**
+ * Publishes an archived answer again, without sending anything.
+ *
+ * It keeps the attempt's `runId` and `producer`, because this is that same
+ * attempt: what changed is on this side of the wire. The review goes back to
+ * pending, as it does after any write of a result — the files are not the ones
+ * somebody accepted, even when the difference is a name.
+ */
+async function fromArchive(
+  call: VideoCall,
+  artifact: VideoArtifact,
+  stage: StageFile,
+  record: StageFile["artifacts"][string]
+): Promise<Result<VideoAttempt>> {
+  const run = videoRunPaths(call, record.runId);
+  const saved = await readDigest(run.response);
+
+  if (!saved.ok) {
+    return err(
+      artifact.blocked([
+        `${artifact.key}: próba ${record.runId} nie zachowała odpowiedzi — nie ma czego opublikować ponownie`,
+        "wynik da się odzyskać tylko z archiwum, a to archiwum go nie ma",
+      ])
+    );
+  }
+
+  const task = readTaskResponse(saved.data.bytes.toString("utf8"));
+
+  if (!task.ok) {
+    return task;
+  }
+
+  if (task.data.kind !== "succeeded") {
+    return err(
+      artifact.blocked([
+        `${artifact.key}: zapisana odpowiedź nie jest ukończonym zadaniem (${task.data.kind})`,
+      ])
+    );
+  }
+
+  return await publish(call, artifact, stage, {
+    jobId: record.jobId,
+    producer: record.producer,
+    resumed: true,
+    run,
+    runId: record.runId,
+    task: { endFrameUrl: task.data.endFrameUrl, videoUrl: task.data.videoUrl },
   });
 }
 
@@ -505,10 +587,13 @@ async function collect(
     video = downloaded.data;
   }
 
-  const savedFrame = await readDigest(run.endFrame);
+  // Either name, because the format is the provider's choice and an earlier
+  // attempt archived the still under whichever one it turned out to be.
+  const savedJpeg = await readDigest(run.endFrameJpeg);
+  const savedPng = savedJpeg.ok ? savedJpeg : await readDigest(run.endFramePng);
 
-  if (savedFrame.ok) {
-    return ok({ endFrame: savedFrame.data.bytes, video });
+  if (savedPng.ok) {
+    return ok({ endFrame: savedPng.data.bytes, video });
   }
 
   if (task.endFrameUrl === null) {
@@ -525,7 +610,14 @@ async function collect(
     return frame;
   }
 
-  await writeNewBytes(run.endFrame, frame.data);
+  const format = stillFormat(frame.data);
+
+  // Bytes that are neither format are not archived under a name claiming one.
+  // They are still handed on: the verdict below refuses them with its own
+  // words, and a repeat of the command downloads them again for nothing.
+  if (format !== null) {
+    await writeNewBytes(format === "jpeg" ? run.endFrameJpeg : run.endFramePng, frame.data);
+  }
 
   return ok({ endFrame: frame.data, video });
 }
@@ -535,7 +627,7 @@ async function publish(
   artifact: VideoArtifact,
   stage: StageFile,
   data: {
-    readonly jobId: string;
+    readonly jobId: string | null;
     readonly producer: ReturnType<typeof modelProducer>;
     readonly resumed: boolean;
     readonly run: VideoRunPaths;
@@ -575,11 +667,15 @@ async function publish(
 
   // The end frame is judged against the clip it was taken from, because that is
   // the only size it can honestly be compared to: the provider chose the pixels
-  // inside its resolution tier, and the frame is that same picture.
-  const endFrame =
+  // inside its resolution tier, and the frame is that same picture. Its format
+  // is the provider's too, so the file is named after what it holds rather than
+  // re-encoded into the one the rest of the tree happens to use.
+  const still =
     collected.data.endFrame === null
       ? null
-      : keepFrame(collected.data.endFrame, `${verdict.data.width}x${verdict.data.height}`);
+      : validateEndFrame(collected.data.endFrame, verdict.data);
+  const target = still?.ok === true ? artifact.endFrameTarget(still.data.format) : null;
+  const endFrame = target?.ok === true ? collected.data.endFrame : null;
   const outputs: RecordedFile[] = [
     {
       path: toWorkspacePath(call.workspace.root, artifact.target),
@@ -588,12 +684,12 @@ async function publish(
   ];
   const writes = [{ bytes: collected.data.video, kind: "bytes" as const, to: artifact.target }];
 
-  if (endFrame !== null) {
+  if (endFrame !== null && target?.ok === true) {
     outputs.push({
-      path: toWorkspacePath(call.workspace.root, artifact.endFrameTarget),
+      path: toWorkspacePath(call.workspace.root, target.data),
       sha256: sha256Of(endFrame),
     });
-    writes.push({ bytes: endFrame, kind: "bytes" as const, to: artifact.endFrameTarget });
+    writes.push({ bytes: endFrame, kind: "bytes" as const, to: target.data });
   }
 
   await writeNew(
@@ -636,17 +732,6 @@ async function publish(
     state: data.resumed ? "resumed" : "published",
     verdict: verdict.data,
   });
-}
-
-/**
- * The end frame, or nothing when the bytes are not the picture they claim.
- *
- * A malformed still is not worth losing a paid clip over: the clip publishes,
- * the chain that wanted the frame says what is missing, and the remedy is the
- * same free repeat as everywhere else.
- */
-function keepFrame(bytes: Buffer, size: string): Buffer | null {
-  return validateImage(bytes, size).ok ? bytes : null;
 }
 
 function note(verdict: VideoVerdict, endFrame: boolean, resumed: boolean): string {

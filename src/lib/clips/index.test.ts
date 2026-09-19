@@ -194,6 +194,7 @@ function generate(overrides: Partial<Parameters<typeof generateClips>[0]> = {}) 
     mode: "apply",
     projectId: PROJECT,
     regenerate: false,
+    republish: false,
     track: "gpt-image",
     videoKey: VIDEO_KEY,
     videoModel: "dreamina-seedance-2-5-260628",
@@ -432,5 +433,49 @@ describe("checkClips", () => {
     await status();
 
     await expect(stageFile()).rejects.toThrow();
+  });
+});
+
+describe("--republish", () => {
+  it("should refuse to republish without naming a clip", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    expect(reason(await generate({ republish: true }))).toContain("--artifact");
+  });
+
+  it("should refuse to republish and regenerate at once", async () => {
+    await upstream();
+
+    expect(
+      reason(await generate({ artifacts: ["C01"], regenerate: true, republish: true }))
+    ).toContain("wykluczają się");
+  });
+
+  /**
+   * An entry frame is published exactly as the image model drew it, so there is
+   * no renderer there whose mistake would need undoing — and saying so is more
+   * useful than quietly doing nothing.
+   */
+  it("should refuse to republish an entry frame", async () => {
+    await upstream();
+
+    expect(reason(await generate({ artifacts: ["entry:C02"], republish: true }))).toContain(
+      "wyłącznie klipów"
+    );
+  });
+
+  it("should republish a finished clip without buying anything", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    const api = provider();
+    await generate({ fetch: api.fetch });
+    const before = api.calls.length;
+    const again = await generate({ artifacts: ["C01"], fetch: api.fetch, republish: true });
+
+    expect(again.ok ? again.data.paidVideos : reason(again)).toBe(0);
+    expect(api.calls).toHaveLength(before);
+    expect((await stageFile()).C01?.review.status).toBe("pending");
   });
 });

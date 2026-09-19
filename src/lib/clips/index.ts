@@ -28,17 +28,23 @@
  * **The end frame comes back with the clip.** The job is asked to return the
  * final frame, so it is published in the same step, out of the same paid
  * attempt, as an output of the same record — which is what lets one review
- * cover the clip and the frame the next one continues out of.
+ * cover the clip and the frame the next one continues out of. Its format is the
+ * provider's choice, so the file is named after what it holds: `end.jpg` for the
+ * JPEG ModelArk returns, `end.png` if a provider ever returns one.
  *
  * **A duration the model cannot render is refused before the POST.** The shot
  * list may plan any length its `maxClipSeconds` allows; the model renders a
  * narrower range, and rounding a plan somebody approved would change the film's
  * timing on nobody's authority. The refusal names the remedy, which is upstream.
  *
- * There is no `--republish`: this stage publishes exactly the bytes the
- * provider returned, so it has no renderer whose mistake would need undoing. A
- * bought answer that failed to publish is already free to retry — the record
- * keeps its job id and repeating the command collects it.
+ * **`--republish` exists here, and only for clips.** Stages 5 and 6 have none
+ * because they publish exactly the bytes the provider returned; this one
+ * decides something as well — what the still that came back with the clip is,
+ * and what to call it — and a mistake in that decision surfaces *after*
+ * publication, on a record that already says `completed`. The contract is
+ * explicit that a bought answer must stay re-derivable for free, so the clip is
+ * published again from its archive, sending nothing. An entry frame is drawn
+ * exactly as the image model drew it, so there is nothing there to undo.
  */
 
 export { type ClipsReport, generateClips } from "./generate.js";

@@ -77,6 +77,37 @@ export function png(width: number, height: number, fill = 0): Buffer {
 }
 
 /**
+ * A structurally valid JPEG of a given size, built the same way — because the
+ * video provider hands the frame a clip ended on back as a JPEG, whatever the
+ * rest of the pipeline draws in.
+ *
+ * It carries what the verdict reads and nothing else: the signature, one
+ * segment that is not a start-of-frame (so the walk has something to skip) and
+ * the SOF0 segment that states the picture's size.
+ */
+export function jpeg(width: number, height: number): Buffer {
+  const app0 = Buffer.alloc(18);
+  app0.writeUInt16BE(0xff_e0, 0);
+  app0.writeUInt16BE(16, 2);
+  app0.write("JFIF\0", 4, "ascii");
+
+  const sof = Buffer.alloc(11);
+  sof.writeUInt16BE(0xff_c0, 0);
+  sof.writeUInt16BE(9, 2);
+  sof.writeUInt8(8, 4);
+  sof.writeUInt16BE(height, 5);
+  sof.writeUInt16BE(width, 7);
+
+  return Buffer.concat([
+    Buffer.from([0xff, 0xd8]),
+    app0,
+    sof,
+    Buffer.alloc(32, 9),
+    Buffer.from([0xff, 0xd9]),
+  ]);
+}
+
+/**
  * A structurally valid MP4 of a given frame and duration, built rather than
  * committed as a binary — the same reason `png` is built.
  *
