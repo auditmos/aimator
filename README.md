@@ -21,6 +21,13 @@ scenariusz i assety, po gotowy film sklejony z klipów.
 
 Tryby dźwięku, które ten proces obsługuje w całości, to `music-and-effects` i `narration`.
 
+**„Krótka" znaczy tu kilkanaście minut.** `--duration` przyjmuje formalnie do 3600 s, ale
+praktyczna granica leży niżej i bierze się stąd, że etapy 1, 3 i 4 mieszczą **cały film
+w jednej odpowiedzi modelu**. Lista ujęć zużywa około 259 znaków na sekundę filmu, więc przy
+modelu z oknem wyjścia 64k tokenów wychodzi z tego mniej więcej 14 minut, a przy 32k — około
+siedmiu. Co musiałoby się zmienić, żeby dało się robić filmy godzinne, rozpisuje
+[issue #1](https://github.com/auditmos/aimator/issues/1).
+
 ## Podejście
 
 Produkcja jest rozbita na etapy, a **każdy etap konsumuje wyłącznie pliki wyprodukowane
