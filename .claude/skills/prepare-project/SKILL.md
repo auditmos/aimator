@@ -1,6 +1,6 @@
 ---
 name: prepare-project
-description: Run stage 0 of the animation pipeline — establish a project's shared creative rules and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
+description: Run stage 0 of the animation pipeline — establish a project's shared creative rules, its cast including the narrator's voice when an episode narrates, and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
 ---
 
 # Stage 0 — prepare a project and an episode
@@ -86,6 +86,26 @@ For each episode establish:
    Explain that in a speechless film on-screen text means short captions, and that
    `none` also excludes title cards and any text the plot needs to be understood.
 
+### The narrator's voice, when an episode asks for one
+
+An `audio` mode of `narration` or `dialogue-and-narration` puts a narrator in the film, and
+that narrator has to be cast. **Who reads the series is casting, not configuration** — the
+same reader comes back in episode seven exactly as the characters do — so it belongs to the
+project, beside the roster, and a later stage reads it from there.
+
+Ask for the provider's voice id and record it verbatim. You cannot derive it from a
+description of how the narrator should sound, and a voice nobody chose is not a decision,
+so **never invent one and never pick a plausible default**: ask, or leave it unset and say
+it is unset.
+
+Two things this is not. It is not *how* the narrator reads — stability, style and pace are
+direction, they live in their own file, and they are dialled in by ear once there is
+something to hear, which is stage 9's business and not yours. And it is not gated here:
+`aimator check` passes without a voice, because a film with no narration never has to make
+this decision. That makes it the one stage-0 decision a green check does not cover, so if
+an episode asks for narration and no voice is set, say so in your report — otherwise the
+user meets it as a refusal several paid stages later.
+
 ## 3. Save
 
 ```sh
@@ -96,6 +116,7 @@ aimator character describe <project-id> <character-id>
 aimator episode add <project-id> --source <NN-tytul.md>
 aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-effects \
   --language pl --subtitles pl --nature law-or-idea
+aimator project voice <project-id> --voice-id <id głosu>   # only when an episode narrates
 ```
 
 Add `--dry-run` to any of these to see what would be written without writing it.
@@ -139,6 +160,8 @@ aimator approve <project-id> [--note "<co zostało przeczytane>"]
 `check` passes when the rules carry no markers, the aspect ratio and the character basis
 are set, the recorded digests still match and every episode has all five decisions. That is
 a **file** check: it does not confirm that the rules make sense or that the ideas are good.
+It also says nothing about the narrator's voice, which gates stage 9 alone — a pass is not
+evidence that a narrated episode is ready to reach it.
 
 `approve` is where somebody says they do. Run it only after the user has read the rules and
 said yes — never on your own initiative, and never to make a report look finished. It
