@@ -20,7 +20,7 @@
     "prepare": "simple-git-hooks",
     "test": "vitest run",
     "test:watch": "vitest",
-    "types": "tsc --noEmit",
+    "types": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "unused": "knip",
     "update": "taze --interactive"
   },

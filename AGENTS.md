@@ -501,7 +501,7 @@ function parsePort(raw: string): Result<number> {
 | `pnpm dev` | Run the CLI from source with tsx (no build step) |
 | `pnpm lint` | Check code with Biome |
 | `pnpm lint:fix` | Auto-fix lint/format issues |
-| `pnpm types` | Type-check with tsc --noEmit |
+| `pnpm types` | Type-check with tsc --noEmit — **two projects, one command**. `tsconfig.json` holds `src` alone, because `rootDir: "src"` is what tsup reads when it rolls up the declarations and a wider root would move them. The configs in the repo root are therefore a second project, `tsconfig.tools.json`, which `include`s `*.config.ts` and which the root **references** — not for `tsc -b`, which nothing here runs, but because a referenced project is the only thing that makes the editor's language server put those files in it. Without the reference they land in an inferred project, type-checked against TypeScript's defaults instead of this repo's `strict`, and nothing in CI reads them at all. A new config in the root is covered the moment it is named `*.config.ts`, and silently uncovered if it is not. |
 | `pnpm test` | Run tests with Vitest |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm unused` | Detect unused code with Knip |
