@@ -342,12 +342,67 @@ interface Parsed {
   readonly values: Record<string, boolean | string | string[] | undefined>;
 }
 
+/** `-22`, `-0.5`, `-.5`: a value, never an option — this CLI declares no numeric ones. */
+const NEGATIVE_NUMBER = /^-(?:\d|\.\d)/;
+
+/**
+ * Joins a negative number onto the option it belongs to.
+ *
+ * `parseArgs` treats every token starting with `-` as an option, so
+ * `--music-db -22` leaves the flag without a value and fails as "ambiguous".
+ * That is deliberate on Node's side and not configurable — but here it breaks
+ * the **ordinary** case rather than an edge one: a bed sits *under* a voice, so
+ * every decibel this CLI takes is normally negative, and the `--music-db=-22`
+ * spelling that does work is a trap rather than an interface.
+ *
+ * The rewrite is narrow on purpose. It fires only when the option is declared
+ * to take a value **and** the next token is a number with a leading minus —
+ * which no option here can be, so nothing ambiguous is being guessed at.
+ * Everything else travels through untouched: positive numbers, boolean flags,
+ * the joined spelling, and anything past `--`.
+ */
+function joinNegatives(
+  argv: readonly string[],
+  options: ParseArgsConfig["options"]
+): readonly string[] {
+  const joined: string[] = [];
+  let at = 0;
+
+  while (at < argv.length) {
+    const token = argv[at] ?? "";
+
+    // Past the terminator nothing is an option, so nothing is rewritten.
+    if (token === "--") {
+      joined.push(...argv.slice(at));
+
+      return joined;
+    }
+
+    const name = token.startsWith("--") && !token.includes("=") ? token.slice(2) : null;
+    const next = argv[at + 1];
+    const takesValue = name !== null && options?.[name]?.type === "string";
+
+    if (takesValue && next !== undefined && NEGATIVE_NUMBER.test(next)) {
+      joined.push(`${token}=${next}`);
+      at += 2;
+      continue;
+    }
+
+    joined.push(token);
+    at += 1;
+  }
+
+  return joined;
+}
+
 function parse(argv: readonly string[], options: ParseArgsConfig["options"]): Result<Parsed> {
+  const merged = { ...COMMON_OPTIONS, ...options };
+
   try {
     const { positionals, values } = parseArgs({
       allowPositionals: true,
-      args: [...argv],
-      options: { ...COMMON_OPTIONS, ...options },
+      args: [...joinNegatives(argv, merged)],
+      options: merged,
       strict: true,
     });
 

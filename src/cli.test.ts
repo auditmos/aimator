@@ -731,3 +731,34 @@ describe("--stage sound-design", () => {
     expect(track.text).not.toContain("unknown command");
   });
 });
+
+/**
+ * Every decibel this stage takes is normally negative — a bed sits *under* a
+ * voice — so `--music-db -22` is the ordinary case rather than an edge one.
+ * `parseArgs` refuses it on its own, because it cannot tell a value starting
+ * with a dash from the next option, and the `--music-db=-22` spelling that
+ * does work is a trap rather than an interface.
+ */
+describe("a flag whose value is a negative number", () => {
+  it("should take the level as a separate argument", async () => {
+    const result = await cli(
+      "sound-design",
+      "levels",
+      "demo",
+      "--music-db",
+      "-22",
+      "--duck-db",
+      "-12",
+      "--dry-run"
+    );
+
+    expect(result.text).not.toContain("ambiguous");
+    expect(result.text).toContain("-22");
+  });
+
+  it("should still take the joined spelling", async () => {
+    const result = await cli("sound-design", "levels", "demo", "--music-db=-22", "--dry-run");
+
+    expect(result.text).toContain("-22");
+  });
+});
