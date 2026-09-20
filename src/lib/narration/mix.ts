@@ -106,25 +106,50 @@ function intent(finished: boolean, blocked: boolean): MixReport["state"] {
   return blocked ? "blocked" : "planned";
 }
 
-/** `--dry-run`: the whole placement, the engine, and no write. */
+/**
+ * `--dry-run`: the whole placement, the engine, and no write.
+ *
+ * What it says to do next has to account for a mix that already exists, or it
+ * sends a person back round a loop they have already closed — and past the one
+ * thing this stage actually needs from them, which is listening to the
+ * narration over the picture and saying yes. So a finished mix answers the same
+ * way `idle` does; only an unfinished one points at the mix.
+ */
 function preview(
   input: MixInput,
   report: Partial9,
   problems: readonly string[],
   audio: readonly string[],
-  finished: boolean
+  state: { readonly approved: boolean; readonly finished: boolean }
 ): MixReport {
   const blocked = problems.length > 0;
+  const { finished } = state;
 
   return {
     ...report,
-    nextStep: blocked
-      ? "usuń powyższe przeszkody przed miksem"
-      : `aimator narration mix ${input.projectId} ${input.episodeId} --track ${input.track}`,
+    nextStep: nextStep(input, { ...state, blocked }),
     problems: [...problems, ...audio],
     ready: !(blocked || finished),
     state: intent(finished, blocked),
   };
+}
+
+/** Where a person goes from here, in the order the obstacles actually bite. */
+function nextStep(
+  input: MixInput,
+  state: { readonly approved: boolean; readonly blocked: boolean; readonly finished: boolean }
+): string {
+  if (state.blocked) {
+    return "usuń powyższe przeszkody przed miksem";
+  }
+
+  if (!state.finished) {
+    return `aimator narration mix ${input.projectId} ${input.episodeId} --track ${input.track}`;
+  }
+
+  return state.approved
+    ? `odcinek "${input.episodeId}" na torze ${input.track} ma narrację i jest przyjęty`
+    : `obejrzyj całość z narracją i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`;
 }
 
 /** Nothing to do: the mix exists and nobody asked for another one. */
@@ -205,7 +230,20 @@ export async function generateMix(input: MixInput): Promise<Result<MixReport>> {
   };
 
   if (input.mode === "dry-run") {
-    return ok(preview(input, report, problems, missingSound(stage9.data.settings), finished));
+    // The raw field is enough here, and stage 10's is not — which is a real
+    // difference rather than an inconsistency. Every input of *this* mix is
+    // gated: the script, each bought line and `episode.mp4` all have to be
+    // approved before the mix may happen at all, so an input that drifted has
+    // already put a problem in `problems` and `blocked` answers first. Stage
+    // 10 has one input nothing gates — `mix.json`, whose whole point is to be
+    // turned freely — so there the approval has to be checked against the
+    // bytes. If an ungated input ever appears here, this stops being true.
+    return ok(
+      preview(input, report, problems, missingSound(stage9.data.settings), {
+        approved: record?.review.status === "approved",
+        finished,
+      })
+    );
   }
 
   if (problems.length > 0) {

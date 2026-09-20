@@ -994,3 +994,112 @@ describe("what the full mix hands the engine, and what it refuses", () => {
     expect(result.ok ? result.data.problems.join(" ") : "").toContain("gra bez muzyki");
   });
 });
+
+/**
+ * What a preview says to do next, once there is nothing left to mix.
+ *
+ * A dry run that points at the command it just told you is finished sends a
+ * person back round a loop they have already closed — and here it points past
+ * the one thing the pipeline actually needs from them, which is a human
+ * listening to the whole film and saying yes.
+ */
+describe("the next step a preview names", () => {
+  it("should point at the approval once a mix exists", async () => {
+    const calls = transport();
+
+    await makeCut({ root, track: "gpt-image", workspace });
+    await boughtStems(calls);
+    await narrate();
+    await master();
+
+    const preview = await master({ mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.nextStep : "").toContain("approve");
+  });
+
+  it("should say the film is accepted once somebody has accepted it", async () => {
+    const calls = transport();
+
+    await makeCut({ root, track: "gpt-image", workspace });
+    await boughtStems(calls);
+    await narrate();
+    await master();
+    await approveMaster({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "test",
+      track: "gpt-image",
+      workspace,
+    });
+
+    const preview = await master({ mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.nextStep : "").toContain("przyjęty");
+  });
+
+  /** A mix that has not happened still points at the mix. */
+  it("should still point at the mix when there is none", async () => {
+    const calls = transport();
+
+    await makeCut({ root, track: "gpt-image", workspace });
+    await boughtStems(calls);
+    await narrate();
+
+    const preview = await master({ mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.nextStep : "").toContain("sound-design mix");
+  });
+});
+
+/**
+ * A preview may not claim an approval that `check` would call lapsed.
+ *
+ * "Approved" is never the raw field on its own: an approval is bound to the
+ * bytes it was given for, so a recorded input that has moved since lapses it.
+ * A dry run reading only `review.status` would tell somebody their film is
+ * accepted while `check` told them the opposite — which is worse than the
+ * unhelpful answer it replaced, because it is wrong rather than merely stale.
+ */
+describe("what a preview may call accepted", () => {
+  it("should not call a mix accepted once its levels have moved", async () => {
+    const calls = transport();
+
+    await makeCut({ root, track: "gpt-image", workspace });
+    await boughtStems(calls);
+    await narrate();
+    await master();
+    await approveMaster({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "test",
+      track: "gpt-image",
+      workspace,
+    });
+    await setLevels({
+      duckDb: null,
+      duckReleaseMs: null,
+      effectsDb: null,
+      mode: "apply",
+      musicDb: -24,
+      projectId: PROJECT,
+      workspace,
+    });
+
+    const preview = await master({ mode: "dry-run" });
+    const status = await checkMaster({
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      track: "gpt-image",
+      workspace,
+    });
+
+    expect(status.ok ? status.data.approved : null).toBe(false);
+    expect(preview.ok ? preview.data.nextStep : "").not.toContain("przyjęty");
+  });
+});

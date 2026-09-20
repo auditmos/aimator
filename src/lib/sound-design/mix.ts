@@ -122,25 +122,84 @@ function intent(finished: boolean, blocked: boolean): MasterReport["state"] {
   return blocked ? "blocked" : "planned";
 }
 
-/** `--dry-run`: the whole placement, the levels, the engine, and no write. */
+/**
+ * `--dry-run`: the whole placement, the levels, the engine, and no write.
+ *
+ * What it says to do next has to account for a mix that already exists, or it
+ * sends a person back round a loop they have already closed — and past the one
+ * thing this stage actually needs from them, which is listening to the whole
+ * film and saying yes. So a finished mix answers the same way `idle` does; only
+ * an unfinished one points at the mix.
+ */
 function preview(
   input: MasterInput,
   report: Partial10,
   problems: readonly string[],
   notes: readonly string[],
-  finished: boolean
+  state: { readonly approved: boolean; readonly finished: boolean }
 ): MasterReport {
   const blocked = problems.length > 0;
+  const { approved, finished } = state;
 
   return {
     ...report,
-    nextStep: blocked
-      ? "usuń powyższe przeszkody przed miksem"
-      : `aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track}`,
+    nextStep: nextStep(input, { approved, blocked, finished }),
     problems: [...problems, ...notes],
     ready: !(blocked || finished),
     state: intent(finished, blocked),
   };
+}
+
+/**
+ * Whether this mix still carries a valid yes.
+ *
+ * Never the raw `review.status` on its own. An approval is bound to the bytes
+ * it was given for, so a recorded input that has moved since lapses it — which
+ * is exactly what `check` reports and what a preview must not contradict. The
+ * comparison is against the inputs *this run* would record, so it costs no
+ * extra read: the files have already been opened to decide whether the mix may
+ * happen at all.
+ */
+function accepted(
+  record:
+    | { readonly inputs: readonly RecordedFile[]; readonly review: { status: string } }
+    | undefined,
+  inputs: readonly RecordedFile[]
+): boolean {
+  if (record?.review.status !== "approved") {
+    return false;
+  }
+
+  // Both directions, and the second is not symmetry for its own sake. A mix
+  // made before anybody dialled the levels holds no entry for `mix.json` at
+  // all, so nothing in it can drift — and a check that only looked for moved
+  // bytes would call that mix current after somebody changed how the series
+  // sounds. An input that has appeared since lapses an approval exactly as one
+  // that has moved does.
+  return (
+    record.inputs.length === inputs.length &&
+    record.inputs.every((entry) =>
+      inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
+    )
+  );
+}
+
+/** Where a person goes from here, in the order the obstacles actually bite. */
+function nextStep(
+  input: MasterInput,
+  state: { readonly approved: boolean; readonly blocked: boolean; readonly finished: boolean }
+): string {
+  if (state.blocked) {
+    return "usuń powyższe przeszkody przed miksem";
+  }
+
+  if (!state.finished) {
+    return `aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track}`;
+  }
+
+  return state.approved
+    ? `odcinek "${input.episodeId}" na torze ${input.track} ma pełną ścieżkę i jest przyjęty`
+    : `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`;
 }
 
 /** Nothing to do: the mix exists and nobody asked for another one. */
@@ -231,6 +290,12 @@ export async function generateMaster(input: MasterInput): Promise<Result<MasterR
   ];
   const record = track.data.stage.artifacts[MIXED];
   const finished = record?.status === "completed" && !input.regenerate;
+  const inputs = [
+    ...stems.data.inputs,
+    ...(speaks ? lines.data.inputs : []),
+    ...track.data.inputs,
+    ...(levels.data.input === null ? [] : [levels.data.input]),
+  ];
   const notes = [
     ...missingDialogue(stage10.data.settings),
     ...musicGap(placement.placed, track.data.actualSeconds),
@@ -246,7 +311,9 @@ export async function generateMaster(input: MasterInput): Promise<Result<MasterR
   };
 
   if (input.mode === "dry-run") {
-    return ok(preview(input, report, problems, notes, finished));
+    return ok(
+      preview(input, report, problems, notes, { approved: accepted(record, inputs), finished })
+    );
   }
 
   if (problems.length > 0) {
@@ -269,12 +336,7 @@ export async function generateMaster(input: MasterInput): Promise<Result<MasterR
   try {
     return await lay(input, {
       actualSeconds: track.data.actualSeconds,
-      inputs: [
-        ...stems.data.inputs,
-        ...(speaks ? lines.data.inputs : []),
-        ...track.data.inputs,
-        ...(levels.data.input === null ? [] : [levels.data.input]),
-      ],
+      inputs,
       levels: levels.data.levels,
       notes,
       paths: track.data.paths,

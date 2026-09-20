@@ -16,6 +16,7 @@ import { readStage0Inputs } from "../project/index.js";
 import { validateShotList } from "../shot-list/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../workspace.js";
 import {
+  approveMix,
   approveNarration,
   checkNarration,
   generateMix,
@@ -877,5 +878,55 @@ describe("checkNarration after the reading changes", () => {
 
     expect(after.ok ? after.data.lines.every((one) => one.approved) : null).toBe(false);
     expect(after.ok ? after.data.problems.join(" ") : null).toContain("domyślnych ustawieniach");
+  });
+});
+
+/**
+ * What a preview says to do next, once there is nothing left to mix.
+ *
+ * A dry run that points at the command it just told you is finished sends a
+ * person back round a loop they have already closed — and here it points past
+ * the one thing stage 9 actually needs from them, which is listening to the
+ * narration over the picture and saying yes.
+ */
+describe("the next step a mix preview names", () => {
+  it("should point at the approval once a mix exists", async () => {
+    const calls = transport();
+
+    await makeCut({ root, track: "gpt-image", workspace });
+    await generate(calls);
+    await approveScript();
+    await generate(calls);
+    await approveLines();
+    await mix();
+
+    const preview = await mix({ mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.nextStep : "").toContain("approve");
+  });
+
+  it("should say the film is accepted once somebody has accepted it", async () => {
+    const calls = transport();
+
+    await makeCut({ root, track: "gpt-image", workspace });
+    await generate(calls);
+    await approveScript();
+    await generate(calls);
+    await approveLines();
+    await mix();
+    await approveMix({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      note: null,
+      projectId: PROJECT,
+      reviewer: "test",
+      track: "gpt-image",
+      workspace,
+    });
+
+    const preview = await mix({ mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.nextStep : "").toContain("przyjęty");
   });
 });
