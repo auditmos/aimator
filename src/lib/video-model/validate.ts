@@ -98,7 +98,14 @@ export function clipDuration(seconds: number): Result<number> {
 /**
  * Is this the clip the request asked for?
  *
- * The duration is compared because it is what was ordered and what was billed.
+ * The duration is compared when something was ordered. `seconds: null` means
+ * nothing was — stage 9 reads a finished cut whose length stage 8 already
+ * judged, and it needs the number rather than a second opinion on it. Stated in
+ * the type rather than passed as an impossible expectation, because a caller
+ * that had to spell "no expectation" as a number nobody matches would be
+ * relying on arithmetic to mean something it does not say.
+ *
+ * Where it is compared, it is compared because it is what was ordered and billed.
  * The frame is compared against the episode's ratio rather than against an
  * exact size, because that is what the request actually stated: the entry frame
  * pins the ratio and the provider picks the pixels inside its resolution tier.
@@ -108,7 +115,7 @@ export function clipDuration(seconds: number): Result<number> {
  */
 export function validateVideo(
   bytes: Buffer,
-  expected: { readonly aspectRatio: string; readonly seconds: number }
+  expected: { readonly aspectRatio: string; readonly seconds: number | null }
 ): Result<VideoVerdict> {
   if (bytes.length > MAX_BYTES) {
     return err(
@@ -140,7 +147,7 @@ export function validateVideo(
     );
   }
 
-  if (Math.abs(seconds - expected.seconds) >= SECOND) {
+  if (expected.seconds !== null && Math.abs(seconds - expected.seconds) >= SECOND) {
     return err(
       new VideoError(
         "duration",

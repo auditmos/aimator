@@ -12,7 +12,7 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 8 are implemented. Stage 9 is a declared contract, not working code.
+Stages 0 through 9 are implemented. Stage 10 is a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -43,6 +43,17 @@ engine, which is why `producer.kind` grew a third value; its input the contract 
 than stored; and its result is the picture cut — silent by declaration and loudly so,
 because a soundtrack has to be written against the film that exists rather than the plan,
 which makes it a row *below* this one rather than a half of it.
+Stage 9 is the first that buys from **two providers** and the first whose artifacts live at
+**two levels of the tree**: the words are shared like every text stage's and the mix is per
+track like every video stage's. It writes none of the narration — stage 1 already did,
+under a prompt that asks for speech in the film's language, and stage 3 carried it into
+each shot's `Audio` prose — so a model lifts it and the validator proves the lift by
+finding every sentence inside the shot it names. Its two halves take their refusals from
+different rows: the bought bytes are published as they arrived, because stage 8 cuts what
+came back, while where a line sits is refused rather than nudged, because stage 7 refuses a
+length no model renders. It cannot fulfil any of the four sound modes on its own, since all
+of them include music and effects, so it reports what is missing and the row below it is
+declared rather than half-built.
 
 ## Project Structure
 
@@ -167,6 +178,26 @@ src/
     │   ├── generate.ts   # Internal — the command: one lock, one cut, no bill
     │   ├── review.ts     # Internal — the verdict on the whole, and the approval
     │   └── index.test.ts    # Gate/derived plan/drift/no-engine, through the entry
+    ├── voice-model/   # Folder form — one billed speech call (stage 9)
+    │   ├── index.ts       # Public: runVoiceStage, validateSpeech, billedCharacters,
+    │   │                  #         utteranceLength
+    │   ├── client.ts      # Internal — the endpoint, the container, redaction
+    │   ├── attempt.ts     # Internal — submitted, archive, resume, publish
+    │   ├── validate.ts    # Internal — the WAV verdict, pure and offline
+    │   └── index.test.ts  # The verdict, the bill, the limit — through the entry
+    ├── narration/    # Folder form — index.ts is the only entry (stage 9)
+    │   ├── index.ts      # Public: generateNarration, generateMix, checkNarration,
+    │   │                 #         checkMix, approveNarration, approveMix,
+    │   │                 #         validateNarration
+    │   ├── prompt.ts     # Internal — the instruction that forbids writing anything
+    │   ├── validate.ts   # Internal — the verdict, including "lifted, not invented"
+    │   ├── plan.ts       # Internal — two gates, and plan seconds resolved per track
+    │   ├── generate.ts   # Internal — the script, then the lines it authorises
+    │   ├── mix.ts        # Internal — the per-track half; buys nothing
+    │   ├── review.ts     # Internal — two reviews, because there are two levels
+    │   └── index.test.ts    # Lift/gate/bill/placement, through the entry
+    ├── muxer.ts      # Single-file form — the local engine, shared by stages 8 and 9
+    ├── muxer.test.ts
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
@@ -214,12 +245,21 @@ the verdict on it are one question asked once. Stage 2 keeps its own numbering: 
 the *position*, and what follows the equals sign is each stage's vocabulary, which for stage
 2 is file names because its references never had manifest ids.
 
-`lib/assembly` keeps ffmpeg **inside** it, in `mux.ts`, and that is the rule read correctly
-rather than an exception to it. `lib/image-model` was promoted at the second caller because
-stage 6 was a contracted certainty that would draw one image exactly as stage 5 does; no row
-of the table promises a second muxer, and a module promoted for one caller is a widened
-interface bought with nothing. If stage 9 turns out to mix audio with the same program, that
-is the second caller and the promotion happens then — at the caller, not at the guess.
+`lib/muxer` is that promise come due. `lib/assembly` kept ffmpeg inside it while stage 8
+was its only caller, because a module promoted for one caller is a widened interface bought
+with nothing — and this file said that if stage 9 turned out to mix with the same program,
+that would be the second caller and the promotion would happen then. It does, so it did:
+at the caller, not at the guess. The module grew one operation and kept its shape —
+**operations, never a process**. There is no `run(args)` in it, because a generic escape
+hatch would let any caller spell anything, which is the widened interface it exists to
+prevent. A stage says what it wants done; how ffmpeg says it stays inside.
+
+`lib/voice-model` exists for the reason `lib/video-model` does: the order of operations
+*is* the contract of a billed call, and a speech call's is not a text call's. A text call
+answers with a document this pipeline then validates as prose; a speech call answers with
+bytes — and what it charges for is not the answer but the question, because this provider
+bills per character of the text it is handed. So the number every stage prints before it
+spends, the count of calls, stops being the bill here, and both numbers are printed instead.
 
 The same module is also why `producer.kind` has three values instead of two. It is worth
 saying plainly, because a schema change in a shared module is the kind of thing that looks
@@ -246,7 +286,10 @@ Nine rules that stop an agent from re-creating the mess this tool was built to r
 Full contract in [docs/pipeline.md](docs/pipeline.md).
 
 1. **One state filename: `<stage>.stage.json`.** One shape for every stage. Never invent
-   `screenplay-state.json`, `references-state.json` or `downstream-status.json`.
+   `screenplay-state.json`, `references-state.json` or `downstream-status.json`. One file
+   per stage **per directory the stage writes to** — stage 2 holds one per character per
+   track, and stage 9 holds one under the episode and one under each track, because its
+   words are shared and its mix is not.
 2. **The image-model track is a directory level** (`gpt-image/`, `seedream/`), never a
    filename prefix and never a parallel tree. **A character is a directory level too**
    (`characters/ewa/`, `characters/tata/`), for the same reason.
@@ -270,7 +313,9 @@ Full contract in [docs/pipeline.md](docs/pipeline.md).
    of the task, generated at call time and never stored; a planning stage may write an id
    into prose only because that list is guaranteed. Never a filename, a path or a track
    name — the id resolves to a file at the sender, per track, which is what lets one prompt
-   package serve both. `character/prompt.ts` shows the shape; stages 5–7 owe the same.
+   package serve both. `character/prompt.ts` shows the shape; stages 5–7 owe the same. It
+   does not bind stage 9: a speech call carries no attachments, and the whole purpose of the
+   list is addressing one by position.
 9. **An instruction to a model is written in English; material the model works from stays
    in the language it was authored in.** Role decides, not readership. Every stage's task
    text and every artifact that is itself a prompt — `prompts/**`, including its `subject`
@@ -375,6 +420,14 @@ stages 5, 6 and 7. It is **not a domain**: nothing under `src/lib` imports it,
 `src/index.ts` does not re-export it and `tsup` does not bundle it, which is why it sits
 outside the layer table rather than inside it.
 
+`makeCut` joined them at stage 9, which is the first stage that needs an episode already
+assembled and needs one on both tracks. It carries the fixture's own `muxer`, because the
+clips this fixture builds are structurally valid MP4s rather than decodable ones — the real
+engine is exercised where it is the thing under test, in `muxer.test.ts`, against inputs it
+made itself. `NARRATION` and the `narration` option are the same line drawn again: the
+shots carry what a narrator says only where a test asks for it, because a longer `Audio`
+field would quietly change the prose stages 5 to 8 attach verbatim.
+
 `makeTrack` was promoted for the same reason and at the same threshold as the rest of it:
 stage 8 would have been the fourth copy of the stage 5-to-6 build-up and the second of stage
 7's. It deliberately does **not** replace the instrumented transports stages 5, 6 and 7
@@ -447,6 +500,15 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   follows the model rather than the directory it writes into. Stage 7's entry frames reuse
   `AIMATOR_IMAGE_MODEL_<TRACK>` for the opposite reason: a different image model inside one
   track would put two hands on the same drawing.
+- Stage 9 carries **two** model variables, because it buys from two providers:
+  `AIMATOR_NARRATION_MODEL` lifts the script and `AIMATOR_VOICE_MODEL` reads it. The second
+  is one variable for both tracks, for the reason `AIMATOR_VIDEO_MODEL` is: a spoken
+  sentence is not drawn, so a voice has no idea which of the two films it will sit over.
+  Neither carries the **voice**. Which voice reads the series is casting — it recurs between
+  episodes exactly as the cast does — so it is stored in `project.json` as
+  `narratorVoiceId`, and it gates stage 9 alone. In a variable, the second episode would get
+  a different narrator from a different shell with nothing on disk saying anybody decided
+  that, which is the silent default the cast was invented to remove.
 - `AIMATOR_FFMPEG` is the only variable here that names a **program** rather than a model or
   a key, and the only one whose absence has a sensible answer. Every other one refuses a
   default because a model nobody chose is not a decision; "the ffmpeg on this machine" is

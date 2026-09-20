@@ -86,11 +86,18 @@ export function localProducer(engine: string): Producer {
  * What a paid call produced. The endpoint, model and prompt version belong in
  * the artifact because "which prompt produced this" has to stay answerable
  * from the workspace, long after the source tree has moved on.
+ *
+ * `promptVersion` is nullable because stage 9 found a paid call with no
+ * instruction of ours behind it: a speech provider is handed the film's own
+ * sentence, travelling verbatim, and a version number on somebody else's words
+ * would be a claim about authorship rather than a record of provenance. That
+ * stage answers "what would have to run again" with the model and the voice,
+ * both of which land in `model`.
  */
 export function modelProducer(input: {
   readonly endpoint: string;
   readonly model: string;
-  readonly promptVersion: number;
+  readonly promptVersion: number | null;
 }): Producer {
   return {
     endpoint: input.endpoint,

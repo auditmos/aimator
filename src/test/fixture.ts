@@ -1,7 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sha256Of } from "../lib/artifact/index.js";
+import { approveAssembly, generateAssembly } from "../lib/assembly/index.js";
 import { approveClips, generateClips } from "../lib/clips/index.js";
+import type { Muxer } from "../lib/muxer.js";
 import { approveOpeningFrame, generateOpeningFrame } from "../lib/opening-frame/index.js";
 import {
   addCharacter,
@@ -10,9 +12,11 @@ import {
   initProject,
   setCharacterBasis,
   setEpisodeSettings,
+  setNarratorVoice,
 } from "../lib/project/index.js";
 import { approvePromptPackage, generatePromptPackage } from "../lib/prompt-package/index.js";
 import { approveReferences, generateReferences } from "../lib/references/index.js";
+import { ok } from "../lib/result.js";
 import { approveScreenplay, generateScreenplay } from "../lib/screenplay/index.js";
 import { approveShotList, generateShotList } from "../lib/shot-list/index.js";
 import { type ImageTrack, imageTracks, type Workspace } from "../lib/workspace.js";
@@ -135,6 +139,59 @@ export function mp4(options: {
   ]);
 }
 
+/**
+ * A structurally valid PCM WAV of a given length, built rather than committed
+ * as a binary — the same reason `mp4` is built.
+ *
+ * It carries exactly what the verdict reads: a RIFF/WAVE header, an `fmt `
+ * chunk stating the rate, the channels and the depth, and a `data` chunk whose
+ * size is the whole of the duration. `junk` puts an unknown chunk in front of
+ * the ones that matter, because a real encoder does and a reader that assumes
+ * a fixed layout would work here and fail there.
+ */
+export function wav(options: {
+  readonly channels?: number;
+  readonly junk?: boolean;
+  readonly sampleRate?: number;
+  readonly seconds: number;
+}): Buffer {
+  const { channels = 1, junk = false, sampleRate = 24_000, seconds } = options;
+  const blockAlign = channels * 2;
+  const byteRate = sampleRate * blockAlign;
+  const format = Buffer.alloc(16);
+
+  format.writeUInt16LE(1, 0);
+  format.writeUInt16LE(channels, 2);
+  format.writeUInt32LE(sampleRate, 4);
+  format.writeUInt32LE(byteRate, 8);
+  format.writeUInt16LE(blockAlign, 12);
+  format.writeUInt16LE(16, 14);
+
+  const body = Buffer.concat([
+    Buffer.from("WAVE", "ascii"),
+    ...(junk ? [chunk("LIST", Buffer.from("INFOhand-rolled", "ascii"))] : []),
+    chunk("fmt ", format),
+    chunk("data", Buffer.alloc(Math.round(seconds * byteRate), 0)),
+  ]);
+
+  return Buffer.concat([chunk("RIFF", body)]);
+}
+
+/** One RIFF chunk: a four-character id, a little-endian size, and the payload. */
+function chunk(id: string, payload: Buffer): Buffer {
+  const head = Buffer.alloc(8);
+
+  head.write(id, 0, "ascii");
+  head.writeUInt32LE(payload.length, 4);
+
+  // RIFF pads an odd payload to an even boundary; the size field does not count it.
+  return Buffer.concat([
+    head,
+    payload,
+    payload.length % 2 === 0 ? Buffer.alloc(0) : Buffer.alloc(1),
+  ]);
+}
+
 function box(type: string, payload: Buffer): Buffer {
   const head = Buffer.alloc(8);
   head.writeUInt32BE(payload.length + 8, 0);
@@ -189,7 +246,33 @@ function screenplay(): string {
     .join("\n");
 }
 
-function shot(id: string, scene: string, clip: string, range: string, cast: string): string {
+/**
+ * What the narrator says in one shot, when the episode has a narrator.
+ *
+ * Stage 9 lifts these sentences rather than writing them, and its validator
+ * proves the lift by finding each one inside the shot it names — so a fixture
+ * that wants a narrated episode has to put the words where stage 1 would have
+ * put them: in the prose of the Audio field, beside the music and the rain.
+ */
+export const NARRATION = {
+  U01: "Ewa została sama z burzą",
+  U02: "Tata usiadł obok",
+  U03: "Jeszcze grzmiało",
+  U04: "Burza przeszła",
+} as const satisfies Readonly<Record<string, string>>;
+
+function shot(
+  id: string,
+  scene: string,
+  clip: string,
+  range: string,
+  cast: string,
+  narrated = false
+): string {
+  const line: string | undefined = (NARRATION as Readonly<Record<string, string>>)[id];
+  const audio =
+    narrated && line !== undefined ? `Deszcz o szybę; narrator: „${line}”.` : "Deszcz o szybę.";
+
   return [
     `### ${id} | ${scene} | ${clip} | ${range}`,
     "",
@@ -199,7 +282,7 @@ function shot(id: string, scene: string, clip: string, range: string, cast: stri
     "- Expression: Zaciśnięte usta.",
     "- Camera: Statyczny kadr.",
     `- Cast: ${cast}`,
-    "- Audio: Deszcz o szybę.",
+    `- Audio: ${audio}`,
     "- Text: none",
     "- Start state: Ewa stoi przy krześle.",
     "- End state: Ewa siedzi.",
@@ -227,15 +310,15 @@ function shot(id: string, scene: string, clip: string, range: string, cast: stri
  */
 export type ShotListShape = "three-clips" | "two-clips" | "unrenderable-clip";
 
-function shotList(shape: ShotListShape): string {
+function shotList(shape: ShotListShape, narrated: boolean): string {
   if (shape === "two-clips") {
-    return twoClips();
+    return twoClips(narrated);
   }
 
-  return shape === "three-clips" ? threeClips() : unrenderableClips();
+  return shape === "three-clips" ? threeClips(narrated) : unrenderableClips(narrated);
 }
 
-function twoClips(): string {
+function twoClips(narrated: boolean): string {
   return [
     "## Plan\n\nDwa klipy, kadr 16:9.\n",
     [
@@ -257,17 +340,17 @@ function twoClips(): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-10s", "ewa"),
-      shot("U02", "S02", "C01", "10-15s", "ewa,tata"),
-      shot("U03", "S02", "C02", "15-20s", "tata"),
-      shot("U04", "S03", "C02", "20-30s", "ewa,tata"),
+      shot("U01", "S01", "C01", "0-10s", "ewa", narrated),
+      shot("U02", "S02", "C01", "10-15s", "ewa,tata", narrated),
+      shot("U03", "S02", "C02", "15-20s", "tata", narrated),
+      shot("U04", "S03", "C02", "20-30s", "ewa,tata", narrated),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
 }
 
 /** The same thirty seconds, cut so that every way of seeding a clip appears. */
-function threeClips(): string {
+function threeClips(narrated: boolean): string {
   return [
     "## Plan\n\nTrzy klipy, kadr 16:9.\n",
     [
@@ -295,9 +378,9 @@ function threeClips(): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-10s", "ewa"),
-      shot("U02", "S02", "C02", "10-20s", "ewa,tata"),
-      shot("U03", "S03", "C03", "20-30s", "tata"),
+      shot("U01", "S01", "C01", "0-10s", "ewa", narrated),
+      shot("U02", "S02", "C02", "10-20s", "ewa,tata", narrated),
+      shot("U03", "S03", "C03", "20-30s", "tata", narrated),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
@@ -311,7 +394,7 @@ function threeClips(): string {
  * the episode's duration. The video model does not render anything under four
  * seconds, so this is the plan stage 7 has to refuse — before it spends.
  */
-function unrenderableClips(): string {
+function unrenderableClips(narrated: boolean): string {
   return [
     "## Plan\n\nCztery klipy, pierwszy bardzo krótki, kadr 16:9.\n",
     [
@@ -345,10 +428,10 @@ function unrenderableClips(): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-3s", "ewa"),
-      shot("U02", "S01", "C02", "3-10s", "ewa,tata"),
-      shot("U03", "S02", "C03", "10-20s", "ewa,tata"),
-      shot("U04", "S03", "C04", "20-30s", "tata"),
+      shot("U01", "S01", "C01", "0-3s", "ewa", narrated),
+      shot("U02", "S01", "C02", "3-10s", "ewa,tata", narrated),
+      shot("U03", "S02", "C03", "10-20s", "ewa,tata", narrated),
+      shot("U04", "S03", "C04", "20-30s", "tata", narrated),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
@@ -508,16 +591,33 @@ interface UpstreamOptions {
    * would silently change what one of them asserts.
    */
   readonly approvePackage: boolean;
-  readonly root: string;
-  readonly rules?: string;
-  readonly scratch: string;
   /**
    * Which cut of the same thirty seconds the shot list plans. Two clips by
    * default; three when a test needs both ways of seeding a later clip, which
    * only a third one can show; and one cut so short no video model renders it,
    * for the stage that has to refuse it before spending anything.
    */
+  /**
+   * Whether the shots carry what a narrator says.
+   *
+   * Off by default, because the episodes stages 5 to 8 test are silent and a
+   * longer Audio field would quietly change the prose they attach verbatim.
+   * Stage 9 turns it on, which is the only place the words matter.
+   */
+  readonly narration?: boolean;
+  readonly root: string;
+  readonly rules?: string;
+  readonly scratch: string;
   readonly shotList?: ShotListShape;
+  /**
+   * Which voice reads the series, cast before stage 0 is approved.
+   *
+   * Cast here rather than by the test, because that is when a real series casts
+   * one: `project.json` is a recorded input of every stage below it, so naming
+   * a narrator after the shot list has been accepted is input drift — real,
+   * correct, and paid for with a re-approval nobody wants inside a fixture.
+   */
+  readonly voiceId?: string;
   readonly workspace: Workspace;
 }
 
@@ -569,6 +669,15 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
     sourcePath: source,
     workspace,
   });
+  if (options.voiceId !== undefined) {
+    await setNarratorVoice({
+      mode: "apply",
+      projectId: PROJECT,
+      voiceId: options.voiceId,
+      workspace,
+    });
+  }
+
   await setEpisodeSettings({
     episodeId: EPISODE,
     mode: "apply",
@@ -621,7 +730,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
   await generateShotList({
     apiKey: API_KEY,
     episodeId: EPISODE,
-    fetch: respondWith(completion(shotList(shape))),
+    fetch: respondWith(completion(shotList(shape, options.narration ?? false))),
     maxOutputTokens: 24_000,
     mode: "apply",
     model: "gpt-6-astra",
@@ -847,6 +956,83 @@ function videoProvider(clipSeconds: Readonly<Record<string, number>>): typeof fe
       })
     );
   }) as unknown as typeof fetch;
+}
+
+/**
+ * A muxer for the stages that need a finished film rather than a finished
+ * muxer.
+ *
+ * The clips this fixture builds are structurally valid MP4s rather than
+ * decodable ones — they carry the boxes every verdict reads and nothing else —
+ * so a real ffmpeg has nothing to concatenate. That is the right trade: the
+ * real engine is exercised where it is the thing under test, in
+ * `muxer.test.ts`, against inputs it made itself. Here what matters is that
+ * the stage called it with the right arguments and published what came back.
+ */
+export function muxer(): Muxer {
+  return {
+    concat: async (input) => {
+      const { writeFile: write } = await import("node:fs/promises");
+      const seconds = CUT_SECONDS;
+
+      await write(input.target, mp4({ height: 1080, seconds, width: 1920 }));
+
+      return ok({ argv: ["ffmpeg", "-f", "concat"], engine: ENGINE, stderr: "" });
+    },
+    mix: async (input) => {
+      const { writeFile: write } = await import("node:fs/promises");
+
+      // A mix adds a sound track and copies the picture through, so the file it
+      // writes is the film it was given plus one frameless track.
+      await write(
+        input.target,
+        mp4({ audio: true, height: 1080, seconds: CUT_SECONDS, width: 1920 })
+      );
+
+      return ok({ argv: ["ffmpeg", "-filter_complex"], engine: ENGINE, stderr: "" });
+    },
+    version: () => Promise.resolve(ok(ENGINE)),
+  };
+}
+
+/** What the fixture's two-clip plan adds up to. */
+const CUT_SECONDS = 30;
+const ENGINE = "ffmpeg 7.1.1";
+
+/**
+ * A finished picture cut: `makeTrack` plus stage 8, accepted.
+ *
+ * Promoted at the same threshold as the rest of this file: stage 9 is the first
+ * stage that needs an episode already assembled, and it needs one on both
+ * tracks. The muxer is the fixture's, for the reason `muxer` gives.
+ */
+export async function makeCut(options: {
+  readonly clipSeconds?: Readonly<Record<string, number>>;
+  readonly root: string;
+  readonly track: ImageTrack;
+  readonly workspace: Workspace;
+}): Promise<void> {
+  await makeTrack(options);
+  await generateAssembly({
+    artifacts: [],
+    episodeId: EPISODE,
+    mode: "apply",
+    mux: muxer(),
+    projectId: PROJECT,
+    regenerate: false,
+    track: options.track,
+    workspace: options.workspace,
+  });
+  await approveAssembly({
+    artifacts: [],
+    episodeId: EPISODE,
+    mode: "apply",
+    note: "ok",
+    projectId: PROJECT,
+    reviewer: "fixture",
+    track: options.track,
+    workspace: options.workspace,
+  });
 }
 
 /** A clip of a length no plan orders, so an unmapped call is visibly wrong. */

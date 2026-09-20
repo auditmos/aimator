@@ -31,6 +31,9 @@ $AIMATOR_WORKSPACE/
         ├── prompt-package.json       │
         ├── prompt-package.stage.json │
         ├── prompts/                  ┘ opening-frame.md, references/, clips/, entry-frames/
+        ├── narration.md               ┐ etap 9 — słowa, wspólne dla obu torów
+        ├── narration/Nnn.wav          │ jedna kupiona wypowiedź na plik
+        ├── soundtrack.stage.json      ┘ rekord skryptu i każdej kwestii
         ├── runs/<runId>/             archiwum prób etapów tekstowych;
         │                             previous/ tylko przy --regenerate
         ├── gpt-image/                ┐ references/Rxx.png, references.stage.json,
@@ -40,7 +43,9 @@ $AIMATOR_WORKSPACE/
                                         frames/Cxx/end.jpg (format dostawcy),
                                         clips.stage.json, clips.lock,
                                         episode.mp4, assembly.stage.json,
-                                        assembly.lock, runs/
+                                        assembly.lock, narrated.mp4,
+                                        soundtrack.stage.json, soundtrack.lock,
+                                        runs/
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -205,24 +210,20 @@ Obowiązują we wszystkich etapach.
 | 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
 | 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` (format oddaje dostawca), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
-| 9 dźwięk | zatwierdzony `<tor>/episode.mp4` | ścieżka dźwiękowa odcinka | ocena odsłuchu | niezaimplementowany |
+| 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, a do miksu — zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
+| 10 pełna ścieżka | zatwierdzony `<tor>/narrated.mp4`, muzyka i efekty | pełna ścieżka dźwiękowa odcinka | ocena odsłuchu | niezaimplementowany |
 
-Etap 9 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
+Etap 10 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
 żeby kolejny krok wpiął się w ustalony układ zamiast wymyślać własny — dokładnie tak, jak
-wiersz etapu 8 istniał, zanim etap 8 powstał.
+wiersz etapu 9 istniał, zanim etap 9 powstał.
 
-**Jego wejściem jest zmontowany odcinek, nie lista ujęć, i to nie jest szczegół.** Ścieżka
-dźwiękowa musi być pisana wobec osi czasu, na której zagra. Klipy nie wracają co do sekundy
-(zobacz „Etap 8"), więc narracja rozpisana na sekundy z planu rozjeżdżałaby się z obrazem
-tym bardziej, im dalej od początku. Wobec `episode.mp4` dryf przestaje istnieć jako pojęcie:
-oś, pod którą się pisze, jest tą, nad którą się słucha. To także drugi, niezależny powód,
-dla którego dźwięk nie mieści się w etapie 8 — potrzebuje jego **wyniku** jako wejścia.
-
-Dwóch rzeczy ten wiersz jeszcze nie rozstrzyga i nie udaje, że rozstrzyga: skąd bierze się
-tekst narratora (pole `Audio` scenariusza **opisuje** dźwięk, nie jest kwestią do
-przeczytania, więc jest to nowa decyzja twórcza, która musi mieć własny artefakt i własne
-`approve`) oraz czy ścieżka jest kupowana, czy przynoszona. Reguła 7 obowiązuje: brak
-odpowiedzi nie udaje odpowiedzi.
+Jednej rzeczy ten wiersz nie rozstrzyga i nie udaje, że rozstrzyga: **skąd biorą się muzyka
+i efekty.** Żaden model w tym potoku ich nie pisze, żadna zmienna nie nazywa modelu
+muzycznego i żadne polecenie nie wciąga cudzych plików do katalogu roboczego — robi to
+wyłącznie etap 0. Wymyślenie którejkolwiek z tych trzech rzeczy byłoby odpowiedzią na
+pytanie, którego nikt nie zadał. Reguła 7 obowiązuje: brak odpowiedzi nie udaje odpowiedzi,
+więc muzyka i efekty są **nieobecne**, a ich brak jest raportowany przy każdym `check`
+i przy każdej generacji etapu 9.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
 Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2 — nazywa
@@ -246,6 +247,7 @@ Dwie decyzje projektu — obie jawne, obie bez wartości domyślnej:
 |---|---|
 | `aspectRatio` | np. `16:9`; po powstaniu obrazów nie da się zmienić bez ich unieważnienia |
 | `characters` | obsada: każda powracająca postać z własnym identyfikatorem, nazwą i podstawą |
+| `narratorVoiceId` | głos narratora serii; bramkuje wyłącznie etap 9 |
 
 **Obsada jest decyzją, nie wnioskiem.** Pusta obsada znaczy „nikt nie powiedział, kto
 występuje w tej serii", i bramka blokuje. Nie ma tu wartości domyślnej, bo projekt bez
@@ -1198,3 +1200,194 @@ filmem. Niespełniona deklaracja jest **raportowana, nie egzekwowana**, dokładn
 kanału alfa na torze seedream: `check` i raport z generacji mówią, że odcinek deklaruje
 `audio: <tryb>`, a `episode.mp4` jest niemy. Dalej prowadzi etap 9, który jako jedyny może
 tę ścieżkę napisać — wobec filmu, który już istnieje.
+
+## Etap 9 — szczegóły
+
+Pierwszy etap, który kupuje od **dwóch dostawców**, i pierwszy, którego artefakty leżą na
+**dwóch poziomach drzewa**. Konsumuje zatwierdzoną `shot-list.md`, zasady i decyzje
+z `project.json`, `project.md` i `episode.json`, głos narratora z `project.json` oraz —
+wyłącznie do miksu — zatwierdzony `<tor>/episode.mp4`.
+
+**Nie konsumuje pakietu promptów ani scenariusza.** Narracja jest już w liście ujęć, a
+zapisanie hasha bajtów, których nikt nie wysłał, opisywałoby pytanie, którego nie zadano —
+ta sama zasada, dla której etap 3 nie czyta `source.md`, a etap 8 nie czyta manifestu.
+Drugi egzemplarz tych samych zdań zapraszałby zresztą model do wybrania tej wersji, która
+lepiej się czyta, czyli dokładnie do rozjazdu, jaki zawsze produkują dwa pliki opisujące
+jedną prawdę.
+
+### Narracja jest podnoszona, nie pisana — i walidator to sprawdza
+
+Prompt etapu 1 mówi wprost: *„If speech is allowed, write it in `language`"*. Kiedy tryb
+dźwięku dopuszcza mowę, **słowa narratora powstają w etapie 1**, a etap 3 przenosi je do
+pola `Audio` każdego ujęcia. Nie istnieje natomiast żadna ich postać maszynowa: siedzą
+w zdaniu, które opisuje też muzykę, deszcz i grzmot.
+
+Wyciąganie ich parserem byłoby **parserem nad prozą** — tym, czego etap 3 odmówił, robiąc
+wiązaniem identyfikator obsady zamiast imienia, a etap 4, wpisując graf do JSON-a zamiast
+w zdania. Robi to więc model, bo czytanie prozy jest tym, do czego model służy — a
+walidator udowadnia, że podniesienie było podniesieniem: **tekst każdej kwestii musi
+wystąpić co do słowa w ujęciu, które ta kwestia nazywa.** Zdanie, którego lista ujęć nie
+zawiera, nie przechodzi walidacji, choćby czytało się lepiej.
+
+Reguła 7 jest tu spełniona, a nie naginana, dokładnie jak w sekcji „Kto nazywa referencje
+nieosobowe" piętro wyżej: każda decyzja, z której ten skrypt powstaje, **jest** zapisana —
+słowa w zatwierdzonym scenariuszu, okna w zatwierdzonej liście ujęć. Model dokłada to,
+czego nie ma żaden zatwierdzony artefakt: identyfikator na wypowiedź i sekundę planu,
+w której ta wypowiedź się zaczyna.
+
+Jeśli narracja ma powiedzieć coś, czego w ujęciach nie ma, poprawka należy do **etapu 1**.
+Komunikat odmowy mówi to wprost, zamiast po prostu odmówić.
+
+### Słowa są wspólne, miks jest per tor
+
+To jest precedens etapu 4 przeczytany co do joty. Manifest nazywa `hero:ewa`, a w jaki plik
+to się zamienia, rozstrzyga dopiero wysyłający, per tor. Tutaj skrypt nazywa
+`N02 @ 7 s planu`, a w jaki **timecode** to się zamienia, rozstrzyga dopiero mikser.
+
+| co | gdzie | dlaczego |
+|---|---|---|
+| `narration.md` | pod odcinkiem, bez poziomu toru | słowa opisują historię, nie obrazy |
+| `narration/Nnn.wav` | pod odcinkiem, bez poziomu toru | bajty zależą od tekstu, głosu i modelu mowy — żadne z tych trzech nie różni się per tor |
+| `<tor>/narrated.mp4` | pod torem | jedyna rzecz, która wie, ile naprawdę trwa *ten* film |
+
+Głos czytający zdanie nie wie, nad którym z dwóch filmów usiądzie, więc kupowanie go dwa
+razy byłoby płaceniem za katalog. Precedens złamałby się dopiero wtedy, gdyby różniła się
+**mowa** — a nie różni się.
+
+**Etap 9 pisze więc plik stanu na dwóch poziomach**, i to nie jest wyjątek od reguły 1.
+Brzmi ona „jeden plik na etap, **na tym poziomie katalogu, do którego etap pisze**", a etap
+2 trzyma już po jednym `character.stage.json` na każdą parę (postać, tor). Etap 9 jest po
+prostu pierwszym, który ma obie połowy niezmiennika 3 w jednym wierszu: tekstową wspólną
+i medialną per tor. Klucz `mix:gpt-image` w pliku wspólnym byłby prefiksem nazwy zamiast
+poziomu katalogu, czyli złamaniem reguły 2, a duplikowanie słów per tor — dwiema wersjami
+jednej prawdy.
+
+### Głos jest obsadą, nie konfiguracją
+
+`narratorVoiceId` mieszka w `project.json`, obok `characters` i `aspectRatio`, bez wartości
+domyślnej, i **bramkuje wyłącznie etap 9** — jak `maxClipSeconds` bramkuje wyłącznie etap 3.
+
+Rozstrzyga to test drugiego odcinka. W zmiennej środowiskowej odcinek 2 puszczony z innej
+powłoki dostałby **innego lektora**, a na dysku nie byłoby pliku mówiącego, że ktokolwiek
+to zdecydował — co do joty awaria, przed którą powstała obsada. W `episode.json` seria
+musiałaby odpowiadać na to pytanie raz na odcinek, a nic nie wiązałoby odpowiedzi ze sobą.
+
+Model mowy to osobna sprawa i jest zmienną: `--voice-model <id>`, a bez flagi
+`AIMATOR_VOICE_MODEL` — **jedna na oba tory**, z tego samego powodu co model wideo. Klucz to
+`ELEVENLABS_API_KEY`. Skrypt podnosi osobny model tekstowy: `--model <id>` albo
+`AIMATOR_NARRATION_MODEL`, bo dwa płatne miejsca wywołania to dwie flagi.
+
+**Obsadzenie narratora po zatwierdzeniu listy ujęć jest rozjazdem wejścia**, bo
+`project.json` jest zapisanym wejściem każdego etapu poniżej. To nie usterka, tylko ten sam
+mechanizm, co przy edycji `project.md`: akceptacja wygasa, `approve` przepisuje hashe
+i zapisuje nową zgodę. Głos obsadza się razem z obsadą, na początku serii.
+
+### Jednostką jest wypowiedź, a rachunek jest w znakach
+
+Jedna kwestia to **ciągły odcinek mowy** — nie zdanie i nie scena. Dwa zdania wypowiedziane
+pod rząd bez przerwy są jedną wypowiedzią, bo to jeden kawałek prozodii; dwa zdania
+rozdzielone sekundami ciszy są dwiema.
+
+Argument prozodyczny za grubszą jednostką tutaj nie istnieje: kwestie dzielą dziesiątki
+sekund, przez które żadna fraza nie przechodzi. Zostają dwa argumenty za drobną — ocena,
+jak w etapie 5, gdzie zła interpretacja jednego zdania kosztuje ponowne kupienie samego
+tego zdania, oraz umieszczenie: jedno wywołanie na cały odcinek oddałoby jeden blok, którego
+nie da się położyć na czterech kotwicach.
+
+**Liczba wywołań przestała tu być rachunkiem.** ElevenLabs rozlicza **znaki wejścia**, więc
+podgląd podaje jedno i drugie — per wypowiedź i łącznie — zanim cokolwiek wyśle. Tak samo
+jak etap 7 musiał podać obrazy i wideo osobno, bo jedna liczba kłamała. Ceny nie podaje:
+tego potok nie robi nigdzie.
+
+Jeden `narration.md` zamiast jednego pliku na wywołanie, i to nie jest złamanie reguły
+etapu 4. Tamta broni przed **krojeniem prozy parserem**; skrypt prozą nie jest, tylko listą
+z gramatyką nagłówka `### N02 | U02 | 7s`, walidowaną ściśle — czyli kształtem **listy
+ujęć**, nie pakietu promptów. Cztery pliki po jednym zdaniu byłyby płytkim modułem.
+
+### Synchronizacja: bajty jak w etapie 8, umieszczenie jak w etapie 7
+
+Oba precedensy obowiązują, każdy w swojej połowie, i to nie jest unik — etapy 7 i 8
+rozróżniają dokładnie to samo, tylko każdy widzi jedną stronę.
+
+**Bajtami rządzi etap 8.** Publikuje się to, co wróciło: żadnego rozciągania czasu, zmiany
+tempa czytania ani skracania pauzy. To byłyby „bajty, których nie przyjął nikt" — ten sam
+zarzut, którym etap 2 broni się przed wycinaniem tła, a etap 7 przed przekodowaniem
+końcówki.
+
+**Umieszczeniem rządzi etap 7.** Kotwica pochodzi z planu, który zatwierdził człowiek, więc
+narzędzie jej po cichu nie przesuwa. Odmowa, nie zaokrąglenie, gdy kwestia nachodzi na
+początek następnej albo wychodzi poza koniec filmu; komunikat wskazuje poprawkę — skróć
+zdanie w skrypcie i przyjmij je ponownie, albo przeplanuj etap 1.
+
+Różnica wobec etapu 7 jest jedna: tam długość była znana **przed** zapłatą i dało się
+odmówić przed POST-em. Tutaj poznaje się ją dopiero z bajtów, więc odmowa pada **przy
+miksie**. Rekord zostaje `completed`, nagrania zostają, a ponowny miks po poprawce jest
+darmowy — dokładnie jak etap 8 mówi o niepoprawnym cięciu.
+
+**Kotwica z planu nie jest sekundą filmu.** Klipy wróciły dłuższe, niż je zamówiono, więc
+7 s planu to nie 7 s tego toru. Mikser mapuje jedno na drugie przez same klipy — ta sama
+arytmetyka, którą etap 8 melduje jako dryf, przeczytana w drugą stronę — i **melduje
+przesunięcie**, zamiast je ukrywać.
+
+### Czym miksuje, co zapisuje `producer`, i dlaczego `check` zostaje offline
+
+`lib/muxer` to ten sam ffmpeg, którym tnie etap 8: **drugi wołający, więc promocja** —
+`AGENTS.md` zapowiadał ją przy wołającym, nie przy zgadywaniu. Moduł wystawia operacje
+(`version`, `concat`, `mix`), nigdy procesu: `run(args)` byłby poszerzeniem interfejsu,
+przed którym ten moduł istnieje.
+
+**Obraz idzie kopią strumieniową.** `narrated.mp4` to nowy plik, którego strumień wideo jest
+strumieniem `episode.mp4`, klatka w klatkę. Zatwierdzony montaż nie jest ani nadpisywany,
+ani przekodowywany, więc zgoda wydana etapowi 8 zostaje tam, gdzie była. Dźwięk jest jedyną
+rzeczą, którą ten moduł koduje, i tylko tutaj: MP4 nie niesie WAV-a, więc mowa jest
+kodowana dokładnie raz, do pliku, który ktoś zaraz przyjmie, a bezstratne kwestie zostają
+na dysku jako bajty, które kupiono.
+
+**Trzy rodzaje pochodzenia w jednym etapie to trzy rekordy, nie jeden.** `producer` należy
+do artefaktu, nie do etapu — etap 7 ma już dwa media w jednym pliku stanu:
+
+| artefakt | `producer.kind` | `model` |
+|---|---|---|
+| `script` | `model` | model tekstowy, z `promptVersion` |
+| `N01`…`Nnn` | `model` | `<model> / voice <voiceId>` |
+| `narrated` | `local` | `ffmpeg <wersja>` |
+
+Schemat `producer` nie wymagał nowej wartości. Identyfikator głosu ląduje w `model` obok
+identyfikatora modelu, bo to pole odpowiada na „co trzeba by uruchomić ponownie, żeby dostać
+te bajty", a dla mowy odpowiedzią jest model **i** głos. `promptVersion` przy TTS zostaje
+`null`: nie ma tam naszej instrukcji, jest cudze zdanie jadące dosłownie, a numer wersji na
+czyimś zdaniu byłby twierdzeniem o autorstwie, nie zapisem pochodzenia.
+
+**Format kupowanej mowy to `wav_24000`, i to jest rozstrzygnięcie, nie preferencja.**
+Domyślny MP3 podaje swoją długość tylko temu, kto przejdzie po jego ramkach, licząc je wobec
+tablicy bitrate'ów i ufając, że strumień jest stały. WAV podaje częstotliwość, kanały
+i rozmiar bloku danych w dwudziestu czterech bajtach przy początku, więc długość kupionej
+kwestii jest arytmetyką. Etap 7 czytał pudełka MP4 zamiast wołać dekoder dokładnie z tego
+powodu — wybór kontenera jest tym samym wyborem, o krok wcześniej. Format jest stałą miejsca
+wywołania, jak endpoint, a nie decyzją.
+
+`check` zostaje więc offline i bez ffmpeg, jak wszędzie: kwestie czyta nagłówkiem RIFF,
+a `narrated.mp4` tym samym czytnikiem pudełek, którym etap 8 czyta `episode.mp4` —
+sprawdzając przy okazji, że plik naprawdę niesie ścieżkę dźwiękową.
+
+### Dwie oceny, bo dwa poziomy
+
+**Ocena wspólna** dotyczy słów i głosów: czy ten skrypt mówi to, co mówi zatwierdzony plan,
+i czy to czytanie brzmi jak narrator tej serii. Zapada raz, bo odpowiedź nie zależy od tego,
+nad którym filmem kwestia usiądzie. `--artifact` jest tu **wymagane**, ostrzej niż
+w etapie 5: przyjęcie skryptu uruchamia kupowanie każdego zdania w nim, a przyjęcie kwestii
+otwiera miks.
+
+**Ocena odsłuchu** jest per tor i nie da się jej wydać nigdzie indziej: czy narrator trafia
+we właściwe miejsce nad **tym** obrazem. Nie jest powtórką ocen kwestii — kwestia przeczytana
+bez zarzutu wciąż może wejść dwie sekundy za późno — dokładnie jak ocena całości w etapie 8
+nie jest powtórką ośmiu ocen klipów. `--artifact` nie jest tu wymagane: jeden artefakt na
+tor i nic poniżej, co przyjęcie mogłoby kupić.
+
+### Czego ten etap nie domyka
+
+Wszystkie cztery tryby dźwięku **zawierają muzykę i efekty**. Etap 9 produkuje samą
+narrację, więc deklaracji nie domyka — i mówi o tym przy każdej generacji i przy każdym
+`check`, dokładnie jak etap 8 melduje ciszę, a etap 2 brak kanału alfa. **Raportowane, nie
+egzekwowane**: plik jest całością tego, co ten wiersz kontraktuje, a film wciąż nie jest
+skończony. Dalej prowadzi etap 10.

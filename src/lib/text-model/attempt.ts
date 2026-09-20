@@ -90,11 +90,24 @@ export interface Published<T> {
 
 /** The half of an attempt that belongs to one particular stage. */
 export interface TextStage<T> {
-  /** The stage-file key, the `stage` field and the file name, in one word. */
+  /**
+   * The `stage` field of the file this writes, and the file's own name.
+   *
+   * Separate from `key` since stage 9, which is the first text stage whose
+   * state file holds more than one artifact: its shared file carries the script
+   * and every bought utterance, so "which stage wrote this" and "which record
+   * is this" stopped being one word. For stages 1, 3 and 4 they are still the
+   * same word, and nothing about those stages changed.
+   */
   readonly artifact: StageName;
   /** Why a paid call may not happen, in this stage's own error type. */
   readonly blocked: (problems: readonly string[]) => Error;
   readonly inputs: readonly RecordedFile[];
+  /**
+   * The record this attempt owns, inside that file. Defaults to the stage name,
+   * which is what every text stage before stage 9 meant by it.
+   */
+  readonly key?: string;
   readonly lock: string;
   /**
    * Copies the results this attempt is about to replace into `previous/`.
@@ -138,8 +151,29 @@ function write(path: string, text: string): Promise<Result<readonly string[]>> {
   return applyWrites([{ kind: "text", text, to: path }], "apply");
 }
 
-function stageFile(artifact: StageName, record: StageFile["artifacts"][string]): string {
-  return serialize({ ...emptyStage(artifact), artifacts: { [artifact]: record } });
+/**
+ * This attempt's record, merged into the file rather than replacing it.
+ *
+ * A text stage used to own exactly one artifact, so writing the whole file was
+ * the same thing as writing its record. Stage 9 broke that: its shared file
+ * holds the script beside every line bought from it, and replacing the file
+ * when the script is re-lifted would erase recordings somebody paid for — the
+ * failure `lib/image-model` avoids for the same reason, ten images down.
+ */
+async function writeRecord<T>(
+  stage: TextStage<T>,
+  record: StageFile["artifacts"][string]
+): Promise<void> {
+  const previous = await readJson(stage.stagePath, stageFileSchema);
+  const artifacts = previous.ok ? previous.data.artifacts : {};
+
+  await write(
+    stage.stagePath,
+    serialize({
+      ...emptyStage(stage.artifact),
+      artifacts: { ...artifacts, [stage.key ?? stage.artifact]: record },
+    })
+  );
 }
 
 /**
@@ -168,7 +202,9 @@ export async function runTextStage<T>(
 
 async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<TextAttempt<T>>> {
   const previousStage = await readJson(stage.stagePath, stageFileSchema);
-  const record = previousStage.ok ? previousStage.data.artifacts[stage.artifact] : undefined;
+  const record = previousStage.ok
+    ? previousStage.data.artifacts[stage.key ?? stage.artifact]
+    : undefined;
 
   if (call.republish) {
     return await republish(call, stage, record);
@@ -209,12 +245,9 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
   // then visibly an attempt that may already have been billed.
-  await write(
-    stage.stagePath,
-    stageFile(
-      stage.artifact,
-      newRecord({ inputs: stage.inputs, outputs: [], producer, runId, status: "submitted" })
-    )
+  await writeRecord(
+    stage,
+    newRecord({ inputs: stage.inputs, outputs: [], producer, runId, status: "submitted" })
   );
 
   const transport = await callModel({ apiKey: call.apiKey, fetch: call.fetch, request });
@@ -394,6 +427,7 @@ async function prepare<T>(
   return await writeNew(
     archive.run,
     serialize({
+      artifact: stage.key ?? stage.artifact,
       endpoint: ENDPOINT,
       inputs: stage.inputs,
       maxOutputTokens: call.maxOutputTokens,
@@ -437,19 +471,16 @@ async function publish<T>(
     return published;
   }
 
-  await write(
-    stage.stagePath,
-    stageFile(
-      stage.artifact,
-      newRecord({
-        inputs: stage.inputs,
-        jobId: parsed.data.jobId,
-        outputs: published.data.outputs,
-        producer: data.producer,
-        runId: data.runId,
-        status: "completed",
-      })
-    )
+  await writeRecord(
+    stage,
+    newRecord({
+      inputs: stage.inputs,
+      jobId: parsed.data.jobId,
+      outputs: published.data.outputs,
+      producer: data.producer,
+      runId: data.runId,
+      status: "completed",
+    })
   );
 
   return ok({

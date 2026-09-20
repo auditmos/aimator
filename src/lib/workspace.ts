@@ -236,7 +236,7 @@ interface AssemblyRunPaths {
  * settings, which is the whole of what was sent — a TTS call has no attachments
  * and therefore no reference bytes to leave out.
  */
-interface VoiceRunPaths {
+export interface VoiceRunPaths {
   /** Exactly what the provider returned, before anything was published. */
   readonly audio: string;
   /** The line being replaced. Written only by `--regenerate`. */
