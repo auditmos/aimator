@@ -47,6 +47,18 @@ export interface ProjectPaths {
   readonly episodes: string;
   readonly file: string;
   /**
+   * How loud the music sits under the narrator — stage 10's own decision file,
+   * and `narration.json`'s twin one row down.
+   *
+   * At the project level for the same reason: a series sounds like itself
+   * between episodes. In a file of its own rather than inside `narration.json`
+   * because where a decision lives decides what changing it invalidates, and
+   * these two invalidate different things — the reading lapses the recordings
+   * it produced, the levels lapse the mix they produced and must leave those
+   * recordings, which they never touched, exactly where they are.
+   */
+  readonly mix: string;
+  /**
    * How the narrator of this series performs — stage 9's own decision file.
    *
    * At the project level because a reading recurs between episodes exactly as a
@@ -125,6 +137,21 @@ export interface EpisodeTrackPaths {
    */
   readonly frames: string;
   /**
+   * Stage 10's one output on this track: the whole film, with every sound it
+   * has — narration, music and effects — over a picture copied through
+   * untouched.
+   *
+   * It sits beside `narrated.mp4` rather than replacing it, exactly as that
+   * one sits beside `episode.mp4`. Each of the three carries a separate yes
+   * about a separate question: the cut is the film, the narrated cut is where
+   * the narrator lands, and this one is whether the whole thing plays. Stage 10
+   * rebuilds from `episode.mp4` and the lossless stems rather than laying music
+   * over `narrated.mp4`, so the speech is encoded exactly once — which is also
+   * the only arrangement in which music can step back under a voice, because
+   * the voice has to be an input of the graph rather than already inside it.
+   */
+  readonly mixedVideo: string;
+  /**
    * Stage 9's one output on this track: the approved picture cut with the
    * narration laid over it, the video copied through untouched.
    *
@@ -160,6 +187,14 @@ export interface EpisodeTrackPaths {
    * one `runs/` under the episode.
    */
   readonly runs: string;
+  /**
+   * Stage 10's per-track lock and state file, at the second of its two levels
+   * for the reason stage 9 writes at two: its stems are shared and its mix is
+   * not. Rule 1 asks for one state file per stage *per directory it writes to*,
+   * which is what both of them do.
+   */
+  readonly soundDesignLock: string;
+  readonly soundDesignStage: string;
   /**
    * Stage 9's per-track lock and state file. Stage 9 is the first stage whose
    * artifacts live at two levels — the words are shared like every text stage's
@@ -261,11 +296,35 @@ export interface VoiceRunPaths {
   readonly validation: string;
 }
 
-/** What one mix archives: stage 8's thin archive, plus where each line landed. */
-interface SoundtrackRunPaths {
-  /** Which utterance was laid down at which second of this track's own cut. */
+/**
+ * What one bought stem archives. Stage 10's counterpart to `VoiceRunPaths`,
+ * and separate from it for one reason that is not cosmetic: the container
+ * differs, and the archive holds exactly what the provider returned.
+ */
+export interface AudioRunPaths {
+  /** Exactly what the provider returned, before anything was published. */
+  readonly audio: string;
+  /** The stem being replaced. Written only by `--regenerate`. */
+  readonly previousAudio: string;
+  readonly prompt: string;
+  readonly request: string;
+  readonly response: string;
+  readonly root: string;
+  readonly run: string;
+  readonly transport: string;
+  readonly validation: string;
+}
+
+/**
+ * What one local mix archives: stage 8's thin archive, plus where each sound
+ * landed. Shared by stage 9's narrated cut and stage 10's full mix, because
+ * both are the same act — a local engine laying sound over a picture it copied
+ * — and `placement.json` answers the same question for both.
+ */
+interface MixRunPaths {
+  /** Which sound was laid down at which second of this track's own cut. */
   readonly placement: string;
-  /** The narrated cut being replaced. Written only by `--regenerate`. */
+  /** The mix being replaced. Written only by `--regenerate`. */
   readonly previousVideo: string;
   readonly root: string;
   readonly run: string;
@@ -321,6 +380,29 @@ export interface EpisodePaths {
   readonly shotList: string;
   readonly shotListLock: string;
   readonly shotListStage: string;
+  /**
+   * Stage 10's bought stems: the music bed and every sound effect, one file per
+   * paid call.
+   *
+   * Shared between the tracks, with no track level, for the reason stage 9's
+   * spoken lines are: what the bytes depend on — the cue text, the audio model
+   * and the length asked for — does not differ per track. A music bed has no
+   * idea which of the two films it will sit under, and the two differ only by
+   * the drift their clips came back with.
+   */
+  readonly sound: string;
+  /**
+   * Stage 10's cue sheet: what the episode sounds like, section by section and
+   * effect by effect.
+   *
+   * It sits beside the screenplay, the shot list and the narration script
+   * because it is words rather than pictures — but unlike those three it is an
+   * **instruction**, so rule 9 puts it in English while the shot list it is
+   * written from stays in the film's own language.
+   */
+  readonly soundDesign: string;
+  readonly soundDesignLock: string;
+  readonly soundDesignStage: string;
   /**
    * Stage 9's shared state file, holding the script and every bought utterance.
    * Its per-track half sits under the track, because the mix is per track and
@@ -445,6 +527,7 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
     characters: join(root, "characters"),
     episodes: join(root, "episodes"),
     file: join(root, "project.json"),
+    mix: join(root, "mix.json"),
     narration: join(root, "narration.json"),
     prepareStage: join(root, "prepare.stage.json"),
     root,
@@ -557,6 +640,10 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
     shotList: join(root, "shot-list.md"),
     shotListLock: join(root, "shot-list.lock"),
     shotListStage: join(root, "shot-list.stage.json"),
+    sound: join(root, "sound"),
+    soundDesign: join(root, "sound-design.md"),
+    soundDesignLock: join(root, "sound-design.lock"),
+    soundDesignStage: join(root, "sound-design.stage.json"),
     soundtrackStage: join(root, "soundtrack.stage.json"),
     source: join(root, "source.md"),
   });
@@ -585,6 +672,7 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
     clipsStage: join(root, "clips.stage.json"),
     episodeVideo: join(root, "episode.mp4"),
     frames: join(root, "frames"),
+    mixedVideo: join(root, "mixed.mp4"),
     narratedVideo: join(root, "narrated.mp4"),
     openingFrameImage: join(root, "opening-frame.png"),
     openingFrameLock: join(root, "opening-frame.lock"),
@@ -594,6 +682,8 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
     referencesStage: join(root, "references.stage.json"),
     root,
     runs: join(root, "runs"),
+    soundDesignLock: join(root, "sound-design.lock"),
+    soundDesignStage: join(root, "sound-design.stage.json"),
     soundtrackLock: join(root, "soundtrack.lock"),
     soundtrackStage: join(root, "soundtrack.stage.json"),
   };
@@ -725,6 +815,26 @@ export function narrationAudio(paths: EpisodePaths, id: string): Result<string> 
 }
 
 /**
+ * One bought stem's own file — the music bed `M01`, or an effect `E01`.
+ *
+ * MP3 rather than the WAV a line is bought in, and that is the provider's
+ * doing rather than this pipeline's preference. Neither the music endpoint nor
+ * the sound-effect one offers a WAV container at all, and the raw PCM they do
+ * offer carries **no header**: the sample rate would be known from the format
+ * asked for, but the channel count would not, and guessing it wrong states a
+ * length twice or half the truth without a word of warning. An MP3 frame
+ * header declares its own rate, bitrate and channel mode, so the verdict on a
+ * stem stays exact and offline — it simply has to walk the frames instead of
+ * reading twenty-four bytes. That is the same trade stage 7 made when it read
+ * MP4 boxes rather than calling a decoder.
+ */
+export function soundStem(paths: EpisodePaths, id: string): Result<string> {
+  return ARTIFACT_ID.test(id)
+    ? ok(join(paths.sound, `${id}.mp3`))
+    : err(new IdentifierError(id, `invalid stem id "${id}": expected a form like M01 or E01`));
+}
+
+/**
  * The archive of one speech attempt.
  *
  * It sits under the episode rather than under a track, because that is where
@@ -749,16 +859,38 @@ export function voiceRunPaths(paths: { readonly runs: string }, runId: string): 
 }
 
 /**
- * The archive of one mix — stage 9's local half, and the second archive in the
- * pipeline with no network behind it. It keeps what stage 8's keeps and one
- * thing more: where each line was laid down. That is arithmetic and could be
- * recomputed, but it is also what the engine was actually told, and an archive
- * holding the arguments without it would record half the invocation.
+ * The archive of one bought stem.
+ *
+ * It sits under the episode rather than under a track, for the reason a
+ * speech attempt does: that is where the stem was bought, and the stems are
+ * shared. Like every archive here it never copies an input — the cue it was
+ * composed from is in the cue sheet, referenced by path and digest.
  */
-export function soundtrackRunPaths(
-  paths: { readonly runs: string },
-  runId: string
-): SoundtrackRunPaths {
+export function audioRunPaths(paths: { readonly runs: string }, runId: string): AudioRunPaths {
+  const root = join(paths.runs, runId);
+
+  return {
+    audio: join(root, "original.mp3"),
+    previousAudio: join(root, "previous.mp3"),
+    prompt: join(root, "prompt.md"),
+    request: join(root, "request.json"),
+    response: join(root, "response.json"),
+    root,
+    run: join(root, "run.json"),
+    transport: join(root, "transport.json"),
+    validation: join(root, "validation.json"),
+  };
+}
+
+/**
+ * The archive of one local mix — stage 9's narrated cut and stage 10's full
+ * one, which are the same act over different inputs. It keeps what stage 8's
+ * archive keeps and one thing more: where each sound was laid down. That is
+ * arithmetic and could be recomputed, but it is also what the engine was
+ * actually told, and an archive holding the arguments without it would record
+ * half the invocation.
+ */
+export function mixRunPaths(paths: { readonly runs: string }, runId: string): MixRunPaths {
   const root = join(paths.runs, runId);
 
   return {

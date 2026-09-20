@@ -16,6 +16,9 @@ $AIMATOR_WORKSPACE/
     ├── project.md                    zasady wspólne — jedyny plik pisany ręcznie
     ├── narration.json                jak narrator CZYTA (etap 9) — osobno od project.json,
     │                                 bo to suwak, a project.json jest wejściem wszystkiego
+    ├── mix.json                      jak głośno siedzi podkład i jak ustępuje pod mową
+    │                                 (etap 10) — osobno od narration.json, bo unieważnia
+    │                                 miks, a nie nagrania
     ├── prepare.stage.json
     ├── characters/<character-id>/
     │   ├── sources/                  zdjęcia użytkownika (etap 0)
@@ -36,6 +39,11 @@ $AIMATOR_WORKSPACE/
         ├── narration.md               ┐ etap 9 — słowa, wspólne dla obu torów
         ├── narration/Nnn.wav          │ jedna kupiona wypowiedź na plik
         ├── soundtrack.stage.json      ┘ rekord skryptu i każdej kwestii
+        ├── sound-design.md            ┐ etap 10 — arkusz cue PO ANGIELSKU, wspólny
+        ├── sound/Mnn.mp3              │ podkład; jedno wywołanie na plik
+        ├── sound/Enn.mp3              │ efekty; jedno wywołanie na plik
+        ├── sound-design.stage.json    ┘ rekord arkusza i każdego stemu
+        ├── sound-design.lock
         ├── runs/<runId>/             archiwum prób etapów tekstowych;
         │                             previous/ tylko przy --regenerate
         ├── gpt-image/                ┐ references/Rxx.png, references.stage.json,
@@ -47,7 +55,8 @@ $AIMATOR_WORKSPACE/
                                         episode.mp4, assembly.stage.json,
                                         assembly.lock, narrated.mp4,
                                         soundtrack.stage.json, soundtrack.lock,
-                                        runs/
+                                        mixed.mp4, sound-design.stage.json,
+                                        sound-design.lock, runs/
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -213,19 +222,27 @@ Obowiązują we wszystkich etapach.
 | 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` (format oddaje dostawca), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu — zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
-| 10 pełna ścieżka | zatwierdzony `<tor>/narrated.mp4`, muzyka i efekty | pełna ścieżka dźwiękowa odcinka | ocena odsłuchu | niezaimplementowany |
+| 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu — zatwierdzony `<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
+| 11 dialog | zatwierdzona `shot-list.md`, głos każdej postaci z `project.json` | kwestie postaci, dosypywane do miksu etapu 10 | ocena każdej kwestii | niezaimplementowany |
 
-Etap 10 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
-żeby kolejny krok wpiął się w ustalony układ zamiast wymyślać własny — dokładnie tak, jak
-wiersz etapu 9 istniał, zanim etap 9 powstał.
+**Wiersz 10 zmienił się przy implementacji i to jest zapisane tutaj, a nie przemilczane.**
+Mówił, że muzyka i efekty są **wejściem** wnoszonym przez człowieka — i sam przyznawał, że
+nie rozstrzyga, skąd się biorą. Nie da się go tak zbudować: wciąganie cudzych plików do
+katalogu roboczego ma monopol etapu 0, więc „wnosi człowiek" było przepisaniem etapu 0 pod
+inną nazwą, a nie wierszem 10. Stemy kupuje więc etap 10, z ElevenLabs — co nie jest
+czwartym dostawcą, tylko **czwartym i piątym miejscem wywołania u dostawcy, którego potok
+już ma** na mowę. Dostawców dalej jest trzech: OpenAI, BytePlus, ElevenLabs.
 
-Jednej rzeczy ten wiersz nie rozstrzyga i nie udaje, że rozstrzyga: **skąd biorą się muzyka
-i efekty.** Żaden model w tym potoku ich nie pisze, żadna zmienna nie nazywa modelu
-muzycznego i żadne polecenie nie wciąga cudzych plików do katalogu roboczego — robi to
-wyłącznie etap 0. Wymyślenie którejkolwiek z tych trzech rzeczy byłoby odpowiedzią na
-pytanie, którego nikt nie zadał. Reguła 7 obowiązuje: brak odpowiedzi nie udaje odpowiedzi,
-więc muzyka i efekty są **nieobecne**, a ich brak jest raportowany przy każdym `check`
-i przy każdej generacji etapu 9.
+Etap 11 jest **zadeklarowanym kontraktem**, nie działającym kodem — dokładnie tak, jak
+wiersz etapu 9, a potem 10, istniał zanim powstał. Wiersz istnieje po to, żeby mowa postaci
+wpięła się w ustalony układ zamiast wymyślać własny: kupowana wspólnie dla obu torów jak
+narracja, i lądująca w miksie etapu 10 jako kolejny stem, a nie jako drugi miks.
+
+Czego ten wiersz nie rozstrzyga: **skąd bierze się głos każdej postaci.** `project.json`
+trzyma dziś `narratorVoiceId` i nic więcej, a obsadzenie dziesięciu postaci to dziesięć
+decyzji, których nikt jeszcze nie podjął. Reguła 7 obowiązuje: brak odpowiedzi nie udaje
+odpowiedzi, więc dialogi są **nieobecne**, a ich brak jest raportowany przy każdym `check`
+i przy każdej generacji etapu 10 — ale wyłącznie w dwóch trybach, które go deklarują.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
 Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2 — nazywa
@@ -1445,4 +1462,207 @@ Wszystkie cztery tryby dźwięku **zawierają muzykę i efekty**. Etap 9 produku
 narrację, więc deklaracji nie domyka — i mówi o tym przy każdej generacji i przy każdym
 `check`, dokładnie jak etap 8 melduje ciszę, a etap 2 brak kanału alfa. **Raportowane, nie
 egzekwowane**: plik jest całością tego, co ten wiersz kontraktuje, a film wciąż nie jest
-skończony. Dalej prowadzi etap 10.
+skończony. Dalej prowadzi etap 10, który muzykę i efekty kupuje.
+
+## Etap 10 — szczegóły
+
+Pierwszy etap, który **przepisał własny wiersz kontraktu**, i jedyny, którego werdykt nie
+potrafi udowodnić, że jego wynik mówi prawdę o wejściu. Obie te rzeczy są rozstrzygnięciami,
+nie niedoróbkami, i obie są tutaj opisane.
+
+Konsumuje zatwierdzoną `shot-list.md`, zasady i decyzje z `project.json`, `project.md`
+i `episode.json`, poziomy z `mix.json` oraz — wyłącznie do miksu — zatwierdzony
+`<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9.
+
+**Nie konsumuje pakietu promptów ani scenariusza**, z tego samego powodu co etap 9:
+zapisanie hasza bajtów, których nikt nie wysłał, opisywałoby pytanie, którego nie zadano.
+
+### Czego nie ma i co stoi w tym miejscu
+
+Etap 9 udowadnia uczciwość swojego skryptu mechanicznie: kwestia jest **podnoszona, nigdy
+pisana**, a walidator znajduje każde zdanie co do słowa w ujęciu, które je nazywa. **Tutaj
+jest to niemożliwe i potok tego nie udaje.**
+
+Sprzeczność jest prawdziwa i wynika z reguły 9. Prompt muzyczny jest **instrukcją**, więc
+reguła 9 każe pisać go po angielsku. Pole `Audio`, z którego on powstaje, jest
+**materiałem** — po polsku — a reguła 9 zabrania go tłumaczyć. Przepisanie jest więc
+zakazane z obu stron i nie ma czego szukać dosłownie.
+
+Precedensem nie jest etap 9, tylko **etap 4**. Tamten też pisze angielskie instrukcje
+z polskiej listy ujęć, też wysyła jedno obok drugiego w dwujęzycznym żądaniu, i też ocenia
+własną odpowiedź werdyktem, który **nigdy nie czyta promptu** — tylko okablowanie wokół
+niego. Etap 10 bierze tę samą umowę:
+
+| co udowadnia walidator | co zostaje człowiekowi |
+|---|---|
+| każdy cue nazywa ujęcia, które istnieją | czy angielski opisuje polską prozę |
+| **zadeklarowane ujęcia cue to dokładnie te, które leżą w jego sekundach** | czy to jest dobra muzyka |
+| podkład kafelkuje film od 0 do końca planu, bez dziur i zakładek | |
+| każda długość jest taka, jaką dostawca zrenderuje | |
+
+Drugi wiersz niesie ciężar, który piętro wyżej niesie „podnoszone, nie pisane". Wierności
+nie dowodzi — dowodzi, że model przeszedł **cały plan**: ujęcie pominięte i ujęcie wymyślone
+wychodzą tak samo, jako rozjazd między tym, co cue deklaruje, a tym, co naprawdę leży w jego
+sekundach.
+
+**Reguły 9 nic tu nie egzekwuje i to jest precedens, a nie niedopatrzenie.** Instrukcja każe
+odpowiadać po angielsku, dokładnie jak instrukcja etapu 4 — a walidator etapu 4 też języka
+nie sprawdza; to on ustanowił zasadę „nigdy nie czyta promptu". Sprawdzian był napisany
+i został usunięty: jedyny tani test to litery języka filmu, a polskie zdanie potrafi nie
+mieć ani jednej z nich — *„Delikatny instrumentalny motyw wieczorny"* nie ma. Strażnik,
+który przepuszcza wklejony polski i odrzuca uczciwy angielski cytujący nazwę, jest gorszy
+niż człowiek czytający arkusz, zanim kupi się choć sekundę dźwięku.
+
+### Jednostka, rachunek i sprzeczność w cenniku dostawcy
+
+Cennik ElevenLabs mówi na jednej stronie dwie rzeczy, które wyglądają na sprzeczne: tabela
+stawek podaje cenę **za minutę** dla Music i dla Sound Effects, a FAQ pod nią mówi, że oba
+są rozliczane **„per generation"**. Sprzeczności nie ma — to są odpowiedzi na dwa różne
+pytania. Tabela podaje jednostkę **stawki**: sekundy wygenerowanego dźwięku. FAQ podaje
+**moment naliczenia**: opłata pada przy żądaniu, nie przy pobraniu. Praktyczny wniosek jest
+jeden i twardy: **`--regenerate` to druga pełna opłata, nie dopłata**, i raport mówi to
+tam, gdzie ktoś to przeczyta.
+
+**Liczba wywołań przestała tu być rachunkiem, drugi raz w potoku i z innego powodu niż
+w etapie 9.** Tam rachunek był w znakach wejścia; tutaj jest w sekundach wyjścia. Jedno
+wywołanie na trzydziestosekundowy podkład i jedno na półsekundowy trzask to ta sama liczba
+i nic podobnego do tej samej kwoty. Podgląd podaje więc **wywołania i sekundy**, per cue
+i łącznie. Cen nie podaje: tego potok nie robi nigdzie.
+
+**Jednostką podkładu jest odcinek, jednostką efektu — zdarzenie.** Dwa osobno wygenerowane
+utwory zestawione na styk nie dzielą tonacji ani tempa, więc podkład jest jednym
+wywołaniem; to argument prozodyczny, którego etap 9 **nie** miał i wprost tego nie ukrywał.
+Efekt jest kupowany pojedynczo, bo zła interpretacja jednego grzmotu ma kosztować jeden
+grzmot — argument etapu 5.
+
+Podkład zamawia się **prozą**, nie planem kompozycyjnym. Prompt w tym potoku jest prozą
+wszędzie indziej, a lista list stylów byłaby JSON-em stojącym tam, gdzie należą zdania —
+czyli tym, czego etap 4 odmówił.
+
+### Stemy są wspólne, miks jest per tor
+
+Precedens etapu 9 przeczytany co do joty. Podkład nie wie, nad którym z dwóch filmów
+usiądzie, a różnią się one tylko dryfem, z jakim wróciły klipy — więc kupowanie dwa razy
+byłoby płaceniem za katalog.
+
+| co | gdzie | dlaczego |
+|---|---|---|
+| `sound-design.md` | pod odcinkiem, bez poziomu toru | arkusz opisuje historię, nie obrazy |
+| `sound/Mnn.mp3`, `sound/Enn.mp3` | pod odcinkiem, bez poziomu toru | bajty zależą od cue, modelu i zamówionej długości — żadne z tych trzech nie różni się per tor |
+| `<tor>/mixed.mp4` | pod torem | jedyna rzecz, która wie, ile naprawdę trwa *ten* film |
+
+### Skąd się miksuje, i co się dzieje ze zgodą na `narrated.mp4`
+
+**Etap 10 nie miksuje na `narrated.mp4`. Składa od nowa** z `episode.mp4` i stemów: obraz
+idzie kopią strumieniową, mowa bierze się z bezstratnych `narration/Nnn.wav`, a wszystko
+koduje się **dokładnie raz**, do pliku, który ktoś zaraz przyjmie. Miksowanie na narracji
+kodowałoby mowę po raz drugi — i, co gorsza, czyniłoby ducking nieuczciwym, bo głos byłby
+już w sygnale, pod który muzyka ma ustępować.
+
+**Ze zgodą na `narrated.mp4` nie dzieje się nic, i to jest powiedziane wprost.** Plik nie
+jest nadpisywany, przekodowywany ani unieważniany, a zgoda dalej znaczy to, co znaczyła:
+narrator trafia we właściwe miejsce nad tym obrazem. Staje się **przyjętym produktem
+pośrednim** — jedynym miejscem w całym potoku, w którym umieszczenie narracji słychać bez
+muzyki w drodze.
+
+I to jest odpowiedź na zarzut, który sam się nasuwa: etap 8 nazywa „trzymaniem etapu
+zakładnikiem" bramkę na pliku, którego etap nigdy nie otwiera. Etap 10 faktycznie nie
+otwiera tych bajtów. Czyta **zgodę** na nie — a ta zgoda jest jedynym dowodem, że narracja
+siedzi tam, gdzie ma siedzieć nad *tym* filmem. Etap 10 ten fakt wykorzystuje, zamiast
+ustalać go po raz drugi. Bramka na klatce wejściowej w etapie 8 nie miała takiego dowodu za
+sobą; ta ma.
+
+### Poziomy i ducking
+
+**Ducking nie jest decyzją przechowywaną.** Odcinek, którego tryb niesie mowę, już
+zadecydował, że głos jest na pierwszym planie; muzyka, która pod niego nie ustępuje, nie
+jest „muzyką i narracją", tylko dwiema rzeczami naraz. Sidechain jest więc **wyprowadzany**
+z trybu, tak samo jak `force_instrumental`.
+
+**Ile ustępuje — jest.** Poziom podkładu, poziom efektów, głębokość duckingu i czas powrotu
+mieszkają w `projects/<id>/mix.json`, na poziomie projektu, bo brzmienie serii powraca
+między odcinkami tak samo jak obsada i sposób czytania.
+
+Nie w `project.json`, z powodu `narration.json`: plik etapu 0 jest zapisanym wejściem
+niemal wszystkiego, więc suwak unieważniałby zgody na bajty, których nie dotknął. I — to
+subtelniejsza połowa — **nie w `narration.json`**: tamten jest zapisanym wejściem *kupionych
+nagrań*, a to, jak głośno pod nimi siedzi podkład, nie mówi nic o tym, jak zostały
+przeczytane. Zmiana miksu nie może unieważniać nagrania. Dwa suwaki, dwa zasięgi, dwa pliki.
+
+**Wartości startowe są i wymagają osobnego uzasadnienia**, bo tego, którym broni się
+`narration.json`, tu nie ma: tam domyślne są udokumentowane przez dostawcę, a tutaj nie ma
+dostawcy. Uzasadnienie jest inne i mocniejsze: **tej decyzji nie da się podjąć, zanim się ją
+usłyszy.** Odmowa przed pierwszym miksem żądałaby odpowiedzi, której człowiek nie ma jak
+uformować, a miks nic nie kosztuje i powtórzenie jest darmowe. Jak przy reżyserii, wartości
+jadą do silnika **jawnie** przy każdym wywołaniu i lądują w archiwum, więc plik odpowiada,
+co wyprodukowało te bajty.
+
+### Werdykt offline, i co dokładnie tracimy
+
+Etap 9 czytał długość kwestii z dwudziestu czterech bajtów nagłówka RIFF, bo sam wybrał
+kontener. **Tutaj tego wyboru nie ma.** Ani `/v1/music`, ani `/v1/sound-generation` nie
+oferują WAV-a — udokumentowany enum to MP3, surowy PCM, µ-law, A-law i Opus. PCM byłby
+bezstratny, ale **nie niesie żadnego nagłówka**: częstotliwość znalibyśmy z nazwy formatu,
+liczby kanałów nie, a pomyłka podaje długość dwukrotnie złą i nie mówi o tym ani słowa.
+
+Stemy kupuje się więc w **MP3**, a werdykt **przechodzi po ramkach**. Zarzut, którym etap 9
+odrzucił MP3 — że długość zna tylko ten, kto liczy ramki „wobec tablicy bitrate'ów, ufając,
+że strumień jest stały" — zostaje odpowiedziany przez to, że się nie ufa: każdy nagłówek
+ramki sam deklaruje swój bitrate, swoją częstotliwość i tryb kanałów, więc strumień
+zmienny czyta się tak samo dokładnie jak stały. To ten sam wybór, co czytanie pudełek MP4
+w etapie 7, i kosztuje około stu linii zamiast dwudziestu czterech bajtów. **Koszt jest
+realny i dlatego jest tu napisany.**
+
+`check` zostaje offline i bez ffmpeg, jak wszędzie: stemy czyta ramkami, a `mixed.mp4` tym
+samym czytnikiem pudełek, którym etap 8 czyta `episode.mp4` — sprawdzając przy okazji, że
+plik naprawdę niesie ścieżkę dźwiękową.
+
+### Odmowa i meldunek: dwie różne rzeczy
+
+**Efekt, który wychodzi poza koniec filmu, jest odmową.** To precedens etapu 7 i 9: gdzie
+dźwięk siedzi, wynika z planu, który zatwierdził człowiek, więc narzędzie po cichu tego nie
+przesuwa. Odmowa nic nie kosztuje — stemy zostają kupione, a ponowny miks po poprawce jest
+darmowy.
+
+**Podkład, który kończy się przed filmem, jest meldunkiem.** To precedens etapu 8: klipy
+wróciły dłuższe, niż je zamówiono, więc podkład kupiony na długość planu kończy się ułamek
+sekundy przed obrazem. To dziura, nie zderzenie, a odmowa z powodu, którego nikt niżej nie
+naprawi, byłaby odmową bez wyjścia. Cisza na końcu jest ciszą, którą da się usłyszeć
+i o której da się zdecydować.
+
+**Efekty mogą na siebie nachodzić** — dwie rzeczy mogą dziać się naraz, a tylko narrator nie
+może mówić sam przez siebie.
+
+### Trzy rodzaje pochodzenia, tak jak w etapie 9
+
+| artefakt | `producer.kind` | `model` |
+|---|---|---|
+| `cues` | `model` | model tekstowy, z `promptVersion` |
+| `M01`…`Enn` | `model` | model muzyczny albo efektowy |
+| `mixed` | `local` | `ffmpeg <wersja>` |
+
+`promptVersion` przy stemach zostaje `null`, i wygląda to na odwrotność etapu 9, więc warto
+powiedzieć wprost dlaczego. Tam tekstem było cudze zdanie jadące dosłownie. Tutaj tekst
+**jest** instrukcją — ale nie naszą stałą: to cue, które ktoś przyjął w `sound-design.md`,
+a na pytanie „która instrukcja wyprodukowała te bajty" odpowiada hash tego pliku, zapisany
+wśród wejść. Numer wersji wskazywałby nie ten dokument.
+
+### Dwie oceny, bo dwa poziomy
+
+**Ocena wspólna** dotyczy dźwięku jako takiego: czy ten arkusz opisuje to, co opisuje
+zatwierdzony plan, i czy to, co wróciło, brzmi jak ta seria. Zapada raz, bo odpowiedź nie
+zależy od tego, nad którym filmem podkład usiądzie. `--artifact` jest **wymagane**, jak
+w etapie 9 i z jedną krawędzią więcej: przyjęcie arkusza uruchamia kupowanie każdego cue,
+przyjęcie stemu otwiera miks, a druga próba u tego dostawcy kosztuje pełną cenę jeszcze raz.
+
+**Ocena odsłuchu** jest per tor i nie da się jej wydać nigdzie indziej: czy całość gra nad
+**tym** obrazem. Nie jest powtórką ocen stemów — podkład piękny sam w sobie wciąż może bić
+się z narratorem, a tylko ten plik ma oba naraz. `--artifact` nie jest tu wymagane: jeden
+artefakt na tor i nic poniżej, co przyjęcie mogłoby kupić.
+
+### Czego ten etap nie domyka
+
+Po etapie 10 tryby `music-and-effects` i `narration` są **domknięte** — to dokładnie to, co
+etapy 9 i 10 produkują między sobą. `dialogue` i `dialogue-and-narration` nie są:
+**mowy postaci nie wytwarza dziś żaden etap tego potoku i po tym etapie nadal nie będzie.**
+Raportowane, nie egzekwowane, jak wszędzie. Dalej prowadzi zadeklarowany wiersz 11.

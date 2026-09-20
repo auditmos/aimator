@@ -17,6 +17,15 @@ export const sha256Schema = z.string().regex(SHA256, "expected a lowercase sha25
  * Every stage named by the contract, not only the implemented ones. The enum
  * is the filename vocabulary: a stage that is not here cannot write a state
  * file, which is the point.
+ *
+ * `soundtrack` is stage 9's and `sound-design` is stage 10's, which reads
+ * backwards for a moment and is right. Stage 9 was named before anyone knew
+ * there would be a row below it; by the time this one arrived, the name that
+ * described it was taken. Renaming stage 9's would have invalidated every
+ * `soundtrack.stage.json` already on disk — a rename that costs a human their
+ * recorded approvals to fix a word. So stage 10 takes the name the film
+ * industry uses for exactly what it does, music and effects, and the two do
+ * not collide.
  */
 export const stageNames = [
   "prepare",
@@ -29,6 +38,7 @@ export const stageNames = [
   "clips",
   "assembly",
   "soundtrack",
+  "sound-design",
 ] as const;
 
 const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });

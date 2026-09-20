@@ -19,6 +19,20 @@ export const env = createEnv({
   runtimeEnv: process.env,
   server: {
     /**
+     * Stage 10's two audio call sites: `AIMATOR_MUSIC_MODEL` composes a bed and
+     * this one renders a sound effect. **One variable each for both tracks**,
+     * like the video model and the voice model and for the same reason —
+     * neither is *drawn*, so neither has any idea which of the two films it
+     * will end up under.
+     *
+     * Two variables rather than one, because they are two endpoints with two
+     * models behind them: a shared one would mean that choosing how the score
+     * sounds quietly chose how a thunderclap does, which nobody decided. The
+     * key for both is `ELEVENLABS_API_KEY`, shared with stage 9 — the key
+     * follows the provider, the variable follows the call site.
+     */
+    AIMATOR_EFFECTS_MODEL: z.string().min(1).optional(),
+    /**
      * Where stage 8's muxer lives, when it is not simply `ffmpeg` on PATH.
      *
      * The only variable here that names a program rather than a model or a
@@ -36,6 +50,8 @@ export const env = createEnv({
      */
     AIMATOR_IMAGE_MODEL_GPT_IMAGE: z.string().min(1).optional(),
     AIMATOR_IMAGE_MODEL_SEEDREAM: z.string().min(1).optional(),
+    /** Stage 10's other audio call site; see `AIMATOR_EFFECTS_MODEL` above. */
+    AIMATOR_MUSIC_MODEL: z.string().min(1).optional(),
     /**
      * The text model stage 9 lifts the narration script with. Its own variable,
      * like every other paid call site — and separate from the voice model below
@@ -65,6 +81,13 @@ export const env = createEnv({
      * of the two documents, so it is a reasonable place to spend differently.
      */
     AIMATOR_SHOTLIST_MODEL: z.string().min(1).optional(),
+    /**
+     * The text model stage 10 writes the cue sheet with. Its own variable, like
+     * every other paid call site, and separate from the two audio models above
+     * for the reason stage 9's text model is separate from its voice: one
+     * decides what the episode should sound like, the others make the sound.
+     */
+    AIMATOR_SOUND_MODEL: z.string().min(1).optional(),
     /**
      * The video model stage 7 renders every clip with — **one variable, not one
      * per track**, unlike the image models above.

@@ -639,3 +639,95 @@ describe("--stage assembly", () => {
     expect(result.text).not.toContain("unknown command");
   });
 });
+
+describe("sound-design", () => {
+  it("should be dispatched rather than read as an unknown command", async () => {
+    const result = await cli("sound-design", "generate", "demo", "01-burza");
+    expect(result.text).not.toContain("unknown command");
+  });
+
+  it("should reject a subcommand it does not have", async () => {
+    const result = await cli("sound-design", "score", "demo", "01-burza");
+    expect(result.text).toContain("nieznane polecenie: sound-design score");
+  });
+
+  /**
+   * Three model flags, because three paid call sites: one text model writes
+   * the cue sheet, one composes a bed and one renders an effect. A single
+   * `--model` would mean that choosing how the score sounds quietly chose how
+   * a thunderclap does, which is the refusal stage 7 already makes.
+   */
+  it("should name each of its three models separately", async () => {
+    const result = await cli(
+      "sound-design",
+      "generate",
+      "demo",
+      "01-burza",
+      "--model",
+      "gpt-6",
+      "--music-model",
+      "music_v2",
+      "--effects-model",
+      "eleven_text_to_sound_v2",
+      "--dry-run"
+    );
+
+    expect(result.text).not.toContain("Unknown option");
+  });
+
+  /** Two tracks are two films, and only the mix is per track. */
+  it("should require the track for the mix and not for the sheet", async () => {
+    const mix = await cli("sound-design", "mix", "demo", "01-burza");
+    const generate = await cli("sound-design", "generate", "demo", "01-burza", "--dry-run");
+
+    expect(mix.text).toContain("--track");
+    expect(generate.text).not.toContain("--track");
+  });
+
+  it("should take the levels at the project level, with no episode", async () => {
+    const result = await cli("sound-design", "levels", "demo", "--music-db", "-20", "--dry-run");
+    expect(result.text).not.toContain("unknown command");
+  });
+
+  it("should document itself in the usage text", async () => {
+    const result = await run(["--help"]);
+    expect(result.ok && result.data).toContain("sound-design generate");
+  });
+});
+
+describe("--stage sound-design", () => {
+  it("should be an allowed approve stage for the shared half", async () => {
+    const result = await cli(
+      "approve",
+      "demo",
+      "01-burza",
+      "--stage",
+      "sound-design",
+      "--artifact",
+      "cues"
+    );
+
+    expect(result.text).not.toContain("dozwolone:");
+  });
+
+  it("should name itself among the allowed stages when another is wrong", async () => {
+    const result = await cli("approve", "demo", "--stage", "montage");
+    expect(result.text).toContain("sound-design");
+  });
+
+  it("should be an allowed check stage at both of its levels", async () => {
+    const shared = await cli("check", "demo", "01-burza", "--stage", "sound-design");
+    const track = await cli(
+      "check",
+      "demo",
+      "01-burza",
+      "--stage",
+      "sound-design",
+      "--track",
+      "seedream"
+    );
+
+    expect(shared.text).not.toContain("unknown command");
+    expect(track.text).not.toContain("unknown command");
+  });
+});

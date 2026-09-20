@@ -106,6 +106,9 @@ function muxer(options: { absent?: boolean; seconds?: number } = {}): Fake {
           stderr: "",
         });
       },
+      /** Stage 8 never lays sound down; being asked to is a bug, not a fallback. */
+      master: (): Promise<Result<ConcatReport>> =>
+        Promise.resolve(err(new Error("etap 8 nie składa ścieżki dźwiękowej"))),
       /** Stage 8 never lays speech down; being asked to is a bug, not a fallback. */
       mix: (): Promise<Result<ConcatReport>> =>
         Promise.resolve(err(new Error("etap 8 nie miksuje dźwięku"))),

@@ -12,7 +12,7 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
-Stages 0 through 9 are implemented. Stage 10 is a declared contract, not working code.
+Stages 0 through 10 are implemented. Stage 11 is a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -52,8 +52,27 @@ finding every sentence inside the shot it names. Its two halves take their refus
 different rows: the bought bytes are published as they arrived, because stage 8 cuts what
 came back, while where a line sits is refused rather than nudged, because stage 7 refuses a
 length no model renders. It cannot fulfil any of the four sound modes on its own, since all
-of them include music and effects, so it reports what is missing and the row below it is
-declared rather than half-built.
+of them include music and effects, so it reports what is missing and the row below it buys
+exactly that.
+Stage 10 is the first that **rewrote its own row of the contract**, and the first whose
+verdict cannot prove its result is faithful to its input — both deliberate, both written
+down. The row said music and effects were an *input* a person brings, and admitted it did
+not settle where they come from; it cannot be built that way, because pulling outside files
+into the workspace is stage 0's monopoly, so "a person brings them" was a rewrite of stage 0
+under another name. So it buys them, which adds no fourth provider — only a fourth and fifth
+call site at the one stage 9 already uses. And it is where **"lifted, not invented" runs
+out**: a music prompt is an instruction, which rule 9 writes in English, while the `Audio`
+prose it comes from is material, which rule 9 forbids translating, so copying is illegal in
+both directions and there is nothing verbatim to look for. What stands in its place is stage
+4's bargain rather than stage 9's — a wiring verdict that never reads a prompt, whose load
+is carried by one check: a cue's declared shots must be exactly the shots its seconds cover,
+so a shot dropped and a shot invented fail the same way. Its bill is seconds rather than
+calls, for a different reason than stage 9's: this provider rates per minute of generated
+audio and charges at generation, so one call for a bed and one for a click are the same
+count and nothing like the same money. It rebuilds from `episode.mp4` rather than laying
+music over `narrated.mp4`, which is the only arrangement that encodes the speech once and
+the only one in which music can honestly step back under a voice — and `narrated.mp4`
+becomes a reviewed intermediate whose yes stage 10 gates on rather than reproduces.
 
 ## Project Structure
 
@@ -198,8 +217,27 @@ src/
     │   ├── mix.ts        # Internal — the per-track half; buys nothing
     │   ├── review.ts     # Internal — two reviews, because there are two levels
     │   └── index.test.ts    # Lift/gate/bill/placement, through the entry
-    ├── muxer.ts      # Single-file form — the local engine, shared by stages 8 and 9
+    ├── audio-model/   # Folder form — one billed audio call (stage 10), two endpoints
+    │   ├── index.ts       # Public: runAudioStage, validateAudio, musicLength, effectLength
+    │   ├── client.ts      # Internal — /v1/music and /v1/sound-generation, redaction
+    │   ├── attempt.ts     # Internal — submitted, archive, resume, publish
+    │   ├── validate.ts    # Internal — the MP3 verdict, walked frame by frame, offline
+    │   └── index.test.ts  # The walk, the limits — through the entry
+    ├── sound-design/  # Folder form — index.ts is the only entry (stage 10)
+    │   ├── index.ts       # Public: generateSoundDesign, generateMaster, checkSoundDesign,
+    │   │                  #         checkMaster, approveSoundDesign, approveMaster,
+    │   │                  #         setLevels, validateSoundDesign
+    │   ├── prompt.ts      # Internal — the instruction that carries rule 9 alone
+    │   ├── validate.ts    # Internal — the wiring verdict; never reads a prompt
+    │   ├── levels.ts      # Internal — how loud it sits, and why that is its own file
+    │   ├── plan.ts        # Internal — two gates, placement, and what is still missing
+    │   ├── generate.ts    # Internal — the cue sheet, then the stems it authorises
+    │   ├── mix.ts         # Internal — the per-track half; buys nothing
+    │   ├── review.ts      # Internal — two reviews, because there are two levels
+    │   └── index.test.ts  # Wiring/gate/bill/refusal, through the entry
+    ├── muxer.ts      # Single-file form — the local engine, shared by stages 8, 9 and 10
     ├── muxer.test.ts
+    ├── timeline.ts   # Single-file form — the plan's clock as one film's, stages 9 and 10
     ├── result.ts     # Result<T> — the recoverable-error contract
     └── result.test.ts
 ```
@@ -295,6 +333,46 @@ would have to run again to get these bytes", and for a muxed file the honest ans
 engine and its version — two releases do not necessarily write the same container from the
 same clips. `manual` would have made that unanswerable from the file, which is the exact
 failure `producer` was built to prevent.
+
+`lib/audio-model` is the fifth kind of billed call, and it is a module rather than a flag in
+`lib/voice-model` for the reason `lib/video-model` is one rather than a flag in
+`lib/text-model`: what a module of this kind holds is the contract of a *kind* of call, and
+speech and music are not one kind. A speech call is handed a sentence and charges for the
+sentence; these two are handed a description and charge for **the length of audio they are
+asked to produce**. That changes the number a stage must print before it spends, which is
+the one thing every paid stage here is required to get right. Two endpoints behind one entry
+follows `lib/image-model`, and is truer here: one provider, one key, one container, one
+verdict, one lifecycle, and a body that differs by a URL and a field name.
+
+`lib/timeline` is a promotion at the **second** caller, on `lib/image-model`'s judgement
+rather than `lib/text-model`'s. Two clocks have existed since stage 7 — the plan's and each
+finished film's — and every stage that lays sound on a picture has to cross the gap between
+them. Stage 9 crossed it for an utterance anchored at "7s of the plan"; stage 10 crosses it
+for a thunderclap and for the second a bed begins. The arithmetic is not a formula anybody
+would want written twice, and stage 10 was a certainty rather than a discovery, so waiting
+for a third caller would have been choosing to make an invariant into a coincidence on
+purpose. `readAcceptedLines` moved the other way and is worth distinguishing: it was not
+promoted into a module but **exported from stage 9's own entry**, because "which lines did a
+human accept" is a question about stage 9's artifact, and a later stage consuming an earlier
+stage's artifact through its public entry is the ordinary direction.
+
+`lib/muxer` grew a **third operation**, `master`, and did not absorb `mix` into it although
+it is a superset. They answer different questions and both stay: `mix` produces the film a
+human listens to in order to judge **placement**, with nothing else in the way, and `master`
+produces the film with everything in it. Collapsing them would delete the only artifact in
+the pipeline where the narration can be heard on its own — which is also the artifact stage
+10's gate reads a yes from.
+
+`sound-design/levels.ts` is `narration/delivery.ts` one row down, and the interesting part
+is why it is not *inside* it. Delivery is a recorded input of the bought recordings; levels
+are a recorded input of the mix. How loud the bed sits under a narrator says nothing about
+how that narrator read, so changing the mix must not lapse a recording — the same reasoning
+that keeps delivery out of `project.json`, applied one level finer. **Two knobs, two scopes,
+two files.** Its defaults need their own justification, because delivery's is unavailable:
+delivery could point at the provider's documented defaults and there is no provider here.
+The one that applies is different and stronger — **this decision cannot be made before it is
+heard**, so refusing the first mix would demand an answer nobody is in a position to form,
+and a mix costs nothing to redo.
 
 It **grew** with stage 7 rather than being copied: resolving `opening-frame`, `entry:Cnn`
 and `end:Cnn` per track is the same question it already answered for `hero:ewa` and `Rnn`,
@@ -427,7 +505,7 @@ function parsePort(raw: string): Result<number> {
 | `pnpm test` | Run tests with Vitest |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm unused` | Detect unused code with Knip |
-| `ffmpeg` | Not a script — a **system** dependency stage 8 needs on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes so a cut can be verified on a machine with no media tools. Absent, stage 8 refuses rather than re-encoding. |
+| `ffmpeg` | Not a script — a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
 
 ## Testing Conventions
@@ -446,8 +524,21 @@ stages 5, 6 and 7. It is **not a domain**: nothing under `src/lib` imports it,
 `src/index.ts` does not re-export it and `tsup` does not bundle it, which is why it sits
 outside the layer table rather than inside it.
 
+`mp3` joined `wav`, `mp4`, `png` and `jpeg` at stage 10, and is built rather than committed
+for their reason. It carries exactly what the verdict reads — a chain of frame headers, each
+declaring its own bitrate and rate — plus the two cases that make the reader worth having:
+`bitrate` takes a list, so a variable stream exists to be read exactly, and `id3` writes a
+tag whose payload **looks like a frame header**, so honouring the declared size is the only
+way to get the length right. A fixture that filled the tag with zeroes would have passed
+against a reader that simply hunted for the first sync byte.
+
 `makeCut` joined them at stage 9, which is the first stage that needs an episode already
-assembled and needs one on both tracks. It carries the fixture's own `muxer`, because the
+assembled and needs one on both tracks. Stage 10 is its second caller and needed no change
+beyond `clipSeconds`, which was already there: a track whose clips came back a little short
+is the only way an effect legal against the plan can overrun the real film, and a track
+whose clips came back long is the only way a bed bought at the plan's length can leave
+silence at the end. Those are the two halves of "refused versus reported", and the fixture
+could already produce both. It carries the fixture's own `muxer`, because the
 clips this fixture builds are structurally valid MP4s rather than decodable ones — the real
 engine is exercised where it is the thing under test, in `muxer.test.ts`, against inputs it
 made itself. `NARRATION` and the `narration` option are the same line drawn again: the
@@ -526,6 +617,15 @@ Pre-commit hook runs `pnpm lint && pnpm test` automatically.
   follows the model rather than the directory it writes into. Stage 7's entry frames reuse
   `AIMATOR_IMAGE_MODEL_<TRACK>` for the opposite reason: a different image model inside one
   track would put two hands on the same drawing.
+- Stage 10 carries **three**, because it has three paid call sites: `AIMATOR_SOUND_MODEL`
+  writes the cue sheet, `AIMATOR_MUSIC_MODEL` composes a bed and `AIMATOR_EFFECTS_MODEL`
+  renders an effect. The last two are one variable each for **both tracks**, for the reason
+  the voice model is: neither a bed nor a thunderclap is *drawn*, so neither knows which of
+  the two films it will end up under. Two of them rather than one, because a shared variable
+  would mean that choosing how the score sounds quietly chose how a thunderclap does. Their
+  key is `ELEVENLABS_API_KEY`, stage 9's — **the key follows the provider, the variable
+  follows the call site**, which is the same reading that gives `BYTEPLUS_MODELARK` to a
+  clip on the `gpt-image` track.
 - Stage 9 carries **two** model variables, because it buys from two providers:
   `AIMATOR_NARRATION_MODEL` lifts the script and `AIMATOR_VOICE_MODEL` reads it. The second
   is one variable for both tracks, for the reason `AIMATOR_VIDEO_MODEL` is: a spoken

@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
   assemblyRunPaths,
+  audioRunPaths,
   characterPaths,
   characterTrackPaths,
   characterViewImage,
@@ -11,12 +12,13 @@ import {
   episodePaths,
   episodeTrackPaths,
   imageRunPaths,
+  mixRunPaths,
   narrationAudio,
   projectPaths,
   referenceImage,
   resolveWorkspace,
   runPaths,
-  soundtrackRunPaths,
+  soundStem,
   videoRunPaths,
   voiceRunPaths,
 } from "./workspace.js";
@@ -56,6 +58,11 @@ describe("projectPaths", () => {
    * episodes — and kept *beside* `project.json` rather than inside it because
    * stage 0's file is a recorded input of nearly every artifact, so a knob
    * somebody is expected to turn would lapse approvals its bytes never touched.
+   *
+   * `mix.json` is stage 10's twin of that file and is separate from it for the
+   * same reason it is separate from `project.json`: how loud the music sits
+   * under the narrator lapses the mix it produced, and must not lapse the
+   * recordings, which it never touched.
    */
   it("should place every project-level file under the project directory", () => {
     const result = projectPaths(workspace, "48-praw-wladzy");
@@ -63,6 +70,7 @@ describe("projectPaths", () => {
       characters: "/srv/aimator/projects/48-praw-wladzy/characters",
       episodes: "/srv/aimator/projects/48-praw-wladzy/episodes",
       file: "/srv/aimator/projects/48-praw-wladzy/project.json",
+      mix: "/srv/aimator/projects/48-praw-wladzy/mix.json",
       narration: "/srv/aimator/projects/48-praw-wladzy/narration.json",
       prepareStage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
       root: "/srv/aimator/projects/48-praw-wladzy",
@@ -169,6 +177,10 @@ describe("episodePaths", () => {
       shotList: `${episode}/shot-list.md`,
       shotListLock: `${episode}/shot-list.lock`,
       shotListStage: `${episode}/shot-list.stage.json`,
+      sound: `${episode}/sound`,
+      soundDesign: `${episode}/sound-design.md`,
+      soundDesignLock: `${episode}/sound-design.lock`,
+      soundDesignStage: `${episode}/sound-design.stage.json`,
       soundtrackStage: `${episode}/soundtrack.stage.json`,
       source: `${episode}/source.md`,
     });
@@ -204,6 +216,7 @@ describe("episodeTrackPaths", () => {
       clipsStage: `${root}/clips.stage.json`,
       episodeVideo: `${root}/episode.mp4`,
       frames: `${root}/frames`,
+      mixedVideo: `${root}/mixed.mp4`,
       narratedVideo: `${root}/narrated.mp4`,
       openingFrameImage: `${root}/opening-frame.png`,
       openingFrameLock: `${root}/opening-frame.lock`,
@@ -213,6 +226,8 @@ describe("episodeTrackPaths", () => {
       referencesStage: `${root}/references.stage.json`,
       root,
       runs: `${root}/runs`,
+      soundDesignLock: `${root}/sound-design.lock`,
+      soundDesignStage: `${root}/sound-design.stage.json`,
       soundtrackLock: `${root}/soundtrack.lock`,
       soundtrackStage: `${root}/soundtrack.stage.json`,
     });
@@ -443,11 +458,96 @@ describe("stage 9 paths", () => {
    * the arguments without it would record half the invocation.
    */
   it("should archive a mix without a request or a response", () => {
-    const run = track === null ? null : soundtrackRunPaths(track, "20260919T110000Z-abcd1234");
+    const run = track === null ? null : mixRunPaths(track, "20260919T110000Z-abcd1234");
     expect(run?.root).toBe(`${root}/runs/20260919T110000Z-abcd1234`);
     expect(run?.run).toBe(`${run?.root}/run.json`);
     expect(run?.transport).toBe(`${run?.root}/transport.json`);
     expect(run?.validation).toBe(`${run?.root}/validation.json`);
+    expect(run?.placement).toBe(`${run?.root}/placement.json`);
+    expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
+  });
+});
+
+describe("stage 10 paths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const paths = project.ok ? episodePaths(project.data, "01-arrival") : null;
+  const track = paths?.ok ? episodeTrackPaths(paths.data, "seedream") : null;
+  const episode = "/srv/aimator/projects/demo/episodes/01-arrival";
+  const root = `${episode}/seedream`;
+
+  /**
+   * Stage 9's precedent read to the letter. A cue sheet describes the story's
+   * sound, and a bought stem depends on the cue text and the audio model —
+   * neither of which differs per track. So both sit at the episode level, and
+   * buying them twice for a difference of a second of clip drift would be
+   * paying for a directory.
+   */
+  it("should keep the cue sheet and the stems shared between the tracks", () => {
+    expect(paths?.ok ? paths.data.soundDesign : null).toBe(`${episode}/sound-design.md`);
+    expect(paths?.ok ? paths.data.sound : null).toBe(`${episode}/sound`);
+    expect(paths?.ok ? paths.data.soundDesignStage : null).toBe(
+      `${episode}/sound-design.stage.json`
+    );
+    expect(paths?.ok ? paths.data.soundDesignLock : null).toBe(`${episode}/sound-design.lock`);
+  });
+
+  /**
+   * MP3 rather than the WAV stage 9 buys, and that is the provider's doing
+   * rather than a preference: neither the music nor the sound-effect endpoint
+   * offers a WAV container, and their raw PCM carries no header at all — so a
+   * channel count could not be read back out of the bytes, and a wrong guess
+   * would state a length twice the truth without saying a word. An MP3 frame
+   * header declares its own rate, bitrate and channel mode, so the verdict
+   * stays exact and offline; it just has to walk.
+   */
+  it("should give a stem its own file, named by its artifact id", () => {
+    const bed = paths?.ok ? soundStem(paths.data, "M01") : null;
+    const effect = paths?.ok ? soundStem(paths.data, "E04") : null;
+
+    expect(bed?.ok ? bed.data : null).toBe(`${episode}/sound/M01.mp3`);
+    expect(effect?.ok ? effect.data : null).toBe(`${episode}/sound/E04.mp3`);
+  });
+
+  it("should reject a stem id that is not a numbered artifact", () => {
+    const stem = paths?.ok ? soundStem(paths.data, "../escape") : null;
+    expect(stem?.ok).toBe(false);
+  });
+
+  /**
+   * The full mix is per track for the reason the narrated cut is: it is the
+   * only artifact that knows how long *this* film actually runs. It sits
+   * beside `narrated.mp4` rather than replacing it — those bytes carry a
+   * human's yes, and stage 10 neither overwrites nor re-encodes them.
+   */
+  it("should place the full mix and its state file inside the track", () => {
+    expect(track?.mixedVideo).toBe(`${root}/mixed.mp4`);
+    expect(track?.soundDesignStage).toBe(`${root}/sound-design.stage.json`);
+    expect(track?.soundDesignLock).toBe(`${root}/sound-design.lock`);
+    expect(track?.mixedVideo).not.toBe(track?.narratedVideo);
+  });
+
+  it("should archive a bought stem under the episode's shared runs directory", () => {
+    const run = paths?.ok ? audioRunPaths(paths.data, "20260920T120000Z-abcd1234") : null;
+
+    expect(run?.root).toBe(`${episode}/runs/20260920T120000Z-abcd1234`);
+    expect(run?.audio).toBe(`${run?.root}/original.mp3`);
+    expect(run?.previousAudio).toBe(`${run?.root}/previous.mp3`);
+    expect(run?.request).toBe(`${run?.root}/request.json`);
+    expect(run?.response).toBe(`${run?.root}/response.json`);
+    expect(run?.transport).toBe(`${run?.root}/transport.json`);
+    expect(run?.validation).toBe(`${run?.root}/validation.json`);
+  });
+
+  /**
+   * The full mix archives exactly what the narrated one does, so it asks the
+   * same builder rather than a copy of it: both are a local engine laying
+   * sound over a picture it copied, and `placement.json` answers the same
+   * question in both — which sound was laid down where.
+   */
+  it("should archive a full mix with the same shape stage 9's mix uses", () => {
+    const run = track === null ? null : mixRunPaths(track, "20260920T120000Z-abcd1234");
+
+    expect(run?.root).toBe(`${root}/runs/20260920T120000Z-abcd1234`);
     expect(run?.placement).toBe(`${run?.root}/placement.json`);
     expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
   });

@@ -177,6 +177,126 @@ export function wav(options: {
   return Buffer.concat([chunk("RIFF", body)]);
 }
 
+/** MPEG1 Layer III bitrates, in kbps, indexed as the frame header indexes them. */
+const MPEG1_BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+/** MPEG2 and MPEG2.5 Layer III, same field, a different table behind it. */
+const MPEG2_BITRATES = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+const MPEG1_RATES = [44_100, 48_000, 32_000];
+const MPEG2_RATES = [22_050, 24_000, 16_000];
+
+/**
+ * A structurally valid Layer III MP3 of a given length, built rather than
+ * committed as a binary — the same reason `mp4` and `wav` are built.
+ *
+ * It carries exactly what the verdict reads: a chain of frame headers, each
+ * declaring its own version, bitrate, sample rate and channel mode. `bitrate`
+ * takes a list to make a variable-rate stream, which is the case a reader that
+ * multiplies one bitrate by a file size gets wrong; `id3` puts a tag in front
+ * of the first frame, because every real encoder does; `xing` puts a metadata
+ * frame where a real encoder puts one, which carries no audio and must not be
+ * counted as a frame of it.
+ */
+export function mp3(options: {
+  readonly bitrate?: number | readonly number[];
+  readonly id3?: boolean;
+  readonly mono?: boolean;
+  readonly sampleRate?: number;
+  readonly seconds: number;
+  readonly xing?: boolean;
+}): Buffer {
+  const { bitrate = 128, id3 = false, mono = false, sampleRate = 44_100, seconds, xing } = options;
+  const mpeg1 = MPEG1_RATES.includes(sampleRate);
+  const perFrame = mpeg1 ? 1152 : 576;
+  const rates = mpeg1 ? MPEG1_BITRATES : MPEG2_BITRATES;
+  const chosen = typeof bitrate === "number" ? [bitrate] : bitrate;
+  const count = Math.round((seconds * sampleRate) / perFrame);
+  const frames: Buffer[] = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const kbps = chosen[index % chosen.length] ?? 128;
+    frames.push(frame({ kbps, mono, mpeg1, rates, sampleRate }));
+  }
+
+  return Buffer.concat([
+    ...(id3 ? [id3v2()] : []),
+    ...(xing === true
+      ? [tagged(frame({ kbps: 32, mono, mpeg1, rates, sampleRate }), mpeg1, mono)]
+      : []),
+    ...frames,
+  ]);
+}
+
+/** One Layer III frame: a four-byte header and a payload of the length it declares. */
+function frame(options: {
+  readonly kbps: number;
+  readonly mono: boolean;
+  readonly mpeg1: boolean;
+  readonly rates: readonly number[];
+  readonly sampleRate: number;
+}): Buffer {
+  const { kbps, mono, mpeg1, rates, sampleRate } = options;
+  const rateIndex = (mpeg1 ? MPEG1_RATES : MPEG2_RATES).indexOf(sampleRate);
+  const head = Buffer.alloc(4);
+
+  head[0] = 0xff;
+  // Bit runs, spelled as the arithmetic they are: 111 sync, then version
+  // (11 = MPEG1, 10 = MPEG2), layer (01 = Layer III) and the no-CRC bit.
+  head[1] = 0b111 * 32 + (mpeg1 ? 0b11 : 0b10) * 8 + 0b01 * 2 + 1;
+  head[2] = rates.indexOf(kbps) * 16 + rateIndex * 4;
+  // Channel mode 11 is mono, 00 is stereo; the rest of the byte is unused here.
+  head[3] = (mono ? 0b11 : 0b00) * 64;
+
+  const length = Math.floor(((mpeg1 ? 144_000 : 72_000) * kbps) / sampleRate) || head.length + 1;
+
+  return Buffer.concat([head, Buffer.alloc(Math.max(length - head.length, 1), 0)]);
+}
+
+/** Past the side information, whose size the version and channel mode fix. */
+function tagOffset(mpeg1: boolean, mono: boolean): number {
+  if (mpeg1) {
+    return mono ? 21 : 36;
+  }
+
+  return mono ? 13 : 21;
+}
+
+/** A metadata frame, where a real encoder writes one: inside the side-info area. */
+function tagged(first: Buffer, mpeg1: boolean, mono: boolean): Buffer {
+  const at = tagOffset(mpeg1, mono);
+  const copy = Buffer.from(first);
+
+  copy.write("Xing", at, "ascii");
+
+  return copy;
+}
+
+/**
+ * An ID3v2 tag: the three letters, a version, flags, and a synchsafe size.
+ *
+ * Its payload is filled with something that looks exactly like a frame header,
+ * because that is what makes skipping the tag matter. A reader that hunted for
+ * the first sync pattern instead of honouring the declared size would start
+ * counting here and report a length that is simply wrong.
+ */
+function id3v2(): Buffer {
+  const payload = Buffer.alloc(64, 0);
+  const head = Buffer.alloc(10);
+
+  for (let at = 0; at + 4 <= payload.length; at += 4) {
+    payload[at] = 0xff;
+    payload[at + 1] = 0xfb;
+    payload[at + 2] = 0x90;
+    payload[at + 3] = 0x00;
+  }
+
+  head.write("ID3", 0, "ascii");
+  head[3] = 4;
+  // Synchsafe: seven bits per byte, so 64 fits in the last one untouched.
+  head[9] = payload.length;
+
+  return Buffer.concat([head, payload]);
+}
+
 /** One RIFF chunk: a four-character id, a little-endian size, and the payload. */
 function chunk(id: string, payload: Buffer): Buffer {
   const head = Buffer.alloc(8);
@@ -978,6 +1098,18 @@ export function muxer(): Muxer {
       await write(input.target, mp4({ height: 1080, seconds, width: 1920 }));
 
       return ok({ argv: ["ffmpeg", "-f", "concat"], engine: ENGINE, stderr: "" });
+    },
+    master: async (input) => {
+      const { writeFile: write } = await import("node:fs/promises");
+
+      // The full mix is the same shape of answer as the narrated one: the film
+      // it was given, plus one frameless track carrying everything at once.
+      await write(
+        input.target,
+        mp4({ audio: true, height: 1080, seconds: CUT_SECONDS, width: 1920 })
+      );
+
+      return ok({ argv: ["ffmpeg", "-filter_complex"], engine: ENGINE, stderr: "" });
     },
     mix: async (input) => {
       const { writeFile: write } = await import("node:fs/promises");

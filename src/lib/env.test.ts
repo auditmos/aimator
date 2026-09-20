@@ -57,4 +57,22 @@ describe("env", () => {
   it("should expose ELEVENLABS_API_KEY as an optional string", () => {
     expect(["string", "undefined"]).toContain(typeof env.ELEVENLABS_API_KEY);
   });
+
+  /**
+   * Stage 10 has three of its own, because it has three paid call sites: one
+   * text model writes the cue sheet and two audio models make the sound. The
+   * key for the last two is stage 9's — the key follows the provider, the
+   * variable follows the call site.
+   */
+  it("should expose the stage-10 cue-sheet model as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_SOUND_MODEL);
+  });
+
+  it("should expose the stage-10 music model as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_MUSIC_MODEL);
+  });
+
+  it("should expose the stage-10 effects model as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_EFFECTS_MODEL);
+  });
 });

@@ -8,22 +8,24 @@ import {
   toWorkspacePath,
 } from "../artifact/index.js";
 import { type EpisodeSettings, readStage0Inputs } from "../project/index.js";
-import { err, ok, type Result } from "../result.js";
+import { ok, type Result } from "../result.js";
 import { checkShotList } from "../shot-list/index.js";
+import type { PlanClock } from "../timeline.js";
 import { validateVideo } from "../video-model/index.js";
+import { validateSpeech } from "../voice-model/index.js";
 import {
-  clipVideo,
   type EpisodePaths,
   type EpisodeTrackPaths,
   episodePaths,
   episodeTrackPaths,
   type ImageTrack,
+  narrationAudio,
   type ProjectPaths,
   projectPaths,
   type Workspace,
 } from "../workspace.js";
 import { buildPrompt } from "./prompt.js";
-import type { NarrationLine } from "./validate.js";
+import { type NarrationLine, validateNarration } from "./validate.js";
 
 /**
  * Internal to the narration module: what stage 9 reads, and whether it may act.
@@ -200,6 +202,137 @@ export async function readStage9Inputs(input: Stage9Scope): Promise<Result<Stage
   });
 }
 
+/** One accepted line: the sentence, its anchor in the plan, and its bytes. */
+interface AcceptedLine {
+  /** Where the plan puts it, before any track's drift is applied. */
+  readonly atSeconds: number;
+  readonly characters: number;
+  readonly id: string;
+  /** Absolute, for a mixer. */
+  readonly path: string;
+  /** How long the bought recording runs, from its own header. */
+  readonly seconds: number;
+  readonly shot: string;
+  readonly text: string;
+}
+
+interface AcceptedLines {
+  /** Why these lines may not be laid down yet. Empty means they may. */
+  readonly gate: readonly string[];
+  readonly inputs: readonly RecordedFile[];
+  readonly lines: readonly AcceptedLine[];
+}
+
+/**
+ * Every line of the approved script, with the recording somebody accepted.
+ *
+ * The gate is per utterance and it is approval rather than existence: a
+ * recording that merely exists is one nobody has listened to, and every stage
+ * that lays these down sits downstream of a human saying yes.
+ *
+ * It is **exported** because stage 10 mixes the same recordings into the full
+ * soundtrack and would otherwise have to ask the same seven questions of the
+ * same files. That is a stage consuming an earlier stage's artifact through
+ * its public entry, which is the ordinary direction — the alternative was a
+ * second copy of this function inside stage 10, reaching into what stage 9
+ * knows about its own lines.
+ */
+export async function readAcceptedLines(input: Stage9Scope): Promise<Result<AcceptedLines>> {
+  const stage9 = await readStage9Inputs(input);
+
+  if (!stage9.ok) {
+    return stage9;
+  }
+
+  const script = await readDigest(stage9.data.paths.episode.narrationScript);
+  const plan = await checkShotList(input);
+
+  if (!plan.ok) {
+    return plan;
+  }
+
+  // An absent script is an obstacle, not a failure: `--dry-run` has to be able
+  // to report it beside the others rather than die on it, which is what every
+  // gate in this pipeline promises.
+  if (!script.ok || plan.data.verdict === null) {
+    return ok({
+      gate: ["nie ma skryptu narracji — uruchom najpierw: narration generate"],
+      inputs: [],
+      lines: [],
+    });
+  }
+
+  const verdict = validateNarration({
+    shotList: plan.data.verdict,
+    text: script.data.bytes.toString("utf8"),
+  });
+
+  if (!verdict.ok) {
+    return ok({ gate: [verdict.error.message], inputs: [], lines: [] });
+  }
+
+  const gate: string[] = [];
+  const inputs: RecordedFile[] = [
+    {
+      path: toWorkspacePath(input.workspace.root, stage9.data.paths.episode.narrationScript),
+      sha256: script.data.sha256,
+    },
+  ];
+
+  if (stage9.data.stage.artifacts[SCRIPT]?.review.status !== "approved") {
+    gate.push("skrypt narracji czeka na ocenę człowieka");
+  }
+
+  const lines: AcceptedLine[] = [];
+
+  for (const line of verdict.data.lines) {
+    const file = narrationAudio(stage9.data.paths.episode, line.id);
+
+    if (!file.ok) {
+      return file;
+    }
+
+    // biome-ignore lint/performance/noAwaitInLoops: one line read at a time, in the script's order
+    const bytes = await readDigest(file.data);
+    const record = stage9.data.stage.artifacts[line.id];
+
+    if (!bytes.ok || record?.status !== "completed") {
+      gate.push(`${line.id}: nie ma nagrania — kwestia nie została kupiona`);
+      continue;
+    }
+
+    const recorded = {
+      path: toWorkspacePath(input.workspace.root, file.data),
+      sha256: bytes.data.sha256,
+    };
+    const output = record.outputs.find((one) => one.path === recorded.path);
+
+    if (output === undefined || output.sha256 !== recorded.sha256) {
+      gate.push(`${line.id}: bajty nagrania nie zgadzają się z jego rekordem`);
+    }
+
+    if (record.review.status !== "approved") {
+      gate.push(`${line.id}: nagranie czeka na ocenę człowieka`);
+    }
+
+    const speech = validateSpeech(bytes.data.bytes);
+
+    if (!speech.ok) {
+      gate.push(`${line.id}: ${speech.error.message}`);
+      continue;
+    }
+
+    inputs.push(recorded);
+    lines.push({ ...line, path: file.data, seconds: speech.data.seconds });
+  }
+
+  if (lines.length === 0) {
+    gate.push("żadna kwestia nie jest gotowa — nie ma czego położyć na obrazie");
+  }
+
+  return ok({ gate, inputs, lines });
+}
+
 /** One line as the mixer uses it: where the bytes are, and when they start. */
 export interface PlacedLine {
   /** The second of *this track's* finished film the line begins at. */
@@ -297,40 +430,6 @@ export async function readTrackTimeline(
   });
 }
 
-/**
- * A second of the approved plan, as a second of one track's finished film.
- *
- * The clips tile the plan without a gap and came back a little longer than they
- * were ordered, so the two timelines run at the same speed and drift apart at
- * every seam. Mapping one to the other is therefore not a scale factor: it is
- * "which clip is this second in, how far into it, and how much real time came
- * before that clip" — the same arithmetic stage 8 reports as drift, read in the
- * other direction.
- *
- * A second past the end of the plan maps to the end of the film. Nothing
- * upstream can produce one, because every anchor validated inside a shot.
- */
-function resolveAnchor(
-  plannedSeconds: number,
-  clips: readonly { readonly actualSeconds: number; readonly end: number; readonly start: number }[]
-): number {
-  let elapsed = 0;
-
-  for (const clip of clips) {
-    if (plannedSeconds < clip.end) {
-      const into = plannedSeconds - clip.start;
-
-      // Within a clip the two run at the same rate; the fraction a renderer
-      // leaves over sits at its end, not spread through it.
-      return round(elapsed + Math.min(into, clip.actualSeconds));
-    }
-
-    elapsed += clip.actualSeconds;
-  }
-
-  return round(elapsed);
-}
-
 /** Seconds, to the thousandth — the precision an audio delay is spelled in. */
 function round(seconds: number): number {
   return Math.round(seconds * 1000) / 1000;
@@ -350,14 +449,15 @@ function round(seconds: number): number {
  */
 export function placeLines(input: {
   readonly actualSeconds: number;
-  readonly clips: readonly { actualSeconds: number; end: number; start: number }[];
+  /** The plan's clock as this track's, from `lib/timeline`. */
+  readonly clock: PlanClock;
   readonly lines: readonly (NarrationLine & { readonly path: string; readonly seconds: number })[];
 }): { placed: readonly PlacedLine[]; problems: readonly string[] } {
   const placed: PlacedLine[] = [];
   const problems: string[] = [];
 
   for (const line of input.lines) {
-    const atSeconds = resolveAnchor(line.atSeconds, input.clips);
+    const atSeconds = input.clock.at(line.atSeconds);
     const ends = round(atSeconds + line.seconds);
     const previous = placed.at(-1);
 
@@ -397,45 +497,4 @@ export function missingSound(settings: EpisodeSettings): readonly string[] {
   return [
     `odcinek deklaruje audio: ${settings.audio}, co obejmuje muzykę i efekty — etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku`,
   ];
-}
-
-/** The clips of the approved plan with the seconds each one actually runs. */
-export async function readClipDrift(
-  input: Stage9Scope & { readonly track: ImageTrack },
-  paths: Stage9Paths,
-  aspectRatio: string
-): Promise<Result<readonly { actualSeconds: number; end: number; start: number }[]>> {
-  const plan = await checkShotList(input);
-
-  if (!plan.ok) {
-    return plan;
-  }
-
-  if (plan.data.verdict === null) {
-    return err(new Stage9BlockedError(["lista ujęć nie istnieje albo nie przechodzi walidacji"]));
-  }
-
-  const track = episodeTrackPaths(paths.episode, input.track);
-  const drift: { actualSeconds: number; end: number; start: number }[] = [];
-
-  for (const clip of plan.data.verdict.clips) {
-    const file = clipVideo(track, clip.id);
-    // biome-ignore lint/performance/noAwaitInLoops: one clip read at a time, in the plan's order
-    const bytes = file.ok ? await readDigest(file.data) : null;
-    const verdict =
-      bytes?.ok === true
-        ? validateVideo(bytes.data.bytes, { aspectRatio, seconds: clip.end - clip.start })
-        : null;
-
-    drift.push({
-      // A clip that cannot be read falls back to what the plan ordered. The
-      // gate has already refused the mix by then; this only keeps the
-      // arithmetic total so the report can still be printed.
-      actualSeconds: verdict?.ok === true ? verdict.data.seconds : clip.end - clip.start,
-      end: clip.end,
-      start: clip.start,
-    });
-  }
-
-  return ok(drift);
 }

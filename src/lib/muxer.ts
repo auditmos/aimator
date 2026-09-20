@@ -96,17 +96,54 @@ export interface MixInput {
   readonly video: string;
 }
 
+/** One stem of the full mix, and the second of the finished film it starts at. */
+interface Stem {
+  readonly atSeconds: number;
+  readonly path: string;
+}
+
 /**
- * The narrow half of this module: ask what the engine is, ask it to cut, or ask
- * it to lay speech over a cut.
+ * How the full mix sits. Decibels relative to each stem as it was bought, and
+ * one time constant. The stage stores these; this module only sends them.
+ */
+interface MixLevels {
+  readonly duckDb: number;
+  readonly duckReleaseMs: number;
+  readonly effectsDb: number;
+  readonly musicDb: number;
+}
+
+export interface MasterInput {
+  readonly effects: readonly Stem[];
+  readonly levels: MixLevels;
+  /** The bed, or beds where the film genuinely breaks in two. */
+  readonly music: readonly Stem[];
+  /** The narration, if this episode has any. May be empty; the others may not both be. */
+  readonly speech: readonly Stem[];
+  readonly target: string;
+  /** The approved picture cut. Its frames are copied through, never re-encoded. */
+  readonly video: string;
+}
+
+/**
+ * The narrow half of this module: ask what the engine is, ask it to cut, to lay
+ * speech over a cut, or to build the whole soundtrack over one.
  *
- * `version` exists apart from the two operations because `--dry-run` has to
- * answer "would this work" without writing anything, and because a missing
- * engine is an obstacle a person reads beside the gate rather than a failure
- * they discover after the lock is taken.
+ * `version` exists apart from the operations because `--dry-run` has to answer
+ * "would this work" without writing anything, and because a missing engine is
+ * an obstacle a person reads beside the gate rather than a failure they
+ * discover after the lock is taken.
+ *
+ * `master` is the third operation and not a superset of `mix` by accident.
+ * They answer different questions and both stay: `mix` produces the film a
+ * human listens to in order to judge **placement**, with nothing else in the
+ * way, and `master` produces the film with everything in it. Collapsing them
+ * would remove the only artifact in the pipeline where the narration can be
+ * heard on its own.
  */
 export interface Muxer {
   readonly concat: (input: ConcatInput) => Promise<Result<ConcatReport>>;
+  readonly master: (input: MasterInput) => Promise<Result<ConcatReport>>;
   readonly mix: (input: MixInput) => Promise<Result<ConcatReport>>;
   readonly version: () => Promise<Result<string>>;
 }
@@ -131,6 +168,7 @@ interface ProcessResult {
 export function ffmpeg(binary: string): Muxer {
   return {
     concat: (input) => concat(binary, input),
+    master: (input) => master(binary, input),
     mix: (input) => mix(binary, input),
     version: () => version(binary),
   };
@@ -290,6 +328,129 @@ async function mix(binary: string, input: MixInput): Promise<Result<ConcatReport
           `ffmpeg zakończył się kodem ${run.data.code} i nie położył narracji:\n${run.data.stderr.trim()}`
         )
       );
+}
+
+/**
+ * Builds the whole soundtrack over an approved picture cut.
+ *
+ * Three things are worth knowing about this graph, and each of them is a
+ * decision rather than an implementation detail.
+ *
+ * **It is built from `episode.mp4` and the lossless stems, never from
+ * `narrated.mp4`.** Laying music over the narrated cut would encode the speech
+ * a second time, and — worse — would make ducking dishonest, because the voice
+ * would already be inside the signal the music was supposed to step back
+ * under. Here the speech is an input of its own, so it is encoded exactly
+ * once, into the file a human is about to accept.
+ *
+ * **The music steps back under the voice, and that is not a stored decision.**
+ * An episode whose mode carries speech has declared that a voice is the
+ * foreground; music that does not give way to it is not "music and narration",
+ * it is two things at once. So the sidechain is derived from whether there is
+ * speech at all. *How far* it steps back is the knob, and that is stored.
+ *
+ * **`apad` with `-shortest` is what keeps the film its own length**, exactly
+ * as in `mix`: without the pad the audio would end with the last sound and
+ * `-shortest` would cut the picture there, discarding frames a human accepted.
+ */
+async function master(binary: string, input: MasterInput): Promise<Result<ConcatReport>> {
+  const engine = await version(binary);
+
+  if (!engine.ok) {
+    return engine;
+  }
+
+  if (input.music.length === 0 && input.effects.length === 0) {
+    return err(
+      new MuxError(
+        "incompatible",
+        "pełny miks bez muzyki i bez efektów nie jest pełnym miksem — nie ma czego położyć"
+      )
+    );
+  }
+
+  const stems = [
+    ...input.speech.map((stem) => ({ ...stem, gain: 0, tag: "s" })),
+    ...input.music.map((stem) => ({ ...stem, gain: input.levels.musicDb, tag: "m" })),
+    ...input.effects.map((stem) => ({ ...stem, gain: input.levels.effectsDb, tag: "e" })),
+  ];
+  const chains = stems.map(
+    (stem, index) =>
+      `[${index + 1}:a]aresample=${SPEECH_RATE},aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${stem.gain}dB,adelay=${Math.round(stem.atSeconds * 1000)}:all=1[${stem.tag}${index}]`
+  );
+  const label = (tag: string): string =>
+    stems
+      .map((stem, index) => (stem.tag === tag ? `[${tag}${index}]` : ""))
+      .filter((one) => one !== "")
+      .join("");
+  const speech = label("s");
+  const bed = [label("m"), label("e")].join("");
+  const bedInputs = input.music.length + input.effects.length;
+  const graph = [
+    ...chains,
+    `${bed}amix=inputs=${bedInputs}:duration=longest:normalize=0[bed]`,
+    // With no narrator there is nothing to duck under, so the chain is the bed
+    // alone. Sidechaining against silence would be an argument with no effect
+    // and a filter in the archive that nobody could account for.
+    ...(speech === ""
+      ? ["[bed]apad[aout]"]
+      : [
+          `${speech}amix=inputs=${input.speech.length}:duration=longest:normalize=0[voice]`,
+          "[voice]asplit=2[key][mixvoice]",
+          `[bed][key]sidechaincompress=threshold=0.03:ratio=${duckRatio(input.levels.duckDb)}:attack=20:release=${Math.round(input.levels.duckReleaseMs)}[ducked]`,
+          "[ducked][mixvoice]amix=inputs=2:duration=longest:normalize=0,apad[aout]",
+        ]),
+  ].join(";");
+  const args = [
+    "-hide_banner",
+    "-nostdin",
+    "-loglevel",
+    "warning",
+    "-i",
+    input.video,
+    ...stems.flatMap((stem) => ["-i", stem.path]),
+    "-filter_complex",
+    graph,
+    "-map",
+    "0:v",
+    "-map",
+    "[aout]",
+    // The picture is the cut a human accepted. It is copied, frame for frame.
+    "-c:v",
+    "copy",
+    ...SPEECH_CODEC,
+    "-shortest",
+    "-movflags",
+    "+faststart",
+    "-y",
+    input.target,
+  ];
+  const run = await spawn(binary, args);
+
+  if (!run.ok) {
+    return run;
+  }
+
+  return run.data.code === 0
+    ? ok({ argv: [binary, ...args], engine: engine.data, stderr: run.data.stderr })
+    : err(
+        new MuxError(
+          "failed",
+          `ffmpeg zakończył się kodem ${run.data.code} i nie złożył pełnej ścieżki:\n${run.data.stderr.trim()}`
+        )
+      );
+}
+
+/**
+ * How hard the compressor squeezes, from how far the bed should drop.
+ *
+ * `sidechaincompress` takes a ratio rather than a target level, so the knob a
+ * person actually dials — "the music drops nine decibels while somebody is
+ * talking" — is converted here rather than being asked for in the engine's own
+ * units. A ratio of one changes nothing, which is what a duck of zero means.
+ */
+function duckRatio(duckDb: number): number {
+  return Math.max(1, Math.round(Math.abs(duckDb) * 10) / 10 + 1);
 }
 
 /**

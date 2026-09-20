@@ -53,6 +53,7 @@
 export { type DirectionReport, readDirection, setDirection } from "./delivery.js";
 export { generateNarration, type NarrationReport } from "./generate.js";
 export { generateMix, type MixReport } from "./mix.js";
+export { readAcceptedLines } from "./plan.js";
 export {
   approveMix,
   approveNarration,

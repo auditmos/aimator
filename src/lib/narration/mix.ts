@@ -15,29 +15,20 @@ import {
 } from "../artifact/index.js";
 import type { Muxer } from "../muxer.js";
 import { err, ok, type Result } from "../result.js";
-import { checkShotList } from "../shot-list/index.js";
+import { readPlanClock } from "../timeline.js";
 import { hasSound, validateVideo } from "../video-model/index.js";
-import { validateSpeech } from "../voice-model/index.js";
-import {
-  type ImageTrack,
-  narrationAudio,
-  soundtrackRunPaths,
-  type Workspace,
-} from "../workspace.js";
+import { type ImageTrack, mixRunPaths, type Workspace } from "../workspace.js";
 import {
   missingSound,
   NARRATED,
   type PlacedLine,
   placeLines,
-  readClipDrift,
+  readAcceptedLines,
   readStage9Inputs,
   readTrackTimeline,
-  SCRIPT,
   STAGE,
   Stage9BlockedError,
-  type Stage9Inputs,
 } from "./plan.js";
-import { validateNarration } from "./validate.js";
 
 /**
  * Internal to the narration module: the command that lays the speech down.
@@ -178,13 +169,13 @@ export async function generateMix(input: MixInput): Promise<Result<MixReport>> {
     return timeline;
   }
 
-  const clips = await readClipDrift(input, stage9.data.paths, stage9.data.aspectRatio);
+  const clock = await readPlanClock({ ...input, aspectRatio: stage9.data.aspectRatio });
 
-  if (!clips.ok) {
-    return clips;
+  if (!clock.ok) {
+    return clock;
   }
 
-  const lines = await readBoughtLines(input, stage9.data);
+  const lines = await readAcceptedLines(input);
 
   if (!lines.ok) {
     return lines;
@@ -192,7 +183,7 @@ export async function generateMix(input: MixInput): Promise<Result<MixReport>> {
 
   const placement = placeLines({
     actualSeconds: timeline.data.actualSeconds,
-    clips: clips.data,
+    clock: clock.data,
     lines: lines.data.lines,
   });
   const engine = await input.mux.version();
@@ -251,121 +242,6 @@ export async function generateMix(input: MixInput): Promise<Result<MixReport>> {
   }
 }
 
-interface BoughtLines {
-  /** Why the mix may not happen: a line nobody accepted, or none bought at all. */
-  readonly gate: readonly string[];
-  readonly inputs: readonly RecordedFile[];
-  readonly lines: readonly {
-    readonly atSeconds: number;
-    readonly characters: number;
-    readonly id: string;
-    readonly path: string;
-    readonly seconds: number;
-    readonly shot: string;
-    readonly text: string;
-  }[];
-}
-
-/**
- * Every line of the approved script, with the recording somebody accepted.
- *
- * The gate is per utterance and it is approval rather than existence: a
- * recording that merely exists is one nobody has listened to, and the whole
- * stage sits downstream of a human saying yes.
- */
-async function readBoughtLines(
-  input: MixInput,
-  stage9: Stage9Inputs
-): Promise<Result<BoughtLines>> {
-  const script = await readDigest(stage9.paths.episode.narrationScript);
-  const plan = await checkShotList(input);
-
-  if (!plan.ok) {
-    return plan;
-  }
-
-  // An absent script is an obstacle, not a failure: `--dry-run` has to be able
-  // to report it beside the others rather than die on it, which is what every
-  // gate in this pipeline promises.
-  if (!script.ok || plan.data.verdict === null) {
-    return ok({
-      gate: ["nie ma skryptu narracji — uruchom najpierw: narration generate"],
-      inputs: [],
-      lines: [],
-    });
-  }
-
-  const verdict = validateNarration({
-    shotList: plan.data.verdict,
-    text: script.data.bytes.toString("utf8"),
-  });
-
-  if (!verdict.ok) {
-    return ok({ gate: [verdict.error.message], inputs: [], lines: [] });
-  }
-
-  const gate: string[] = [];
-  const inputs: RecordedFile[] = [
-    {
-      path: toWorkspacePath(input.workspace.root, stage9.paths.episode.narrationScript),
-      sha256: script.data.sha256,
-    },
-  ];
-
-  if (stage9.stage.artifacts[SCRIPT]?.review.status !== "approved") {
-    gate.push("skrypt narracji czeka na ocenę człowieka");
-  }
-
-  const lines: BoughtLines["lines"][number][] = [];
-
-  for (const line of verdict.data.lines) {
-    const file = narrationAudio(stage9.paths.episode, line.id);
-
-    if (!file.ok) {
-      return file;
-    }
-
-    // biome-ignore lint/performance/noAwaitInLoops: one line read at a time, in the script's order
-    const bytes = await readDigest(file.data);
-    const record = stage9.stage.artifacts[line.id];
-
-    if (!bytes.ok || record?.status !== "completed") {
-      gate.push(`${line.id}: nie ma nagrania — kwestia nie została kupiona`);
-      continue;
-    }
-
-    const recorded = {
-      path: toWorkspacePath(input.workspace.root, file.data),
-      sha256: bytes.data.sha256,
-    };
-    const output = record.outputs.find((one) => one.path === recorded.path);
-
-    if (output === undefined || output.sha256 !== recorded.sha256) {
-      gate.push(`${line.id}: bajty nagrania nie zgadzają się z jego rekordem`);
-    }
-
-    if (record.review.status !== "approved") {
-      gate.push(`${line.id}: nagranie czeka na ocenę człowieka`);
-    }
-
-    const speech = validateSpeech(bytes.data.bytes);
-
-    if (!speech.ok) {
-      gate.push(`${line.id}: ${speech.error.message}`);
-      continue;
-    }
-
-    inputs.push(recorded);
-    lines.push({ ...line, path: file.data, seconds: speech.data.seconds });
-  }
-
-  if (lines.length === 0) {
-    gate.push("żadna kwestia nie jest gotowa — nie ma czego położyć na obrazie");
-  }
-
-  return ok({ gate, inputs, lines });
-}
-
 async function lay(
   input: MixInput,
   data: {
@@ -383,7 +259,7 @@ async function lay(
   }
 ): Promise<Result<MixReport>> {
   const runId = newRunId();
-  const run = soundtrackRunPaths(data.paths, runId);
+  const run = mixRunPaths(data.paths, runId);
   const target = data.paths.narratedVideo;
   const created: string[] = [];
 
