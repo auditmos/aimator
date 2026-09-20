@@ -12,6 +12,17 @@ project and per image model. The stage contract — directory layout, the `*.sta
 shape and the cross-cutting invariants — is in [docs/pipeline.md](docs/pipeline.md).
 Read it before touching anything that writes an artifact.
 
+The prose around the code is three documents with three different readers, and a change
+usually lands in exactly one of them. [docs/pipeline.md](docs/pipeline.md) is the contract:
+what a stage consumes, produces and refuses. [docs/stages/](docs/stages/) is one page per
+implemented stage for the person running the tool — the commands, their flags and what each
+gate waits for — and [README.md](README.md) is the front page that links to them, holding
+only the input-and-output table. **A change to a command, a flag or a gate belongs in that
+stage's page** as much as it belongs in the usage text; `src/test/docs.test.ts` fails the
+build when a documented command or flag is missing from `--help`, when a local link points
+at nothing, and when an implemented stage has no page, so this is enforced rather than
+remembered. It cannot check prose, so a renamed concept is still yours to carry across.
+
 Stages 0 through 10 are implemented. Stage 11 is a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
@@ -515,6 +526,22 @@ function parsePort(raw: string): Result<number> {
 - Test **behavior through public interfaces**, not implementation details
 - If a test needs to import an internal file, the module boundary is wrong — test through its `index.ts`
 - Run tests: `pnpm test`
+
+### The one test with no source file beside it
+
+`src/test/docs.test.ts` is the exception to co-location, and it earns it by having no
+module to sit next to: its subject is the documentation. It reads the pages under `docs/`
+and `README.md` and checks them against `run(["--help"])` — every documented command and
+flag has to exist in the usage text, every local link has to resolve, and every implemented
+stage has to have a page. It sits in `src/test/` for the reason the fixture does, and it
+still tests through a public interface: the usage text arrives by calling `run`, not by
+reaching into the parser.
+
+**It lists no command and no flag of its own.** Both sets are parsed out of `--help`,
+because a second copy of that list is the very drift the test exists to catch. The set of
+legal commands comes from the usage lines, so a second word counts as a subcommand only
+when the usage text pairs the two — which is what keeps `approve dzielna-ewa` an argument
+and `character generte` an error.
 
 ### The shared fixture
 
