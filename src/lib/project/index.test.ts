@@ -12,6 +12,7 @@ import {
   initProject,
   setCharacterBasis,
   setEpisodeSettings,
+  setNarratorVoice,
 } from "./index.js";
 
 let root = "";
@@ -652,6 +653,68 @@ describe("setCharacterBasis", () => {
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
     expect(project.characters.ewa.basis).toBe("photographs");
     expect(result.ok ? result.data.problems.join(" ") : null).toContain("z opisu na zdjęcia");
+  });
+});
+
+/**
+ * The narrator's voice is cast, not configuration.
+ *
+ * It recurs between episodes exactly as a character does, which is the one
+ * criterion that puts somebody in `project.json` rather than in an episode or
+ * in a shell. Stage 0 does not gate it: like `maxClipSeconds`, the stage that
+ * consumes it is the stage that insists on it, and a project that will never
+ * have a narrator must not be held hostage by a decision it never makes.
+ */
+describe("setNarratorVoice", () => {
+  it("should record the voice on the project, beside the cast", async () => {
+    await makeProject();
+    const result = await setNarratorVoice({
+      mode: "apply",
+      projectId: "demo",
+      voiceId: "21m00Tcm4TlvDq8ikWAM",
+      workspace,
+    });
+
+    expect(result.ok).toBe(true);
+    const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
+    expect(project.narratorVoiceId).toBe("21m00Tcm4TlvDq8ikWAM");
+  });
+
+  /**
+   * Undecided is written down as undecided. A fresh project carries the key
+   * with a null in it rather than leaving it out, so "nobody has chosen a
+   * narrator" is a fact the file states instead of one a reader infers from an
+   * absence — which is the whole of rule 7 in one field.
+   */
+  it("should start undecided rather than absent", async () => {
+    await makeProject();
+    const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
+
+    expect(project).toHaveProperty("narratorVoiceId");
+    expect(project.narratorVoiceId).toBeNull();
+  });
+
+  it("should not hold stage 0 hostage to a voice nobody has chosen", async () => {
+    await makeProject();
+    await fillRules();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: {},
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    await setEpisodeSettings({
+      episodeId: "01-never-outshine-the-master",
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      workspace,
+    });
+
+    const status = await checkStage0({ projectId: "demo", workspace });
+
+    expect(status.ok ? status.data.ready : null).toBe(true);
   });
 });
 

@@ -38,4 +38,23 @@ describe("env", () => {
   it("should expose the muxer path as an optional string", () => {
     expect(["string", "undefined"]).toContain(typeof env.AIMATOR_FFMPEG);
   });
+
+  /**
+   * Stage 9 buys twice, from two providers, so it carries two model variables
+   * — one per call site, exactly as every stage above it does. Neither is the
+   * narrator's voice: that is a creative decision recurring across episodes,
+   * so it is stored in `project.json` beside the cast rather than left to
+   * whichever shell happens to run the command.
+   */
+  it("should expose the stage-9 narration model as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_NARRATION_MODEL);
+  });
+
+  it("should expose the stage-9 voice model as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_VOICE_MODEL);
+  });
+
+  it("should expose ELEVENLABS_API_KEY as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.ELEVENLABS_API_KEY);
+  });
 });

@@ -44,6 +44,7 @@ import {
   type Stage0Report,
   setCharacterBasis,
   setEpisodeSettings,
+  setNarratorVoice,
 } from "./lib/project/index.js";
 import {
   approvePromptPackage,
@@ -80,6 +81,11 @@ const USAGE = `Usage: aimator <command>
 
 Etap 0 — przygotowanie projektu i odcinka:
   project init <id> --title <tytuł> [--aspect-ratio <w:h>]
+  project voice <id> --voice-id <id głosu>
+    Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
+    odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
+    dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
+    etap 9 — film bez narracji nigdy nie musi tej decyzji podejmować.
   character new <id> <character-id> --name <nazwa>
   character add <id> <character-id> --source <plik> [--source <plik>...]
   character describe <id> <character-id>
@@ -407,7 +413,56 @@ function renderScreenplay(
   return lines.join("\n");
 }
 
+/**
+ * Casts the narrator. A stage-0 command because a voice recurs between episodes
+ * exactly as a character does, which is the one criterion that decides whether
+ * a decision belongs to the project rather than to an episode or a shell.
+ */
+async function runProjectVoice(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, { "voice-id": { type: "string" } });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const voiceId = requireFlag(parsed.data, "voice-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!voiceId.ok) {
+    return voiceId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const mode = modeOf(parsed.data);
+  const result = await setNarratorVoice({
+    mode,
+    projectId: projectId.data,
+    voiceId: voiceId.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(
+        render(
+          `Narratorem projektu "${projectId.data}" jest głos ${voiceId.data}`,
+          result.data,
+          mode
+        )
+      )
+    : result;
+}
+
 async function runProject(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] === "voice") {
+    return runProjectVoice(argv.slice(1));
+  }
+
   if (argv[0] !== "init") {
     return err(new UsageError(`nieznane polecenie: project ${argv[0] ?? ""}`.trim()));
   }

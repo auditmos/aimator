@@ -105,6 +105,13 @@ export interface Stage0Inputs {
    */
   readonly cast: readonly CastMember[];
   readonly inputs: readonly RecordedFile[];
+  /**
+   * Which voice reads this series, or null when nobody has cast one.
+   *
+   * Null rather than absent, and never a fallback: stage 9 is the only stage
+   * that consumes it, so it is the only stage that refuses without it.
+   */
+  readonly narratorVoiceId: string | null;
   /** Why the approval does not hold, when it does not. */
   readonly problems: readonly string[];
   /** `project.md`, verbatim. */
@@ -137,6 +144,8 @@ type InitProjectInput = ProjectInput & {
 /** Every command that names one member of the cast carries its id. */
 type CharacterInput = ProjectInput & { readonly characterId: string };
 type AddCharacterInput = CharacterInput & { readonly name: string };
+/** The one stage-0 decision that belongs to no character: who reads the film. */
+type SetVoiceInput = ProjectInput & { readonly voiceId: string };
 type SetBasisInput = CharacterInput & {
   readonly basis: NonNullable<CharacterEntry["basis"]>;
 };
@@ -260,6 +269,7 @@ async function readProjectFile(path: string): Promise<Result<ProjectFile>> {
     aspectRatio: legacy.data.aspectRatio,
     characters: {},
     id: legacy.data.id,
+    narratorVoiceId: null,
     schemaVersion: 2,
     title: legacy.data.title,
   });
@@ -440,6 +450,7 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
     aspectRatio: input.aspectRatio,
     characters: {},
     id: input.projectId,
+    narratorVoiceId: null,
     schemaVersion: 2,
     title: input.title,
   };
@@ -914,6 +925,51 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
 }
 
 /**
+ * Casts the narrator.
+ *
+ * It sits among the stage-0 commands rather than inside stage 9 because a voice
+ * is a property of the series, not of one episode's soundtrack — the same
+ * reason `aspectRatio` and the roster are decided here and merely consumed
+ * below. Recording it revokes the project's approval like any other decision,
+ * because approval is bound to the file as it stands.
+ */
+export async function setNarratorVoice(input: SetVoiceInput): Promise<Result<Stage0Report>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const current = await readProjectFile(project.data.file);
+
+  if (!current.ok) {
+    return current;
+  }
+
+  const file: ProjectFile = { ...current.data, narratorVoiceId: input.voiceId };
+  const lapsed = await approvalLapses(project.data.prepareStage);
+  const written = await applyWrites(
+    [...projectWrites(input.workspace, project.data, file)],
+    input.mode
+  );
+
+  return written.ok
+    ? ok({
+        approved: false,
+        created: [],
+        nextStep: `aimator check ${input.projectId}`,
+        problems: lapsed
+          ? [
+              `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+            ]
+          : [],
+        ready: false,
+        reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+      })
+    : written;
+}
+
+/**
  * Everything a later stage may read from stage 0, in one call.
  *
  * It exists so no other module has to know that the rules are in `project.md`,
@@ -1006,6 +1062,7 @@ export async function readStage0Inputs(
       { path: relative(paths.data.file), sha256: episodeJson.data.sha256 },
       { path: relative(paths.data.source), sha256: source.data.sha256 },
     ],
+    narratorVoiceId: file.data.narratorVoiceId,
     problems: approval.problems,
     rules: rules.data.bytes.toString("utf8"),
     settings: settings.data,

@@ -37,6 +37,13 @@ export const env = createEnv({
     AIMATOR_IMAGE_MODEL_GPT_IMAGE: z.string().min(1).optional(),
     AIMATOR_IMAGE_MODEL_SEEDREAM: z.string().min(1).optional(),
     /**
+     * The text model stage 9 lifts the narration script with. Its own variable,
+     * like every other paid call site — and separate from the voice model below
+     * because stage 9 buys from two providers: one writes down what the
+     * narrator says, the other says it.
+     */
+    AIMATOR_NARRATION_MODEL: z.string().min(1).optional(),
+    /**
      * The text model stage 4 sends the prompt-package prompt to. Its own
      * variable, like every other paid call site: one shared with stage 1 or 3
      * would mean that choosing a model for the screenplay quietly chose one for
@@ -74,6 +81,19 @@ export const env = createEnv({
      * default because a model nobody chose is not a decision.
      */
     AIMATOR_VIDEO_MODEL: z.string().min(1).optional(),
+    /**
+     * The speech model stage 9 reads the narration with — **one variable for
+     * both tracks**, for the reason the video model is one: a spoken sentence
+     * is not drawn. A voice reading a line has no idea which of the two films
+     * it will sit over, so the axis is the call site.
+     *
+     * It is the model, never the voice. Which voice reads the series is a
+     * creative decision that recurs across episodes, exactly as the cast does,
+     * so it lives in `project.json` — a variable would let the second episode
+     * get a different narrator from a different shell with nothing on disk
+     * saying anybody decided that.
+     */
+    AIMATOR_VOICE_MODEL: z.string().min(1).optional(),
     // Optional on purpose: a missing workspace is a recoverable, actionable
     // condition that `run()` reports as a Result. Marking it required would
     // throw here, at import time, before the CLI could explain itself.
@@ -84,6 +104,8 @@ export const env = createEnv({
      * which stage 2 does not call.
      */
     BYTEPLUS_MODELARK: z.string().min(1).optional(),
+    /** Stage 9's speech key. Read only on the paid path, like every other one. */
+    ELEVENLABS_API_KEY: z.string().min(1).optional(),
     /** Read only on the paid path; `--dry-run` never asks for it. */
     OPENAI_API_KEY: z.string().min(1).optional(),
   },

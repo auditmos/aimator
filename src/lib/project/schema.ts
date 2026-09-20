@@ -124,6 +124,23 @@ export const projectFileSchema = z.strictObject({
    */
   characters: z.record(z.string(), characterSchema),
   id: z.string().min(1),
+  /**
+   * Which voice reads this series. Casting, not configuration.
+   *
+   * It sits here rather than in `episode.json` or an environment variable for
+   * the reason the cast sits here: it recurs between episodes. A variable would
+   * let the second episode get a different narrator from a different shell with
+   * nothing on disk saying anybody decided that — the same silent default that
+   * let a two-character series produce one. An episode field would make the
+   * series answer the question again per episode, with nothing binding the
+   * answers together.
+   *
+   * Defaulted to null so a project written before stage 9 existed reads as
+   * undecided rather than as a parse failure, exactly as `maxClipSeconds` does
+   * one level down. Undecided blocks stage 9 alone: each stage gates the
+   * decisions it consumes, and a silent film never has to make this one.
+   */
+  narratorVoiceId: z.string().min(1).nullable().default(null),
   schemaVersion: z.literal(2),
   title: z.string().min(1),
 });
