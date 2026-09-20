@@ -7,19 +7,26 @@ Artefakty są grupowane **per projekt i per model obrazu**. Jeden projekt może 
 komplet assetów w `gpt-image` i w `seedream` — to dwa niezależne byty dające dwie różne
 animacje z tej samej historii. Ujęcia i klipy w obu torach robi Seedance 2.5.
 
-**Stan: zaimplementowane są etapy 0–8** — przygotowanie, scenariusz, postać, lista ujęć,
-pakiet promptów, obrazy referencyjne, klatka otwarcia, klipy i montaż. Etap 9 — dźwięk —
-ma zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md), ale nie ma jeszcze kodu,
-więc `episode.mp4` jest **niemy**: ścieżkę dźwiękową trzeba pisać wobec sklejonego
-filmu, a nie wobec planu, więc należy do etapu po montażu.
+**Stan: zaimplementowane są etapy 0–10** — przygotowanie, scenariusz, postać, lista ujęć,
+pakiet promptów, obrazy referencyjne, klatka otwarcia, klipy, montaż, narracja oraz muzyka
+i efekty. Film wychodzi z tego w trzech wersjach, z których każda nosi własną zgodę:
+`episode.mp4` jest niemym cięciem obrazu, `narrated.mp4` dokłada narrację i jest jedynym
+miejscem, gdzie słychać samo jej umieszczenie, a `mixed.mp4` ma wszystko.
+
+Etap 11 — dialogi postaci — ma zapisany kontrakt w [docs/pipeline.md](docs/pipeline.md),
+ale nie ma jeszcze kodu. Dwa z czterech trybów dźwięku (`music-and-effects`, `narration`)
+są domknięte; dwa pozostałe deklarują mowę postaci, której nie wytwarza żaden etap — i
+`check` mówi to wprost, zamiast milczeć.
 
 ## Wymagania
 
 - [Node.js](https://nodejs.org/) >= 22
 - [pnpm](https://pnpm.io/)
-- [ffmpeg](https://ffmpeg.org/) — tylko dla etapu 8. Skleja klipy bez przekodowania;
-  gdy go nie ma, montaż odmawia zamiast szukać objazdu. Reszta narzędzia, razem
-  z `check`, działa bez niego — werdykty czytają pudełka MP4, nie wołają dekodera.
+- [ffmpeg](https://ffmpeg.org/) — dla etapów 8, 9 i 10. Skleja klipy, kładzie na nich
+  narrację i składa pełną ścieżkę, za każdym razem kopiując obraz bez przekodowania; gdy
+  go nie ma, te etapy odmawiają zamiast szukać objazdu. Reszta narzędzia, razem z `check`,
+  działa bez niego — werdykty czytają pudełka MP4, nagłówki RIFF i ramki MP3, nie wołają
+  dekodera.
 
 ## Instalacja
 
@@ -46,10 +53,26 @@ AIMATOR_PROMPTS_MODEL=…               # etap 4
 AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
 AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream
 AIMATOR_VIDEO_MODEL=…                 # etap 7, JEDEN dla obu torów
-AIMATOR_FFMPEG=ffmpeg                 # etap 8; program, nie model — tylko gdy nie jest w PATH
+AIMATOR_FFMPEG=ffmpeg                 # etapy 8-10; program, nie model — tylko gdy nie jest w PATH
+AIMATOR_NARRATION_MODEL=…             # etap 9, tekstowy — podnosi skrypt
+AIMATOR_VOICE_MODEL=…                 # etap 9, mowa; JEDEN dla obu torów
+AIMATOR_SOUND_MODEL=…                 # etap 10, tekstowy — pisze arkusz cue
+AIMATOR_MUSIC_MODEL=…                 # etap 10, podkład; JEDEN dla obu torów
+AIMATOR_EFFECTS_MODEL=…               # etap 10, efekty; JEDEN dla obu torów
 OPENAI_API_KEY=…
 BYTEPLUS_MODELARK=…                   # także klucz wideo, na obu torach
+ELEVENLABS_API_KEY=…                  # mowa, muzyka i efekty — trzy miejsca wywołania, jeden klucz
 ```
+
+**Jedna zmienna na płatne miejsce wywołania, nie na dostawcę.** Dlatego etap 9 ma dwie,
+a etap 10 trzy: model, który pisze, i modele, które robią dźwięk, to różne decyzje.
+Zmienna idzie za miejscem wywołania, klucz za dostawcą — stąd jeden `ELEVENLABS_API_KEY`
+na trzy zmienne i `BYTEPLUS_MODELARK` także na torze `gpt-image`, kiedy renderuje klip.
+
+**Głosu narratora tu nie ma i nie będzie.** Kto czyta serię, to obsada — wraca między
+odcinkami tak samo jak postacie — więc siedzi w `project.json` jako `narratorVoiceId`.
+W zmiennej drugi odcinek puszczony z innej powłoki dostałby innego lektora, a na dysku
+nie byłoby pliku mówiącego, że ktokolwiek tak zdecydował.
 
 Wiodące `~/` jest rozwijane. Kolejność ma znaczenie: `.env.local` wygrywa z `.env`,
 a zmienna z powłoki wygrywa z obydwoma. Commitowany jest wyłącznie `.env.example`.
@@ -328,6 +351,130 @@ nie jest wymagane nigdzie; `--regenerate` jest — nie dlatego, że coś kosztuj
 że gotowy montaż nosi czyjąś zgodę.
 
 **`episode.mp4` jest niemy** i `check` mówi to przy każdym uruchomieniu.
+
+## Etap 9 — narracja
+
+Pierwszy etap, który kupuje od **dwóch dostawców**, i pierwszy, którego artefakty leżą na
+**dwóch poziomach drzewa**: słowa są wspólne, miks jest per tor.
+
+```bash
+pnpm dev narration generate dzielna-ewa 01-burza --dry-run
+pnpm dev narration generate dzielna-ewa 01-burza
+pnpm dev approve dzielna-ewa 01-burza --stage soundtrack --artifact script \
+  --note "każde zdanie jest w swoim ujęciu"
+pnpm dev narration generate dzielna-ewa 01-burza        # dopiero teraz kupuje kwestie
+pnpm dev approve dzielna-ewa 01-burza --stage soundtrack --artifact N01,N02,N03,N04
+pnpm dev narration mix dzielna-ewa 01-burza --track gpt-image
+pnpm dev approve dzielna-ewa 01-burza --stage soundtrack --track gpt-image
+```
+
+**Narracja jest podnoszona, nie pisana — i walidator to sprawdza.** Słowa narratora powstały
+już w etapie 1, a etap 3 przeniósł je do pola `Audio` każdego ujęcia, gdzie siedzą w zdaniu
+opisującym też muzykę i deszcz. Wyciąganie ich parserem byłoby parserem nad prozą, więc robi
+to model — a walidator dowodzi, że podniesienie było podniesieniem: **tekst każdej kwestii
+musi wystąpić co do słowa w ujęciu, które ta kwestia nazywa.** Zdanie, którego lista ujęć nie
+zawiera, nie przechodzi, choćby czytało się lepiej. Jeśli film ma powiedzieć coś nowego,
+poprawka należy do etapu 1.
+
+**Głos to obsada, sposób czytania to reżyseria.** `narratorVoiceId` mieszka w `project.json`
+obok postaci, bo lektor wraca między odcinkami. To, *jak* on gra, mieszka w osobnym
+`projects/<id>/narration.json` — i to nie jest kaprys układu. `project.json` jest zapisanym
+wejściem niemal wszystkiego, więc suwak, który ma się kręcić, unieważniałby zgody na bajty,
+których nie dotknął o ani jeden bit.
+
+```bash
+pnpm dev narration direction dzielna-ewa --stability 0.35 --style 0.4
+```
+
+**Rachunek nie jest w wywołaniach.** Dostawca liczy **znaki wejścia**, więc podgląd podaje
+jedno i drugie, per kwestia i łącznie. Znaki kontekstu (`previous_text`/`next_text`) są
+liczone **obok** rachunku, nigdy w nim: dostawca dokumentuje te parametry, ale nie mówi, czy
+je rozlicza, a narzędzie nie zgaduje cudzymi pieniędzmi.
+
+**Bajtami rządzi etap 8, umieszczeniem etap 7.** Publikuje się to, co wróciło — żadnego
+rozciągania czasu ani skracania pauzy. Ale kotwica pochodzi z planu, który zatwierdził
+człowiek, więc kwestia nachodząca na następną albo wychodząca poza koniec filmu jest
+**odmową**, nie zaokrągleniem. Kotwica z planu nie jest sekundą filmu: klipy wróciły dłuższe,
+więc mikser przelicza jedno na drugie i **melduje przesunięcie**.
+
+**`episode.mp4` nie jest dotykany.** `narrated.mp4` to nowy plik, którego obraz jest kopią
+strumieniową zatwierdzonego cięcia, klatka w klatkę.
+
+## Etap 10 — muzyka i efekty
+
+Pierwszy etap, który **przepisał własny wiersz kontraktu**, i jedyny, którego werdykt nie
+potrafi udowodnić, że wynik mówi prawdę o wejściu. Obie rzeczy są rozstrzygnięciami, nie
+niedoróbkami.
+
+```bash
+pnpm dev sound-design generate dzielna-ewa 01-burza --dry-run
+pnpm dev sound-design generate dzielna-ewa 01-burza      # jedno wywołanie TEKSTOWE
+pnpm dev approve dzielna-ewa 01-burza --stage sound-design --artifact cues
+pnpm dev sound-design generate dzielna-ewa 01-burza --dry-run   # TU pojawia się rachunek
+pnpm dev sound-design generate dzielna-ewa 01-burza      # kupuje podkład i efekty
+pnpm dev check dzielna-ewa 01-burza --stage sound-design
+pnpm dev approve dzielna-ewa 01-burza --stage sound-design --artifact M01,E01,E02
+pnpm dev sound-design mix dzielna-ewa 01-burza --track gpt-image
+pnpm dev approve dzielna-ewa 01-burza --stage sound-design --track gpt-image
+```
+
+**Wiersz 10 się zmienił i jest to zapisane.** Mówił, że muzyka i efekty są *wejściem*
+wnoszonym przez człowieka — i sam przyznawał, że nie rozstrzyga, skąd się biorą. Tak się go
+nie da zbudować: wciąganie cudzych plików do katalogu roboczego ma monopol etapu 0, więc
+„wnosi człowiek" było przepisaniem etapu 0 pod inną nazwą. Stemy kupuje więc ten etap, od
+ElevenLabs — co nie jest czwartym dostawcą, tylko czwartym i piątym miejscem wywołania
+u dostawcy, którego potok już ma na mowę.
+
+**Nie ma tu odpowiednika reguły „podnoszone, nie pisane" i nie da się go mieć.** Prompt
+muzyczny jest **instrukcją**, więc reguła 9 każe pisać go po angielsku; pole `Audio`, z
+którego powstaje, jest **materiałem** po polsku, którego reguła 9 zabrania tłumaczyć.
+Przepisanie jest zakazane z obu stron. Precedensem jest więc etap 4, nie 9: **werdykt
+okablowania, który nigdy nie czyta promptu**.
+
+| co udowadnia walidator | co zostaje człowiekowi |
+|---|---|
+| każdy cue nazywa ujęcia, które istnieją | czy angielski opisuje polską prozę |
+| **ujęcia cue to dokładnie te, które leżą w jego sekundach** | czy to jest dobra muzyka |
+| podkład kafelkuje film od 0 do końca planu, bez dziur | |
+| każda długość jest taka, jaką dostawca zrenderuje | |
+
+Drugi wiersz niesie ciężar, który piętro wyżej niesie podnoszenie: wierności nie dowodzi, ale
+dowodzi, że model przeszedł **cały plan** — ujęcie pominięte i ujęcie wymyślone wychodzą tak
+samo. Języka nie sprawdza nic, dokładnie jak w etapie 4; sprawdzian był napisany i usunięty,
+bo polskie zdanie potrafi nie mieć ani jednego diakrytyku.
+
+**Rachunek jest w sekundach, nie w wywołaniach** — drugi raz w potoku i z innego powodu niż
+w etapie 9. Cennik dostawcy wygląda na sprzeczny: tabela podaje cenę za minutę, a FAQ mówi
+„per generation". To odpowiedzi na dwa pytania — tabela podaje jednostkę **stawki**, FAQ
+**moment naliczenia**. Wniosek jest twardy: `--regenerate` to **druga pełna opłata**, nie
+dopłata, i raport mówi to tam, gdzie ktoś przeczyta.
+
+**Składa z `episode.mp4` i stemów, nie z `narrated.mp4`.** Miksowanie na narracji kodowałoby
+mowę drugi raz i czyniłoby ducking nieuczciwym, bo głos byłby już w sygnale, pod który muzyka
+ma ustępować. `narrated.mp4` nie jest ani nadpisywany, ani unieważniany — staje się przyjętym
+produktem pośrednim, a etap 10 bramkuje od **zgody** na niego, bo to jedyny dowód, że
+narracja siedzi we właściwym miejscu nad tym filmem.
+
+**Poziomy mają własny plik, `projects/<id>/mix.json`.** Nie w `project.json`, z powodu
+`narration.json` — i nie w `narration.json`, bo głośność podkładu nie mówi nic o tym, jak
+narrator czytał, więc nie może unieważniać nagrań. Wartości startowe są, bo **tej decyzji nie
+da się podjąć, zanim się ją usłyszy**; jadą do silnika jawnie i lądują w archiwum.
+
+```bash
+pnpm dev sound-design levels dzielna-ewa --music-db -22 --duck-db -12
+```
+
+**Werdykt offline kosztuje tu więcej niż w etapie 9.** Ani `/v1/music`, ani
+`/v1/sound-generation` nie oferują WAV-a, a ich surowy PCM nie niesie żadnego nagłówka —
+liczby kanałów nie dałoby się odczytać z bajtów, a pomyłka podaje długość dwukrotnie złą.
+Stemy są więc w MP3, a werdykt **przechodzi po ramkach**: każdy nagłówek deklaruje własny
+bitrate, więc strumień zmienny czyta się tak samo dokładnie jak stały. Sto linii zamiast
+dwudziestu czterech bajtów — koszt realny i dlatego wypisany.
+
+**Odmowa i meldunek to dwie różne rzeczy.** Efekt wychodzący poza koniec filmu jest odmową
+(zderzenie, precedens etapu 7). Podkład kończący się przed filmem jest meldunkiem (dziura,
+precedens etapu 8) — klipy wróciły dłuższe niż plan, a odmowa z powodu, którego nikt niżej
+nie naprawi, byłaby odmową bez wyjścia.
 
 ## Zasady, na których stoi całe narzędzie
 
