@@ -14,6 +14,8 @@ $AIMATOR_WORKSPACE/
 └── projects/<project-id>/
     ├── project.json                  identyfikator, tytuł, proporcje, obsada
     ├── project.md                    zasady wspólne — jedyny plik pisany ręcznie
+    ├── narration.json                jak narrator CZYTA (etap 9) — osobno od project.json,
+    │                                 bo to suwak, a project.json jest wejściem wszystkiego
     ├── prepare.stage.json
     ├── characters/<character-id>/
     │   ├── sources/                  zdjęcia użytkownika (etap 0)
@@ -210,7 +212,7 @@ Obowiązują we wszystkich etapach.
 | 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
 | 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i — przy `previous-end-frame` — zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` (format oddaje dostawca), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
-| 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, a do miksu — zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
+| 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu — zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 pełna ścieżka | zatwierdzony `<tor>/narrated.mp4`, muzyka i efekty | pełna ścieżka dźwiękowa odcinka | ocena odsłuchu | niezaimplementowany |
 
 Etap 10 jest **zadeklarowanym kontraktem**, nie działającym kodem. Wiersz istnieje po to,
@@ -1281,6 +1283,59 @@ Model mowy to osobna sprawa i jest zmienną: `--voice-model <id>`, a bez flagi
 `project.json` jest zapisanym wejściem każdego etapu poniżej. To nie usterka, tylko ten sam
 mechanizm, co przy edycji `project.md`: akceptacja wygasa, `approve` przepisuje hashe
 i zapisuje nową zgodę. Głos obsadza się razem z obsadą, na początku serii.
+
+### Sposób czytania jest reżyserią i ma własny plik
+
+Głos to **obsada**; to, jak on gra, to **reżyseria**, i to są dwie różne decyzje. Reżyseria
+mieszka w `projects/<id>/narration.json`, na poziomie projektu, bo sposób czytania powraca
+między odcinkami tak samo jak obsada — ale **obok** `project.json`, nigdy w środku.
+
+Powód jest mechaniczny, nie estetyczny. `project.json` jest zapisanym wejściem niemal
+każdego artefaktu w potoku: w `dzielna-ewa` to ~89 rekordów, aż po zatwierdzony
+`episode.mp4` obu torów. Suwak, który ma się kręcić — bo dobiera się go odsłuchem, w kilku
+podejściach — unieważniałby przy każdym ruchu zgodę na bajty, których nie dotknął o ani
+jeden bit. `narration.json` jest wejściem **wyłącznie kupionych nagrań**, więc zmiana
+brzmienia unieważnia dokładnie to, co pod starym brzmieniem powstało.
+
+To jest też odpowiedź na to, czemu pierwsze nagrania wyszły płaskie. Nie było wady
+w żadnej linijce kodu — nie było **miejsca na decyzję**, więc każde wywołanie szło na
+ustawieniach domyślnych dostawcy, a te brzmią `stability: 0.5`, `style: 0`, o których sam
+dostawca pisze, że skłaniają się ku monotonii. Brak decyzji nie jest brakiem liczby.
+
+| suwak | zakres | domyślnie | w którą stronę |
+|---|---|---|---|
+| `stability` | 0–1 | 0.5 | **niżej** = szerszy zakres emocji; wyżej = monotonnie |
+| `style` | 0–1 | 0.0 | **wyżej** = mocniejszy charakter głosu |
+| `speed` | 0.7–1.2 | 1.0 | poniżej 1 zwalnia czytanie |
+| `similarity` | 0–1 | 0.75 | wyżej = bliżej oryginalnej próbki |
+| `speaker-boost` | tak/nie | tak | |
+
+Wartości domyślne **nie łamią reguły 7**. Reguła wiąże decyzje, które domyślnej nie mają —
+a te pięć ma, i to udokumentowaną przez dostawcę, dokładnie jak `AIMATOR_FFMPEG`. Czego
+etap nie robi, to milczeć: wysyła je **jawnie przy każdym wywołaniu**, żeby archiwum
+żądania odpowiadało na pytanie, co wyprodukowało te bajty, zamiast odsyłać czytelnika do
+tego, jakie akurat były wtedy domyślne u dostawcy.
+
+Zapisuje je `aimator narration direction <id> [--stability n] [--style n] [--speed n]
+[--similarity n] [--speaker-boost]`, scalając — `--stability` samo znaczy stability,
+a nie „przywróć resztę do domyślnych".
+
+### Sąsiedztwo kwestii jest wyprowadzane, nigdy zapisywane
+
+Druga połowa tego, czemu pierwsze podejście brzmiało płasko: każda kwestia była kupowana
+tak, jakby była jedynym zdaniem w filmie. Dostawca przyjmuje `previous_text` i `next_text`
+jako kontekst, żeby zdanie kupione osobno zostało przeczytane jak część akapitu — i są to
+**sąsiednie kwestie skryptu**, więc są wyprowadzane, nigdy zapisywane. To ta sama reguła 7
+czytana od drugiej strony, co przy planie montażowym etapu 8.
+
+Znaki kontekstu są liczone **obok** rachunku, nigdy w nim. Dostawca dokumentuje te dwa
+parametry, ale nie mówi, czy je rozlicza; nic tu nie zgaduje cudzymi pieniędzmi, więc
+podgląd podaje obie liczby osobno i mówi, która jest która.
+
+`seed` jest wyprowadzany z **identyfikatora próby**, nie ze zdania. Odtworzenie zapisanej
+próby ma prosić o to samo czytanie — a `--regenerate` istnieje dlatego, że komuś się nie
+spodobało to, co przyszło, więc ziarno przywiązane do zdania sprzedałoby mu tę samą
+interpretację drugi raz.
 
 ### Jednostką jest wypowiedź, a rachunek jest w znakach
 

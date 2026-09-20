@@ -17,8 +17,9 @@ import {
   runTextStage,
   type TextStage,
 } from "../text-model/index.js";
-import { runVoiceStage } from "../voice-model/index.js";
+import { contextCharacters, runVoiceStage, type SpeechContext } from "../voice-model/index.js";
 import { narrationAudio, previousFile, type RunPaths, type Workspace } from "../workspace.js";
+import { readDirection } from "./delivery.js";
 import {
   missingSound,
   readStage9Inputs,
@@ -28,7 +29,7 @@ import {
   type Stage9Inputs,
 } from "./plan.js";
 import { PROMPT_VERSION } from "./prompt.js";
-import { type NarrationScript, validateNarration } from "./validate.js";
+import { type NarrationLine, type NarrationScript, validateNarration } from "./validate.js";
 
 /**
  * Internal to the narration module: the command that buys the words.
@@ -50,6 +51,8 @@ import { type NarrationScript, validateNarration } from "./validate.js";
 export interface LineOutcome {
   /** What this line costs, in the unit the provider actually charges. */
   readonly characters: number;
+  /** What the neighbouring lines carry as context. Reported beside the bill, never in it. */
+  readonly contextCharacters: number;
   readonly id: string;
   readonly note: string;
   /** How long the bought recording runs, once there is one. */
@@ -64,6 +67,16 @@ export interface NarrationReport {
   readonly calls: number;
   /** What those calls would be billed for. The count of calls is not the bill. */
   readonly characters: number;
+  /**
+   * What the continuity parameters carry, beside the bill rather than in it.
+   *
+   * The provider documents `previous_text` and `next_text` but does not say
+   * whether they are charged for. Neither is rendered, so on any ordinary
+   * reading of "billed per character converted to audio" they are free — but
+   * this tool does not guess with somebody else's account, so the figure is on
+   * screen and labelled as the one to add if that reading turns out wrong.
+   */
+  readonly contextCharacters: number;
   readonly created: readonly string[];
   readonly lines: readonly LineOutcome[];
   readonly nextStep: string;
@@ -193,6 +206,20 @@ async function readScript(
   return verdict.ok ? verdict.data : null;
 }
 
+/**
+ * What the narrator says either side of a line, taken from the script itself.
+ *
+ * Derived, never stored — rule 7's mirror. The neighbouring lines *are* the
+ * neighbouring lines, so writing them down anywhere would be a second copy of
+ * the script that drifts the first time somebody re-lifts it. The provider uses
+ * them so a sentence bought on its own is read as part of a paragraph rather
+ * than as an isolated announcement, which is the other half of why the first
+ * take sounded flat: every line was bought as if it were the only one.
+ */
+function contextOf(lines: readonly NarrationLine[], index: number): SpeechContext {
+  return { next: lines[index + 1]?.text ?? null, previous: lines[index - 1]?.text ?? null };
+}
+
 /** What each line's state is before anything is bought, and what that would cost. */
 function outcomes(
   input: GenerateInput,
@@ -206,10 +233,15 @@ function outcomes(
 
   const named = input.artifacts.filter((id) => id !== SCRIPT);
 
-  return script.lines.map((line) => {
+  return script.lines.map((line, index) => {
     const record = stage9.stage.artifacts[line.id];
     const wanted = named.length === 0 || named.includes(line.id);
-    const base = { characters: line.characters, id: line.id, seconds: null };
+    const base = {
+      characters: line.characters,
+      contextCharacters: contextCharacters(contextOf(script.lines, index)),
+      id: line.id,
+      seconds: null,
+    };
 
     if (record?.status === "completed" && !(input.regenerate && named.includes(line.id))) {
       return { ...base, note: "kupione i gotowe", state: "skipped" as const };
@@ -243,6 +275,7 @@ function preview(
     approved,
     calls: buying.length,
     characters: buying.reduce((total, line) => total + line.characters, 0),
+    contextCharacters: buying.reduce((total, line) => total + line.contextCharacters, 0),
     created: [],
     lines,
     nextStep: blocked
@@ -268,6 +301,7 @@ function waiting(
     approved: false,
     calls: 0,
     characters: 0,
+    contextCharacters: 0,
     created: [],
     lines,
     nextStep: `przeczytaj skrypt i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${SCRIPT}`,
@@ -312,9 +346,11 @@ async function lift(input: GenerateInput, stage9: Stage9Inputs): Promise<Result<
     approved: false,
     calls: 0,
     characters: 0,
+    contextCharacters: 0,
     created: attempt.data.created,
-    lines: attempt.data.value.lines.map((line) => ({
+    lines: attempt.data.value.lines.map((line, index) => ({
       characters: line.characters,
+      contextCharacters: contextCharacters(contextOf(attempt.data.value.lines, index)),
       id: line.id,
       note: `${line.shot}, ${line.atSeconds}s planu`,
       seconds: null,
@@ -466,15 +502,25 @@ async function buy(
     return digest;
   }
 
+  // How the narrator reads is the other half of what produced these bytes, so
+  // it is recorded beside the script. That is also what keeps the decision
+  // cheap to revisit: it lapses the recordings it made and nothing above them.
+  const direction = await readDirection(input);
+
+  if (!direction.ok) {
+    return direction;
+  }
+
   const inputs: readonly RecordedFile[] = [
     ...stage9.inputs,
     {
       path: toWorkspacePath(input.workspace.root, stage9.paths.episode.narrationScript),
       sha256: digest.data.sha256,
     },
+    ...(direction.data.input === null ? [] : [direction.data.input]),
   ];
 
-  for (const line of script.lines) {
+  for (const [index, line] of script.lines.entries()) {
     const already = planned.find((one) => one.id === line.id);
 
     if (!wanted.has(line.id)) {
@@ -492,6 +538,7 @@ async function buy(
     const attempt = await runVoiceStage(
       {
         apiKey: input.voiceKey ?? "",
+        delivery: direction.data.delivery,
         fetch: input.fetch,
         model: input.voiceModel ?? "",
         regenerate: input.regenerate,
@@ -501,6 +548,7 @@ async function buy(
       },
       {
         blocked: (problems) => new Stage9BlockedError(problems),
+        context: contextOf(script.lines, index),
         inputs,
         key: line.id,
         stage: STAGE,
@@ -517,6 +565,7 @@ async function buy(
     created.push(...attempt.data.created);
     bought.push({
       characters: attempt.data.characters,
+      contextCharacters: contextCharacters(contextOf(script.lines, index)),
       id: line.id,
       note: attempt.data.note,
       seconds: attempt.data.verdict.seconds,
@@ -531,6 +580,7 @@ async function buy(
     approved: true,
     calls: paid.length,
     characters: paid.reduce((total, one) => total + one.characters, 0),
+    contextCharacters: paid.reduce((total, one) => total + one.contextCharacters, 0),
     created,
     lines: bought,
     nextStep: pending
@@ -545,5 +595,5 @@ async function buy(
 }
 
 function blank(id: string, characters: number): Omit<LineOutcome, "state"> {
-  return { characters, id, note: "", seconds: null };
+  return { characters, contextCharacters: 0, id, note: "", seconds: null };
 }

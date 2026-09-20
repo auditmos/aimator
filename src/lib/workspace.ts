@@ -46,6 +46,17 @@ export interface ProjectPaths {
   readonly characters: string;
   readonly episodes: string;
   readonly file: string;
+  /**
+   * How the narrator of this series performs — stage 9's own decision file.
+   *
+   * At the project level because a reading recurs between episodes exactly as a
+   * cast does, and beside `project.json` rather than inside it because stage 0
+   * neither writes it nor reads it. That separation is the whole point: this
+   * file is a recorded input of the bought recordings and of nothing else, so
+   * changing how the narrator reads lapses the lines it actually produced and
+   * leaves every approval above them standing.
+   */
+  readonly narration: string;
   readonly prepareStage: string;
   readonly root: string;
   readonly rules: string;
@@ -434,6 +445,7 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
     characters: join(root, "characters"),
     episodes: join(root, "episodes"),
     file: join(root, "project.json"),
+    narration: join(root, "narration.json"),
     prepareStage: join(root, "prepare.stage.json"),
     root,
     rules: join(root, "project.md"),

@@ -32,13 +32,65 @@ const REDACTED = "[UKRYTY KLUCZ]";
 const TIMEOUT_MS = 5 * 60_000;
 const MAX_BYTES = 50_000_000;
 
+/**
+ * How the narrator performs, as this provider spells it.
+ *
+ * The shape lives here because it is true of any utterance; *which* numbers
+ * this series uses is a decision the stage stores and hands over. Every field
+ * carries the provider's own documented default, so an undecided project sends
+ * exactly what it would have sent anyway — but it sends it **explicitly**,
+ * which is the point. A request archive that omits the settings cannot answer
+ * what produced these bytes, and that is the question the archive exists for.
+ */
+export interface SpeechDelivery {
+  readonly similarityBoost: number;
+  readonly speakerBoost: boolean;
+  /** 0.7 to 1.2. Below 1 slows the reading down. */
+  readonly speed: number;
+  /** Lower widens the emotional range; higher trends monotone. */
+  readonly stability: number;
+  /** Style exaggeration. Zero is the provider's default and the flattest. */
+  readonly style: number;
+}
+
+/**
+ * What the narrator says either side of this line.
+ *
+ * Not billed as speech and never rendered: the provider takes it as context so
+ * a sentence bought on its own is read as part of a paragraph rather than as an
+ * isolated announcement. It is **derived** from the approved script — the
+ * neighbouring lines are the neighbouring lines — which is why nothing stores
+ * it. `null` means this line has no neighbour on that side.
+ */
+export interface SpeechContext {
+  readonly next: string | null;
+  readonly previous: string | null;
+}
+
 export interface SpeechRequest {
+  readonly context: SpeechContext;
+  readonly delivery: SpeechDelivery;
   readonly endpoint: string;
   readonly model: string;
+  /**
+   * Best effort determinism, so re-running an attempt from its recorded run id
+   * asks for the same reading rather than a new one. The provider says as much:
+   * "determinism is not guaranteed".
+   */
+  readonly seed: number;
   /** Verbatim, in the film's own language. It is material, never an instruction. */
   readonly text: string;
   readonly voiceId: string;
 }
+
+/** What an undecided project sends: the provider's own documented defaults. */
+export const DEFAULT_DELIVERY: SpeechDelivery = {
+  similarityBoost: 0.75,
+  speakerBoost: true,
+  speed: 1,
+  stability: 0.5,
+  style: 0,
+};
 
 interface SpeechTransport {
   /** The audio, when the provider sent audio. `null` on a refusal. */
@@ -69,15 +121,39 @@ class SpeechCallError extends Error {
  * endpoint, which container, and that there is exactly one call per utterance.
  */
 export function buildRequest(input: {
+  readonly context: SpeechContext;
+  readonly delivery: SpeechDelivery;
   readonly model: string;
+  readonly seed: number;
   readonly text: string;
   readonly voiceId: string;
 }): SpeechRequest {
   return {
+    context: input.context,
+    delivery: input.delivery,
     endpoint: `${ENDPOINT}/${encodeURIComponent(input.voiceId)}?output_format=${OUTPUT_FORMAT}`,
     model: input.model,
+    seed: input.seed,
     text: input.text,
     voiceId: input.voiceId,
+  };
+}
+
+/** The body, in the provider's spelling. Kept in one place so the archive matches it. */
+function requestBody(request: SpeechRequest): Record<string, unknown> {
+  return {
+    model_id: request.model,
+    next_text: request.context.next,
+    previous_text: request.context.previous,
+    seed: request.seed,
+    text: request.text,
+    voice_settings: {
+      similarity_boost: request.delivery.similarityBoost,
+      speed: request.delivery.speed,
+      stability: request.delivery.stability,
+      style: request.delivery.style,
+      use_speaker_boost: request.delivery.speakerBoost,
+    },
   };
 }
 
@@ -87,10 +163,9 @@ export function buildRequest(input: {
  */
 export function archiveRequest(request: SpeechRequest): unknown {
   return {
+    body: requestBody(request),
     endpoint: request.endpoint,
-    model: request.model,
     outputFormat: OUTPUT_FORMAT,
-    text: request.text,
     voiceId: request.voiceId,
   };
 }
@@ -108,7 +183,7 @@ export async function callSpeech(input: {
 
   try {
     response = await input.fetch(input.request.endpoint, {
-      body: JSON.stringify({ model_id: input.request.model, text: input.request.text }),
+      body: JSON.stringify(requestBody(input.request)),
       headers: {
         Accept: "audio/wav",
         "Content-Type": "application/json",

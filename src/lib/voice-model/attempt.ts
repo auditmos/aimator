@@ -26,9 +26,16 @@ import {
   callSpeech,
   httpFailure,
   refusedWithoutCharge,
+  type SpeechContext,
+  type SpeechDelivery,
   type SpeechRequest,
 } from "./client.js";
-import { billedCharacters, type SpeechVerdict, validateSpeech } from "./validate.js";
+import {
+  billedCharacters,
+  contextCharacters,
+  type SpeechVerdict,
+  validateSpeech,
+} from "./validate.js";
 
 /**
  * Internal to the voice-model module: one paid speech call, start to finish.
@@ -54,6 +61,8 @@ import { billedCharacters, type SpeechVerdict, validateSpeech } from "./validate
 /** Everything a call needs that is not about one particular utterance. */
 interface VoiceCall {
   readonly apiKey: string;
+  /** How the narrator performs. The stage stores it; this module only sends it. */
+  readonly delivery: SpeechDelivery;
   readonly fetch: typeof fetch;
   readonly model: string;
   /** The only road to a second charge. Nothing here retries on its own. */
@@ -69,6 +78,8 @@ interface VoiceCall {
 interface VoiceArtifact {
   /** Why a paid call may not happen, in this stage's own error type. */
   readonly blocked: (problems: readonly string[]) => Error;
+  /** What is said either side of this line, derived by the stage from its script. */
+  readonly context: SpeechContext;
   readonly inputs: readonly RecordedFile[];
   /** The stage-file key and the utterance's own word: `N01`, `N02`. */
   readonly key: string;
@@ -120,6 +131,21 @@ async function readStage(path: string, name: StageName): Promise<StageFile> {
   const stage = await readJson(path, stageFileSchema);
 
   return stage.ok ? stage.data : emptyStage(name);
+}
+
+/**
+ * The seed this attempt asks for, derived from the attempt's own id.
+ *
+ * Derived rather than stored, and from the run id rather than from the
+ * sentence, because the two things a seed has to do pull in opposite
+ * directions. Re-deriving the reading of a *recorded* attempt must give the
+ * same request, and the run id is recorded — so it does. But `--regenerate`
+ * exists because somebody did not like what came back, and a seed fixed to the
+ * sentence would hand them the same reading for a second charge. A new attempt
+ * gets a new id, so it gets a new seed.
+ */
+function seedFrom(runId: string): number {
+  return Number.parseInt(sha256Of(Buffer.from(runId, "utf8")).slice(0, 8), 16);
 }
 
 /** The HTTP status an earlier attempt archived, or `null` if it archived none. */
@@ -228,7 +254,10 @@ async function attempt(
   const runId = newRunId();
   const run = voiceRunPaths(call, runId);
   const request = buildRequest({
+    context: artifact.context,
+    delivery: call.delivery,
     model: call.model,
+    seed: seedFrom(runId),
     text: artifact.text,
     voiceId: call.voiceId,
   });
@@ -341,10 +370,16 @@ async function prepare(
     serialize({
       artifact: artifact.key,
       characters: billedCharacters(data.request.text),
+      // Counted apart from the bill, never added to it. The provider documents
+      // the context parameters but does not say whether they are charged for,
+      // and a tool that guessed would be guessing with somebody else's money.
+      contextCharacters: contextCharacters(data.request.context),
+      delivery: data.request.delivery,
       endpoint: data.request.endpoint,
       inputs: artifact.inputs,
       model: data.request.model,
       runId: data.runId,
+      seed: data.request.seed,
       stage: artifact.stage,
       startedAt: nowIso(),
       status: "submitted",

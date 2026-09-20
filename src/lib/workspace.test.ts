@@ -50,12 +50,20 @@ describe("resolveWorkspace", () => {
 describe("projectPaths", () => {
   const workspace = { root: "/srv/aimator" };
 
-  it("should place every stage-0 artifact under the project directory", () => {
+  /**
+   * Not every file here is stage 0's. `narration.json` is stage 9's own
+   * decision, kept at the project level because a reading recurs between
+   * episodes — and kept *beside* `project.json` rather than inside it because
+   * stage 0's file is a recorded input of nearly every artifact, so a knob
+   * somebody is expected to turn would lapse approvals its bytes never touched.
+   */
+  it("should place every project-level file under the project directory", () => {
     const result = projectPaths(workspace, "48-praw-wladzy");
     expect(result.ok ? result.data : null).toEqual({
       characters: "/srv/aimator/projects/48-praw-wladzy/characters",
       episodes: "/srv/aimator/projects/48-praw-wladzy/episodes",
       file: "/srv/aimator/projects/48-praw-wladzy/project.json",
+      narration: "/srv/aimator/projects/48-praw-wladzy/narration.json",
       prepareStage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
       root: "/srv/aimator/projects/48-praw-wladzy",
       rules: "/srv/aimator/projects/48-praw-wladzy/project.md",

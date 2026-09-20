@@ -79,6 +79,25 @@ export function billedCharacters(text: string): number {
 }
 
 /**
+ * What the continuity parameters carry, counted **apart** from the bill.
+ *
+ * The neighbouring lines are handed to the provider so a sentence bought on its
+ * own is read as part of a paragraph. They are never rendered, so on any
+ * ordinary reading of "billed per character of text converted to audio" they
+ * cost nothing — but the provider's billing page does not say so, and this tool
+ * has never guessed with somebody else's account. So the number is reported
+ * beside the bill rather than folded into it, and the preview says which is
+ * which. If it turns out these are charged for, the figure to add is already on
+ * screen.
+ */
+export function contextCharacters(context: {
+  readonly next: string | null;
+  readonly previous: string | null;
+}): number {
+  return billedCharacters(context.previous ?? "") + billedCharacters(context.next ?? "");
+}
+
+/**
  * Whether the model will read a line of this length, and how much it bills.
  *
  * An empty line is refused before the limit is, because the two are different

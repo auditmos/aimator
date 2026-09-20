@@ -32,12 +32,14 @@ import {
   approveNarration,
   checkMix,
   checkNarration,
+  type DirectionReport,
   generateMix,
   generateNarration,
   type MixReport,
   type MixStatus,
   type NarrationReport,
   type NarrationStatus,
+  setDirection,
 } from "./lib/narration/index.js";
 import {
   approveOpeningFrame,
@@ -181,6 +183,16 @@ Etap 9 — dźwięk (płatny; słowa wspólne, miks per tor):
     poprawka należy do etapu 1. Skrypt i nagrania są WSPÓLNE dla obu torów, bo
     głos czytający zdanie nie wie, nad którym filmem usiądzie.
     ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
+  narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]
+                      [--similarity <0-1>] [--speaker-boost] [--dry-run]
+    Jak narrator serii CZYTA. Bez tej decyzji każde wywołanie szło na domyślnych
+    ustawieniach dostawcy — stability 0.5 i style 0 — które sam dostawca opisuje
+    jako skłonne do monotonii; płaskie brzmienie nie było wadą głosu, tylko
+    brakiem miejsca na decyzję. Mieszka w narration.json OBOK project.json, a nie
+    w nim: plik etapu 0 jest zapisanym wejściem niemal wszystkiego, więc suwak,
+    który ma się kręcić, unieważniałby zgody na bajty, których nie dotknął. Tutaj
+    unieważnia dokładnie te nagrania, które powstały pod starym brzmieniem.
+    Głos to obsada (etap 0), sposób czytania to reżyseria (etap 9).
   narration mix <id> <episode-id> --track <gpt-image|seedream>
                 [--dry-run] [--regenerate]
     Kładzie przyjęte kwestie na zatwierdzonym episode.mp4 i zapisuje
@@ -2463,6 +2475,113 @@ async function runNarrationMix(argv: readonly string[]): Promise<Result<string>>
   return result.ok ? ok(renderMix(result.data, projectId.data, episodeId.data, mode)) : result;
 }
 
+/** An optional number flag. Absent means "leave this one as it was". */
+function numberFlag(parsed: Parsed, name: string): Result<number | null> {
+  const raw = parsed.values[name];
+
+  if (typeof raw !== "string") {
+    return ok(null);
+  }
+
+  const value = Number(raw.replace(",", "."));
+
+  return Number.isFinite(value)
+    ? ok(value)
+    : err(new UsageError(`--${name}: "${raw}" nie jest liczbą`));
+}
+
+/**
+ * Stage 9's direction: how the narrator of this series performs.
+ *
+ * A project-level command because a reading recurs between episodes, and one
+ * that writes stage 9's own file rather than stage 0's because a knob somebody
+ * is expected to turn must not lapse approvals its bytes never touched.
+ */
+async function runNarrationDirection(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, {
+    similarity: { type: "string" },
+    "speaker-boost": { type: "boolean" },
+    speed: { type: "string" },
+    stability: { type: "string" },
+    style: { type: "string" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const workspace = workspaceOf(parsed.data);
+  const similarityBoost = numberFlag(parsed.data, "similarity");
+  const speed = numberFlag(parsed.data, "speed");
+  const stability = numberFlag(parsed.data, "stability");
+  const style = numberFlag(parsed.data, "style");
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  for (const flag of [similarityBoost, speed, stability, style]) {
+    if (!flag.ok) {
+      return flag;
+    }
+  }
+
+  const mode = modeOf(parsed.data);
+  const boost = parsed.data.values["speaker-boost"];
+  const result = await setDirection({
+    mode,
+    projectId: projectId.data,
+    similarityBoost: similarityBoost.ok ? similarityBoost.data : null,
+    speakerBoost: typeof boost === "boolean" ? boost : null,
+    speed: speed.ok ? speed.data : null,
+    stability: stability.ok ? stability.data : null,
+    style: style.ok ? style.data : null,
+    workspace: workspace.data,
+  });
+
+  return result.ok ? ok(renderDirection(result.data, projectId.data, mode)) : result;
+}
+
+/**
+ * Five numbers, each said in the words that make it actionable.
+ *
+ * The labels carry the direction of each knob because the provider's own
+ * defaults are the flat ones: somebody reading this after a flat take needs to
+ * know which way to move, not merely what the value currently is.
+ */
+function renderDirection(
+  report: DirectionReport,
+  projectId: string,
+  mode: "apply" | "dry-run"
+): string {
+  const { delivery } = report;
+  const lines = [
+    mode === "dry-run"
+      ? `Próba na sucho — nic nie zapisano. Narrator projektu "${projectId}"`
+      : `Narrator projektu "${projectId}" czyta tak:`,
+    `  stability ${delivery.stability} — niżej znaczy szerszy zakres emocji, wyżej monotonnie`,
+    `  style ${delivery.style} — wyżej znaczy mocniejszy charakter głosu`,
+    `  speed ${delivery.speed} — poniżej 1 zwalnia czytanie`,
+    `  similarity ${delivery.similarityBoost}`,
+    `  speaker-boost ${delivery.speakerBoost ? "tak" : "nie"}`,
+  ];
+
+  for (const path of report.created) {
+    lines.push(`  + ${path}`);
+  }
+
+  for (const problem of report.problems) {
+    lines.push(`  ! ${problem}`);
+  }
+
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  return lines.join("\n");
+}
+
 async function runNarration(argv: readonly string[]): Promise<Result<string>> {
   if (argv[0] === "generate") {
     return await runNarrationGenerate(argv.slice(1));
@@ -2470,6 +2589,10 @@ async function runNarration(argv: readonly string[]): Promise<Result<string>> {
 
   if (argv[0] === "mix") {
     return await runNarrationMix(argv.slice(1));
+  }
+
+  if (argv[0] === "direction") {
+    return await runNarrationDirection(argv.slice(1));
   }
 
   return err(new UsageError(`nieznane polecenie: narration ${argv[0] ?? ""}`.trim()));
@@ -2495,6 +2618,15 @@ function renderNarration(
     `  skrypt: ${report.script.state} — ${report.script.note}`,
     `  do kupienia: ${report.calls} wywołań, ${report.characters} znaków`,
   ];
+
+  // Beside the bill, never inside it: the provider documents the continuity
+  // parameters but does not say whether it charges for them, and this tool does
+  // not guess with somebody else's account.
+  if (report.contextCharacters > 0) {
+    lines.push(
+      `  + ${report.contextCharacters} znaków kontekstu (previous_text/next_text) — dostawca nie podaje, czy je rozlicza`
+    );
+  }
 
   for (const line of report.lines) {
     lines.push(

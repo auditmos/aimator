@@ -188,9 +188,11 @@ src/
     ├── narration/    # Folder form — index.ts is the only entry (stage 9)
     │   ├── index.ts      # Public: generateNarration, generateMix, checkNarration,
     │   │                 #         checkMix, approveNarration, approveMix,
-    │   │                 #         validateNarration
+    │   │                 #         validateNarration, readDirection, setDirection
     │   ├── prompt.ts     # Internal — the instruction that forbids writing anything
     │   ├── validate.ts   # Internal — the verdict, including "lifted, not invented"
+    │   ├── delivery.ts   # Internal — how the narrator reads, and why that is a file
+    │   │                 #            of its own rather than a field in project.json
     │   ├── plan.ts       # Internal — two gates, and plan seconds resolved per track
     │   ├── generate.ts   # Internal — the script, then the lines it authorises
     │   ├── mix.ts        # Internal — the per-track half; buys nothing
@@ -260,6 +262,30 @@ answers with a document this pipeline then validates as prose; a speech call ans
 bytes — and what it charges for is not the answer but the question, because this provider
 bills per character of the text it is handed. So the number every stage prints before it
 spends, the count of calls, stops being the bill here, and both numbers are printed instead.
+
+`narration/delivery.ts` is where a decision went **because of where it must not go**, and
+that is the general lesson rather than a stage-9 detail. Stage 9's first recordings came
+back flat, and nothing in the code was wrong: the stage had nowhere to say how the narrator
+reads, so every call went out on the provider's defaults — which are `stability: 0.5` and
+`style: 0`, the flattest configuration the endpoint offers. A missing decision is not a
+missing number; it is a missing place to put one, and the fix is a place, not a constant.
+
+The obvious place was `project.json`, beside `narratorVoiceId`, since a reading recurs
+between episodes exactly as a cast does. It is the wrong one. `project.json` is a recorded
+input of nearly every artifact in the workspace — in one real project, ~89 records, up to
+both tracks' approved `episode.mp4` — so a knob somebody is *expected* to turn, because it
+is dialled in by ear over several attempts, would lapse the approval on rendered clips and
+on a cut episode whose bytes it never touched. **Where a decision lives decides what
+changing it invalidates**, so a file that is a recorded input of everything can only hold
+decisions nobody revisits. The reading lives beside `project.json`, in a file stage 9 owns
+and no earlier stage reads, and is a recorded input of the bought recordings alone.
+
+The seam that falls out of this is real rather than convenient: **the voice is casting** and
+belongs with the cast in stage 0; **the reading is direction** and belongs to the only stage
+able to hear it. Defaults are allowed here because these five have the provider's own, which
+is the reading that lets `AIMATOR_FFMPEG` be optional — but they are sent **explicitly** on
+every call, so the request archive answers what produced these bytes instead of deferring to
+whatever the provider's defaults were that month.
 
 The same module is also why `producer.kind` has three values instead of two. It is worth
 saying plainly, because a schema change in a shared module is the kind of thing that looks

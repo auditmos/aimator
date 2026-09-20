@@ -24,4 +24,11 @@
  */
 
 export { runVoiceStage } from "./attempt.js";
-export { billedCharacters, utteranceLength, validateSpeech } from "./validate.js";
+export type { SpeechContext, SpeechDelivery } from "./client.js";
+export { DEFAULT_DELIVERY } from "./client.js";
+export {
+  billedCharacters,
+  contextCharacters,
+  utteranceLength,
+  validateSpeech,
+} from "./validate.js";

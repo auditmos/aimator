@@ -15,7 +15,15 @@ import {
 import { readStage0Inputs } from "../project/index.js";
 import { validateShotList } from "../shot-list/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../workspace.js";
-import { approveNarration, generateMix, generateNarration, validateNarration } from "./index.js";
+import {
+  approveNarration,
+  checkNarration,
+  generateMix,
+  generateNarration,
+  readDirection,
+  setDirection,
+  validateNarration,
+} from "./index.js";
 
 /**
  * Stage 9's script, through the module entry.
@@ -316,8 +324,13 @@ const SCRIPT_LINES = [
 
 interface Calls {
   readonly fetch: typeof fetch;
-  /** Every speech request, in order: what was said and how long it was. */
-  readonly spoken: { characters: number; text: string }[];
+  /**
+   * Every speech request, in order: what was said, how long it was, and the
+   * whole body as the provider received it. The body is kept because half of
+   * what stage 9 decides never appears in the text — how the narrator performs,
+   * what is said either side, and which seed was asked for.
+   */
+  readonly spoken: { characters: number; sent: Record<string, unknown>; text: string }[];
   readonly text: number[];
 }
 
@@ -329,7 +342,7 @@ interface Calls {
  */
 function transport(options: { readonly script?: string; readonly seconds?: number } = {}): Calls {
   const { script: lifted = answerScript(), seconds = 1 } = options;
-  const spoken: { characters: number; text: string }[] = [];
+  const spoken: { characters: number; sent: Record<string, unknown>; text: string }[] = [];
   const text: number[] = [];
 
   return {
@@ -337,10 +350,10 @@ function transport(options: { readonly script?: string; readonly seconds?: numbe
       const href = String(url);
 
       if (href.includes("elevenlabs")) {
-        const sent = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
-        const said = sent.text ?? "";
+        const sent = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        const said = typeof sent.text === "string" ? sent.text : "";
 
-        spoken.push({ characters: [...said].length, text: said });
+        spoken.push({ characters: [...said].length, sent, text: said });
 
         return Promise.resolve(
           new Response(wav({ seconds }), {
@@ -605,5 +618,264 @@ describe("generateMix", () => {
     const result = await mix();
 
     expect(result.ok ? result.data.problems.join(" ") : null).toContain("muzyki ani efektów");
+  });
+});
+
+/**
+ * How the narrator performs — stage 9's own decision, in stage 9's own file.
+ *
+ * The bug this answers was not in any line of code. Stage 9 had nowhere to say
+ * how the narrator reads, so every call went out on the provider's defaults,
+ * and those defaults are `stability: 0.5` with `style: 0` — which the provider
+ * itself describes as trending monotone. The recordings sounded flat and no
+ * amount of re-buying would have changed that, because nothing in the pipeline
+ * was ever asked the question.
+ */
+describe("narration direction", () => {
+  function direction(overrides: Partial<Parameters<typeof setDirection>[0]> = {}) {
+    return setDirection({
+      mode: "apply",
+      projectId: PROJECT,
+      similarityBoost: null,
+      speakerBoost: null,
+      speed: null,
+      stability: null,
+      style: null,
+      workspace,
+      ...overrides,
+    });
+  }
+
+  /**
+   * An undecided project reads as the provider's documented defaults rather
+   * than as a refusal. Rule 7 binds decisions that *have* no default; these
+   * five have one, which is the same reading that lets `AIMATOR_FFMPEG` be
+   * optional. What the stage must not do is stay silent about them.
+   */
+  it("should start at the provider's own defaults, recording nothing", async () => {
+    const result = await readDirection({ projectId: PROJECT, workspace });
+
+    expect(result.ok ? result.data.delivery.stability : null).toBe(0.5);
+    expect(result.ok ? result.data.delivery.style : null).toBe(0);
+    expect(result.ok ? result.data.input : "missing").toBeNull();
+  });
+
+  /**
+   * Five independent decisions, so a command given one of them leaves the other
+   * four alone. Replacing the file wholesale would silently undo a choice
+   * nobody revisited, which is the failure `withRecord` exists to prevent one
+   * level down.
+   */
+  it("should merge a single knob over what was decided before", async () => {
+    await direction({ stability: 0.35 });
+    await direction({ style: 0.4 });
+
+    const result = await readDirection({ projectId: PROJECT, workspace });
+
+    expect(result.ok ? result.data.delivery.stability : null).toBe(0.35);
+    expect(result.ok ? result.data.delivery.style : null).toBe(0.4);
+    expect(result.ok ? result.data.input : null).not.toBeNull();
+  });
+
+  it("should refuse a speed the provider does not accept", async () => {
+    const result = await direction({ speed: 2 });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.error.message).toContain("zakres");
+  });
+
+  /** It says what it lapses rather than leaving it to be discovered. */
+  it("should warn that recordings bought under the old reading are stale", async () => {
+    const result = await direction({ stability: 0.3 });
+
+    expect(result.ok ? result.data.problems.join(" ") : null).toContain("--regenerate");
+  });
+
+  /**
+   * The whole point of the separate file: a knob somebody is expected to turn
+   * must not lapse approvals whose bytes it never touched. `project.json` is a
+   * recorded input of nearly every artifact in the workspace; this one is a
+   * recorded input of the recordings it actually produced.
+   */
+  it("should not touch stage 0's file", async () => {
+    const paths = projectPaths(workspace, PROJECT);
+    const before = await readFile(paths.ok ? paths.data.file : "", "utf8");
+
+    await direction({ stability: 0.3, style: 0.45 });
+
+    expect(await readFile(paths.ok ? paths.data.file : "", "utf8")).toBe(before);
+  });
+});
+
+/**
+ * What a paid speech call actually carries.
+ *
+ * Half of what stage 9 decides never appears in the text: how the narrator
+ * performs, what is said either side of this line, and which seed was asked
+ * for. None of it is visible in the script or in the published WAV, so it is
+ * asserted where it is observable — on the request itself.
+ */
+describe("what stage 9 puts on the wire", () => {
+  async function buy(): Promise<Calls> {
+    const calls = transport();
+
+    await generate(calls);
+    await approveScript();
+    await generate(calls);
+
+    return calls;
+  }
+
+  function settingsOf(calls: Calls, index: number): Record<string, unknown> {
+    return (calls.spoken[index]?.sent.voice_settings ?? {}) as Record<string, unknown>;
+  }
+
+  /**
+   * The provider's defaults are sent explicitly rather than by omission. An
+   * archive that leaves them out cannot answer what produced these bytes, and
+   * that is the one question the archive exists for — the defaults are the
+   * provider's to change, not ours to assume.
+   */
+  it("should state the provider's defaults rather than stay silent", async () => {
+    const calls = await buy();
+
+    expect(settingsOf(calls, 0).stability).toBe(0.5);
+    expect(settingsOf(calls, 0).style).toBe(0);
+    expect(settingsOf(calls, 0).use_speaker_boost).toBe(true);
+  });
+
+  it("should send the reading somebody decided", async () => {
+    await setDirection({
+      mode: "apply",
+      projectId: PROJECT,
+      similarityBoost: null,
+      speakerBoost: null,
+      speed: 0.95,
+      stability: 0.35,
+      style: 0.4,
+      workspace,
+    });
+
+    const calls = await buy();
+
+    expect(settingsOf(calls, 0).stability).toBe(0.35);
+    expect(settingsOf(calls, 0).style).toBe(0.4);
+    expect(settingsOf(calls, 0).speed).toBe(0.95);
+  });
+
+  /**
+   * The other half of why the first take sounded flat: every line was bought as
+   * if it were the only sentence in the film. The neighbours are derived from
+   * the script rather than stored — they *are* the neighbouring lines, so a
+   * second copy of them would drift the first time somebody re-lifts it.
+   */
+  it("should hand each line what is said either side of it", async () => {
+    const calls = await buy();
+
+    expect(calls.spoken[0]?.sent.previous_text).toBeNull();
+    expect(calls.spoken[0]?.sent.next_text).toBe(NARRATION.U04);
+    expect(calls.spoken[1]?.sent.previous_text).toBe(NARRATION.U01);
+    expect(calls.spoken[1]?.sent.next_text).toBeNull();
+  });
+
+  /**
+   * A seed per attempt, not per sentence. Re-deriving a recorded attempt has to
+   * ask for the same reading, but `--regenerate` exists because somebody did
+   * not like what came back — and a seed fixed to the sentence would sell them
+   * the same reading twice.
+   */
+  it("should ask for a seed, and a different one per attempt", async () => {
+    const calls = await buy();
+
+    expect(typeof calls.spoken[0]?.sent.seed).toBe("number");
+    expect(calls.spoken[0]?.sent.seed).not.toBe(calls.spoken[1]?.sent.seed);
+  });
+
+  /**
+   * The reading is half of what produced these bytes, so it is recorded beside
+   * the script. That is also what keeps the decision cheap to revisit: it
+   * lapses the recordings it made and nothing above them.
+   */
+  it("should record the reading as an input of every line it bought", async () => {
+    await setDirection({
+      mode: "apply",
+      projectId: PROJECT,
+      similarityBoost: null,
+      speakerBoost: null,
+      speed: null,
+      stability: 0.3,
+      style: null,
+      workspace,
+    });
+    await buy();
+
+    const project = projectPaths(workspace, PROJECT);
+    const episode = project.ok ? episodePaths(project.data, EPISODE) : null;
+    const stage = JSON.parse(
+      await readFile(episode?.ok === true ? episode.data.soundtrackStage : "", "utf8")
+    ) as { artifacts: Record<string, { inputs: { path: string }[] } | undefined> };
+    const inputsOf = (key: string): readonly string[] =>
+      (stage.artifacts[key]?.inputs ?? []).map((one) => one.path);
+
+    expect(inputsOf("N01")).toContain(`projects/${PROJECT}/narration.json`);
+    // The script's own record is not bound to it: how a line is read changes
+    // nothing about which sentences the model lifted.
+    expect(inputsOf("script")).not.toContain(`projects/${PROJECT}/narration.json`);
+  });
+
+  /** Counted beside the bill, because the provider does not say whether it charges. */
+  it("should count the context apart from the bill", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await approveScript();
+
+    const result = await generate(calls, { mode: "dry-run" });
+
+    expect(result.ok ? result.data.characters : null).toBe(
+      [...NARRATION.U01].length + [...NARRATION.U04].length
+    );
+    expect(result.ok ? result.data.contextCharacters : null).toBe(
+      [...NARRATION.U01].length + [...NARRATION.U04].length
+    );
+  });
+});
+
+/**
+ * The gap `changedInputs` cannot see.
+ *
+ * A recording bought before anybody decided how the narrator reads holds no
+ * entry for `narration.json` at all, so nothing drifts and nothing is reported.
+ * Left alone, `check` would present a reading nobody chose as one somebody
+ * approved — which is the exact failure the review exists to prevent.
+ */
+describe("checkNarration after the reading changes", () => {
+  it("should report lines bought before anybody decided how it reads", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await approveScript();
+    await generate(calls);
+    await approveLines();
+
+    const before = await checkNarration({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+    expect(before.ok ? before.data.lines.every((one) => one.approved) : null).toBe(true);
+
+    await setDirection({
+      mode: "apply",
+      projectId: PROJECT,
+      similarityBoost: null,
+      speakerBoost: null,
+      speed: null,
+      stability: 0.3,
+      style: 0.45,
+      workspace,
+    });
+
+    const after = await checkNarration({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+    expect(after.ok ? after.data.lines.every((one) => one.approved) : null).toBe(false);
+    expect(after.ok ? after.data.problems.join(" ") : null).toContain("domyślnych ustawieniach");
   });
 });

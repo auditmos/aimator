@@ -13,6 +13,7 @@ import { checkShotList } from "../shot-list/index.js";
 import { hasSound, validateVideo } from "../video-model/index.js";
 import { validateSpeech } from "../voice-model/index.js";
 import { episodeTrackPaths, type ImageTrack, narrationAudio, workspacePath } from "../workspace.js";
+import { readDirection } from "./delivery.js";
 import {
   missingSound,
   NARRATED,
@@ -184,8 +185,16 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
   const scriptChanged = await changedInputs(input, record.inputs);
   const scriptApproved =
     record.review.status === "approved" && blocking.length === 0 && scriptChanged.length === 0;
+  // The script's own record is deliberately not bound to the reading: how a
+  // line is spoken changes nothing about which sentences the model lifted.
+  const direction = await readDirection(input);
   const lines = verdict.ok
-    ? await readLineStates(input, stage9.data, verdict.data.lines)
+    ? await readLineStates(
+        input,
+        stage9.data,
+        verdict.data.lines,
+        direction.ok ? direction.data.input : null
+      )
     : { problems: [], states: [] };
   const approved = scriptApproved && lines.states.every((one) => one.approved);
 
@@ -243,17 +252,36 @@ function nextStep(
     : `aimator narration mix ${input.projectId} ${input.episodeId} --track <gpt-image|seedream>`;
 }
 
+/**
+ * Whether this line was bought before anybody decided how the narrator reads.
+ *
+ * `changedInputs` cannot see this, and the difference matters. It compares the
+ * inputs a record *holds* against the bytes on disk — but a recording made
+ * before `narration.json` existed holds no entry for it at all, so nothing
+ * drifts and nothing is reported. The absence is therefore checked directly:
+ * a line read on the provider's defaults is not a line read the way this series
+ * was later decided to sound, and a check that stayed quiet would be presenting
+ * a reading nobody chose as one somebody approved.
+ */
+function readingChanged(
+  direction: RecordedFile | null,
+  record: StageFile["artifacts"][string]
+): boolean {
+  return direction !== null && !record.inputs.some((one) => one.path === direction.path);
+}
+
 async function readLineStates(
   input: Stage9Scope,
   stage9: Stage9Inputs,
-  lines: readonly { characters: number; id: string }[]
+  lines: readonly { characters: number; id: string }[],
+  direction: RecordedFile | null
 ): Promise<{ problems: readonly string[]; states: readonly LineState[] }> {
   const states: LineState[] = [];
   const problems: string[] = [];
 
   for (const line of lines) {
     // biome-ignore lint/performance/noAwaitInLoops: each line read once per check
-    const one = await readLineState(input, stage9, line);
+    const one = await readLineState(input, stage9, line, direction);
 
     states.push(one.state);
     problems.push(...one.problems);
@@ -266,7 +294,8 @@ async function readLineStates(
 async function readLineState(
   input: Stage9Scope,
   stage9: Stage9Inputs,
-  line: { characters: number; id: string }
+  line: { characters: number; id: string },
+  direction: RecordedFile | null
 ): Promise<{ problems: readonly string[]; state: LineState }> {
   const record = stage9.stage.artifacts[line.id];
   const file = narrationAudio(stage9.paths.episode, line.id);
@@ -297,13 +326,19 @@ async function readLineState(
   const digest = await readDigest(file.data);
   const speech = digest.ok ? validateSpeech(digest.data.bytes) : null;
   const blocking = bytesProblems(line.id, record.outputs, digest, speech);
-  const inputsChanged = await changedInputs(input, record.inputs);
+  const stale = readingChanged(direction, record);
+  const inputsChanged = [
+    ...(await changedInputs(input, record.inputs)),
+    ...(stale && direction !== null ? [direction.path] : []),
+  ];
 
   return {
     problems: [
       ...blocking,
-      ...inputsChanged.map(
-        (path) => `${line.id}: ${path} zmienił się od czasu nagrania — odsłuchaj je jeszcze raz`
+      ...inputsChanged.map((path) =>
+        stale && path === direction?.path
+          ? `${line.id}: kupiona zanim ktokolwiek zdecydował, jak narrator czyta — poszła na domyślnych ustawieniach dostawcy; nowe brzmienie kupuje wyłącznie --regenerate`
+          : `${line.id}: ${path} zmienił się od czasu nagrania — odsłuchaj je jeszcze raz`
       ),
     ],
     state: {

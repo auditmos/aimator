@@ -50,6 +50,7 @@
  * assembly stays exactly where it was.
  */
 
+export { type DirectionReport, readDirection, setDirection } from "./delivery.js";
 export { generateNarration, type NarrationReport } from "./generate.js";
 export { generateMix, type MixReport } from "./mix.js";
 export {
