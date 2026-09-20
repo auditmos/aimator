@@ -220,6 +220,45 @@ export function validateEndFrame(
 }
 
 /**
+ * Whether this file carries a sound track, read from its own boxes.
+ *
+ * Stage 8 reports a silent cut and stage 9 has to be able to say the silence is
+ * over — and both answers must survive on a machine with no media tools, which
+ * is why this walks `trak` boxes rather than asking a decoder. The test is the
+ * one `readFrame` already relies on from the other side: a sound track states a
+ * frame of zero by zero, because it has no picture in it.
+ *
+ * A file it cannot parse reads as silent. That is the honest answer for a
+ * verdict whose question is "is there sound here": a shape this cannot read is
+ * not a shape it may claim anything about.
+ */
+export function hasSound(bytes: Buffer): boolean {
+  const moov = findBox(bytes, 0, bytes.length, "moov");
+
+  if (moov === null) {
+    return false;
+  }
+
+  let at = moov.body;
+
+  while (at < moov.end) {
+    const trak = findBox(bytes, at, moov.end, "trak");
+
+    if (trak === null) {
+      return false;
+    }
+
+    if (readTrackFrame(bytes, trak) === null) {
+      return true;
+    }
+
+    at = trak.end;
+  }
+
+  return false;
+}
+
+/**
  * Which of the two formats a still is, or `null` for neither.
  *
  * It exists so the archive can name the file after what it holds before

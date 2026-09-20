@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EPISODE, makeTrack, makeUpstream, mp4, PROJECT } from "../../test/fixture.js";
+import type { ConcatReport } from "../muxer.js";
 import { err, ok, type Result } from "../result.js";
 import { type ImageTrack, resolveWorkspace, type Workspace } from "../workspace.js";
-import { approveAssembly, type ConcatReport, checkAssembly, generateAssembly } from "./index.js";
+import { approveAssembly, checkAssembly, generateAssembly } from "./index.js";
 
 /**
  * Stage 8 end to end, through the module entry.
@@ -105,6 +106,9 @@ function muxer(options: { absent?: boolean; seconds?: number } = {}): Fake {
           stderr: "",
         });
       },
+      /** Stage 8 never lays speech down; being asked to is a bug, not a fallback. */
+      mix: (): Promise<Result<ConcatReport>> =>
+        Promise.resolve(err(new Error("etap 8 nie miksuje dźwięku"))),
       version: () =>
         Promise.resolve(
           absent ? err(new Error("nie znaleziono ffmpeg w PATH ani w AIMATOR_FFMPEG")) : ok(ENGINE)

@@ -11,11 +11,14 @@ import {
   episodePaths,
   episodeTrackPaths,
   imageRunPaths,
+  narrationAudio,
   projectPaths,
   referenceImage,
   resolveWorkspace,
   runPaths,
+  soundtrackRunPaths,
   videoRunPaths,
+  voiceRunPaths,
 } from "./workspace.js";
 
 describe("resolveWorkspace", () => {
@@ -142,6 +145,9 @@ describe("episodePaths", () => {
     const result = project.ok ? episodePaths(project.data, "01-arrival") : null;
     expect(result?.ok ? result.data : null).toEqual({
       file: `${episode}/episode.json`,
+      narration: `${episode}/narration`,
+      narrationLock: `${episode}/narration.lock`,
+      narrationScript: `${episode}/narration.md`,
       prepareStage: `${episode}/prepare.stage.json`,
       promptPackage: `${episode}/prompt-package.json`,
       promptPackageLock: `${episode}/prompt-package.lock`,
@@ -155,6 +161,7 @@ describe("episodePaths", () => {
       shotList: `${episode}/shot-list.md`,
       shotListLock: `${episode}/shot-list.lock`,
       shotListStage: `${episode}/shot-list.stage.json`,
+      soundtrackStage: `${episode}/soundtrack.stage.json`,
       source: `${episode}/source.md`,
     });
   });
@@ -189,6 +196,7 @@ describe("episodeTrackPaths", () => {
       clipsStage: `${root}/clips.stage.json`,
       episodeVideo: `${root}/episode.mp4`,
       frames: `${root}/frames`,
+      narratedVideo: `${root}/narrated.mp4`,
       openingFrameImage: `${root}/opening-frame.png`,
       openingFrameLock: `${root}/opening-frame.lock`,
       openingFrameStage: `${root}/opening-frame.stage.json`,
@@ -197,6 +205,8 @@ describe("episodeTrackPaths", () => {
       referencesStage: `${root}/references.stage.json`,
       root,
       runs: `${root}/runs`,
+      soundtrackLock: `${root}/soundtrack.lock`,
+      soundtrackStage: `${root}/soundtrack.stage.json`,
     });
   });
 
@@ -355,5 +365,82 @@ describe("stage 8 paths", () => {
     expect(run?.validation).toBe(`${run?.root}/validation.json`);
     expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
     expect(run?.list).toBe(`${run?.root}/concat.txt`);
+  });
+});
+
+describe("stage 9 paths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const paths = project.ok ? episodePaths(project.data, "01-arrival") : null;
+  const track = paths?.ok ? episodeTrackPaths(paths.data, "seedream") : null;
+  const episode = "/srv/aimator/projects/demo/episodes/01-arrival";
+  const root = `${episode}/seedream`;
+
+  /**
+   * The words sit at the episode level, with no track directory, for the reason
+   * the screenplay and the shot list do: they describe the story rather than
+   * the pictures. The spoken bytes sit beside them because they depend on the
+   * text, the voice and the speech model — and not one of those three differs
+   * per track. A voice reading a sentence has no idea which of the two films it
+   * will sit over, so buying it twice would be paying for a directory.
+   */
+  it("should keep the script and the spoken lines shared between the tracks", () => {
+    expect(paths?.ok ? paths.data.narrationScript : null).toBe(`${episode}/narration.md`);
+    expect(paths?.ok ? paths.data.narration : null).toBe(`${episode}/narration`);
+    expect(paths?.ok ? paths.data.soundtrackStage : null).toBe(`${episode}/soundtrack.stage.json`);
+    expect(paths?.ok ? paths.data.narrationLock : null).toBe(`${episode}/narration.lock`);
+  });
+
+  it("should give an utterance its own file beside the others", () => {
+    const line = paths?.ok ? narrationAudio(paths.data, "N02") : null;
+    expect(line?.ok ? line.data : null).toBe(`${episode}/narration/N02.wav`);
+  });
+
+  it("should reject an utterance id that is not a numbered artifact", () => {
+    const line = paths?.ok ? narrationAudio(paths.data, "../escape") : null;
+    expect(line?.ok).toBe(false);
+  });
+
+  /**
+   * The mix is the one half of stage 9 that is per track, and it has to be:
+   * it is timed against that track's own cut, whose clips came back with their
+   * own drift. Two tracks are two films of one story and neither is "the
+   * episode" — so neither is "the soundtrack" either.
+   */
+  it("should place the narrated cut and its state file inside the track", () => {
+    expect(track?.narratedVideo).toBe(`${root}/narrated.mp4`);
+    expect(track?.soundtrackStage).toBe(`${root}/soundtrack.stage.json`);
+    expect(track?.soundtrackLock).toBe(`${root}/soundtrack.lock`);
+  });
+
+  /**
+   * A bought utterance archives beside the text stages, under the episode,
+   * because that is where it was bought — one `runs/` per level, and the run id
+   * says which stage minted it.
+   */
+  it("should archive a speech attempt under the episode's shared runs directory", () => {
+    const run = paths?.ok ? voiceRunPaths(paths.data, "20260919T110000Z-abcd1234") : null;
+    expect(run?.root).toBe(`${episode}/runs/20260919T110000Z-abcd1234`);
+    expect(run?.audio).toBe(`${run?.root}/original.wav`);
+    expect(run?.previousAudio).toBe(`${run?.root}/previous.wav`);
+    expect(run?.request).toBe(`${run?.root}/request.json`);
+    expect(run?.response).toBe(`${run?.root}/response.json`);
+    expect(run?.transport).toBe(`${run?.root}/transport.json`);
+    expect(run?.validation).toBe(`${run?.root}/validation.json`);
+  });
+
+  /**
+   * The mix archives what stage 8's does and one thing more: where each line
+   * was laid down. The placement is arithmetic, so it could be recomputed —
+   * but it is also what the engine was actually told, and an archive holding
+   * the arguments without it would record half the invocation.
+   */
+  it("should archive a mix without a request or a response", () => {
+    const run = track === null ? null : soundtrackRunPaths(track, "20260919T110000Z-abcd1234");
+    expect(run?.root).toBe(`${root}/runs/20260919T110000Z-abcd1234`);
+    expect(run?.run).toBe(`${run?.root}/run.json`);
+    expect(run?.transport).toBe(`${run?.root}/transport.json`);
+    expect(run?.validation).toBe(`${run?.root}/validation.json`);
+    expect(run?.placement).toBe(`${run?.root}/placement.json`);
+    expect(run?.previousVideo).toBe(`${run?.root}/previous.mp4`);
   });
 });

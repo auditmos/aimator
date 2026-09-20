@@ -13,10 +13,10 @@ import {
   type WriteOp,
   writeNew,
 } from "../artifact/index.js";
+import type { Muxer } from "../muxer.js";
 import { err, ok, type Result } from "../result.js";
 import { validateVideo } from "../video-model/index.js";
 import { assemblyRunPaths, type ImageTrack, type Workspace } from "../workspace.js";
-import type { Muxer } from "./mux.js";
 import {
   EPISODE_CUT,
   readStage8Inputs,

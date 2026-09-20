@@ -5,7 +5,6 @@ import {
   type AssemblyStatus,
   approveAssembly,
   checkAssembly,
-  ffmpeg,
   generateAssembly,
 } from "./lib/assembly/index.js";
 import {
@@ -27,6 +26,7 @@ import {
 } from "./lib/clips/index.js";
 import { env } from "./lib/env.js";
 import { type Attachment, readSendPlan, type SendPlan } from "./lib/media-prompt/index.js";
+import { ffmpeg } from "./lib/muxer.js";
 import {
   approveOpeningFrame,
   checkOpeningFrame,

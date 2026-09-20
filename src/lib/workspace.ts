@@ -114,6 +114,17 @@ export interface EpisodeTrackPaths {
    */
   readonly frames: string;
   /**
+   * Stage 9's one output on this track: the approved picture cut with the
+   * narration laid over it, the video copied through untouched.
+   *
+   * A file rather than a directory, and named for what it holds rather than for
+   * the stage that made it — the same reading that makes stage 8's output
+   * `episode.mp4` and its state file `assembly.stage.json`. It sits beside
+   * `episode.mp4` rather than replacing it: those bytes carry a human's yes,
+   * and stage 9 neither overwrites nor re-encodes them.
+   */
+  readonly narratedVideo: string;
+  /**
    * Stage 6's one output. It is a file rather than a directory because the
    * opening frame is a single image, so there is no set for a directory to
    * hold — and it is `openingFrameImage` rather than `openingFrame` because
@@ -138,6 +149,15 @@ export interface EpisodeTrackPaths {
    * one `runs/` under the episode.
    */
   readonly runs: string;
+  /**
+   * Stage 9's per-track lock and state file. Stage 9 is the first stage whose
+   * artifacts live at two levels — the words are shared like every text stage's
+   * and the mix is per track like every video stage's — so it writes one state
+   * file at each, exactly as rule 1 asks: one per stage per directory it writes
+   * to, the way stage 2 holds one per character per track.
+   */
+  readonly soundtrackLock: string;
+  readonly soundtrackStage: string;
 }
 
 /**
@@ -211,8 +231,55 @@ interface AssemblyRunPaths {
   readonly validation: string;
 }
 
+/**
+ * What one speech attempt archives. `request.json` carries the text and the
+ * settings, which is the whole of what was sent — a TTS call has no attachments
+ * and therefore no reference bytes to leave out.
+ */
+interface VoiceRunPaths {
+  /** Exactly what the provider returned, before anything was published. */
+  readonly audio: string;
+  /** The line being replaced. Written only by `--regenerate`. */
+  readonly previousAudio: string;
+  readonly prompt: string;
+  readonly request: string;
+  readonly response: string;
+  readonly root: string;
+  readonly run: string;
+  readonly transport: string;
+  readonly validation: string;
+}
+
+/** What one mix archives: stage 8's thin archive, plus where each line landed. */
+interface SoundtrackRunPaths {
+  /** Which utterance was laid down at which second of this track's own cut. */
+  readonly placement: string;
+  /** The narrated cut being replaced. Written only by `--regenerate`. */
+  readonly previousVideo: string;
+  readonly root: string;
+  readonly run: string;
+  readonly transport: string;
+  readonly validation: string;
+}
+
 export interface EpisodePaths {
   readonly file: string;
+  /**
+   * Stage 9's spoken lines, one file per utterance and per paid call.
+   *
+   * Shared between the tracks, with no track level, because what the bytes
+   * depend on — the text, the voice and the speech model — does not differ per
+   * track. Only the mix does, because only the mix is timed against a
+   * particular cut.
+   */
+  readonly narration: string;
+  readonly narrationLock: string;
+  /**
+   * Stage 9's script: which sentences the narrator says and where each one is
+   * anchored in the plan. It sits directly under the episode, beside the
+   * screenplay and the shot list, because it is words rather than pictures.
+   */
+  readonly narrationScript: string;
   readonly prepareStage: string;
   /**
    * Stage 4. Like the shot list it has no track level: the package describes
@@ -243,6 +310,12 @@ export interface EpisodePaths {
   readonly shotList: string;
   readonly shotListLock: string;
   readonly shotListStage: string;
+  /**
+   * Stage 9's shared state file, holding the script and every bought utterance.
+   * Its per-track half sits under the track, because the mix is per track and
+   * the words are not.
+   */
+  readonly soundtrackStage: string;
   readonly source: string;
 }
 
@@ -456,6 +529,9 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
 
   return ok({
     file: join(root, "episode.json"),
+    narration: join(root, "narration"),
+    narrationLock: join(root, "narration.lock"),
+    narrationScript: join(root, "narration.md"),
     prepareStage: join(root, "prepare.stage.json"),
     promptPackage: join(root, "prompt-package.json"),
     promptPackageLock: join(root, "prompt-package.lock"),
@@ -469,6 +545,7 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
     shotList: join(root, "shot-list.md"),
     shotListLock: join(root, "shot-list.lock"),
     shotListStage: join(root, "shot-list.stage.json"),
+    soundtrackStage: join(root, "soundtrack.stage.json"),
     source: join(root, "source.md"),
   });
 }
@@ -496,6 +573,7 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
     clipsStage: join(root, "clips.stage.json"),
     episodeVideo: join(root, "episode.mp4"),
     frames: join(root, "frames"),
+    narratedVideo: join(root, "narrated.mp4"),
     openingFrameImage: join(root, "opening-frame.png"),
     openingFrameLock: join(root, "opening-frame.lock"),
     openingFrameStage: join(root, "opening-frame.stage.json"),
@@ -504,6 +582,8 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
     referencesStage: join(root, "references.stage.json"),
     root,
     runs: join(root, "runs"),
+    soundtrackLock: join(root, "soundtrack.lock"),
+    soundtrackStage: join(root, "soundtrack.stage.json"),
   };
 }
 
@@ -606,6 +686,71 @@ export function assemblyRunPaths(
 
   return {
     list: join(root, "concat.txt"),
+    previousVideo: join(root, "previous.mp4"),
+    root,
+    run: join(root, "run.json"),
+    transport: join(root, "transport.json"),
+    validation: join(root, "validation.json"),
+  };
+}
+
+/**
+ * One utterance's own file. The identifier is the artifact key, the line of
+ * the script and the file name at once, so it is checked here rather than
+ * trusted into a path — the same reason `referenceImage` checks a reference id.
+ *
+ * WAV rather than the provider's default MP3, and that is a decision rather
+ * than a preference: a RIFF header states its sample rate, its channels and the
+ * size of its data block, so the length of a bought line is exact arithmetic on
+ * a machine with no media tools. An MP3 states its length only to whoever walks
+ * its frames. Stage 7 read boxes instead of calling a decoder for exactly this;
+ * choosing the container is the same choice, one step earlier.
+ */
+export function narrationAudio(paths: EpisodePaths, id: string): Result<string> {
+  return ARTIFACT_ID.test(id)
+    ? ok(join(paths.narration, `${id}.wav`))
+    : err(new IdentifierError(id, `invalid utterance id "${id}": expected a form like N01`));
+}
+
+/**
+ * The archive of one speech attempt.
+ *
+ * It sits under the episode rather than under a track, because that is where
+ * the line was bought: the words are shared, so the receipt is too. Like every
+ * other archive it never copies an input — the text it read out is in the
+ * script, referenced by path and digest.
+ */
+export function voiceRunPaths(paths: { readonly runs: string }, runId: string): VoiceRunPaths {
+  const root = join(paths.runs, runId);
+
+  return {
+    audio: join(root, "original.wav"),
+    previousAudio: join(root, "previous.wav"),
+    prompt: join(root, "prompt.md"),
+    request: join(root, "request.json"),
+    response: join(root, "response.json"),
+    root,
+    run: join(root, "run.json"),
+    transport: join(root, "transport.json"),
+    validation: join(root, "validation.json"),
+  };
+}
+
+/**
+ * The archive of one mix — stage 9's local half, and the second archive in the
+ * pipeline with no network behind it. It keeps what stage 8's keeps and one
+ * thing more: where each line was laid down. That is arithmetic and could be
+ * recomputed, but it is also what the engine was actually told, and an archive
+ * holding the arguments without it would record half the invocation.
+ */
+export function soundtrackRunPaths(
+  paths: { readonly runs: string },
+  runId: string
+): SoundtrackRunPaths {
+  const root = join(paths.runs, runId);
+
+  return {
+    placement: join(root, "placement.json"),
     previousVideo: join(root, "previous.mp4"),
     root,
     run: join(root, "run.json"),

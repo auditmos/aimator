@@ -21,4 +21,4 @@
  */
 
 export { runVideoStage } from "./attempt.js";
-export { clipDuration, validateEndFrame, validateVideo } from "./validate.js";
+export { clipDuration, hasSound, validateEndFrame, validateVideo } from "./validate.js";

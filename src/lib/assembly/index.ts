@@ -50,5 +50,4 @@
  */
 
 export { type AssemblyReport, generateAssembly } from "./generate.js";
-export { type ConcatReport, ffmpeg } from "./mux.js";
 export { type AssemblyStatus, approveAssembly, checkAssembly } from "./review.js";
