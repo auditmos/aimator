@@ -101,7 +101,7 @@ Pięć z nich blokuje bramkę tego etapu. Szósta, `--max-clip`, jest wymagana d
 | Pole | Wartość | Kto wymaga |
 |---|---|---|
 | `--duration` | długość w sekundach, liczba całkowita 1–3600 | etap 0 |
-| `--audio` | `music-and-effects`, `dialogue`, `narration`, `dialogue-and-narration` — wszystkie zawierają muzykę i efekty | etap 0 |
+| `--audio` | `music-and-effects`, `dialogue`, `narration`, `dialogue-and-narration` — wszystkie zawierają muzykę i efekty. Proces obsługuje w całości `music-and-effects` i `narration` | etap 0 |
 | `--language` | kod języka scenariusza i wypowiedzi; wymagany także w filmie bez mowy | etap 0 |
 | `--subtitles` | kod języka albo `none`; ustalany niezależnie od `--language` | etap 0 |
 | `--nature` | `law-or-idea`, `synopsis`, `screenplay` — czym jest Twój plik źródłowy | etap 0 |

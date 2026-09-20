@@ -77,7 +77,7 @@ na drugie i **melduje przesunięcie**.
 `episode.mp4` nie jest dotykany. `narrated.mp4` to nowy plik, którego obraz jest kopią
 strumieniową zatwierdzonego cięcia, klatka w klatkę.
 
-## Czego ten etap nie domyka
+## Gdzie kończy się ten etap
 
 Narracja to nie cała ścieżka — muzykę i efekty dokłada [etap 10](10-muzyka-i-efekty.md),
 więc ich brak jest tu meldowany, dokładnie jak cisza w etapie 8.

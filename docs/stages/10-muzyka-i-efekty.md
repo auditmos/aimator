@@ -93,12 +93,12 @@ kończący się przed filmem jest **meldunkiem** (dziura, precedens etapu 8) —
 dłuższe niż plan, a odmowa z powodu, którego nikt niżej nie naprawi, byłaby odmową bez
 wyjścia.
 
-## Czego ten etap nie domyka
+## Gdzie kończy się ten etap
 
-Dwa z czterech trybów dźwięku (`dialogue`, `dialogue-and-narration`) deklarują mowę
-postaci, której nie wytwarza żaden zaimplementowany etap. To etap 11 — ma zapisany kontrakt
-w [docs/pipeline.md](../pipeline.md), ale nie ma kodu. `check` mówi o tym braku wprost,
-zamiast milczeć.
+`mixed.mp4` jest ostatnim plikiem, jaki produkuje ten proces — film z obrazem, narracją,
+podkładem i efektami. Tryby dźwięku, które proces obsługuje w całości, to
+`music-and-effects` i `narration`; przy każdym innym `check` wypisuje, czego w miksie nie
+ma, zamiast milczeć.
 
 ---
 

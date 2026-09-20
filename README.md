@@ -6,8 +6,8 @@ scenariusz i assety, po gotowy film sklejony z klipów.
 ## Co to potrafi dzisiaj
 
 - **Prowadzi całą produkcję od pomysłu do zmontowanego filmu z dźwiękiem** — jedenaście
-  kroków, z których dziesięć działa, a każdy zostawia na dysku plik, który można obejrzeć,
-  odrzucić i wygenerować ponownie.
+  etapów, z których każdy zostawia na dysku plik, który można obejrzeć, odrzucić
+  i wygenerować ponownie.
 - **Robi dwie wersje tej samej historii naraz.** Artefakty są grupowane per projekt
   i **per model obrazu**: jeden projekt może mieć komplet assetów w `gpt-image`
   i w `seedream` — to dwa niezależne byty dające dwie różne animacje z tego samego
@@ -19,10 +19,7 @@ scenariusz i assety, po gotowy film sklejony z klipów.
   pokazuje pełny prompt bez sięgania po klucz, i mówi, ile wywołań wykona, zanim je
   wykona.
 
-Czego jeszcze nie ma: **dialogów postaci** (etap 11 — kontrakt zapisany, kodu brak). Dwa
-z czterech trybów dźwięku (`music-and-effects`, `narration`) są domknięte; dwa pozostałe
-deklarują mowę postaci, której nie wytwarza żaden etap — i `check` mówi to wprost, zamiast
-milczeć.
+Tryby dźwięku, które ten proces obsługuje w całości, to `music-and-effects` i `narration`.
 
 ## Podejście
 
@@ -64,7 +61,6 @@ stanu, szczegóły walidacji — jest w [docs/pipeline.md](docs/pipeline.md).
 | [8 — montaż](docs/stages/08-montaz.md) | wszystkie zatwierdzone klipy tego toru | `episode.mp4` — nieme cięcie obrazu | darmowy (ffmpeg) |
 | [9 — narracja](docs/stages/09-narracja.md) | zatwierdzona lista ujęć, obsadzony głos, zatwierdzony montaż | `narration/Nnn.wav` + `narrated.mp4` | rozliczany w znakach |
 | [10 — muzyka i efekty](docs/stages/10-muzyka-i-efekty.md) | zatwierdzona lista ujęć, zatwierdzony `narrated.mp4` | `sound/*.mp3` + `mixed.mp4` — film ze wszystkim | rozliczany w sekundach |
-| 11 — dialogi | zatwierdzona lista ujęć, głos każdej postaci | kwestie postaci, dosypywane do miksu etapu 10 | **niezaimplementowany** |
 
 Etapy tekstowe (1, 3, 4) są **wspólne dla obu torów**, bo opisują historię, a nie obrazy.
 Rozejście zaczyna się przy pierwszym obrazie odcinka i kończy dwiema niezależnymi

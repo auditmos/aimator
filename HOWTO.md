@@ -1,15 +1,16 @@
-# How to Use Claude Code Skills
+# Skille Claude Code w tym repo
 
-This repo ships Claude Code skills in `.claude/skills/` for the parts of the workflow with rules worth encoding.
+Repo dostarcza skille Claude Code w `.claude/skills/` — dla tych fragmentów pracy, których
+reguły warto mieć zapisane raz, zamiast powtarzać je w każdej rozmowie.
 
-## Available Skills
+## Dostępne skille
 
-| Skill | Command | Purpose |
-|-------|---------|---------|
-| Develop Series | `/develop-series` | Take a vague idea to the point where stage 0 can be answered |
-| Prepare Project | `/prepare-project` | Run stage 0 — collect the creative decisions and save the artifacts stage 1 consumes |
-| Environment Variables | `/environment-variables` | Add and validate environment variables |
-| Bugfix | `/bugfix` | Reproduce a reported bug in a failing test before fixing it |
+| Skill | Polecenie | Do czego służy |
+|-------|-----------|----------------|
+| Develop Series | `/develop-series` | Doprowadza mglisty pomysł do stanu, w którym da się odpowiedzieć na pytania etapu 0 |
+| Prepare Project | `/prepare-project` | Prowadzi etap 0 — zbiera decyzje kreatywne i zapisuje artefakty, które konsumuje etap 1 |
+| Environment Variables | `/environment-variables` | Dodaje i waliduje zmienne środowiskowe |
+| Bugfix | `/bugfix` | Odtwarza zgłoszony błąd w czerwonym teście, zanim cokolwiek naprawi |
 
 ## Develop Series
 
@@ -17,39 +18,38 @@ This repo ships Claude Code skills in `.claude/skills/` for the parts of the wor
 /develop-series
 ```
 
-Stage 0 assumes you already know what the series is. This session is the bridge from
-"mam pomysł" to answers — premise, world, tone, audience, protagonist, visual style,
-aspect ratio. One question at a time, guiding rather than interrogating, because this is
-your own creative material and taste does not need defending.
+[Etap 0](docs/stages/00-przygotowanie.md) zakłada, że wiesz już, czym jest Twoja seria. Ta
+sesja jest mostem od „mam pomysł" do odpowiedzi: premisa, świat, ton, odbiorca, bohater,
+styl wizualny, proporcje obrazu. Jedno pytanie naraz, prowadzenie zamiast przesłuchania —
+to Twój materiał kreatywny, a gust nie musi się tłumaczyć.
 
-It writes nothing. It ends by handing the decisions to `/prepare-project`, which owns
-every write — two places where creative decisions live is one place too many.
+Skill niczego nie zapisuje. Kończy przekazaniem decyzji do `/prepare-project`, który ma
+monopol na zapis — dwa miejsca, w których mieszkają decyzje kreatywne, to o jedno za dużo.
 
-Two boundaries make it useful rather than chatty:
+Użyteczny, a nie gadatliwy, robią go dwie granice:
 
-- **It does not develop the episode's plot.** Stage 1 does that, from the source file. If
-  the plot came out of this conversation instead, the pipeline's core rule — every stage
-  consumes an artifact, never a chat — would be broken on the first step.
-- **It is gently insistent about three things**: the visual style and the protagonist's
-  fixed appearance, because those become image prompts and a model reads "ładny,
-  klimatyczny" as nothing and fills the gap differently every run; the aspect ratio, which
-  has no default and cannot change after images exist; and where the character's look comes
-  from at all.
+- **Nie opracowuje fabuły odcinka.** Robi to [etap 1](docs/stages/01-scenariusz.md), z pliku
+  źródłowego. Gdyby fabuła powstała w rozmowie, główna reguła potoku — każdy etap konsumuje
+  artefakt, nigdy czatu — pękłaby na pierwszym kroku.
+- **Jest łagodnie natarczywy w trzech sprawach**: styl wizualny i stały wygląd bohatera, bo
+  z nich powstają prompty obrazowe, a model czyta „ładny, klimatyczny" jako nic i za każdym
+  razem wypełnia tę lukę inaczej; proporcje obrazu, które nie mają wartości domyślnej i nie
+  dają się zmienić, gdy obrazy już istnieją; oraz to, skąd w ogóle bierze się wygląd postaci.
 
-That last one decides how long the session runs. Answer "photographs" and the character
-stage starts from those files. Answer "description" and no photograph exists anywhere in
-the pipeline, so the characters' own looks have to be written here too.
+Ostatnia z nich decyduje o długości sesji. Odpowiedź „ze zdjęć" znaczy, że etap postaci
+zacznie od tych plików. Odpowiedź „z opisu" znaczy, że w całym potoku nie istnieje żadna
+fotografia, więc wygląd każdej postaci trzeba napisać właśnie tutaj.
 
-Either way the skill keeps a running list of every recurring character, object and place
-the conversation surfaces, and will not hand off while an entry on it is named but not
-described — naming is inventory, not appearance. The list is whatever your interview
-produced, never a fixed checklist: a photograph fixes a face, never an object or a room, so
-those need prose in both branches. The boundary is recurrence — what has to look identical
-in episode seven belongs in the rules, while the episode's own locations, one-off objects
-and shots stay with the later stages that derive them from the screenplay.
+Tak czy inaczej skill prowadzi bieżącą listę każdej powracającej postaci, przedmiotu
+i miejsca, które wypłyną w rozmowie, i nie przekaże pracy dalej, dopóki któraś pozycja jest
+nazwana, ale nieopisana — nazwanie to inwentarz, nie wygląd. Lista jest tym, co wyprodukował
+Twój wywiad, nigdy stałą checklistą: zdjęcie utrwala twarz, ale nigdy przedmiotu ani pokoju,
+więc te potrzebują prozy w obu wariantach. Granicą jest powracalność — to, co w siódmym
+odcinku musi wyglądać identycznie, należy do zasad projektu, a lokacje odcinka, przedmioty
+jednorazowe i ujęcia zostają przy późniejszych etapach, które wyprowadzają je ze scenariusza.
 
-Skip it if you can already answer those questions. An interview with someone who has
-decided invites them to second-guess good instincts.
+Pomiń ten skill, jeśli umiesz już odpowiedzieć na te pytania. Wywiad z kimś, kto zdecydował,
+zaprasza go do podważania dobrych instynktów.
 
 ## Prepare Project
 
@@ -57,24 +57,25 @@ decided invites them to second-guess good instincts.
 /prepare-project
 ```
 
-Stage 0 of the pipeline is a conversation, not a generation step, and it is the one place
-creative decisions enter the system. The skill owns that interview: it summarises what is
-already approved, asks only about what is missing, labels its own ideas as proposals, and
-refuses to write a decision the user never made.
+[Etap 0](docs/stages/00-przygotowanie.md) jest rozmową, nie generacją, i jedynym miejscem,
+którym decyzje kreatywne wchodzą do systemu. Skill jest właścicielem tego wywiadu:
+streszcza, co jest już zatwierdzone, pyta wyłącznie o to, czego brakuje, oznacza własne
+pomysły jako propozycje i odmawia zapisania decyzji, której nikt nie podjął.
 
-The split it enforces is the point. You author exactly one file by hand — `project.md`,
-the shared creative rules. Everything mechanical is a CLI call: directories, the byte-exact
-copy of your episode source, the digests, the schema, the uniqueness of the episode number,
-and the readiness gate. That is why `aimator check` can be trusted: nothing it verifies was
-typed by hand.
+Sens jest w podziale, który skill egzekwuje. Ręcznie piszesz dokładnie jeden plik —
+`project.md`, wspólne zasady serii. Wszystko mechaniczne jest wywołaniem CLI: katalogi,
+kopia bajtowa Twojego źródła odcinka, hashe, schemat, unikalność numeru odcinka i bramka
+gotowości. Właśnie dlatego `aimator check` można ufać: nic, co sprawdza, nie zostało
+wklepane ręcznie.
 
-It ends with `aimator approve`, which is deliberately not the same thing as `aimator check`.
-`check` asks whether the files hold together; `approve` is where a person says they accept
-them. It refuses anything `check` rejects, and it binds the decision to the bytes as they
-stand — including `project.md`, which gets its digest at that moment and at no earlier one.
-Edit an approved artifact afterwards and the approval is gone, with `check` saying so.
+Kończy się na `aimator approve`, które celowo nie jest tym samym co `aimator check`.
+`check` pyta, czy pliki się trzymają kupy; `approve` jest miejscem, w którym człowiek mówi,
+że je przyjmuje. Odmawia wszystkiego, co `check` odrzuca, i wiąże decyzję z bajtami w takim
+kształcie, w jakim leżą — włącznie z `project.md`, który dostaje swój hash dokładnie w tej
+chwili i w żadnej wcześniejszej. Edytuj zatwierdzony artefakt później, a akceptacja znika,
+i `check` to powie.
 
-No command in stage 0 calls a paid API.
+Żadne polecenie etapu 0 nie woła płatnego API.
 
 ## Environment Variables
 
@@ -82,20 +83,23 @@ No command in stage 0 calls a paid API.
 /environment-variables
 ```
 
-When you need a new env var at any point, this skill walks you through:
+Kiedy potrzebujesz nowej zmiennej środowiskowej, skill przeprowadza przez trzy kroki:
 
-1. Adding the Zod schema to `src/lib/env.ts` — `client`, `server`, or `shared`
-2. Placing the value in `.env` (defaults) or `.env.local` (secrets)
-3. Adding a validation test to `src/lib/env.test.ts`
+1. Dodanie schematu Zod w `src/lib/env.ts` — `client`, `server` albo `shared`
+2. Umieszczenie wartości w `.env` (wartości domyślne) albo `.env.local` (sekrety)
+3. Dopisanie testu walidacji w `src/lib/env.test.ts`
 
-It also sets up `@t3-oss/env-core` + Zod from scratch if `src/lib/env.ts` does not exist yet.
+Postawi też `@t3-oss/env-core` + Zod od zera, jeśli `src/lib/env.ts` jeszcze nie istnieje.
 
-### Example
+Kontekst całej konfiguracji — które zmienne istnieją i dlaczego jest ich tyle — jest
+w [docs/konfiguracja.md](docs/konfiguracja.md).
+
+### Przykład
 
 ```
 /environment-variables
-> "I need a WEATHER_API_KEY for the forecast client"
-> Claude adds the schema, puts the secret in .env.local, and writes the test
+> „Potrzebuję WEATHER_API_KEY do klienta pogody"
+> Claude dodaje schemat, wkłada sekret do .env.local i pisze test
 ```
 
 ## Bugfix
@@ -104,24 +108,26 @@ It also sets up `@t3-oss/env-core` + Zod from scratch if `src/lib/env.ts` does n
 /bugfix
 ```
 
-Triggers on its own whenever you report something broken. It enforces one ordering:
+Uruchamia się sam, kiedy zgłaszasz, że coś jest zepsute. Wymusza jedną kolejność:
 
-1. Reproduce the bug in a failing test — no implementation changes yet
-2. Show you the failing test and the proposed fix, then wait for approval
-3. Fix it so the test passes
-4. Run the full suite to confirm nothing else broke
+1. Odtworzenie błędu w czerwonym teście — jeszcze bez zmian w implementacji
+2. Pokazanie Ci czerwonego testu i proponowanej poprawki, a potem czekanie na zgodę
+3. Naprawa, po której test przechodzi
+4. Pełna seria testów, żeby potwierdzić, że nic innego nie padło
 
-The point of step 1 is falsifiability. A test written *after* a fix proves the code does
-what was just written; a test written *before* proves the bug was actually reproduced. If
-that first test passes immediately, the bug was not reproduced and the diagnosis is wrong —
-the skill stops there rather than letting you fix the wrong thing.
+Sensem kroku 1 jest falsyfikowalność. Test napisany *po* poprawce dowodzi, że kod robi to,
+co przed chwilą napisano; test napisany *przed* dowodzi, że błąd naprawdę został odtworzony.
+Jeśli ten pierwszy test od razu przechodzi, błąd nie został odtworzony, a diagnoza jest zła —
+i skill zatrzymuje się w tym miejscu, zamiast pozwolić Ci naprawiać nie to, co trzeba.
 
-## Everything Else
+## Cała reszta
 
-The rest of the workflow is plain Claude Code — no skill required:
+Reszta pracy to zwykły Claude Code, bez żadnego skilla:
 
-- **Planning** — describe what you want to build and ask Claude Code to explore the codebase first
-- **Implementation** — TDD with vertical slices: one failing test, minimal code to pass, refactor, repeat
-- **Committing** — say `commit this`, or use the built-in `/commit`
+- **Planowanie** — opisz, co chcesz zbudować, i poproś, żeby najpierw rozpoznał kod
+- **Implementacja** — TDD pionowymi plastrami: jeden czerwony test, minimalny kod, refaktor,
+  od nowa
+- **Commit** — powiedz `commit this` albo użyj wbudowanego `/commit`
 
-See [README.md](README.md) for the full development workflow.
+Pełny proces produkcyjny opisuje [README.md](README.md), a kontrakt etapów —
+[docs/pipeline.md](docs/pipeline.md).
