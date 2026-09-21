@@ -130,6 +130,9 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 | `pnpm test:watch` | Testy w trybie watch |
 | `pnpm unused` | Nieużywany kod (Knip) |
 | `pnpm update` | Interaktywna aktualizacja zależności (Taze) |
+| `pnpm site:build` | Zbuduj stronę wydań do `out/site` |
+| `pnpm site:preview` | Zbuduj i podejrzyj ją lokalnie |
+| `pnpm site:deploy` | Opublikuj ją na `aimator.auditmos.com` |
 
 `pnpm dev` używa `tsx`, a nie natywnego strippingu typów w Node, bo rozdzielczość
 `Node16` w TypeScripcie zapisuje specyfikatory `.js`, których Node nie zmapuje z powrotem
@@ -146,6 +149,10 @@ Pełne zasady — granice, ścieżka wzrostu, egzekwowanie — w [AGENTS.md](AGE
 Praca nad kodem: testy leżą obok źródeł (`*.test.ts`), TDD (czerwony test → minimalny kod
 → refaktor), commity w formacie [Conventional Commits](https://www.conventionalcommits.org/),
 hook pre-commit uruchamia lint i testy, push na `main` odpala CI i semantic-release.
+
+Gotowe odcinki pokazuje [aimator.auditmos.com](https://aimator.auditmos.com/) — jeden film
+na tor obrazu, razem z klatką otwarcia, referencjami i dokumentami etapów. Jak dodać
+wydanie i co wolno na nim opublikować, opisuje [docs/strona.md](docs/strona.md).
 
 Skille: `/develop-series` (rozwinięcie pomysłu), `/prepare-project` (etap 0),
 `/environment-variables` (zmienne środowiskowe), `/bugfix` (najpierw test odtwarzający

@@ -17,3 +17,8 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 *.code-workspace
+
+out/
+
+# Wrangler trzyma tu lokalny stan podglądu
+.wrangler/

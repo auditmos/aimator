@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pl" data-theme="system" data-lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title data-en="aimator: a short animated episode, idea to film · Auditmos">aimator: krótka animacja od pomysłu do filmu · Auditmos</title>
+    <meta name="description" data-en="A CLI that walks one person through producing a short animated episode: screenplay, characters, clips, edit and sound. Browse the release history and watch a finished episode on two image tracks." content="CLI, które prowadzi jedną osobę przez produkcję krótkiej animacji: scenariusz, postacie, klipy, montaż i dźwięk. Przejrzyj historię wydań i obejrzyj gotowy odcinek w dwóch torach obrazu.">
+    <meta name="color-scheme" content="light dark">
+    <link rel="canonical" href="https://aimator.auditmos.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="aimator · Auditmos">
+    <meta property="og:description" content="Jeden scenariusz, dwa tory obrazu, dwa filmy. Obejrzyj gotowy odcinek i przejrzyj historię wydań.">
+    <meta property="og:url" content="https://aimator.auditmos.com/">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" type="image/svg+xml" href="./assets/auditmos-icon-transparent.svg">
+    <link rel="preload" href="./assets/space-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./theme.js"></script>
+    <script src="./lang.js"></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main"><span class="t" lang="pl">Przejdź do treści</span><span class="t" lang="en">Skip to content</span></a>
+    <header class="site-header">
+      <div class="header-inner wrap">
+        <a class="brand" href="https://auditmos.com/" aria-label="Strona główna Auditmos" data-label-en="Auditmos home">
+          <img class="logo logo-dark" src="./assets/auditmos-wordmark-cyan-transparent.svg" width="738" height="134" alt="Auditmos">
+          <img class="logo logo-light" src="./assets/auditmos-wordmark-black-transparent.svg" width="738" height="134" alt="Auditmos">
+        </a>
+        <div class="header-actions">
+          <nav aria-label="Nawigacja główna" data-label-en="Main navigation"><a href="#changelog">Changelog</a></nav>
+          <button type="button" id="language" class="lang-toggle" aria-label="Zmień język na angielski" data-label-en="Switch language to Polish">
+            <svg class="lang-globe" aria-hidden="true" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.25"></circle><path d="M1.75 8h12.5M8 1.75c3.5 3.5 3.5 9 0 12.5-3.5-3.5-3.5-9 0-12.5Z" stroke="currentColor" stroke-width="1.25"></path></svg>
+            <span class="t" lang="pl">EN</span><span class="t" lang="en">PL</span>
+          </button>
+          <div class="theme-control">
+            <label class="sr-only" for="theme"><span class="t" lang="pl">Motyw</span><span class="t" lang="en">Theme</span></label>
+            <select id="theme"><option value="system" data-en="◐ System">◐ System</option><option value="light" data-en="☀ Light">☀ Jasny</option><option value="dark" data-en="☾ Dark">☾ Ciemny</option></select>
+            <svg class="theme-chevron" aria-hidden="true" viewBox="0 0 12 12" fill="none"><path d="m2.5 4.5 3.5 3 3.5-3" stroke="currentColor" stroke-width="1.25"></path></svg>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main id="main">
+      <section class="hero wrap" aria-labelledby="title">
+        <p class="eyebrow"><span aria-hidden="true">// </span><span class="t" lang="pl">Narzędzia / aimator</span><span class="t" lang="en">Tools / aimator</span></p>
+        <h1 id="title"><span class="t" lang="pl">Krótka animacja, etap po etapie.</span><span class="t" lang="en">A short animation, one stage at a time.</span></h1>
+        <p class="intro"><span class="t" lang="pl">Jeden pomysł przechodzi przez jedenaście etapów — scenariusz, postacie, klipy, montaż i dźwięk — a każdy zostawia plik, który można obejrzeć, odrzucić i wygenerować ponownie.</span><span class="t" lang="en">One idea moves through eleven stages — screenplay, characters, clips, edit and sound — and each one leaves a file you can watch, reject and generate again.</span></p>
+        <a class="hero-link" href="#CURRENT_RELEASE"><span class="t" lang="pl">Zobacz to wydanie</span><span class="t" lang="en">Explore this release</span> <span aria-hidden="true">↘</span></a>
+      </section>
+      <section class="changelog wrap" id="changelog" aria-labelledby="changelog-title">
+        <div class="section-heading"><div><h2 id="changelog-title">Changelog</h2><p><span class="t" lang="pl">Od pliku z pomysłem do gotowego filmu.</span><span class="t" lang="en">From an idea in a file to a finished film.</span></p></div><!-- RELEASE_PICKER --></div>
+        <!-- RELEASES -->
+      </section>
+    </main>
+    <div class="hatch" aria-hidden="true"></div>
+    <footer class="site-footer">
+      <div class="footer-bottom">
+        <div class="footer-legal wrap">
+          <p>Auditmos OÜ · Reg 17025406 · VAT EE102758111</p>
+          <div class="footer-contact"><a href="mailto:tom@auditmos.com">tom@auditmos.com</a><p>Narva mnt 13-27, 10151 Tallinn, Estonia</p></div>
+        </div>
+        <nav class="footer-links wrap" aria-label="Nawigacja w stopce" data-label-en="Footer navigation"><a href="https://auditmos.com/contact"><span class="t" lang="pl">Kontakt</span><span class="t" lang="en">Contact</span></a><a href="https://auditmos.com/privacy"><span class="t" lang="pl">Prywatność</span><span class="t" lang="en">Privacy</span></a><a href="./index.md">Markdown</a></nav>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+# aimator by Auditmos
+
+> A CLI that walks one person through producing a short animated episode: idea, screenplay, characters, shot list, prompt package, reference images, opening frame, clips, edit, narration, music and effects. Every stage leaves a file on disk; nothing is carried in conversation context. Polish narration by default.
+
+- [Overview and changelog](https://aimator.auditmos.com/index.md): Project purpose, the eleven stages, release notes and links to the finished episode on both image tracks.
+- [Design manual](https://auditmos.com/design.md): Auditmos brand and presentation guidelines.

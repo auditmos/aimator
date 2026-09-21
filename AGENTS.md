@@ -95,6 +95,14 @@ src/
 ├── cli.test.ts
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
+├── site/             # Folder form — the published page; not a pipeline domain
+│   ├── index.ts      # Public: buildSite(root) — what gets published, and what does not
+│   ├── build.ts      # Second entry — a process: streams and the exit code
+│   ├── worker.ts     # Second entry — how one published file is served: byte ranges
+│   ├── schema.ts     # Internal — the release registry, one file per release
+│   ├── render.ts     # Internal — the markup, and the English machine twin
+│   ├── index.test.ts # The build, through the entry
+│   └── worker.test.ts
 └── lib/
     ├── env.ts        # Single-file form — loads .env files, validates with Zod
     ├── env.test.ts   # Co-located test for env validation
@@ -395,6 +403,31 @@ not have known. The composer learned the same lesson one level down: a clip is t
 continue from its first image, not to compose one, and the free preview says exactly what
 the paid call will.
 
+`src/site` sits **beside** `src/lib` rather than inside it, and that is the whole point of
+where it is: it is not a stage, it consumes no stage's artifacts and it never reads
+`AIMATOR_WORKSPACE`. A release names a frozen export directory under `out/`, which is what
+lets the page be rebuilt from the repository long after the workspace has moved on to the
+next episode — and it is also what keeps rule 3 intact, because the module joins the
+repository's own paths and never the workspace's. Its contract is one promise carried one
+level up from `approve`: **a published release never changes.** Every file it copies is
+checked against the sha256 the registry recorded, so an export edited after publication
+fails the build instead of quietly replacing an asset whose cache is a year long —
+acceptance bound to bytes, read at the point where the bytes leave the machine.
+
+It has **two entries**, for the reason the package has `index.ts` and `bin.ts`: `build.ts`
+owns the process — streams and the exit code — and `worker.ts` owns how one published file
+is served, which is a different question from what gets published. Neither is an internal of
+the other, and `index.ts` stays a function so the build is tested by calling it.
+
+The page itself is the second half, in `site/`, and it is deliberately the same shell as
+[vaideo.auditmos.com](https://vaideo.auditmos.com/): both are the "portable website shell"
+of the [Auditmos design manual](https://auditmos.com/design.md), so content, subdomain and
+default language differ and the appearance does not. Do not invent a second theme here.
+The one inversion is language — Polish is primary and English is the translation block,
+because this repository's documentation and this film are Polish, while `index.md` and
+`llms.txt` stay English as the machine version. What a release may publish, and what it may
+not, is in [docs/strona.md](docs/strona.md).
+
 ## Pipeline rules
 
 Nine rules that stop an agent from re-creating the mess this tool was built to replace.
@@ -518,6 +551,9 @@ function parsePort(raw: string): Result<number> {
 | `pnpm unused` | Detect unused code with Knip |
 | `ffmpeg` | Not a script — a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
+| `pnpm site:build` | Build the release page into `out/site` — refuses when a published export changed |
+| `pnpm site:preview` | Build it, then serve it on the real Workers runtime, byte ranges included |
+| `pnpm site:deploy` | Build it and publish **every** registered release to `aimator.auditmos.com` |
 
 ## Testing Conventions
 

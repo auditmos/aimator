@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "auditmos-aimator",
+  "main": "./src/site/worker.ts",
+  "compatibility_date": "2026-09-21",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [{ "pattern": "aimator.auditmos.com", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./out/site",
+    "binding": "ASSETS",
+    "run_worker_first": ["/media/*"],
+    "not_found_handling": "404-page"
+  }
+}

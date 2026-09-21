@@ -1,0 +1,283 @@
+{
+  "changes": [
+    "Jedenaście etapów działa od końca do końca: etap 0 zbiera zasady i obsadę, etap 10 oddaje film ze ścieżką dźwiękową.",
+    "Dwa tory obrazu biegną niezależnie od pierwszego obrazu odcinka aż do gotowego filmu.",
+    "Każdy artefakt ma osobną zgodę związaną z bajtami: check sprawdza i niczego nie zapisuje, approve akceptuje, a zmiana pliku poza narzędziem unieważnia akceptację.",
+    "Film wychodzi w trzech cięciach — nieme episode.mp4, narrated.mp4 z narracją i mixed.mp4 ze wszystkim — i każde nosi własną zgodę.",
+    "Płatne polecenia mówią, ile wywołań wykonają, zanim je wykonają, i mają dry-run, który pokazuje pełny prompt bez sięgania po klucz."
+  ],
+  "commit": "b29a344692a0a1a5528e95d3780b09bf40424c3e",
+  "commitDate": "2026-09-20T18:27:01Z",
+  "date": "2026-09-21",
+  "description": "Ten sam scenariusz narysowały dwa modele obrazu. Każdy tor ma własne referencje, własną klatkę otwarcia i własne klipy, więc z jednego pliku z pomysłem wychodzą dwa filmy, które da się porównać obok siebie.",
+  "documents": [
+    {
+      "description": "Sceny z czasami, napisane po polsku na podstawie pliku źródłowego. Jedno wywołanie modelu tekstowego na cały film.",
+      "file": "screenplay.md",
+      "label": "screenplay.md",
+      "sha256": "5132bebbfe2433749d5fe758f0acd9711309154e31debacb161b51871c50540f",
+      "stage": 1
+    },
+    {
+      "description": "Scenariusz rozbity na ujęcia i klipy: co widać, jak długo trwa i co słychać. Montaż wyprowadza z tego cięcie, zamiast trzymać drugi plik z tą samą prawdą.",
+      "file": "shot-list.md",
+      "label": "shot-list.md",
+      "sha256": "96f29bc67e4775e9ce24729813edd9be7f93073417dc9487cf178498b3808be2",
+      "stage": 3
+    },
+    {
+      "description": "Zdania, które czyta lektor — wyjęte z listy ujęć, nie napisane od nowa. Walidator znajduje każde zdanie w ujęciu, które ono wskazuje.",
+      "file": "narration.md",
+      "label": "narration.md",
+      "sha256": "f638297d4a30d2a8f230be5cd8cdb3da3fa5bddc9c1e8ec04aeaf8a70612f6fe",
+      "stage": 9
+    },
+    {
+      "description": "Rozpiska dźwięku: co gra, od której sekundy i pod którymi ujęciami. Zadeklarowane ujęcia muszą być dokładnie tymi, które pokrywają sekundy wpisu.",
+      "file": "sound-design.md",
+      "label": "sound-design.md",
+      "sha256": "c355bd9e0537c122aebd49e1bdf2b6bf8362bee837831879a3a1fe7c36d4adaa",
+      "stage": 10
+    }
+  ],
+  "en": {
+    "changes": [
+      "Eleven stages run end to end: stage 0 gathers the rules and the cast, stage 10 hands back a film with a soundtrack.",
+      "Two image tracks run independently from the episode's first picture to the finished film.",
+      "Every artifact carries its own acceptance, bound to bytes: check verifies and writes nothing, approve accepts, and editing a file outside the tool lapses that acceptance.",
+      "The film comes back in three cuts — silent episode.mp4, narrated.mp4 with the narration, mixed.mp4 with everything — and each carries its own yes.",
+      "Every paid command says how many calls it will make before it makes them, and has a dry run that prints the full prompt without reaching for a key."
+    ],
+    "description": "The same screenplay was drawn by two image models. Each track has its own references, its own opening frame and its own clips, so one idea in a file yields two films you can compare side by side.",
+    "documents": [
+      {
+        "description": "Scenes with timings, written in Polish from the source file. One text-model call for the whole film."
+      },
+      {
+        "description": "The screenplay broken into shots and clips: what is on screen, how long it runs and what is heard. The edit is derived from this rather than from a second file holding the same truth."
+      },
+      {
+        "description": "The sentences the narrator reads, lifted from the shot list rather than written anew. The validator finds every sentence inside the shot it names."
+      },
+      {
+        "description": "The cue sheet: what plays, from which second, and under which shots. A cue's declared shots must be exactly the shots its seconds cover."
+      }
+    ],
+    "episode": {
+      "audio": "narration, music and effects"
+    },
+    "note": "These notes describe the repository at commit b29a344. The material is one episode — “Burza” from the series “Dzielna Ewa” — produced between 17 and 20 September 2026; work in progress since then is not included. The films here are transcoded to H.264 so that any browser plays them: the originals are HEVC 1920 × 1080, 60 MB on the gpt-image track and 79 MB on seedream. The pictures are JPEG previews scaled to 1600 px; the originals are PNG, 2816 × 1584 for frames and 1920 × 1920 for character cards.",
+    "source": {
+      "description": "The file an episode starts from: the idea, what the episode refuses to do, and nothing else. Stage 0 copied it into the workspace and recorded its sha256, so everything below is traceable to these 703 bytes."
+    },
+    "title": "The first episode went the whole way: from an idea in a file to a film with sound."
+  },
+  "episode": {
+    "aspectRatio": "16:9",
+    "audio": "narracja, muzyka i efekty",
+    "episode": "01 — Burza",
+    "language": "pl",
+    "project": "Dzielna Ewa"
+  },
+  "note": "Notatki opisują repozytorium na commicie b29a344. Materiał to jeden odcinek — „Burza” z serii „Dzielna Ewa” — wyprodukowany między 17 a 20 września 2026; późniejsze prace nie są w nim uwzględnione. Filmy na stronie są przekodowane do H.264, żeby odtwarzała je każda przeglądarka: oryginały to HEVC 1920 × 1080, 60 MB na torze gpt-image i 79 MB na seedream. Obrazy to podglądy JPEG zmniejszone do 1600 px; oryginały są w PNG, 2816 × 1584 dla kadrów i 1920 × 1920 dla kart postaci.",
+  "repository": "https://github.com/auditmos/aimator",
+  "repositoryPrivate": true,
+  "source": {
+    "description": "Plik, od którego zaczyna się odcinek: pomysł, to czego odcinek nie robi, i nic więcej. Etap 0 skopiował go do workspace i zapisał jego sha256, więc wszystko poniżej da się do tych 703 bajtów doprowadzić.",
+    "filename": "source.md",
+    "label": "source.md",
+    "language": "pl",
+    "sha256": "21ae919a7ef7e06ce3e0022498c1c977f39d3929b0320d0091d474046a2ebaa4"
+  },
+  "sourceDirectory": "out/releases/0.1.0",
+  "title": "Pierwszy odcinek przeszedł całą ścieżkę: od pliku z pomysłem do filmu z dźwiękiem.",
+  "tracks": [
+    {
+      "bytes": 8754297,
+      "durationSeconds": 90.333333,
+      "height": 1080,
+      "width": 1920,
+      "label": "gpt-image",
+      "stills": [
+        {
+          "file": "gpt-image-opening-frame.jpg",
+          "kind": "opening-frame",
+          "label": "opening-frame",
+          "subject": "First frame of the film — drawn from hero:ewa, R01, R03, R05",
+          "height": 900,
+          "width": 1600,
+          "sha256": "2e7ae91c9811a29ce88554df2750494e50ca2504430781c7588543bb3f646f84"
+        },
+        {
+          "file": "gpt-image-r01.jpg",
+          "kind": "reference",
+          "label": "R01",
+          "subject": "Ewa — evening appearance",
+          "height": 900,
+          "width": 1600,
+          "sha256": "61a4c5d0b326e948d425d479f9567010ddff1f090f206217be1b6531e46648e8"
+        },
+        {
+          "file": "gpt-image-r02.jpg",
+          "kind": "reference",
+          "label": "R02",
+          "subject": "Father — episode appearance",
+          "height": 900,
+          "width": 1600,
+          "sha256": "9bd437b514481806ddd51e5e320b4b47a7e4d65879099d0e41afc1c9cfa35327"
+        },
+        {
+          "file": "gpt-image-r03.jpg",
+          "kind": "reference",
+          "label": "R03",
+          "subject": "Alpaca toy — uncompressed",
+          "height": 900,
+          "width": 1600,
+          "sha256": "b17de64e0e4058be0c5dbc2bc60cf98a0bfca325ac4a21986ed41be60b2fc4a1"
+        },
+        {
+          "file": "gpt-image-r04.jpg",
+          "kind": "reference",
+          "label": "R04",
+          "subject": "Alpaca toy — contact-bent ear",
+          "height": 900,
+          "width": 1600,
+          "sha256": "096be950bc63ed5957a55feb7a76416f9368defa0fdc4ac86116c2290c3ca639"
+        },
+        {
+          "file": "gpt-image-r05.jpg",
+          "kind": "reference",
+          "label": "R05",
+          "subject": "Editorial frame — empty background",
+          "height": 900,
+          "width": 1600,
+          "sha256": "5da2e18684e92fc1cf290abebddef4a4ed973caffeb747e26ab97fa5d0de7273"
+        },
+        {
+          "file": "gpt-image-r06.jpg",
+          "kind": "reference",
+          "label": "R06",
+          "subject": "Living room — fixed-axis spatial layout",
+          "height": 900,
+          "width": 1600,
+          "sha256": "5b4ea163b760116f37213aa7dd7e01b0ecefe893f7f96602d66d7794fbe260bb"
+        },
+        {
+          "file": "gpt-image-ewa.jpg",
+          "kind": "character",
+          "label": "hero:ewa",
+          "subject": "Ewa — character card, eight views",
+          "height": 1600,
+          "width": 1600,
+          "sha256": "6d98c6423329349596e1e0832d3a684db49fd20bb1c7695da912e3280b2b833c"
+        },
+        {
+          "file": "gpt-image-tata.jpg",
+          "kind": "character",
+          "label": "hero:tata",
+          "subject": "Father — character card, eight views",
+          "height": 1600,
+          "width": 1600,
+          "sha256": "3cff0f276d403d03ae2fee6fe17a07faad62dd26e2a931f2747a1854e7eab7ef"
+        }
+      ],
+      "track": "gpt-image",
+      "video": "gpt-image-mixed.mp4",
+      "videoSha256": "b3870d922891a2a56fc841b234c71806af155c7cd4cfeb10581e6941aff65d58"
+    },
+    {
+      "bytes": 11127975,
+      "durationSeconds": 90.333333,
+      "height": 1080,
+      "width": 1920,
+      "label": "seedream",
+      "stills": [
+        {
+          "file": "seedream-opening-frame.jpg",
+          "kind": "opening-frame",
+          "label": "opening-frame",
+          "subject": "First frame of the film — drawn from hero:ewa, R01, R03, R05",
+          "height": 900,
+          "width": 1600,
+          "sha256": "9a414a3a8cfc33a3df0f8d712ff0c1e935694959a514443372527d22f9528419"
+        },
+        {
+          "file": "seedream-r01.jpg",
+          "kind": "reference",
+          "label": "R01",
+          "subject": "Ewa — evening appearance",
+          "height": 900,
+          "width": 1600,
+          "sha256": "6a77530c8c210f7bb90f11b4b41d2bf47c202d916f09be53518429efadd83cef"
+        },
+        {
+          "file": "seedream-r02.jpg",
+          "kind": "reference",
+          "label": "R02",
+          "subject": "Father — episode appearance",
+          "height": 900,
+          "width": 1600,
+          "sha256": "8d784b06c755ea0b90196738fcd6d12c46c5fd77be99cbf70bb8dcef70996448"
+        },
+        {
+          "file": "seedream-r03.jpg",
+          "kind": "reference",
+          "label": "R03",
+          "subject": "Alpaca toy — uncompressed",
+          "height": 900,
+          "width": 1600,
+          "sha256": "e75bbbd54a2864f0858889d558fb5fde1a63840d17ab6f69f482531956da5407"
+        },
+        {
+          "file": "seedream-r04.jpg",
+          "kind": "reference",
+          "label": "R04",
+          "subject": "Alpaca toy — contact-bent ear",
+          "height": 900,
+          "width": 1600,
+          "sha256": "bf2159f91feabe484fcf10eacf6b5437a46f7e75c8e3015da42359f10c61b15e"
+        },
+        {
+          "file": "seedream-r05.jpg",
+          "kind": "reference",
+          "label": "R05",
+          "subject": "Editorial frame — empty background",
+          "height": 900,
+          "width": 1600,
+          "sha256": "71ca0e092972c1071981f9264d971411fcb19a26d1b864e6a549abd7e8544a82"
+        },
+        {
+          "file": "seedream-r06.jpg",
+          "kind": "reference",
+          "label": "R06",
+          "subject": "Living room — fixed-axis spatial layout",
+          "height": 900,
+          "width": 1600,
+          "sha256": "0dd1ece3315251cc8c076e06f32f9d41d78303716606b4c45a5803c8b5067445"
+        },
+        {
+          "file": "seedream-ewa.jpg",
+          "kind": "character",
+          "label": "hero:ewa",
+          "subject": "Ewa — character card, eight views",
+          "height": 1600,
+          "width": 1600,
+          "sha256": "668d5b76fc9d44c38561ff2aba809d80d80768bcf37ee9dd5f5c293eb9e6ae8b"
+        },
+        {
+          "file": "seedream-tata.jpg",
+          "kind": "character",
+          "label": "hero:tata",
+          "subject": "Father — character card, eight views",
+          "height": 1600,
+          "width": 1600,
+          "sha256": "4bb1256609f3642333d8fb7a5bad6aff5fc6bbb4e6183be2e45d4f4536cbbd68"
+        }
+      ],
+      "track": "seedream",
+      "video": "seedream-mixed.mp4",
+      "videoSha256": "4c984014d7fd01ca8e806c93fa437073d0d3b011ceae59b6de494e82b1b9137c"
+    }
+  ],
+  "version": "0.1.0"
+}

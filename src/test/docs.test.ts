@@ -20,8 +20,13 @@ const repoRoot = resolve(import.meta.dirname, "../..");
 /** Documents a reader is handed: the front page and everything under `docs/`. */
 const READER_DOCS = ["README.md", "docs"];
 
-/** Dotted directories are tooling, not documentation, and `dist/` is output. */
-const SKIPPED = new Set(["dist", "node_modules"]);
+/**
+ * Dotted directories are tooling, not documentation; `dist/` and `out/` are
+ * output. `site/` is skipped for a different reason: the Markdown under it is a
+ * frozen episode source, which travels verbatim and is material rather than
+ * prose this repository wrote.
+ */
+const SKIPPED = new Set(["dist", "node_modules", "out", "site"]);
 
 function markdownUnder(path: string): string[] {
   if (!existsSync(path)) {
@@ -73,6 +78,8 @@ const USAGE_LINE = /^ {2}(\S+)(?: (\S+))?/;
 const FLAG = /--[a-z][a-z-]+/g;
 /** Both spellings a document uses for an invocation. */
 const INVOCATION = /(?:pnpm dev|aimator) (\S+)(?: (\S+))?/g;
+/** The other programs this documentation tells a reader to run. */
+const FOREIGN_COMMAND = /\b(wrangler|ffmpeg|ffprobe)\b/;
 const ABSOLUTE_LINK = /^(https?:|mailto:)/;
 const LOCAL_LINK = /\[[^\]]+\]\(([^)]+)\)/g;
 
@@ -139,9 +146,17 @@ describe("documentation", () => {
   it("should name only flags the usage text defines", () => {
     const unknown: string[] = [];
     for (const file of readerDocs()) {
-      for (const flag of readFileSync(file, "utf8").match(FLAG) ?? []) {
-        if (!flags.has(flag)) {
-          unknown.push(`${relative(repoRoot, file)}: ${flag}`);
+      for (const line of readFileSync(file, "utf8").split("\n")) {
+        // A line that invokes another program documents that program's flags.
+        // The check stays on prose, which is where a renamed flag survives
+        // longest, and gives up only the lines that say which tool they mean.
+        if (FOREIGN_COMMAND.test(line)) {
+          continue;
+        }
+        for (const flag of line.match(FLAG) ?? []) {
+          if (!flags.has(flag)) {
+            unknown.push(`${relative(repoRoot, file)}: ${flag}`);
+          }
         }
       }
     }
