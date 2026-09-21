@@ -35,7 +35,7 @@ import { type NarrationLine, validateNarration } from "./validate.js";
  *
  * **Buying the speech** waits on the approved shot list and on a voice: the
  * words come out of the plan, and a narrator nobody cast is not a decision the
- * tool gets to make. It does **not** wait on a cut — a sentence is bought once
+ * tool gets to make. It does **not** wait on a cut, a sentence is bought once
  * and read the same way whichever film it ends up over, so holding it hostage
  * to a track would be the mistake the contract calls holding a stage hostage to
  * a file it never opens.
@@ -46,7 +46,7 @@ import { type NarrationLine, validateNarration } from "./validate.js";
  * Which is also the answer to where the anchors resolve. The script says `N02
  * begins at 7s of the plan`; a track's clips came back with their own drift, so
  * 7s of the plan is not 7s of that film. `resolve` maps one to the other
- * through the clips themselves — the same arithmetic stage 8 already does, run
+ * through the clips themselves, the same arithmetic stage 8 already does, run
  * in the other direction. That is stage 4's precedent, exactly: one artifact,
  * two productions, resolved at the sender.
  */
@@ -94,7 +94,7 @@ export interface Stage9Inputs {
   /** The exact text a paid call would send, or `null` when it cannot be built. */
   readonly prompt: string | null;
   readonly settings: EpisodeSettings;
-  /** `shot-list.md`, verbatim — the document every sentence is lifted out of. */
+  /** `shot-list.md`, verbatim, the document every sentence is lifted out of. */
   readonly shotList: string | null;
   /** The shared stage file: the script and every bought line. */
   readonly stage: StageFile;
@@ -118,7 +118,7 @@ function resolvePaths(input: Stage9Scope): Result<Stage9Paths> {
  *
  * It does not read the prompt package: nothing here carries an instruction to
  * an image or video model, so a hash of bytes nobody sent would describe a
- * question nobody asked — the same reason stage 3 does not record `source.md`
+ * question nobody asked, the same reason stage 3 does not record `source.md`
  * and stage 8 does not record the manifest.
  */
 export async function readStage9Inputs(input: Stage9Scope): Promise<Result<Stage9Inputs>> {
@@ -158,20 +158,20 @@ export async function readStage9Inputs(input: Stage9Scope): Promise<Result<Stage
   // and buying one would put a voice into a film nobody asked to have one.
   if (stage0.data.settings.audio === "music-and-effects") {
     gate.push(
-      `odcinek deklaruje audio: ${stage0.data.settings.audio}, czyli bez mowy — etap 9 nie ma narracji do podniesienia`
+      `odcinek deklaruje audio: ${stage0.data.settings.audio}, czyli bez mowy, etap 9 nie ma narracji do podniesienia`
     );
   }
 
   if (stage0.data.narratorVoiceId === null) {
     gate.push(
-      `nikt nie obsadził narratora — wskaż głos przez: aimator project voice ${input.projectId} --voice-id <id>`
+      `nikt nie obsadził narratora, wskaż głos przez: aimator project voice ${input.projectId} --voice-id <id>`
     );
   }
 
   const shotList = await readDigest(paths.data.episode.shotList);
 
   if (!shotList.ok) {
-    gate.push(`brakuje ${relative(paths.data.episode.shotList)} — etap 9 nie ma z czego podnosić`);
+    gate.push(`brakuje ${relative(paths.data.episode.shotList)}, etap 9 nie ma z czego podnosić`);
   }
 
   const stage = await readJson(paths.data.episode.soundtrackStage, stageFileSchema);
@@ -233,7 +233,7 @@ interface AcceptedLines {
  * It is **exported** because stage 10 mixes the same recordings into the full
  * soundtrack and would otherwise have to ask the same seven questions of the
  * same files. That is a stage consuming an earlier stage's artifact through
- * its public entry, which is the ordinary direction — the alternative was a
+ * its public entry, which is the ordinary direction, the alternative was a
  * second copy of this function inside stage 10, reaching into what stage 9
  * knows about its own lines.
  */
@@ -256,7 +256,7 @@ export async function readAcceptedLines(input: Stage9Scope): Promise<Result<Acce
   // gate in this pipeline promises.
   if (!script.ok || plan.data.verdict === null) {
     return ok({
-      gate: ["nie ma skryptu narracji — uruchom najpierw: narration generate"],
+      gate: ["nie ma skryptu narracji, uruchom najpierw: narration generate"],
       inputs: [],
       lines: [],
     });
@@ -297,7 +297,7 @@ export async function readAcceptedLines(input: Stage9Scope): Promise<Result<Acce
     const record = stage9.data.stage.artifacts[line.id];
 
     if (!bytes.ok || record?.status !== "completed") {
-      gate.push(`${line.id}: nie ma nagrania — kwestia nie została kupiona`);
+      gate.push(`${line.id}: nie ma nagrania, kwestia nie została kupiona`);
       continue;
     }
 
@@ -327,7 +327,7 @@ export async function readAcceptedLines(input: Stage9Scope): Promise<Result<Acce
   }
 
   if (lines.length === 0) {
-    gate.push("żadna kwestia nie jest gotowa — nie ma czego położyć na obrazie");
+    gate.push("żadna kwestia nie jest gotowa, nie ma czego położyć na obrazie");
   }
 
   return ok({ gate, inputs, lines });
@@ -378,7 +378,7 @@ export async function readTrackTimeline(
   const gate: string[] = [];
 
   if (record === undefined || record.status !== "completed") {
-    gate.push(`nie ma zmontowanego odcinka na torze ${input.track} — etap 8 go nie ukończył`);
+    gate.push(`nie ma zmontowanego odcinka na torze ${input.track}, etap 8 go nie ukończył`);
   }
 
   if (!cut.ok) {
@@ -430,7 +430,7 @@ export async function readTrackTimeline(
   });
 }
 
-/** Seconds, to the thousandth — the precision an audio delay is spelled in. */
+/** Seconds, to the thousandth, the precision an audio delay is spelled in. */
 function round(seconds: number): number {
   return Math.round(seconds * 1000) / 1000;
 }
@@ -439,7 +439,7 @@ function round(seconds: number): number {
  * Where each line lands on this track, and every reason it may not land there.
  *
  * Two refusals, and they are stage 7's rather than stage 8's, deliberately. The
- * bytes of a bought line are published exactly as they arrived — nothing here
+ * bytes of a bought line are published exactly as they arrived, nothing here
  * stretches a reading, speeds one up or shortens a pause, because those are
  * bytes somebody paid for and altering them would be a quiet substitution. But
  * **where** a line sits comes from a plan a human approved, so a line that would
@@ -463,13 +463,13 @@ export function placeLines(input: {
 
     if (previous !== undefined && atSeconds < round(previous.atSeconds + previous.seconds)) {
       problems.push(
-        `${previous.id} kończy się w ${round(previous.atSeconds + previous.seconds)}s, a ${line.id} zaczyna w ${atSeconds}s — narrator mówiłby sam przez siebie; skróć wcześniejszą kwestię w skrypcie albo przesuń kotwicę późniejszej`
+        `${previous.id} kończy się w ${round(previous.atSeconds + previous.seconds)}s, a ${line.id} zaczyna w ${atSeconds}s, narrator mówiłby sam przez siebie; skróć wcześniejszą kwestię w skrypcie albo przesuń kotwicę późniejszej`
       );
     }
 
     if (ends > input.actualSeconds) {
       problems.push(
-        `${line.id} kończy się w ${ends}s, a film trwa ${input.actualSeconds}s — kwestia nie mieści się w odcinku; skróć ją w skrypcie narracji albo przesuń jej kotwicę`
+        `${line.id} kończy się w ${ends}s, a film trwa ${input.actualSeconds}s, kwestia nie mieści się w odcinku; skróć ją w skrypcie narracji albo przesuń jej kotwicę`
       );
     }
 
@@ -489,12 +489,12 @@ export function placeLines(input: {
  * What the episode declared it would sound like, against what stage 9 can make.
  *
  * All four sound modes include music and effects. No model here writes either,
- * no variable names one and no command brings one in — so they are absent, and
+ * no variable names one and no command brings one in, so they are absent, and
  * rule 7 says an absence is reported rather than filled with a guess. Stated
  * the way stage 8 states silence and stage 2 states a missing alpha channel.
  */
 export function missingSound(settings: EpisodeSettings): readonly string[] {
   return [
-    `odcinek deklaruje audio: ${settings.audio}, co obejmuje muzykę i efekty — etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku`,
+    `odcinek deklaruje audio: ${settings.audio}, co obejmuje muzykę i efekty, etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku`,
   ];
 }

@@ -74,8 +74,8 @@ export function accepted(stage: StageFile, key: CharacterArtifact): boolean {
  *
  * This is the sequence the whole stage exists to enforce: the views are drawn
  * from the card, so they wait for a human to accept the card; the hero is drawn
- * from the views, so it waits for all eight. Validation never opens either gate
- * — only an explicit approval does.
+ * from the views, so it waits for all eight. Validation never opens either gate;
+ * only an explicit approval does.
  */
 export function sequenceGate(stage: StageFile, artifact: CharacterArtifact): readonly string[] {
   if (artifact === "card") {
@@ -92,7 +92,7 @@ export function sequenceGate(stage: StageFile, artifact: CharacterArtifact): rea
 
   return accepted(stage, "card")
     ? []
-    : ["widoki czekają na zatwierdzenie karty — oceń card.png i zatwierdź ją"];
+    : ["widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją"];
 }
 
 /**
@@ -231,7 +231,7 @@ async function resolveSlots(
     if (expected !== null && expected !== digest.data.sha256) {
       return err(
         new Stage2BlockedError([
-          `${slot.name}: bajty nie zgadzają się z zatwierdzonym hashem — plik zmieniono poza narzędziem, więc nie jest już tym, co ktoś przyjął`,
+          `${slot.name}: bajty nie zgadzają się z zatwierdzonym hashem, plik zmieniono poza narzędziem, więc nie jest już tym, co ktoś przyjął`,
         ])
       );
     }

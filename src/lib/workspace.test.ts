@@ -55,7 +55,7 @@ describe("projectPaths", () => {
   /**
    * Not every file here is stage 0's. `narration.json` is stage 9's own
    * decision, kept at the project level because a reading recurs between
-   * episodes — and kept *beside* `project.json` rather than inside it because
+   * episodes, and kept *beside* `project.json` rather than inside it because
    * stage 0's file is a recorded input of nearly every artifact, so a knob
    * somebody is expected to turn would lapse approvals its bytes never touched.
    *
@@ -377,8 +377,8 @@ describe("stage 8 paths", () => {
 
   /**
    * Nothing is sent, so the archive holds neither a request nor a response. It
-   * holds the two things a re-run cannot reconstruct — which muxer ran, with
-   * which arguments, and what it said — plus the verdict of the moment.
+   * holds the two things a re-run cannot reconstruct, which muxer ran, with
+   * which arguments, and what it said, plus the verdict of the moment.
    */
   it("should archive a local attempt without a request or a response", () => {
     const run = track === null ? null : assemblyRunPaths(track, "20260919T110000Z-abcd1234");
@@ -402,7 +402,7 @@ describe("stage 9 paths", () => {
    * The words sit at the episode level, with no track directory, for the reason
    * the screenplay and the shot list do: they describe the story rather than
    * the pictures. The spoken bytes sit beside them because they depend on the
-   * text, the voice and the speech model — and not one of those three differs
+   * text, the voice and the speech model, and not one of those three differs
    * per track. A voice reading a sentence has no idea which of the two films it
    * will sit over, so buying it twice would be paying for a directory.
    */
@@ -427,7 +427,7 @@ describe("stage 9 paths", () => {
    * The mix is the one half of stage 9 that is per track, and it has to be:
    * it is timed against that track's own cut, whose clips came back with their
    * own drift. Two tracks are two films of one story and neither is "the
-   * episode" — so neither is "the soundtrack" either.
+   * episode", so neither is "the soundtrack" either.
    */
   it("should place the narrated cut and its state file inside the track", () => {
     expect(track?.narratedVideo).toBe(`${root}/narrated.mp4`);
@@ -437,7 +437,7 @@ describe("stage 9 paths", () => {
 
   /**
    * A bought utterance archives beside the text stages, under the episode,
-   * because that is where it was bought — one `runs/` per level, and the run id
+   * because that is where it was bought, one `runs/` per level, and the run id
    * says which stage minted it.
    */
   it("should archive a speech attempt under the episode's shared runs directory", () => {
@@ -453,7 +453,7 @@ describe("stage 9 paths", () => {
 
   /**
    * The mix archives what stage 8's does and one thing more: where each line
-   * was laid down. The placement is arithmetic, so it could be recomputed —
+   * was laid down. The placement is arithmetic, so it could be recomputed,
    * but it is also what the engine was actually told, and an archive holding
    * the arguments without it would record half the invocation.
    */
@@ -477,7 +477,7 @@ describe("stage 10 paths", () => {
 
   /**
    * Stage 9's precedent read to the letter. A cue sheet describes the story's
-   * sound, and a bought stem depends on the cue text and the audio model —
+   * sound, and a bought stem depends on the cue text and the audio model,
    * neither of which differs per track. So both sit at the episode level, and
    * buying them twice for a difference of a second of clip drift would be
    * paying for a directory.
@@ -494,7 +494,7 @@ describe("stage 10 paths", () => {
   /**
    * MP3 rather than the WAV stage 9 buys, and that is the provider's doing
    * rather than a preference: neither the music nor the sound-effect endpoint
-   * offers a WAV container, and their raw PCM carries no header at all — so a
+   * offers a WAV container, and their raw PCM carries no header at all, so a
    * channel count could not be read back out of the bytes, and a wrong guess
    * would state a length twice the truth without saying a word. An MP3 frame
    * header declares its own rate, bitrate and channel mode, so the verdict
@@ -516,7 +516,7 @@ describe("stage 10 paths", () => {
   /**
    * The full mix is per track for the reason the narrated cut is: it is the
    * only artifact that knows how long *this* film actually runs. It sits
-   * beside `narrated.mp4` rather than replacing it — those bytes carry a
+   * beside `narrated.mp4` rather than replacing it, those bytes carry a
    * human's yes, and stage 10 neither overwrites nor re-encodes them.
    */
   it("should place the full mix and its state file inside the track", () => {
@@ -542,7 +542,7 @@ describe("stage 10 paths", () => {
    * The full mix archives exactly what the narrated one does, so it asks the
    * same builder rather than a copy of it: both are a local engine laying
    * sound over a picture it copied, and `placement.json` answers the same
-   * question in both — which sound was laid down where.
+   * question in both, which sound was laid down where.
    */
   it("should archive a full mix with the same shape stage 9's mix uses", () => {
     const run = track === null ? null : mixRunPaths(track, "20260920T120000Z-abcd1234");

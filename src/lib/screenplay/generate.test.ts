@@ -535,7 +535,7 @@ describe("checkScreenplay and approveScreenplay", () => {
 
 describe("resuming a submitted attempt", () => {
   // The response is already paid for and archived. Re-deriving a verdict from
-  // it must never cost a second call — otherwise a validator bug is billable.
+  // it must never cost a second call, otherwise a validator bug is billable.
   it("should re-validate a saved response instead of calling the API again", async () => {
     await generate({ fetch: respondWith(completion(draft([10, 10]))) });
     expect(calls).toBe(1);

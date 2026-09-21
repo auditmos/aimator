@@ -1,11 +1,11 @@
 /**
- * Stage 1 — screenplay. The first stage that spends money.
+ * Stage 1, screenplay. The first stage that spends money.
  *
  * It consumes only artifacts stage 0 produced (`project.json`, `project.md`,
  * `episode.json`, `source.md`) and produces `screenplay.md` beside a
  * `screenplay.stage.json` recording what went in, what came out and who has
  * accepted it. One attempt is archived under `runs/<runId>/`, holding only
- * what cannot be reconstructed — the inputs are referenced by path and digest,
+ * what cannot be reconstructed, the inputs are referenced by path and digest,
  * never copied.
  *
  * Three invariants this interface exists to protect: the paid call refuses

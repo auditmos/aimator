@@ -6,7 +6,7 @@ import { billedCharacters, utteranceLength, validateSpeech } from "./index.js";
  * What is true of any utterance a stage buys, through the module entry.
  *
  * The lifecycle around a paid call is tested by the stage that owns it, with an
- * instrumented transport that counts calls — for a stage that bills per call
+ * instrumented transport that counts calls, for a stage that bills per call
  * the count is the assertion. What belongs here is the half that is true
  * whatever the stage: the verdict on the bytes, how long a line may be, and
  * what the bill is measured in.
@@ -51,7 +51,7 @@ describe("validateSpeech", () => {
   /**
    * A line with no samples in it is a file, not speech. It is refused rather
    * than laid down, because silence at an anchor is indistinguishable from a
-   * line nobody bought — and the remedy is free: the bytes stay in the archive.
+   * line nobody bought, and the remedy is free: the bytes stay in the archive.
    */
   it("should refuse a line with nothing in it", () => {
     const verdict = validateSpeech(wav({ seconds: 0 }));
@@ -91,7 +91,7 @@ describe("billedCharacters", () => {
 });
 
 /**
- * How long a line may be — the speech model's own limit, refused rather than
+ * How long a line may be, the speech model's own limit, refused rather than
  * truncated, exactly as `clipDuration` refuses a length no video model renders.
  * A tool that quietly sent half a sentence would change the film on nobody's
  * authority, and the remedy is upstream: shorten the line in the script.

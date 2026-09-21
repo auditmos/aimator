@@ -34,7 +34,7 @@ import { minimumScenes, type ScreenplayVerdict, validateScreenplay } from "./val
  * The order of operations is the contract, and it now lives in
  * `lib/text-model`: nothing is written in `--dry-run`, the stage file records
  * `submitted` *before* the POST, and nothing retries on its own. What stays
- * here is what is about a screenplay — the gate, the prompt, the structural
+ * here is what is about a screenplay, the gate, the prompt, the structural
  * verdict, and the one file this stage publishes.
  */
 
@@ -81,7 +81,7 @@ class Stage1BlockedError extends Error {
 /**
  * Why a paid call may not happen. Empty means it may.
  *
- * A dry run never reads the key, so it must not claim the key is missing — it
+ * A dry run never reads the key, so it must not claim the key is missing, it
  * says what it did not check instead. Claiming to have found an absence you
  * never looked for is the same lie as claiming a success you never had.
  */
@@ -96,7 +96,7 @@ function blockers(input: GenerateInput, stage0: Stage0Inputs): readonly string[]
 
   if (input.model === null || input.model === "") {
     problems.push(
-      "brak modelu tekstowego — wskaż go przez --model <id> albo AIMATOR_SCREENPLAY_MODEL"
+      "brak modelu tekstowego, wskaż go przez --model <id> albo AIMATOR_SCREENPLAY_MODEL"
     );
   }
 
@@ -248,7 +248,7 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }

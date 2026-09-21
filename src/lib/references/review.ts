@@ -19,7 +19,7 @@ import { REFERENCE_ID, readStage5Inputs, type Stage5Inputs, type Stage5Scope } f
  * on top of it but is never implied by it.
  *
  * `check` reads and reports; it writes nothing. `approve` repeats the whole
- * verification and only then records acceptance — bound to the digest of one
+ * verification and only then records acceptance, bound to the digest of one
  * image at a time, because each reference is a separate creative judgement and
  * because the next one's gate reads them separately. R04 may not be drawn until
  * somebody has accepted R03, so an approval that spilled across the set would
@@ -68,7 +68,7 @@ class ReferenceStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The inputs as they now stand, per reference — what an approval re-records. */
+  /** The inputs as they now stand, per reference, what an approval re-records. */
   readonly inputs: Map<string, readonly RecordedFile[]>;
   readonly stage: StageFile;
   readonly stagePath: string;
@@ -99,7 +99,7 @@ async function inspectOne(
   }
 
   if (record.status === "submitted") {
-    const unfinished = `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca — mogła zostać rozliczona; powtórz polecenie, żeby dokończyć ją z zapisanej odpowiedzi, albo użyj --regenerate`;
+    const unfinished = `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca, mogła zostać rozliczona; powtórz polecenie, żeby dokończyć ją z zapisanej odpowiedzi, albo użyj --regenerate`;
 
     return {
       blocking: [unfinished],
@@ -134,7 +134,7 @@ async function inspectOne(
     }
   } else {
     blocking.push(
-      `${label}: ${output.path} nie zgadza się z zapisanym hashem — wynik został zmieniony poza narzędziem`
+      `${label}: ${output.path} nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`
     );
   }
 
@@ -144,7 +144,7 @@ async function inspectOne(
     blocking,
     status: {
       // Approval is bound to bytes: a recorded "approved" that no longer
-      // verifies is not an approval, it is a stale claim.
+      // verifies is not an approval; it is a stale claim.
       approved:
         record.review.status === "approved" && blocking.length === 0 && inputsChanged.length === 0,
       id: planned.id,
@@ -210,12 +210,12 @@ async function inspect(input: Stage5Scope): Promise<Result<Inspection>> {
     problems.push(...one.blocking);
 
     // Drift is reported beside the blocking problems and revokes the approval
-    // just as loudly — but it is not one of them. The image is intact; it was
+    // just as loudly, but it is not one of them. The image is intact; it was
     // drawn from something that has since changed, and reading it again beside
     // the new version is exactly what an approval is.
     for (const path of one.status.inputsChanged) {
       problems.push(
-        `${path}: zmienił się od czasu narysowania ${planned.id} — obejrzyj obraz jeszcze raz obok nowej wersji i zatwierdź ponownie albo przerysuj: aimator reference generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate --artifact ${planned.id}`
+        `${path}: zmienił się od czasu narysowania ${planned.id}, obejrzyj obraz jeszcze raz obok nowej wersji i zatwierdź ponownie albo przerysuj: aimator reference generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate --artifact ${planned.id}`
       );
     }
   }
@@ -246,10 +246,10 @@ function nextStepOf(input: Stage5Scope, artifacts: readonly ReferenceStatus[]): 
 
   return missing.length > 0
     ? `aimator reference generate ${input.projectId} ${input.episodeId} --track ${input.track}`
-    : `etap 5 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny — dalej etap 6, klatka otwarcia`;
+    : `etap 5 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 6, klatka otwarcia`;
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkReferences(input: Stage5Scope): Promise<Result<ReferencesStatus>> {
   const inspection = await inspect(input);
 
@@ -263,8 +263,8 @@ export async function checkReferences(input: Stage5Scope): Promise<Result<Refere
  * what lets R04 be bought, so it has to be something somebody typed rather than
  * a side effect of accepting something else.
  *
- * An edited input is not a validation failure — the image is exactly what the
- * stage produced, it was simply drawn from a dependency that has changed since.
+ * An edited input is not a validation failure, the image is exactly what the
+ * stage produced; it was simply drawn from a dependency that has changed since.
  * The digests are re-recorded here, by an approval that has already verified
  * the image itself still validates, because the reader who typed `approve` is
  * the one who looked at both.
@@ -277,7 +277,7 @@ export async function approveReferences(input: ApproveScope): Promise<Result<Ref
   const named = input.artifacts.filter((id) => !REFERENCE_ID.test(id));
 
   if (named.length > 0) {
-    return err(new ReferenceStateError(`--artifact "${named.join(", ")}" — oczekiwano formy R01`));
+    return err(new ReferenceStateError(`--artifact "${named.join(", ")}", oczekiwano formy R01`));
   }
 
   const inspection = await inspect(input);

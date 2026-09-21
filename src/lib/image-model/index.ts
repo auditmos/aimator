@@ -2,7 +2,7 @@
  * One billed image call, and what the two image tracks accept.
  *
  * Promoted out of `lib/character` when stage 5 became the second image stage
- * and stage 6 the certain third — the same threshold `lib/text-model` was
+ * and stage 6 the certain third, the same threshold `lib/text-model` was
  * promoted at, reached deliberately this time rather than discovered after two
  * copies had already drifted apart in their comments.
  *

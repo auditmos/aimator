@@ -21,7 +21,7 @@ import { type ScreenplayVerdict, validateScreenplay } from "./validate.js";
  * Internal to the screenplay module: verification, and the approval that sits
  * on top of it but is never implied by it.
  *
- * `check` reads and reports; it writes nothing, not even `needsReview` — that
+ * `check` reads and reports; it writes nothing, not even `needsReview`, that
  * belongs to the dependent stage, at the moment it runs. `approve` repeats the
  * whole verification and only then records a human's acceptance, bound to the
  * digest of the screenplay as it stands.
@@ -29,7 +29,7 @@ import { type ScreenplayVerdict, validateScreenplay } from "./validate.js";
  * Two kinds of wrong are kept apart here, because only one of them may stop an
  * approval. A screenplay that fails its structure, or whose bytes no longer
  * hash to what was recorded, is broken: `approve` refuses. A screenplay whose
- * input has been edited since it was written is not broken — it is unread for
+ * input has been edited since it was written is not broken; it is unread for
  * those inputs, which is a lapsed consent and exactly what an approval is for.
  * `approve` re-records the inputs and accepts, the same way stage 0 lets an
  * edited `project.md` be approved again.
@@ -73,7 +73,7 @@ class ScreenplayStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The stage-0 inputs as they stand now — what an approval re-records. */
+  /** The stage-0 inputs as they stand now, what an approval re-records. */
   readonly inputs: readonly RecordedFile[];
   readonly stage: StageFile | null;
   readonly status: ScreenplayStatus;
@@ -120,7 +120,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
         approved: false,
         inputsChanged: [],
         problems: [
-          `odcinek "${input.episodeId}": etap 1 jeszcze nie powstał — aimator screenplay generate ${input.projectId} ${input.episodeId}`,
+          `odcinek "${input.episodeId}": etap 1 jeszcze nie powstał, aimator screenplay generate ${input.projectId} ${input.episodeId}`,
         ],
         status: "absent",
         verdict: null,
@@ -137,7 +137,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
 
   if (record.status === "submitted") {
     blocking.push(
-      `odcinek "${input.episodeId}": próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca — mogła zostać rozliczona; nową próbę zaczyna --regenerate`
+      `odcinek "${input.episodeId}": próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca, mogła zostać rozliczona; nową próbę zaczyna --regenerate`
     );
 
     return ok({
@@ -166,12 +166,12 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
   }
 
   // Drift is reported beside the blocking problems and revokes the approval
-  // just as loudly — but it is not one of them. The screenplay is intact; it
+  // just as loudly, but it is not one of them. The screenplay is intact; it
   // is unread for these inputs, and `approve` is what reads it.
   const inputsChanged = changedInputs(record.inputs, stage0.data.inputs);
   const lapsed = inputsChanged.map(
     (path) =>
-      `${path}: zmienił się od czasu generacji scenariusza — tych wejść nikt jeszcze nie przyjął; przeczytaj scenariusz jeszcze raz i zatwierdź go ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`
+      `${path}: zmienił się od czasu generacji scenariusza, tych wejść nikt jeszcze nie przyjął; przeczytaj scenariusz jeszcze raz i zatwierdź go ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`
   );
   const problems = [...blocking, ...lapsed];
 
@@ -181,7 +181,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
     stage: stage.data,
     status: {
       // Approval is bound to bytes: a recorded "approved" that no longer
-      // verifies is not an approval, it is a stale claim.
+      // verifies is not an approval; it is a stale claim.
       approved: isApproved(stage.data) && problems.length === 0,
       inputsChanged,
       problems,
@@ -191,7 +191,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
   });
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkScreenplay(input: EpisodeScope): Promise<Result<ScreenplayStatus>> {
   const inspection = await inspect(input);
 
@@ -206,7 +206,7 @@ export async function checkScreenplay(input: EpisodeScope): Promise<Result<Scree
  * a failing draft or an unfinished attempt would be a claim the later stages
  * have no way to doubt. An edited input is not that. The draft still validates
  * against the decisions on disk, so the digests are re-recorded and the
- * approval proceeds — otherwise the one command able to clear the drift would
+ * approval proceeds, otherwise the one command able to clear the drift would
  * be the one command the drift forbids, and the episode would need a second
  * paid screenplay to say something everybody already knew.
  */

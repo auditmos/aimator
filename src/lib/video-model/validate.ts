@@ -3,7 +3,7 @@ import type { StillFormat } from "../workspace.js";
 
 /**
  * Internal to the video-model module: the verdict on bytes and on a provider's
- * answer. Pure and offline, like the image verdict and for the same reason —
+ * answer. Pure and offline, like the image verdict and for the same reason,
  * it decides whether a clip that has already been paid for may be published, so
  * it must never need a network, a secret or a decoder of its own.
  *
@@ -13,7 +13,7 @@ import type { StillFormat } from "../workspace.js";
  * It reads the MP4's own boxes rather than shelling out to a media tool. Two
  * reasons: `check` has to re-run this verdict long after the command that
  * bought the clip, on whatever machine the workspace is sitting on, and the
- * three numbers it needs — duration, width, height — live in two headers that
+ * three numbers it needs, duration, width, height, live in two headers that
  * are eight lines of arithmetic away.
  */
 
@@ -23,8 +23,8 @@ const HEADER = 8;
 const MAX_BYTES = 500_000_000;
 /**
  * How far the clip's own duration may sit from the one that was ordered. A
- * frame rate leaves a fraction of a second over — 14 s at 24 fps is 335 frames
- * plus a remainder — so the tolerance is under one second and never a whole
+ * frame rate leaves a fraction of a second over, 14 s at 24 fps is 335 frames
+ * plus a remainder, so the tolerance is under one second and never a whole
  * one, which would let a 15 s answer pass for a 14 s order.
  */
 const SECOND = 1;
@@ -74,8 +74,8 @@ class DurationError extends Error {
  * Refused rather than rounded, for the reason `frameSize` refuses a ratio no
  * track renders: the shot list is an approved decision, and a tool that
  * silently ordered fifteen seconds where a human planned fourteen would be
- * changing the film's timing on nobody's authority. The remedy is upstream —
- * a different `maxClipSeconds` and a re-planned shot list — and the message
+ * changing the film's timing on nobody's authority. The remedy is upstream,
+ * a different `maxClipSeconds` and a re-planned shot list, and the message
  * says so, because that is a decision the person makes, not the tool.
  */
 export function clipDuration(seconds: number): Result<number> {
@@ -90,7 +90,7 @@ export function clipDuration(seconds: number): Result<number> {
     : err(
         new DurationError(
           seconds,
-          `klip trwa ${seconds}s, a model wideo renderuje od ${MIN_SECONDS} do ${MAX_SECONDS}s — zmień maxClipSeconds odcinka i przeplanuj listę ujęć, bo tego narzędzie nie zaokrągli za ciebie`
+          `klip trwa ${seconds}s, a model wideo renderuje od ${MIN_SECONDS} do ${MAX_SECONDS}s, zmień maxClipSeconds odcinka i przeplanuj listę ujęć, bo tego narzędzie nie zaokrągli za ciebie`
         )
       );
 }
@@ -99,17 +99,17 @@ export function clipDuration(seconds: number): Result<number> {
  * Is this the clip the request asked for?
  *
  * The duration is compared when something was ordered. `seconds: null` means
- * nothing was — stage 9 reads a finished cut whose length stage 8 already
+ * nothing was, stage 9 reads a finished cut whose length stage 8 already
  * judged, and it needs the number rather than a second opinion on it. Stated in
  * the type rather than passed as an impossible expectation, because a caller
  * that had to spell "no expectation" as a number nobody matches would be
  * relying on arithmetic to mean something it does not say.
  *
- * Where it is compared, it is compared because it is what was ordered and billed.
+ * Where it is compared; it is compared because it is what was ordered and billed.
  * The frame is compared against the episode's ratio rather than against an
  * exact size, because that is what the request actually stated: the entry frame
  * pins the ratio and the provider picks the pixels inside its resolution tier.
- * Neither is corrected — a clip of the wrong length is a result that did not
+ * Neither is corrected, a clip of the wrong length is a result that did not
  * follow the request, and re-encoding it would hide that behind a file that
  * looks right.
  */
@@ -128,14 +128,14 @@ export function validateVideo(
 
   if (bytes.length < HEADER * 2 || bytes.toString("ascii", 4, 8) !== FTYP) {
     return err(
-      new VideoError("malformed", "odpowiedź nie jest plikiem MP4 — zachowano ją do sprawdzenia")
+      new VideoError("malformed", "odpowiedź nie jest plikiem MP4, zachowano ją do sprawdzenia")
     );
   }
 
   const moov = findBox(bytes, 0, bytes.length, "moov");
 
   if (moov === null) {
-    return err(new VideoError("malformed", "MP4 jest niekompletny — brak bloku moov"));
+    return err(new VideoError("malformed", "MP4 jest niekompletny, brak bloku moov"));
   }
 
   const seconds = readDuration(bytes, moov);
@@ -151,7 +151,7 @@ export function validateVideo(
     return err(
       new VideoError(
         "duration",
-        `klip trwa ${round(seconds)}s, a plan kupił ${expected.seconds}s — zachowano oryginał, niczego nie przycinam`
+        `klip trwa ${round(seconds)}s, a plan kupił ${expected.seconds}s, zachowano oryginał, niczego nie przycinam`
       )
     );
   }
@@ -162,7 +162,7 @@ export function validateVideo(
     return err(
       new VideoError(
         "ratio",
-        `klip ma kadr ${frame.width}x${frame.height}, a odcinek jest w proporcjach ${expected.aspectRatio} — zachowano oryginał, niczego nie przeskalowuję`
+        `klip ma kadr ${frame.width}x${frame.height}, a odcinek jest w proporcjach ${expected.aspectRatio}, zachowano oryginał, niczego nie przeskalowuję`
       )
     );
   }
@@ -196,8 +196,8 @@ interface EndFrameVerdict {
 /**
  * The frame the clip ended on, as the provider handed it back.
  *
- * Its format is the provider's choice and not ours — ModelArk returns a JPEG
- * beside an MP4 — so this reads whichever of the two it is rather than
+ * Its format is the provider's choice and not ours, ModelArk returns a JPEG
+ * beside an MP4, so this reads whichever of the two it is rather than
  * insisting on the one the rest of the pipeline draws in. The bytes are
  * published exactly as they arrived, under a name that says what they are:
  * re-encoding a still somebody is about to accept would mean approving one
@@ -230,7 +230,7 @@ export function validateEndFrame(
  * Whether this file carries a sound track, read from its own boxes.
  *
  * Stage 8 reports a silent cut and stage 9 has to be able to say the silence is
- * over — and both answers must survive on a machine with no media tools, which
+ * over, and both answers must survive on a machine with no media tools, which
  * is why this walks `trak` boxes rather than asking a decoder. The test is the
  * one `readFrame` already relies on from the other side: a sound track states a
  * frame of zero by zero, because it has no picture in it.
@@ -269,7 +269,7 @@ export function hasSound(bytes: Buffer): boolean {
  * Which of the two formats a still is, or `null` for neither.
  *
  * It exists so the archive can name the file after what it holds before
- * anything has judged whether it is the right picture — naming and judging are
+ * anything has judged whether it is the right picture, naming and judging are
  * two questions, and a file named `.png` holding a JPEG is a lie either way.
  */
 export function stillFormat(bytes: Buffer): StillFormat | null {
@@ -443,9 +443,7 @@ function readUrl(value: string | undefined, what: string): Result<string> {
 
   return url.protocol === "https:" && url.username === "" && url.password === ""
     ? ok(url.href)
-    : err(
-        new TaskError("url", `adres ${what} wymaga HTTPS bez danych logowania — nie pobieram go`)
-      );
+    : err(new TaskError("url", `adres ${what} wymaga HTTPS bez danych logowania, nie pobieram go`));
 }
 
 function readRatio(aspectRatio: string): number | null {
@@ -466,7 +464,7 @@ interface Box {
  * The first box of a type, among the children of one range.
  *
  * A box is a length, a four-character type and a payload, and the payload of a
- * container is more boxes — so one walk serves both levels. A `1` in the length
+ * container is more boxes, so one walk serves both levels. A `1` in the length
  * field means the real length follows as 64 bits, and a `0` means "to the end",
  * which is legal for the last box in a file.
  */
@@ -533,7 +531,7 @@ function readDuration(bytes: Buffer, moov: Box): number | null {
 /**
  * The picture's frame, from the first track that has one.
  *
- * A soundtrack is a track too, and its header states a frame of zero by zero —
+ * A soundtrack is a track too, and its header states a frame of zero by zero,
  * so the first track is not necessarily the picture, and taking it on faith
  * would report a clip with audio as having no frame at all.
  */

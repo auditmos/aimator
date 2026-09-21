@@ -1,9 +1,9 @@
 /**
- * Stage 3 — shot list. The first text stage after the screenplay, and the first
+ * Stage 3, shot list. The first text stage after the screenplay, and the first
  * one both image tracks share.
  *
  * It consumes the approved `screenplay.md` plus the stage-0 decisions that
- * every stage reads — `project.json`, `project.md` and `episode.json` — and
+ * every stage reads, `project.json`, `project.md` and `episode.json`, and
  * produces `shot-list.md` in the episode directory, beside the screenplay, with
  * a `shot-list.stage.json` recording what went in, what came out and who has
  * accepted it. One attempt is archived under `runs/<runId>/`, holding only what

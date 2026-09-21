@@ -3,7 +3,7 @@ import type { ImageTrack } from "../workspace.js";
 
 /**
  * Internal to the image-model module: the verdict on bytes and on a provider's
- * answer. Pure and offline, for the same reason stage 1's validator is — this
+ * answer. Pure and offline, for the same reason stage 1's validator is, this
  * is the half that decides whether an image that has already been paid for may
  * be published, so it must never need a network of its own.
  *
@@ -74,7 +74,7 @@ class ImageAnswerError extends Error {
 export function validateImage(bytes: Buffer, size: string): Result<ImageVerdict> {
   if (bytes.length < SIGNATURE.length || !bytes.subarray(0, SIGNATURE.length).equals(SIGNATURE)) {
     return err(
-      new ImageError("malformed", "odpowiedź nie jest plikiem PNG — zachowano ją do sprawdzenia")
+      new ImageError("malformed", "odpowiedź nie jest plikiem PNG, zachowano ją do sprawdzenia")
     );
   }
 
@@ -93,7 +93,7 @@ export function validateImage(bytes: Buffer, size: string): Result<ImageVerdict>
     bytes.toString("ascii", bytes.length - 8, bytes.length - 4) !== "IEND"
   ) {
     return err(
-      new ImageError("malformed", "PNG jest niekompletny — brak nagłówka IHDR albo bloku IEND")
+      new ImageError("malformed", "PNG jest niekompletny, brak nagłówka IHDR albo bloku IEND")
     );
   }
 
@@ -104,7 +104,7 @@ export function validateImage(bytes: Buffer, size: string): Result<ImageVerdict>
     return err(
       new ImageError(
         "dimensions",
-        `obraz ma ${width}x${height}, a żądanie mówiło ${size} — zachowano oryginał, niczego nie przeskalowuję`
+        `obraz ma ${width}x${height}, a żądanie mówiło ${size}, zachowano oryginał, niczego nie przeskalowuję`
       )
     );
   }
@@ -155,7 +155,7 @@ export function readImageResponse(track: ImageTrack, body: string): Result<Image
     return err(
       new ImageAnswerError(
         "count",
-        `API nie zwróciło dokładnie jednego obrazu (${parsed.data?.length ?? 0}) — odpowiedź zachowana`
+        `API nie zwróciło dokładnie jednego obrazu (${parsed.data?.length ?? 0}), odpowiedź zachowana`
       )
     );
   }
@@ -199,7 +199,7 @@ function readDownloadUrl(value: string | undefined, jobId: string | null): Resul
     : err(
         new ImageAnswerError(
           "url",
-          "adres obrazu wymaga HTTPS bez danych logowania — nie pobieram go"
+          "adres obrazu wymaga HTTPS bez danych logowania, nie pobieram go"
         )
       );
 }

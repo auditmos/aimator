@@ -56,7 +56,7 @@ interface OneResult {
  * artifacts this invocation is about, the lock around them, the preview that
  * spends nothing, and the order the series stops in when one of them fails.
  *
- * Nothing is written in `--dry-run`, and the preview never reads a key — it
+ * Nothing is written in `--dry-run`, and the preview never reads a key, it
  * says what it did not check instead, because claiming to have found an
  * absence you never looked for is the same lie as claiming a success you
  * never had.
@@ -96,7 +96,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -117,7 +117,7 @@ const MODEL_NAME: Record<ImageTrack, string> = {
 /**
  * Why a paid call may not happen at all. Empty means it may.
  *
- * A dry run never reads the key, so it must not claim the key is missing — it
+ * A dry run never reads the key, so it must not claim the key is missing, it
  * says what it did not check instead. Claiming to have found an absence you
  * never looked for is the same lie as claiming a success you never had.
  */
@@ -132,7 +132,7 @@ function blockers(input: GenerateCharacterInput, stage0: Stage0Character): reado
 
   if (input.model === null || input.model === "") {
     problems.push(
-      `brak modelu obrazowego dla toru ${input.track} — wskaż go przez --model <id> albo ${MODEL_NAME[input.track]}`
+      `brak modelu obrazowego dla toru ${input.track}, wskaż go przez --model <id> albo ${MODEL_NAME[input.track]}`
     );
   }
 
@@ -168,7 +168,7 @@ export async function generateCharacter(
   const stage = await readStage(paths.stage);
 
   // A new charge names its target. Without a flag the gates decide what runs
-  // next, and what runs next is never something already finished — so a bare
+  // next, and what runs next is never something already finished, so a bare
   // `--regenerate` would silently do nothing or, worse, hit the wrong image.
   if (input.regenerate && input.artifacts.length === 0) {
     return err(
@@ -268,7 +268,7 @@ async function preview(
         : "usuń powyższe przeszkody przed płatnym wywołaniem",
     problems: [
       ...problems,
-      `${KEY_NAME[input.track]} nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
+      `${KEY_NAME[input.track]} nie był czytany, próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
     ],
     ready: problems.length === 0 && gated.length === 0,
     track: input.track,
@@ -394,7 +394,7 @@ async function runOne(
 
   // Built before the attempt rather than inside it: the references are re-read
   // and re-hashed here, so a card edited outside the tool cannot silently
-  // become the authority for the eight views drawn from it — and the same list
+  // become the authority for the eight views drawn from it, and the same list
   // is what a resume compares its recorded inputs against.
   const plan = await buildPlan(input, scope, artifact);
 

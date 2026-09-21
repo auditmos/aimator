@@ -8,8 +8,8 @@ import { err, ok, type Result } from "../result.js";
  * refusal classification are identical for every text stage, and a second copy
  * is a place for them to diverge. The same reason `lib/artifact` exists.
  *
- * `fetch` is injected so every rule around the call — no retry, the key never
- * reaching disk, a refusal being an error rather than an empty document — is
+ * `fetch` is injected so every rule around the call, no retry, the key never
+ * reaching disk, a refusal being an error rather than an empty document, is
  * testable without spending anything.
  *
  * `store: false` is deliberate and has a consequence worth stating: the
@@ -33,7 +33,7 @@ const TIMEOUT_MS = 10 * 60_000;
  * Stage 4 asks for one, because its result is a dependency graph plus twenty
  * separate prompts rather than a document somebody reads top to bottom: an
  * array is unambiguous where a comma-separated Markdown field would be a parser
- * over prose. Stages 1 and 3 ask for none — their result *is* the document, so
+ * over prose. Stages 1 and 3 ask for none, their result *is* the document, so
  * the shape a person reads and the shape the tool checks are the same thing.
  */
 export interface ResponseFormat {
@@ -146,7 +146,7 @@ export async function callModel(input: {
     return err(
       new ModelCallError(
         null,
-        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas) — nie ponawiam; sprawdź, czy próba nie została rozliczona",
+        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas), nie ponawiam; sprawdź, czy próba nie została rozliczona",
         { cause }
       )
     );
@@ -179,7 +179,7 @@ export function httpFailure(transport: Transport): Error | null {
 
   return new ModelCallError(
     transport.httpStatus,
-    `API zwróciło HTTP ${transport.httpStatus} — nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
+    `API zwróciło HTTP ${transport.httpStatus}, nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
   );
 }
 
@@ -212,7 +212,7 @@ export function refusedWithoutCharge(httpStatus: number): boolean {
 /**
  * Pulls the document out of a Responses payload, or says why there is none.
  *
- * `what` names the thing in the error message — the caller knows whether it
+ * `what` names the thing in the error message, the caller knows whether it
  * asked for a screenplay or a shot list, and this module does not.
  */
 export function readOutputText(
@@ -231,7 +231,7 @@ export function readOutputText(
     return err(
       new ModelOutputError(
         "incomplete",
-        `odpowiedź API ma status "${parsed.status ?? "brak"}" zamiast "completed" — zachowano ją do sprawdzenia, nie publikuję wyniku (${what})`
+        `odpowiedź API ma status "${parsed.status ?? "brak"}" zamiast "completed", zachowano ją do sprawdzenia, nie publikuję wyniku (${what})`
       )
     );
   }
@@ -248,7 +248,7 @@ export function readOutputText(
     return err(
       new ModelOutputError(
         "refusal",
-        `model odmówił wykonania zadania (${what}) — odpowiedź zachowana w archiwum próby`
+        `model odmówił wykonania zadania (${what}), odpowiedź zachowana w archiwum próby`
       )
     );
   }

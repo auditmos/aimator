@@ -3,15 +3,15 @@ import { err, ok, type Result } from "../result.js";
 /**
  * Internal to the audio-model module: the two paid calls, and nothing else.
  *
- * `fetch` is injected so every rule around a call — no retry, the key never
- * reaching disk, a refusal being an error rather than a blank file — is
+ * `fetch` is injected so every rule around a call, no retry, the key never
+ * reaching disk, a refusal being an error rather than a blank file, is
  * testable without spending anything.
  *
  * Two endpoints behind one module, with `lib/image-model`'s precedent. What
  * they have in common is everything that matters here: one provider, one key,
  * one container, one verdict, one lifecycle, and an answer that is the audio
  * itself rather than a document describing it. What differs is a URL and the
- * name of the field carrying the description — which is a reason for two
+ * name of the field carrying the description, which is a reason for two
  * functions, not for two modules.
  *
  * Like the speech endpoint and unlike the image ones, **the answer is not
@@ -25,8 +25,8 @@ const EFFECT_ENDPOINT = "https://api.elevenlabs.io/v1/sound-generation";
 /**
  * The container every stem is bought in.
  *
- * MP3 because neither endpoint offers WAV and their raw PCM carries no header
- * — see `validate.ts`, where that is argued out. 44.1 kHz at 128 kbps because
+ * MP3 because neither endpoint offers WAV and their raw PCM carries no header;
+ * see `validate.ts`, where that is argued out. 44.1 kHz at 128 kbps because
  * it is the one quality both endpoints document on every plan: 192 kbps needs
  * Creator tier or above, and a request the provider refuses is worse than a
  * bitrate nobody hears the difference in under a narrator. A constant of the
@@ -40,7 +40,7 @@ const OUTPUT_FORMAT = "mp3_44100_128";
  * 9 sends its delivery settings explicitly: the request archive has to answer
  * what produced these bytes rather than defer to whatever the provider's
  * defaults were that month. It is not a knob, and will not become one until
- * somebody actually needs to turn it — a widened interface bought with nothing
+ * somebody actually needs to turn it, a widened interface bought with nothing
  * is the thing this repository refuses.
  */
 const PROMPT_INFLUENCE = 0.3;
@@ -117,7 +117,7 @@ export function buildRequest(input: {
  * The music endpoint takes a prose `prompt` and a length in milliseconds; the
  * effect endpoint takes `text` and a length in seconds. Prose rather than a
  * composition plan, because a prompt in this pipeline is prose everywhere else
- * and the model is built to read it — a plan of style lists would be JSON
+ * and the model is built to read it, a plan of style lists would be JSON
  * standing where sentences belong, which is what stage 4 refused.
  */
 function requestBody(request: AudioRequest): Record<string, unknown> {
@@ -154,7 +154,7 @@ export function archiveRequest(request: AudioRequest): unknown {
 
 /**
  * One call. Never two: a non-2xx answer is reported as it stands, because a
- * retry here is a second full charge nobody asked for — this provider bills at
+ * retry here is a second full charge nobody asked for, this provider bills at
  * generation rather than at download.
  */
 export async function callAudio(input: {
@@ -180,7 +180,7 @@ export async function callAudio(input: {
     return err(
       new AudioCallError(
         null,
-        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas) — nie ponawiam; sprawdź, czy próba nie została rozliczona",
+        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas), nie ponawiam; sprawdź, czy próba nie została rozliczona",
         { cause }
       )
     );
@@ -220,7 +220,7 @@ export function httpFailure(transport: AudioTransport): Error | null {
 
   return new AudioCallError(
     transport.httpStatus,
-    `API zwróciło HTTP ${transport.httpStatus} — nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body ?? "")}`
+    `API zwróciło HTTP ${transport.httpStatus}, nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body ?? "")}`
   );
 }
 

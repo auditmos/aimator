@@ -26,9 +26,9 @@ import {
  * verification and only then records acceptance, bound to the digest of the
  * image as it now stands.
  *
- * Unlike stage 5, it does not demand to be told what is being accepted. Stage 5
+ * Unlike stage 5; it does not demand to be told what is being accepted. Stage 5
  * refuses a bare `approve` because accepting R03 is what buys R04, so it must
- * be something somebody typed rather than a side effect — with six candidates,
+ * be something somebody typed rather than a side effect, with six candidates,
  * the flag is the sentence. Here there is one artifact, and
  * `approve … --stage opening-frame --track seedream` already is that sentence:
  * a required flag with one legal value would be ceremony standing where a
@@ -78,7 +78,7 @@ class OpeningFrameStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The inputs as they now stand — what an approval re-records. */
+  /** The inputs as they now stand, what an approval re-records. */
   readonly inputs: readonly RecordedFile[];
   readonly stage6: Stage6Inputs;
   readonly status: OpeningFrameStatus;
@@ -143,7 +143,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
   }
 
   if (record.status === "submitted") {
-    const unfinished = `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca — mogła zostać rozliczona; powtórz polecenie, żeby dokończyć ją z zapisanej odpowiedzi, albo użyj --regenerate`;
+    const unfinished = `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca, mogła zostać rozliczona; powtórz polecenie, żeby dokończyć ją z zapisanej odpowiedzi, albo użyj --regenerate`;
 
     return ok({
       blocking: [unfinished],
@@ -185,7 +185,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
     }
   } else {
     blocking.push(
-      `${label}: ${output.path} nie zgadza się z zapisanym hashem — wynik został zmieniony poza narzędziem`
+      `${label}: ${output.path} nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`
     );
   }
 
@@ -193,12 +193,12 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
   const problems = [...stage6.data.gate, ...blocking];
 
   // Drift is reported beside the blocking problems and revokes the approval
-  // just as loudly — but it is not one of them. The frame is intact; it was
+  // just as loudly, but it is not one of them. The frame is intact; it was
   // drawn from something that has since changed, and reading it again beside
   // the new version is exactly what an approval is.
   for (const path of inputsChanged) {
     problems.push(
-      `${path}: zmienił się od czasu narysowania klatki otwarcia — obejrzyj ją jeszcze raz obok nowej wersji i zatwierdź ponownie albo przerysuj: aimator opening-frame generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
+      `${path}: zmienił się od czasu narysowania klatki otwarcia, obejrzyj ją jeszcze raz obok nowej wersji i zatwierdź ponownie albo przerysuj: aimator opening-frame generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
     );
   }
 
@@ -221,7 +221,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
         verdict,
       },
       nextStep: approved
-        ? `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny — dalej etap 7, klipy`
+        ? `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 7, klipy`
         : `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
       problems,
       track: input.track,
@@ -229,7 +229,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
   });
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkOpeningFrame(input: Stage6Scope): Promise<Result<OpeningFrameStatus>> {
   const inspection = await inspect(input);
 
@@ -239,8 +239,8 @@ export async function checkOpeningFrame(input: Stage6Scope): Promise<Result<Open
 /**
  * Records that a human accepted this frame, bound to its current bytes.
  *
- * An edited input is not a validation failure — the frame is exactly what the
- * stage produced, it was simply drawn from a dependency that has changed since.
+ * An edited input is not a validation failure, the frame is exactly what the
+ * stage produced; it was simply drawn from a dependency that has changed since.
  * The digests are re-recorded here, by an approval that has already verified
  * the image itself still validates, because the reader who typed `approve` is
  * the one who looked at both.
@@ -253,7 +253,7 @@ export async function approveOpeningFrame(
   if (named.length > 0) {
     return err(
       new OpeningFrameStateError(
-        `--artifact "${named.join(", ")}" — etap 6 ma jeden artefakt, ${OPENING_FRAME}; pomiń tę flagę albo podaj właśnie jego`
+        `--artifact "${named.join(", ")}", etap 6 ma jeden artefakt, ${OPENING_FRAME}; pomiń tę flagę albo podaj właśnie jego`
       )
     );
   }
@@ -298,6 +298,6 @@ export async function approveOpeningFrame(
     ...status,
     approved: true,
     artifact: { ...status.artifact, approved: true, inputsChanged: [] },
-    nextStep: `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny — dalej etap 7, klipy`,
+    nextStep: `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 7, klipy`,
   });
 }

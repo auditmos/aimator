@@ -4,7 +4,7 @@ import worker, { type AssetEnv, parseRange } from "./worker.js";
 /**
  * The worker, tested through its entry. Two things are worth proving: the
  * arithmetic of a byte range, which is where an off-by-one hides, and that a
- * partial response asks the bucket for exactly that span — the whole reason
+ * partial response asks the bucket for exactly that span, the whole reason
  * the films moved out of the deployed assets.
  */
 

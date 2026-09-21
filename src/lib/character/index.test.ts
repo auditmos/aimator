@@ -8,7 +8,7 @@ describe("CHARACTER_ARTIFACTS", () => {
     expect(CHARACTER_ARTIFACTS).toHaveLength(10);
   });
 });
-const RULES = "# Demo — zasady wspólne\n\nPłaskie 2D wektorowe. Kropki-oczy.\n";
+const RULES = "# Demo, zasady wspólne\n\nPłaskie 2D wektorowe. Kropki-oczy.\n";
 function prompt(overrides: Partial<Parameters<typeof buildPrompt>[0]> = {}): string {
   const artifact = overrides.artifact ?? "card";
   const basis = overrides.basis ?? "description";

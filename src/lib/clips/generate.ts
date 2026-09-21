@@ -35,7 +35,7 @@ import {
  *
  * That last part matters more here than anywhere before it. A clip is the most
  * expensive thing this pipeline buys, and one command can buy an image and a
- * clip in the same run — so the report counts the two **separately**, before
+ * clip in the same run, so the report counts the two **separately**, before
  * the first request rather than after the last.
  */
 
@@ -61,7 +61,7 @@ const VIDEO_MODEL_NAME = "AIMATOR_VIDEO_MODEL";
 
 /** What happened to one clip or entry frame, in the words a person reads. */
 export interface ClipOutcome {
-  /** The images this call carried, by path and digest — never the bytes. */
+  /** The images this call carried, by path and digest, never the bytes. */
   readonly attachments: readonly RecordedFile[];
   readonly id: string;
   readonly kind: "clip" | "entry-frame";
@@ -105,7 +105,7 @@ interface GenerateInput {
   /**
    * Publishes a clip again from its archive, sending nothing and paying
    * nothing. It names the clips it republishes, because it rewrites a record a
-   * human may already have accepted — and it covers clips only: an entry frame
+   * human may already have accepted, and it covers clips only: an entry frame
    * is published exactly as the provider drew it, so there is no renderer there
    * whose mistake would need undoing.
    */
@@ -123,7 +123,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -136,7 +136,7 @@ class LockError extends Error {
  * It asks only about the media this run would actually use: a command that only
  * draws entry frames has no business demanding a video model, and one that only
  * renders clips has none demanding an image model. A dry run never reads a key,
- * so it must not claim one is missing — it says what it did not check instead.
+ * so it must not claim one is missing, it says what it did not check instead.
  */
 function blockers(
   input: GenerateInput,
@@ -157,13 +157,13 @@ function blockers(
 
   if (images && (input.imageModel === null || input.imageModel === "")) {
     problems.push(
-      `brak modelu obrazowego dla toru ${input.track} — wskaż go przez --image-model <id> albo ${IMAGE_MODEL_NAME[input.track]}`
+      `brak modelu obrazowego dla toru ${input.track}, wskaż go przez --image-model <id> albo ${IMAGE_MODEL_NAME[input.track]}`
     );
   }
 
   if (videos && (input.videoModel === null || input.videoModel === "")) {
     problems.push(
-      `brak modelu wideo — wskaż go przez --video-model <id> albo ${VIDEO_MODEL_NAME}; jest jeden dla obu torów`
+      `brak modelu wideo, wskaż go przez --video-model <id> albo ${VIDEO_MODEL_NAME}; jest jeden dla obu torów`
     );
   }
 
@@ -173,7 +173,7 @@ function blockers(
     }
 
     if (videos && (input.videoKey === null || input.videoKey === "")) {
-      problems.push(`brak ${VIDEO_KEY_NAME} w środowisku lub .env — model wideo idzie na BytePlus`);
+      problems.push(`brak ${VIDEO_KEY_NAME} w środowisku lub .env, model wideo idzie na BytePlus`);
     }
   }
 
@@ -200,7 +200,7 @@ function republishProblem(input: GenerateInput): string | null {
 
   return frames.length === 0
     ? null
-    : `--republish "${frames.join(", ")}" — dotyczy wyłącznie klipów; klatka wejściowa jest publikowana dokładnie tak, jak narysował ją model, więc nie ma tam czego naprawiać po stronie publikacji`;
+    : `--republish "${frames.join(", ")}", dotyczy wyłącznie klipów; klatka wejściowa jest publikowana dokładnie tak, jak narysował ją model, więc nie ma tam czego naprawiać po stronie publikacji`;
 }
 
 export async function generateClips(input: GenerateInput): Promise<Result<ClipsReport>> {
@@ -209,7 +209,7 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
   if (named.length > 0) {
     return err(
       new Stage7BlockedError([
-        `--artifact "${named.join(", ")}" — etap 7 kupuje klipy (C01) i klatki wejściowe (entry:C02)`,
+        `--artifact "${named.join(", ")}", etap 7 kupuje klipy (C01) i klatki wejściowe (entry:C02)`,
         "referencje należą do etapu 5, a klatka otwarcia do etapu 6",
       ])
     );
@@ -224,7 +224,7 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
   }
 
   // A new charge names its target. Without a flag the gates decide what runs,
-  // and what runs is never something already finished — so a bare
+  // and what runs is never something already finished, so a bare
   // `--regenerate` would silently do nothing or, worse, buy the wrong clip.
   if (input.regenerate && input.artifacts.length === 0) {
     return err(
@@ -243,8 +243,8 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
 
   const wanted =
     input.artifacts.length > 0 ? input.artifacts : readyTargets(survey.data).map((one) => one.name);
-  // Read again with the targets named, so the prompts are composed — and the
-  // attachments hashed — in the same pass that is about to send them.
+  // Read again with the targets named, so the prompts are composed, and the
+  // attachments hashed, in the same pass that is about to send them.
   const stage7 = await readStage7Inputs(input, wanted);
 
   if (!stage7.ok) {
@@ -282,7 +282,7 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
   }
 }
 
-/** What one call carried, by path and digest — never the bytes. */
+/** What one call carried, by path and digest, never the bytes. */
 function attachmentsOf(artifact: PlannedArtifact): readonly RecordedFile[] {
   return artifact.attachments
     .filter((one) => one.sha256 !== null)
@@ -307,7 +307,7 @@ function idle(input: GenerateInput, stage7: Stage7Inputs): ClipsReport {
     nextStep:
       waiting.length > 0
         ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${waiting.map((one) => one.name).join(",")}`
-        : `etap 7 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny — dalej etap 8, montaż`,
+        : `etap 7 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 8, montaż`,
     paidImages: 0,
     paidVideos: 0,
     problems: [
@@ -376,7 +376,7 @@ function preview(
     problems: [
       ...problems,
       ...artifacts.filter((one) => one.state === "blocked").map((one) => `${one.id}: ${one.note}`),
-      "klucze nie były czytane — próba na sucho nie sięga po sekrety; płatne wywołanie ich wymaga",
+      "klucze nie były czytane, próba na sucho nie sięga po sekrety; płatne wywołanie ich wymaga",
     ],
     ready: problems.length === 0 && runnable.length > 0,
     size: stage7.plan.size,
@@ -488,7 +488,7 @@ async function runOne(
 
   if (target.artifact.text === null) {
     return err(
-      new Stage7BlockedError([`${target.name}: nie ma czego wysłać — brak promptu z etapu 4`])
+      new Stage7BlockedError([`${target.name}: nie ma czego wysłać, brak promptu z etapu 4`])
     );
   }
 

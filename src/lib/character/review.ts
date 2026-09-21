@@ -27,7 +27,7 @@ import { CHARACTER_ARTIFACTS, type CharacterArtifact, sizeOf } from "./prompt.js
  * top of it but is never implied by it.
  *
  * `check` reads and reports; it writes nothing. `approve` repeats the whole
- * verification and only then records acceptance — bound to the digest of one
+ * verification and only then records acceptance, bound to the digest of one
  * image at a time, because the ten results are ten separate judgements and the
  * next step's gate reads them separately.
  */
@@ -89,8 +89,8 @@ interface Inspection {
  * Which recorded inputs no longer match the bytes on disk.
  *
  * Read from the file rather than from stage 0's input list: half of what a
- * stage-2 run consumes is drawn by stage 2 itself — a view is drawn from the
- * card, the hero from all nine — and none of that appears among stage 0's
+ * stage-2 run consumes is drawn by stage 2 itself, a view is drawn from the
+ * card, the hero from all nine, and none of that appears among stage 0's
  * inputs. Comparing against that list called every image drift, which made the
  * card the only artifact that could ever read as approved.
  *
@@ -145,7 +145,7 @@ async function inspect(input: TrackScope): Promise<Result<Inspection>> {
   const problems: string[] = [];
   const changed = new Set<string>();
   const artifacts: ArtifactStatus[] = [];
-  // The ten records name overlapping inputs — the card appears nine times — so
+  // The ten records name overlapping inputs, the card appears nine times, so
   // each file is hashed once per check rather than once per artifact.
   const seen = new Map<string, string | null>();
 
@@ -231,7 +231,7 @@ async function inspectOne(
     return {
       changed: [],
       problems: [
-        `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca — mogła zostać rozliczona; powtórz polecenie, żeby dokończyć ją z zapisanej odpowiedzi, albo użyj --regenerate`,
+        `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca, mogła zostać rozliczona; powtórz polecenie, żeby dokończyć ją z zapisanej odpowiedzi, albo użyj --regenerate`,
       ],
       status: {
         approved: false,
@@ -262,7 +262,7 @@ async function inspectOne(
     }
   } else {
     problems.push(
-      `${label}: ${output.path} nie zgadza się z zapisanym hashem — wynik został zmieniony poza narzędziem`
+      `${label}: ${output.path} nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`
     );
   }
 
@@ -270,7 +270,7 @@ async function inspectOne(
 
   for (const path of changed) {
     problems.push(
-      `${path}: zmienił się od czasu narysowania ${artifact} — wynik opisuje inne wejście`
+      `${path}: zmienił się od czasu narysowania ${artifact}, wynik opisuje inne wejście`
     );
   }
 
@@ -279,7 +279,7 @@ async function inspectOne(
     problems,
     status: {
       // Approval is bound to bytes: a recorded "approved" that no longer
-      // verifies is not an approval, it is a stale claim.
+      // verifies is not an approval; it is a stale claim.
       approved: record.review.status === "approved" && problems.length === 0,
       artifact,
       note: describeAlpha(artifact, verdict),
@@ -297,11 +297,11 @@ function describeAlpha(artifact: CharacterArtifact, verdict: ImageVerdict | null
   const wantsAlpha = sizeOf(artifact).background === "transparent";
 
   return wantsAlpha && !verdict.alpha
-    ? `${verdict.width}x${verdict.height}, bez kanału alfa — oceń, czy nadaje się do kompozytowania`
+    ? `${verdict.width}x${verdict.height}, bez kanału alfa, oceń, czy nadaje się do kompozytowania`
     : `${verdict.width}x${verdict.height}`;
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkCharacter(input: TrackScope): Promise<Result<CharacterStatus>> {
   const inspection = await inspect(input);
 

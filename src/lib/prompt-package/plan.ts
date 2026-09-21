@@ -29,7 +29,7 @@ import { buildPrompt } from "./prompt.js";
  * This is the first stage whose gate reaches into the image side of the
  * pipeline, and the first whose gate is **per track** while its artifact is
  * shared. The package assigns `hero:<id>` to a frame without saying which track
- * will draw it, which is exactly what lets one manifest serve both — and is
+ * will draw it, which is exactly what lets one manifest serve both, and is
  * exactly why both have to be ready. A shared artifact whose gate was satisfied
  * by one track alone would be a plan half the pipeline never earned.
  */
@@ -49,7 +49,7 @@ export interface Stage4Paths {
 export interface Stage4Inputs {
   readonly cast: readonly CastMember[];
   /**
-   * Why a paid call may not happen yet. Empty means the upstream is in order —
+   * Why a paid call may not happen yet. Empty means the upstream is in order,
    * the model and the key are the command's own business, not this module's.
    */
   readonly gate: readonly string[];
@@ -104,7 +104,7 @@ async function readHero(
     return ok({
       input: null,
       problems: [
-        `${label}: hero.png nie jest zatwierdzony (${hero?.state ?? "brak"}) — etap 4 planuje obrazy tej postaci, więc czeka na jej wygląd: aimator check ${input.projectId} ${characterId} --stage character --track ${track}`,
+        `${label}: hero.png nie jest zatwierdzony (${hero?.state ?? "brak"}), etap 4 planuje obrazy tej postaci, więc czeka na jej wygląd: aimator check ${input.projectId} ${characterId} --stage character --track ${track}`,
       ],
     });
   }
@@ -145,7 +145,7 @@ async function readHero(
  * describe a question that was never asked.
  *
  * The canonical images are the exception that proves the rule. Their bytes are
- * **not** sent — they are accepted per track and this package is shared — but
+ * **not** sent; they are accepted per track and this package is shared, but
  * they are recorded, because what this stage consumes from them is precisely
  * "these exact bytes carry a human's acceptance". That is the fact the gate
  * turns on, so a hero redrawn afterwards has to show up here as drift and send
@@ -189,7 +189,7 @@ export async function readStage4Inputs(input: Stage4Scope): Promise<Result<Stage
   const text = await readDigest(paths.data.episode.shotList);
 
   if (!text.ok) {
-    gate.push(`brakuje ${relative(paths.data.episode.shotList)} — etap 4 nie ma czego planować`);
+    gate.push(`brakuje ${relative(paths.data.episode.shotList)}, etap 4 nie ma czego planować`);
   }
 
   const heroes = shotList === null ? [] : shotList.castSeen;

@@ -17,7 +17,7 @@ import { projectPaths, type Workspace } from "../workspace.js";
  *
  * This file exists because of a bug that was not a bug in any line of code.
  * Stage 9 had nowhere to say how the narrator reads, so every call went out on
- * the provider's defaults — and those defaults are `stability: 0.5` with
+ * the provider's defaults, and those defaults are `stability: 0.5` with
  * `style: 0`, which the provider itself describes as trending monotone. The
  * result sounded flat, and no amount of re-buying would have changed it,
  * because nothing in the pipeline was ever asked the question. A missing
@@ -25,7 +25,7 @@ import { projectPaths, type Workspace } from "../workspace.js";
  *
  * **Why it is a file of its own, beside `project.json` rather than inside it.**
  * A reading recurs between episodes exactly as a cast does, so it belongs at
- * the project level — but `project.json` is stage 0's, and stage 0 is a
+ * the project level, but `project.json` is stage 0's, and stage 0 is a
  * recorded input of nearly every artifact this pipeline makes. Putting a knob
  * somebody is expected to turn into that file would mean that nudging the
  * narrator's warmth lapses the approval on a rendered clip and on a cut
@@ -38,8 +38,8 @@ import { projectPaths, type Workspace } from "../workspace.js";
  * stage that is the only one able to hear it.
  *
  * **Why defaults are allowed here** when rule 7 says a decision with no default
- * is stored and never inferred. These five have defaults — the provider's own,
- * documented on the endpoint — so an absent file is not an unanswered question
+ * is stored and never inferred. These five have defaults, the provider's own,
+ * documented on the endpoint, so an absent file is not an unanswered question
  * standing in for an answer. It is the same reading that lets `AIMATOR_FFMPEG`
  * be optional. What the stage does *not* do is stay silent: it sends the values
  * explicitly on every call, so the request archive states what produced the
@@ -120,7 +120,7 @@ export async function readDirection(input: {
   if (!parsed.ok) {
     return err(
       new DirectionError(
-        `narration.json nie daje się odczytać: ${parsed.error.message} — popraw plik albo usuń go, żeby wrócić do ustawień domyślnych dostawcy`
+        `narration.json nie daje się odczytać: ${parsed.error.message}, popraw plik albo usuń go, żeby wrócić do ustawień domyślnych dostawcy`
       )
     );
   }
@@ -185,7 +185,7 @@ export async function setDirection(input: SetDeliveryInput): Promise<Result<Dire
         // recorded input of every bought line, so a reading somebody changes
         // no longer describes the recordings made under the old one.
         problems: [
-          "kwestie kupione przed tą zmianą były czytane inaczej — check zgłosi je jako nieaktualne; nowe brzmienie kupuje wyłącznie --regenerate",
+          "kwestie kupione przed tą zmianą były czytane inaczej, check zgłosi je jako nieaktualne; nowe brzmienie kupuje wyłącznie --regenerate",
         ],
       })
     : written;

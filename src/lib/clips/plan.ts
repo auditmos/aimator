@@ -27,7 +27,7 @@ import {
  * And the gate is a **chain**. Stage 5's graph waited on images it had drawn
  * itself; stage 6 waited on another stage's results, once. Here C03's entry
  * frame waits for the accepted end of C02, which waits for C02 itself, which
- * waits for its own entry frame — and every link in that chain is a human
+ * waits for its own entry frame, and every link in that chain is a human
  * saying yes. What that chain resolves to on this track is answered where every
  * other attachment is answered, in `lib/media-prompt`; what is left here is the
  * one question that module cannot answer, because it is not about images at
@@ -91,7 +91,7 @@ export interface Stage7Target {
 }
 
 export interface Stage7Inputs {
-  /** Why nothing may be bought at all — an unapproved or unread package. */
+  /** Why nothing may be bought at all, an unapproved or unread package. */
   readonly gate: readonly string[];
   readonly paths: Stage7Paths;
   readonly plan: SendPlan;
@@ -125,7 +125,7 @@ function resolvePaths(input: Stage7Scope): Result<Stage7Paths> {
  * Only one, and it is about the film's timing: the shot list may plan a clip of
  * any length its `maxClipSeconds` allows, and the model renders a narrower
  * range. Refusing here is what keeps the tool from ordering a duration nobody
- * decided — and refusing *before* the POST is what keeps that refusal free.
+ * decided, and refusing *before* the POST is what keeps that refusal free.
  */
 function localBlockers(seconds: number | null, name: string): readonly string[] {
   if (seconds === null) {
@@ -153,7 +153,7 @@ function toTarget(artifact: PlannedArtifact): Stage7Target {
 }
 
 /**
- * Everything stage 7 consumes, for the targets named — or for all of them.
+ * Everything stage 7 consumes, for the targets named, or for all of them.
  *
  * `targets` decides which prompts are composed in full, and the composition
  * happens in the same pass that hashes the attachments: the bytes a paid call

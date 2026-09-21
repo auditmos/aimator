@@ -37,19 +37,19 @@ import { type AudioVerdict, validateAudio } from "./validate.js";
  * The order of operations is the one `lib/image-model` wrote down and
  * `lib/voice-model` repeated, because it genuinely is the same order:
  * `submitted` lands on disk before the POST, so an attempt that dies mid-call
- * is visibly one that may already have been charged — for this one stem, not
+ * is visibly one that may already have been charged, for this one stem, not
  * for the sheet around it. Nothing retries on its own.
  *
  * Resuming costs nothing, which this shares with an image or a speech call and
  * not with a clip: the provider answers with the audio itself, so an archived
- * answer *is* the stem. A validator bug must never be billable — and here that
+ * answer *is* the stem. A validator bug must never be billable, and here that
  * matters more than usual, because the charge lands at generation rather than
  * at download, so a second attempt is a second full price.
  *
  * `promptVersion` stays null, as it does for speech, and for a reason worth
  * stating because it looks like the opposite case. A speech call carries the
  * film's own words, so a version number on them would be a claim about
- * authorship. An audio call carries an instruction — but not one of *ours*: it
+ * authorship. An audio call carries an instruction, but not one of *ours*: it
  * is a cue somebody approved in `sound-design.md`, and what answers "which
  * instruction produced these bytes" is that file's digest, recorded among the
  * inputs. A constant's version number would point at the wrong document.
@@ -112,7 +112,7 @@ function write(path: string, text: string): Promise<Result<readonly string[]>> {
 /**
  * One cue's record, merged into the file rather than replacing it.
  *
- * Stage 10 owns a set — the sheet, the bed and one record per effect — so
+ * Stage 10 owns a set, the sheet, the bed and one record per effect, so
  * replacing the file the way a single-artifact text stage does would erase
  * every record nobody touched.
  */
@@ -188,7 +188,7 @@ async function resume(
   if (!saved.ok || (status !== null && status >= 400)) {
     return err(
       artifact.blocked([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej dźwięku${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
+        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej dźwięku${status === null ? "" : ` (HTTP ${status})`}, mogła zostać rozliczona`,
         `sprawdź ${toWorkspacePath(call.workspace.root, run.root)}; nową płatną próbę zaczyna wyłącznie --regenerate`,
       ])
     );
@@ -205,7 +205,7 @@ async function resume(
     return err(
       artifact.blocked([
         ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "zapisany stem powstał z innego cue — nową płatną próbę zaczyna --regenerate",
+        "zapisany stem powstał z innego cue, nową płatną próbę zaczyna --regenerate",
       ])
     );
   }
@@ -254,7 +254,7 @@ async function attempt(
   }
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
-  // then visibly an attempt that may already have been billed — for this one
+  // then visibly an attempt that may already have been billed, for this one
   // stem, not for the whole sheet.
   const submitted = withRecord(
     stage,
@@ -373,7 +373,7 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }

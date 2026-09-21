@@ -12,8 +12,8 @@ import type { ShotList } from "../shot-list/index.js";
  * has to be able to re-run it against files that already exist, long after the
  * command that produced them.
  *
- * What it judges is the **manifest** — identifiers, kinds, subjects and the
- * dependency graph — never the prose. The prose lives in `prompts/**`, one file
+ * What it judges is the **manifest**, identifiers, kinds, subjects and the
+ * dependency graph, never the prose. The prose lives in `prompts/**`, one file
  * per future paid call, and this module deliberately cannot see it: a rule that
  * read a prompt would be a rule about writing, and no regular expression gets
  * to hold an opinion about that.
@@ -54,7 +54,7 @@ export type PackageReference = z.infer<typeof manifestSchema>["references"][numb
 export type PackageClip = z.infer<typeof manifestSchema>["clips"][number];
 
 /**
- * The package as data — what a later stage reads instead of parsing anything.
+ * The package as data, what a later stage reads instead of parsing anything.
  *
  * `heroes` is the cast this episode actually needs an image of, derived from
  * the shot list rather than from the roster: a recurring character who is not
@@ -131,14 +131,14 @@ function readReferences(
     if (reference.id !== expected) {
       return fail(
         "reference-order",
-        `referencje muszą mieć kolejne numery od R01 — napotkano "${reference.id}" na pozycji ${index + 1}`
+        `referencje muszą mieć kolejne numery od R01, napotkano "${reference.id}" na pozycji ${index + 1}`
       );
     }
 
     if (!ONE_LINE.test(reference.subject.trim())) {
       return fail(
         "reference-subject",
-        `${reference.id}: pole subject musi być jedną niepustą linią — to etykieta, a opis jest w prompts/references/${reference.id}.md`
+        `${reference.id}: pole subject musi być jedną niepustą linią, to etykieta, a opis jest w prompts/references/${reference.id}.md`
       );
     }
 
@@ -170,7 +170,7 @@ function checkIds(
     if (!known.has(id)) {
       return fail(
         "reference-ids",
-        `${context}: "${id}" nie istnieje w tym miejscu — dozwolone są wyłącznie ${[...known].join(", ")}`
+        `${context}: "${id}" nie istnieje w tym miejscu, dozwolone są wyłącznie ${[...known].join(", ")}`
       );
     }
 
@@ -212,7 +212,7 @@ function checkFrame(
   if (missing.length > 0) {
     return fail(
       "frame-cast",
-      `${context}: brakuje ${missing.map(heroId).join(", ")} — lista ujęć umieszcza tu ${missing.join(", ")}, a bez zatwierdzonego obrazu postaci nie ma z czego jej narysować`
+      `${context}: brakuje ${missing.map(heroId).join(", ")}, lista ujęć umieszcza tu ${missing.join(", ")}, a bez zatwierdzonego obrazu postaci nie ma z czego jej narysować`
     );
   }
 
@@ -220,12 +220,12 @@ function checkFrame(
     ? ok(true)
     : fail(
         "frame-location",
-        `${context}: żadna z przypisanych referencji nie opisuje przestrzeni — zbliżenie samo nie ustawi szerszego kadru`
+        `${context}: żadna z przypisanych referencji nie opisuje przestrzeni, zbliżenie samo nie ustawi szerszego kadru`
       );
 }
 
 /**
- * The structural contract, checked against the approved shot list — and the
+ * The structural contract, checked against the approved shot list, and the
  * package, returned as data.
  *
  * Says nothing about whether the direction is any good: a package that passes
@@ -255,7 +255,7 @@ export function validatePromptPackage(input: ValidateInput): Result<PromptPackag
   }
 
   if (manifest.review.trim() === "") {
-    return fail("review", "pakiet nie niesie własnej oceny — pole review jest puste");
+    return fail("review", "pakiet nie niesie własnej oceny, pole review jest puste");
   }
 
   const known = new Set([...heroes.map(heroId), ...manifest.references.map((one) => one.id)]);
@@ -283,7 +283,7 @@ export function validatePromptPackage(input: ValidateInput): Result<PromptPackag
   if (manifest.clips.map((clip) => clip.id).join(",") !== planned.join(",")) {
     return fail(
       "clips",
-      `klipy pakietu muszą być dokładnie klipami listy ujęć, w tej samej kolejności — lista ujęć ma ${planned.join(",")}`
+      `klipy pakietu muszą być dokładnie klipami listy ujęć, w tej samej kolejności, lista ujęć ma ${planned.join(",")}`
     );
   }
 
@@ -311,7 +311,7 @@ export function validatePromptPackage(input: ValidateInput): Result<PromptPackag
   if (orphan.length > 0) {
     return fail(
       "references",
-      `żaden kadr ani żadna referencja nie sięga po ${orphan.map((one) => one.id).join(", ")} — etap 5 zapłaciłby za obraz, którego nikt nie użyje`
+      `żaden kadr ani żadna referencja nie sięga po ${orphan.map((one) => one.id).join(", ")}, etap 5 zapłaciłby za obraz, którego nikt nie użyje`
     );
   }
 

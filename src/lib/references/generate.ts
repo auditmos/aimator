@@ -98,7 +98,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -108,7 +108,7 @@ class LockError extends Error {
 /**
  * Why a paid call may not happen at all. Empty means it may.
  *
- * A dry run never reads the key, so it must not claim the key is missing — it
+ * A dry run never reads the key, so it must not claim the key is missing, it
  * says what it did not check instead. Claiming to have found an absence you
  * never looked for is the same lie as claiming a success you never had.
  */
@@ -117,7 +117,7 @@ function blockers(input: GenerateInput, stage5: Stage5Inputs): readonly string[]
 
   if (input.model === null || input.model === "") {
     problems.push(
-      `brak modelu obrazowego dla toru ${input.track} — wskaż go przez --model <id> albo ${MODEL_NAME[input.track]}`
+      `brak modelu obrazowego dla toru ${input.track}, wskaż go przez --model <id> albo ${MODEL_NAME[input.track]}`
     );
   }
 
@@ -134,14 +134,14 @@ export async function generateReferences(input: GenerateInput): Promise<Result<R
   if (named.length > 0) {
     return err(
       new Stage5BlockedError([
-        `--artifact "${named.join(", ")}" — etap 5 rysuje wyłącznie referencje, w formie R01`,
+        `--artifact "${named.join(", ")}", etap 5 rysuje wyłącznie referencje, w formie R01`,
         "klatka otwarcia należy do etapu 6, a klipy i klatki wejściowe do etapu 7",
       ])
     );
   }
 
   // A new charge names its target. Without a flag the gates decide what runs,
-  // and what runs is never something already finished — so a bare
+  // and what runs is never something already finished, so a bare
   // `--regenerate` would silently do nothing or, worse, hit the wrong image.
   if (input.regenerate && input.artifacts.length === 0) {
     return err(
@@ -162,8 +162,8 @@ export async function generateReferences(input: GenerateInput): Promise<Result<R
     input.artifacts.length > 0
       ? input.artifacts
       : readyReferences(survey.data).map((one) => one.id);
-  // Read again with the targets named, so the prompts are composed — and the
-  // attachments hashed — in the same pass that is about to send them.
+  // Read again with the targets named, so the prompts are composed, and the
+  // attachments hashed, in the same pass that is about to send them.
   const stage5 = await readStage5Inputs(input, wanted);
 
   if (!stage5.ok) {
@@ -284,7 +284,7 @@ function preview(
     paidCalls: runnable.length,
     problems: [
       ...problems,
-      `${KEY_NAME[input.track]} nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
+      `${KEY_NAME[input.track]} nie był czytany, próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
     ],
     ready: problems.length === 0 && runnable.length > 0,
     size: stage5.plan.size,
@@ -292,7 +292,7 @@ function preview(
   };
 }
 
-/** What one call carried, by path and digest — never the bytes. */
+/** What one call carried, by path and digest, never the bytes. */
 function attachmentsOf(artifact: PlannedArtifact): readonly RecordedFile[] {
   return artifact.attachments
     .filter((one) => one.sha256 !== null)
@@ -381,7 +381,7 @@ async function runOne(
 
   if (target.text === null) {
     return err(
-      new Stage5BlockedError([`${target.id}: nie ma czego wysłać — brak promptu z etapu 4`])
+      new Stage5BlockedError([`${target.id}: nie ma czego wysłać, brak promptu z etapu 4`])
     );
   }
 

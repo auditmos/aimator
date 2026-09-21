@@ -1,10 +1,10 @@
 /**
- * Stage 9 — the soundtrack. The first stage that buys from two providers, and
+ * Stage 9, the soundtrack. The first stage that buys from two providers, and
  * the first whose artifacts live at two levels of the tree.
  *
  * It consumes the approved `screenplay.md` and `shot-list.md`, the stage-0
- * decisions every stage reads, the narrator's voice from `project.json`, and —
- * for the mix alone — this track's approved `episode.mp4`. It produces a
+ * decisions every stage reads, the narrator's voice from `project.json`, and,
+ * for the mix alone, this track's approved `episode.mp4`. It produces a
  * `narration.md` and one bought `narration/Nnn.wav` per utterance, shared
  * between the tracks, and a `<track>/narrated.mp4` per track.
  *
@@ -18,24 +18,24 @@
  * for, and the validator proves the lift was a lift by finding every sentence
  * inside the shot it names. Rule 7 is satisfied rather than bent: every
  * decision this script is drawn from is already stored, and what the model adds
- * — an id per utterance and the second it is anchored at — is exactly the part
+ * (an id per utterance and the second it is anchored at) is exactly the part
  * no approved artifact holds.
  *
  * **The words are shared; only the mix is per track.** A voice reading a
  * sentence has no idea which of the two films it will sit over, so buying it
  * twice would be paying for a directory. What differs per track is when each
- * line lands, because the clips came back with their own drift — and that is
+ * line lands, because the clips came back with their own drift, and that is
  * stage 4's precedent read exactly: one artifact, two productions, resolved at
  * the sender. `hero:ewa` becomes a file per track; `N02 at 7s of the plan`
  * becomes a timecode per track.
  *
  * **Bytes are published as they came; placement is refused rather than nudged.**
  * A voice provider hands back however long saying the sentence took, and those
- * are bytes somebody paid for — so no stretching, no faster reading, no
+ * are bytes somebody paid for, so no stretching, no faster reading, no
  * shortened pause, for the reason stage 8 cuts what came back and stage 2 will
  * not strip a background. But where a line *sits* comes from a plan a human
  * approved, so a line that would talk over the next one, or run past the end of
- * the film, is a refusal that names the remedy — the way stage 7 refuses a
+ * the film, is a refusal that names the remedy, the way stage 7 refuses a
  * duration no model renders rather than rounding it.
  *
  * **It cannot fulfil `audio: narration` and says so.** All four sound modes

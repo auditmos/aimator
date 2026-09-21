@@ -47,19 +47,19 @@ export interface ProjectPaths {
   readonly episodes: string;
   readonly file: string;
   /**
-   * How loud the music sits under the narrator — stage 10's own decision file,
+   * How loud the music sits under the narrator, stage 10's own decision file,
    * and `narration.json`'s twin one row down.
    *
    * At the project level for the same reason: a series sounds like itself
    * between episodes. In a file of its own rather than inside `narration.json`
    * because where a decision lives decides what changing it invalidates, and
-   * these two invalidate different things — the reading lapses the recordings
+   * these two invalidate different things, the reading lapses the recordings
    * it produced, the levels lapse the mix they produced and must leave those
    * recordings, which they never touched, exactly where they are.
    */
   readonly mix: string;
   /**
-   * How the narrator of this series performs — stage 9's own decision file.
+   * How the narrator of this series performs, stage 9's own decision file.
    *
    * At the project level because a reading recurs between episodes exactly as a
    * cast does, and beside `project.json` rather than inside it because stage 0
@@ -96,7 +96,7 @@ export interface CharacterTrackPaths {
 }
 
 /**
- * One episode as one model track draws it — stage 5 and, by contract, stages 6
+ * One episode as one model track draws it, stage 5 and, by contract, stages 6
  * to 8. The track is a directory level here for the same reason it is one under
  * a character: the two productions hold identically named files and neither
  * needs a prefix to stay out of the other's way.
@@ -125,8 +125,8 @@ export interface EpisodeTrackPaths {
   /**
    * Stage 8's one output: this track's whole episode, cut from its own clips.
    *
-   * A file rather than a directory, for the reason `openingFrameImage` is one —
-   * there is exactly one of it — and named `episode.mp4` rather than after the
+   * A file rather than a directory, for the reason `openingFrameImage` is one,
+   * there is exactly one of it, and named `episode.mp4` rather than after the
    * stage, because what it holds is the film, not the assembling of it.
    */
   readonly episodeVideo: string;
@@ -138,7 +138,7 @@ export interface EpisodeTrackPaths {
   readonly frames: string;
   /**
    * Stage 10's one output on this track: the whole film, with every sound it
-   * has — narration, music and effects — over a picture copied through
+   * has, narration, music and effects, over a picture copied through
    * untouched.
    *
    * It sits beside `narrated.mp4` rather than replacing it, exactly as that
@@ -146,7 +146,7 @@ export interface EpisodeTrackPaths {
    * about a separate question: the cut is the film, the narrated cut is where
    * the narrator lands, and this one is whether the whole thing plays. Stage 10
    * rebuilds from `episode.mp4` and the lossless stems rather than laying music
-   * over `narrated.mp4`, so the speech is encoded exactly once — which is also
+   * over `narrated.mp4`, so the speech is encoded exactly once, which is also
    * the only arrangement in which music can step back under a voice, because
    * the voice has to be an input of the graph rather than already inside it.
    */
@@ -156,7 +156,7 @@ export interface EpisodeTrackPaths {
    * narration laid over it, the video copied through untouched.
    *
    * A file rather than a directory, and named for what it holds rather than for
-   * the stage that made it — the same reading that makes stage 8's output
+   * the stage that made it, the same reading that makes stage 8's output
    * `episode.mp4` and its state file `assembly.stage.json`. It sits beside
    * `episode.mp4` rather than replacing it: those bytes carry a human's yes,
    * and stage 9 neither overwrites nor re-encodes them.
@@ -165,7 +165,7 @@ export interface EpisodeTrackPaths {
   /**
    * Stage 6's one output. It is a file rather than a directory because the
    * opening frame is a single image, so there is no set for a directory to
-   * hold — and it is `openingFrameImage` rather than `openingFrame` because
+   * hold, and it is `openingFrameImage` rather than `openingFrame` because
    * `PromptPaths` already owns that word for the direction stage 4 published.
    */
   readonly openingFrameImage: string;
@@ -197,8 +197,8 @@ export interface EpisodeTrackPaths {
   readonly soundDesignStage: string;
   /**
    * Stage 9's per-track lock and state file. Stage 9 is the first stage whose
-   * artifacts live at two levels — the words are shared like every text stage's
-   * and the mix is per track like every video stage's — so it writes one state
+   * artifacts live at two levels, the words are shared like every text stage's
+   * and the mix is per track like every video stage's, so it writes one state
    * file at each, exactly as rule 1 asks: one per stage per directory it writes
    * to, the way stage 2 holds one per character per track.
    */
@@ -256,10 +256,10 @@ export interface VideoRunPaths {
  *
  * It is the thinnest archive in the pipeline, and deliberately so: stage 8
  * sends nothing, so there is no request, no response and no prompt. What it
- * keeps is exactly what the invariant asks for — the part that cannot be
+ * keeps is exactly what the invariant asks for, the part that cannot be
  * reconstructed. The cut itself can: it is a pure function of clips whose
- * digests are recorded. Which muxer produced these bytes, with which arguments,
- * and what it said while doing it, cannot — not after the next upgrade.
+ * digests are recorded. Which muxer produced these bytes, with which arguments
+ * and what it said while doing it, cannot: not after the next upgrade.
  */
 interface AssemblyRunPaths {
   /** The concat list handed to the muxer: the clips, in the plan's order. */
@@ -270,7 +270,7 @@ interface AssemblyRunPaths {
   readonly run: string;
   /**
    * How the bytes travelled. For a paid stage that is HTTP; here it is the
-   * process — argv, the version it reported, its exit code and its stderr.
+   * process, argv, the version it reported, its exit code and its stderr.
    * The same word, because it answers the same question.
    */
   readonly transport: string;
@@ -279,7 +279,7 @@ interface AssemblyRunPaths {
 
 /**
  * What one speech attempt archives. `request.json` carries the text and the
- * settings, which is the whole of what was sent — a TTS call has no attachments
+ * settings, which is the whole of what was sent, a TTS call has no attachments
  * and therefore no reference bytes to leave out.
  */
 export interface VoiceRunPaths {
@@ -318,8 +318,8 @@ export interface AudioRunPaths {
 /**
  * What one local mix archives: stage 8's thin archive, plus where each sound
  * landed. Shared by stage 9's narrated cut and stage 10's full mix, because
- * both are the same act — a local engine laying sound over a picture it copied
- * — and `placement.json` answers the same question for both.
+ * both are the same act (a local engine laying sound over a picture it copied),
+ * and `placement.json` answers the same question for both.
  */
 interface MixRunPaths {
   /** Which sound was laid down at which second of this track's own cut. */
@@ -338,7 +338,7 @@ export interface EpisodePaths {
    * Stage 9's spoken lines, one file per utterance and per paid call.
    *
    * Shared between the tracks, with no track level, because what the bytes
-   * depend on — the text, the voice and the speech model — does not differ per
+   * depend on, the text, the voice and the speech model, does not differ per
    * track. Only the mix does, because only the mix is timed against a
    * particular cut.
    */
@@ -385,8 +385,8 @@ export interface EpisodePaths {
    * paid call.
    *
    * Shared between the tracks, with no track level, for the reason stage 9's
-   * spoken lines are: what the bytes depend on — the cue text, the audio model
-   * and the length asked for — does not differ per track. A music bed has no
+   * spoken lines are: what the bytes depend on, the cue text, the audio model
+   * and the length asked for, does not differ per track. A music bed has no
    * idea which of the two films it will sit under, and the two differ only by
    * the drift their clips came back with.
    */
@@ -396,7 +396,7 @@ export interface EpisodePaths {
    * effect by effect.
    *
    * It sits beside the screenplay, the shot list and the narration script
-   * because it is words rather than pictures — but unlike those three it is an
+   * because it is words rather than pictures, but unlike those three it is an
    * **instruction**, so rule 9 puts it in English while the shot list it is
    * written from stays in the film's own language.
    */
@@ -504,7 +504,7 @@ export function resolveWorkspace(root: string | undefined): Result<Workspace> {
  * Turns a path recorded in an artifact back into one that can be read.
  *
  * Records store workspace-relative paths so the whole tree can be moved, which
- * means verifying a recorded input means resolving it again here — this module
+ * means verifying a recorded input means resolving it again here, this module
  * is the only one allowed to join a segment, including in this direction.
  */
 export function workspacePath(workspace: Workspace, recorded: string): string {
@@ -658,7 +658,7 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
  *
  * Every state file and every lock is named after the stage that owns it. While
  * stage 5 was the only writer a bare `stage` read correctly, but it encoded
- * "there is one stage down here" — which stage 6 makes false. Rule 1 asks for
+ * "there is one stage down here", which stage 6 makes false. Rule 1 asks for
  * `<stage>.stage.json`, and that is only unambiguous if the field says which.
  */
 export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): EpisodeTrackPaths {
@@ -692,7 +692,7 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
 /**
  * One reference image. The identifier is the artifact key, the manifest entry
  * and the file name at once, so it is checked here rather than trusted into a
- * path — the same reason `characterViewImage` checks a view name.
+ * path, the same reason `characterViewImage` checks a view name.
  */
 export function referenceImage(paths: EpisodeTrackPaths, id: string): Result<string> {
   return ARTIFACT_ID.test(id)
@@ -702,7 +702,7 @@ export function referenceImage(paths: EpisodeTrackPaths, id: string): Result<str
 
 /**
  * One clip's video. The identifier is the artifact key and the file name at
- * once, so it is checked here rather than trusted into a path — the same
+ * once, so it is checked here rather than trusted into a path, the same
  * reason `referenceImage` checks a reference id.
  */
 export function clipVideo(paths: EpisodeTrackPaths, id: string): Result<string> {
@@ -716,7 +716,7 @@ export function clipVideo(paths: EpisodeTrackPaths, id: string): Result<string> 
  *
  * An entry frame is drawn by an image model this pipeline asks for PNG, so it
  * is always a PNG. The frame a clip ended on is whatever the video provider
- * handed back — a JPEG, in practice — and it is published under a name that
+ * handed back, a JPEG, in practice, and it is published under a name that
  * says so rather than re-encoded into the format the rest of the tree happens
  * to use: approving one picture and attaching another is the thing rule 6 and
  * the bytes-bound approval exist to prevent.
@@ -753,7 +753,7 @@ export function clipFrame(
  *
  * It is an image attempt plus the two files the provider hands back: the clip
  * itself, and the final frame it ended on. Both are downloaded from signed URLs
- * that live 24 hours, so keeping them here is what makes a resume free — the
+ * that live 24 hours, so keeping them here is what makes a resume free, the
  * same reason a seedream image attempt keeps `original.png`.
  */
 export function videoRunPaths(paths: { readonly runs: string }, runId: string): VideoRunPaths {
@@ -775,7 +775,7 @@ export function videoRunPaths(paths: { readonly runs: string }, runId: string): 
 }
 
 /**
- * The archive of one local attempt — stage 8's, and the first with no network
+ * The archive of one local attempt, stage 8's, and the first with no network
  * behind it. It shares this track's `runs/` with the paid stages above it, for
  * the reason they share it with each other: a run id is unique and `run.json`
  * records which stage minted it.
@@ -799,7 +799,7 @@ export function assemblyRunPaths(
 /**
  * One utterance's own file. The identifier is the artifact key, the line of
  * the script and the file name at once, so it is checked here rather than
- * trusted into a path — the same reason `referenceImage` checks a reference id.
+ * trusted into a path, the same reason `referenceImage` checks a reference id.
  *
  * WAV rather than the provider's default MP3, and that is a decision rather
  * than a preference: a RIFF header states its sample rate, its channels and the
@@ -815,7 +815,7 @@ export function narrationAudio(paths: EpisodePaths, id: string): Result<string> 
 }
 
 /**
- * One bought stem's own file — the music bed `M01`, or an effect `E01`.
+ * One bought stem's own file, the music bed `M01`, or an effect `E01`.
  *
  * MP3 rather than the WAV a line is bought in, and that is the provider's
  * doing rather than this pipeline's preference. Neither the music endpoint nor
@@ -824,7 +824,7 @@ export function narrationAudio(paths: EpisodePaths, id: string): Result<string> 
  * asked for, but the channel count would not, and guessing it wrong states a
  * length twice or half the truth without a word of warning. An MP3 frame
  * header declares its own rate, bitrate and channel mode, so the verdict on a
- * stem stays exact and offline — it simply has to walk the frames instead of
+ * stem stays exact and offline; it simply has to walk the frames instead of
  * reading twenty-four bytes. That is the same trade stage 7 made when it read
  * MP4 boxes rather than calling a decoder.
  */
@@ -839,7 +839,7 @@ export function soundStem(paths: EpisodePaths, id: string): Result<string> {
  *
  * It sits under the episode rather than under a track, because that is where
  * the line was bought: the words are shared, so the receipt is too. Like every
- * other archive it never copies an input — the text it read out is in the
+ * other archive it never copies an input, the text it read out is in the
  * script, referenced by path and digest.
  */
 export function voiceRunPaths(paths: { readonly runs: string }, runId: string): VoiceRunPaths {
@@ -863,7 +863,7 @@ export function voiceRunPaths(paths: { readonly runs: string }, runId: string): 
  *
  * It sits under the episode rather than under a track, for the reason a
  * speech attempt does: that is where the stem was bought, and the stems are
- * shared. Like every archive here it never copies an input — the cue it was
+ * shared. Like every archive here it never copies an input, the cue it was
  * composed from is in the cue sheet, referenced by path and digest.
  */
 export function audioRunPaths(paths: { readonly runs: string }, runId: string): AudioRunPaths {
@@ -883,7 +883,7 @@ export function audioRunPaths(paths: { readonly runs: string }, runId: string): 
 }
 
 /**
- * The archive of one local mix — stage 9's narrated cut and stage 10's full
+ * The archive of one local mix, stage 9's narrated cut and stage 10's full
  * one, which are the same act over different inputs. It keeps what stage 8's
  * archive keeps and one thing more: where each sound was laid down. That is
  * arithmetic and could be recomputed, but it is also what the engine was
@@ -923,7 +923,7 @@ export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
  * A file inside a run's `previous/`, named as the artifact itself is named.
  *
  * A stage preserving its own result knows the names it uses; it does not get to
- * join them onto a path, so it asks here — the same direction `workspacePath`
+ * join them onto a path, so it asks here, the same direction `workspacePath`
  * already covers. A name that escapes the archive is refused rather than
  * normalised, because a `--regenerate` that wrote outside its own run
  * directory would be a backup that overwrote something.
@@ -968,7 +968,7 @@ export function promptPaths(episode: EpisodePaths): PromptPaths {
 
 /**
  * One numbered prompt file. The identifier is both the artifact key and the
- * file name, so it is checked here rather than trusted into a path — the same
+ * file name, so it is checked here rather than trusted into a path, the same
  * reason `characterViewImage` checks a view name.
  */
 export function promptFile(paths: PromptPaths, kind: PromptKind, id: string): Result<string> {

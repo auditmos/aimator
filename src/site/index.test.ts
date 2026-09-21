@@ -54,7 +54,7 @@ function registry(version: string): Registry {
     episode: {
       aspectRatio: "16:9",
       audio: "narracja, muzyka i efekty",
-      episode: "01 — Burza",
+      episode: "01, Burza",
       language: "pl",
       project: "Dzielna Ewa",
     },
@@ -83,7 +83,7 @@ function registry(version: string): Registry {
             kind: "reference",
             label: "R01",
             sha256: sha(STILL),
-            subject: "Ewa — evening appearance",
+            subject: "Ewa, evening appearance",
             width: 1600,
           },
         ],

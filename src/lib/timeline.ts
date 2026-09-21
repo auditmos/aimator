@@ -19,7 +19,7 @@ import {
  * nine something, because twenty-four frames do not divide a second evenly.
  * Stage 7 accepts a deviation below one second and publishes what came back,
  * stage 8 cuts what came back and *reports* the difference rather than
- * trimming it — so by the time there is a film, every seam has moved a little
+ * trimming it, so by the time there is a film, every seam has moved a little
  * and the two clocks have come apart.
  *
  * Every stage that lays sound on a picture has to cross that gap. Stage 9 did
@@ -66,7 +66,7 @@ class TimelineError extends Error {
   }
 }
 
-/** Seconds, to the thousandth — the precision an audio delay is spelled in. */
+/** Seconds, to the thousandth, the precision an audio delay is spelled in. */
 function round(seconds: number): number {
   return Math.round(seconds * 1000) / 1000;
 }
@@ -139,7 +139,7 @@ export async function readPlanClock(input: {
  *
  * Not a scale factor: within a clip the two clocks run at exactly the same
  * rate, and the fraction a renderer leaves over sits at the clip's *end*
- * rather than spread through it. So the mapping is a walk — count the real
+ * rather than spread through it. So the mapping is a walk, count the real
  * seconds of every clip before this one, then add however far into this one
  * the plan second falls.
  */

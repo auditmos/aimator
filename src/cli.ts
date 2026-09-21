@@ -107,13 +107,13 @@ import { type ImageTrack, imageTracks, resolveWorkspace, type Workspace } from "
 
 const USAGE = `Usage: aimator <command>
 
-Etap 0 — przygotowanie projektu i odcinka:
+Etap 0. Przygotowanie projektu i odcinka:
   project init <id> --title <tytuł> [--aspect-ratio <w:h>]
   project voice <id> --voice-id <id głosu>
     Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
-    etap 9 — film bez narracji nigdy nie musi tej decyzji podejmować.
+    etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
   character new <id> <character-id> --name <nazwa>
   character add <id> <character-id> --source <plik> [--source <plik>...]
   character describe <id> <character-id>
@@ -122,20 +122,20 @@ Etap 0 — przygotowanie projektu i odcinka:
                    [--max-clip <s>]
   episode set <id> <episode-id> [te same flagi decyzji]
 
-Etap 1 — scenariusz (płatny):
+Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                                         [--dry-run] [--regenerate]
 
-Etap 2 — postać (płatny; niezależny od etapu 1, może biec równolegle):
+Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
   character generate <id> <character-id> --track <gpt-image|seedream>
                      [--artifact card|hero|<widok>,...] [--model <id>]
                      [--dry-run] [--regenerate]
 
-Etap 3 — lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
+Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                                        [--dry-run] [--regenerate]
 
-Etap 4 — pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
+Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
   prompt-package generate <id> <episode-id> [--model <id>]
                           [--max-output-tokens <n>] [--dry-run] [--regenerate]
                           [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
@@ -146,61 +146,61 @@ Etap 4 — pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba)
     blok o medium, kadr, dosłowne ujęcia z listy i project.md. Bez --artifact
     wypisuje sam plan: co pakiet planuje, ile referencji i czy są zatwierdzone.
 
-Etap 5 — obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
+Etap 5. Obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
   reference generate <id> <episode-id> --track <gpt-image|seedream>
                      [--artifact R01,R02] [--model <id>] [--dry-run] [--regenerate]
     Bez --artifact rysuje wszystkie referencje, których zależności są już
     zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.
 
-Etap 6 — klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
+Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
   opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
                          [--model <id>] [--dry-run] [--regenerate]
     Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
-    każdej postaci w kadrze — zatwierdzone NA TYM TORZE. Jeden artefakt, więc
+    każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
     --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.
 
-Etap 7 — klipy (płatny; per tor, dwa media w jednym poleceniu):
+Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
   clip generate <id> <episode-id> --track <gpt-image|seedream>
                [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
                [--dry-run] [--regenerate]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
-    i klipy (wideo, jednym modelem dla obu torów — AIMATOR_VIDEO_MODEL, klucz
+    i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL, klucz
     BYTEPLUS_MODELARK). Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną
     klatkę otwarcia, klatka wejściowa C02 na zatwierdzoną końcówkę C01 (gdy
     lista ujęć mówi previous-end-frame), a klip C02 na tę klatkę. Raport podaje
     liczbę wywołań OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle.
     Długość klipu bierze się z listy ujęć; klipu, którego model nie renderuje,
-    narzędzie nie zaokrągli — odmówi i wskaże poprawkę w etapie 3.
+    narzędzie nie zaokrągli, odmówi i wskaże poprawkę w etapie 3.
 
-Etap 8 — montaż (darmowy; per tor, jeden artefakt):
+Etap 8. Montaż (darmowy; per tor, jeden artefakt):
   assembly generate <id> <episode-id> --track <gpt-image|seedream>
                     [--dry-run] [--regenerate]
     Skleja zatwierdzone klipy w <tor>/episode.mp4 bez przekodowania, w
-    kolejności z zatwierdzonej listy ujęć — planu montażowego nie ma jako pliku,
+    kolejności z zatwierdzonej listy ujęć, planu montażowego nie ma jako pliku,
     bo lista ujęć już go niesie. Nic nie kupuje i nie potrzebuje modelu ani
     klucza; potrzebuje ffmpeg (PATH albo AIMATOR_FFMPEG), a gdy go nie ma,
     odmawia zamiast przekodowywać. Klipy nie wracają co do sekundy, więc skleja
-    to, co wróciło, i melduje różnicę wobec planu — nigdy nie przycina.
+    to, co wróciło, i melduje różnicę wobec planu, nigdy nie przycina.
     Jeden artefakt na tor, więc --artifact niczego nie zawęża i nie jest
     wymagane; --regenerate jest, bo gotowy montaż nosi zgodę człowieka.
     episode.mp4 jest NIEMY: ścieżka dźwiękowa musi powstać wobec sklejonego
     filmu, a nie wobec planu, więc należy do etapu poniżej montażu.
 
-Etap 9 — dźwięk (płatny; słowa wspólne, miks per tor):
+Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
   narration generate <id> <episode-id> [--model <id>] [--voice-model <id>]
                      [--max-output-tokens <n>] [--artifact script|N01[,N02]]
                      [--dry-run] [--regenerate]
     Podnosi narrację z zatwierdzonej listy ujęć i kupuje ją głosem z project.json.
     Narracji nie pisze: każde zdanie musi wystąpić dosłownie w polu Audio swojego
-    ujęcia, a walidator to sprawdza — jeśli film ma powiedzieć coś nowego,
+    ujęcia, a walidator to sprawdza, jeśli film ma powiedzieć coś nowego,
     poprawka należy do etapu 1. Skrypt i nagrania są WSPÓLNE dla obu torów, bo
     głos czytający zdanie nie wie, nad którym filmem usiądzie.
     ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
   narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]
                       [--similarity <0-1>] [--speaker-boost] [--dry-run]
     Jak narrator serii CZYTA. Bez tej decyzji każde wywołanie szło na domyślnych
-    ustawieniach dostawcy — stability 0.5 i style 0 — które sam dostawca opisuje
+    ustawieniach dostawcy, stability 0.5 i style 0, które sam dostawca opisuje
     jako skłonne do monotonii; płaskie brzmienie nie było wadą głosu, tylko
     brakiem miejsca na decyzję. Mieszka w narration.json OBOK project.json, a nie
     w nim: plik etapu 0 jest zapisanym wejściem niemal wszystkiego, więc suwak,
@@ -210,47 +210,47 @@ Etap 9 — dźwięk (płatny; słowa wspólne, miks per tor):
   narration mix <id> <episode-id> --track <gpt-image|seedream>
                 [--dry-run] [--regenerate]
     Kładzie przyjęte kwestie na zatwierdzonym episode.mp4 i zapisuje
-    <tor>/narrated.mp4. Obraz idzie kopią strumieniową — episode.mp4 nie jest
+    <tor>/narrated.mp4. Obraz idzie kopią strumieniową, episode.mp4 nie jest
     nadpisywany ani przekodowywany. Kotwice z planu przelicza na oś TEGO toru,
     bo klipy wróciły z dryfem. Kwestia, która nachodziłaby na następną albo nie
     mieści się w filmie, jest ODMOWĄ, nie przesunięciem.
     Narracja to nie cała ścieżka: muzykę i efekty dokłada etap 10, więc ich brak
     jest tu meldowany, dokładnie jak cisza w etapie 8.
 
-Etap 10 — muzyka i efekty (płatny; stemy wspólne, miks per tor):
+Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
   sound-design generate <id> <episode-id> [--model <id>] [--music-model <id>]
                         [--effects-model <id>] [--max-output-tokens <n>]
                         [--artifact cues|M01[,E02]] [--dry-run] [--regenerate]
     Pisze arkusz cue z zatwierdzonej listy ujęć, a potem kupuje to, co arkusz
     autoryzuje: podkład z /v1/music i efekty z /v1/sound-generation (klucz
-    ELEVENLABS_API_KEY, ten sam co mowa — to czwarte i piąte miejsce wywołania
+    ELEVENLABS_API_KEY, ten sam co mowa, to czwarte i piąte miejsce wywołania
     u dostawcy, którego potok już ma, nie czwarty dostawca).
     Arkusz jest INSTRUKCJĄ, więc idzie po angielsku (reguła 9), a lista ujęć
     jedzie obok niego dosłownie, po swojemu. Nie ma tu odpowiednika reguły
     „podnoszone, nie pisane" z etapu 9 i nie da się go mieć: prompt muzyczny
     trzeba napisać, a nie przepisać. Zamiast niego jest werdykt okablowania
-    etapu 4 — każde ujęcie policzone, podkład kafelkujący film bez dziur,
-    każda długość taka, jaką dostawca zrenderuje — i człowiek, który to czyta.
+    etapu 4, każde ujęcie policzone, podkład kafelkujący film bez dziur,
+    każda długość taka, jaką dostawca zrenderuje, i człowiek, który to czyta.
     ElevenLabs wycenia muzykę i efekty ZA MINUTĘ dźwięku i nalicza przy
     GENERACJI, więc podgląd podaje wywołania I sekundy, a --regenerate to druga
     pełna opłata.
   sound-design levels <id> [--music-db <n>] [--effects-db <n>] [--duck-db <n>]
                       [--duck-release <ms>] [--dry-run]
     Jak głośno siedzi podkład i jak mocno ustępuje pod mową. Mieszka
-    w projects/<id>/mix.json — nie w project.json, bo suwak unieważniałby zgody
+    w projects/<id>/mix.json, nie w project.json, bo suwak unieważniałby zgody
     na bajty, których nie dotknął, i nie w narration.json, bo głośność muzyki
     nie mówi nic o tym, jak narrator czytał, więc nie może unieważniać nagrań.
     Wartości startowe są, bo tej decyzji nie da się podjąć, zanim się ją usłyszy;
     jadą jawnie do silnika i lądują w archiwum.
   sound-design mix <id> <episode-id> --track <gpt-image|seedream>
                    [--dry-run] [--regenerate]
-    Składa <tor>/mixed.mp4 z episode.mp4 i stemów — NIE z narrated.mp4. Dzięki
+    Składa <tor>/mixed.mp4 z episode.mp4 i stemów, NIE z narrated.mp4. Dzięki
     temu mowa koduje się dokładnie raz, a muzyka w ogóle może ustąpić pod
     głosem. narrated.mp4 nie jest nadpisywany ani unieważniany: zostaje
     przyjętym produktem pośrednim i jedynym miejscem, gdzie słychać samo
-    umieszczenie narracji — i to od tej zgody ten etap bramkuje.
+    umieszczenie narracji, i to od tej zgody ten etap bramkuje.
     Efekt, który wychodzi poza koniec filmu, jest ODMOWĄ; podkład, który kończy
-    się przed nim, jest MELDUNKIEM — pierwsze to zderzenie, drugie to dryf.
+    się przed nim, jest MELDUNKIEM, pierwsze to zderzenie, drugie to dryf.
 
 Wspólne:
   check <id> [<episode-id>]
@@ -285,7 +285,7 @@ Wspólne:
                profile-right, rear
 
 Obsada jest jawną decyzją: wymień każdą powracającą postać przez "character new".
-Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę —
+Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę,
 zdjęcia ("character add") albo opis w project.md ("character describe").
 
 Globalne:
@@ -297,7 +297,7 @@ Etapy 1 i 2 odmawiają płatnego wywołania, dopóki etap 0 nie ma review.status
 "approved". W etapie 2 osiem widoków czeka na zatwierdzoną kartę, a hero na
 zatwierdzone widoki. Etap 3 czeka na zatwierdzony scenariusz i nie zależy od
 etapu 2. Etap 4 czeka na zatwierdzoną listę ujęć i na zatwierdzony hero.png
-każdej postaci, którą lista ujęć stawia w kadrze — na obu torach naraz, bo
+każdej postaci, którą lista ujęć stawia w kadrze, na obu torach naraz, bo
 pakiet jest jeden dla obu. Nic nie ponawia się samo; nową płatną próbę zaczyna
 wyłącznie --regenerate, zachowując poprzedni wynik.`;
 
@@ -342,7 +342,7 @@ interface Parsed {
   readonly values: Record<string, boolean | string | string[] | undefined>;
 }
 
-/** `-22`, `-0.5`, `-.5`: a value, never an option — this CLI declares no numeric ones. */
+/** `-22`, `-0.5`, `-.5`: a value, never an option, this CLI declares no numeric ones. */
 const NEGATIVE_NUMBER = /^-(?:\d|\.\d)/;
 
 /**
@@ -350,13 +350,13 @@ const NEGATIVE_NUMBER = /^-(?:\d|\.\d)/;
  *
  * `parseArgs` treats every token starting with `-` as an option, so
  * `--music-db -22` leaves the flag without a value and fails as "ambiguous".
- * That is deliberate on Node's side and not configurable — but here it breaks
+ * That is deliberate on Node's side and not configurable, but here it breaks
  * the **ordinary** case rather than an edge one: a bed sits *under* a voice, so
  * every decibel this CLI takes is normally negative, and the `--music-db=-22`
  * spelling that does work is a trap rather than an interface.
  *
  * The rewrite is narrow on purpose. It fires only when the option is declared
- * to take a value **and** the next token is a number with a leading minus —
+ * to take a value **and** the next token is a number with a leading minus,
  * which no option here can be, so nothing ambiguous is being guessed at.
  * Everything else travels through untouched: positive numbers, boolean flags,
  * the joined spelling, and anything past `--`.
@@ -473,7 +473,7 @@ function settingsOf(parsed: Parsed): Record<string, number | string> {
 }
 
 function render(headline: string, report: Stage0Report, mode: "apply" | "dry-run"): string {
-  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+  const lines = [mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -488,7 +488,7 @@ function render(headline: string, report: Stage0Report, mode: "apply" | "dry-run
   }
 
   if (report.ready && !report.approved) {
-    lines.push("  ! pliki przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+    lines.push("  ! pliki przeszły walidację; to nie to samo co przyjęcie ich przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -509,11 +509,11 @@ function renderGenerate(
   const lines =
     mode === "dry-run"
       ? [
-          `Próba na sucho — nic nie zapisano, nic nie wysłano. Scenariusz ${projectId}/${episodeId}`,
+          `Próba na sucho: nic nie zapisano, nic nie wysłano. Scenariusz ${projectId}/${episodeId}`,
           `  wymagane co najmniej ${report.minimumScenes} scen, każda 1–15 s, suma dokładnie równa durationSeconds`,
-          "  OPENAI_API_KEY nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+          "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
         ]
-      : [`Scenariusz ${projectId}/${episodeId} — próba ${report.runId ?? ""}`];
+      : [`Scenariusz ${projectId}/${episodeId}, próba ${report.runId ?? ""}`];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -523,7 +523,7 @@ function renderGenerate(
     lines.push(
       `  sceny: ${report.verdict.scenes}, suma ${report.verdict.durationSeconds} s, najdłuższa ${report.verdict.longestSceneSeconds} s`
     );
-    lines.push("  ! struktura i suma czasów się zgadzają — fabuła wymaga oceny człowieka");
+    lines.push("  ! struktura i suma czasów się zgadzają; fabuła wymaga oceny człowieka");
   }
 
   for (const problem of report.problems) {
@@ -546,7 +546,7 @@ function renderScreenplay(
   episodeId: string,
   mode: "apply" | "dry-run"
 ): string {
-  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+  const lines = [mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline];
 
   if (status.verdict !== null) {
     lines.push(
@@ -560,7 +560,7 @@ function renderScreenplay(
 
   if (status.status === "completed" && !status.approved && status.problems.length === 0) {
     lines.push(
-      `  ! plik przeszedł walidację — to nie to samo co przyjęcie go przez człowieka: aimator approve ${projectId} ${episodeId} --stage screenplay`
+      `  ! plik przeszedł walidację; to nie to samo co przyjęcie go przez człowieka: aimator approve ${projectId} ${episodeId} --stage screenplay`
     );
   }
 
@@ -662,7 +662,7 @@ async function runProject(argv: readonly string[]): Promise<Result<string>> {
     : result;
 }
 
-/** Project id, character id and the workspace — what every cast command needs. */
+/** Project id, character id and the workspace, what every cast command needs. */
 function castScope(
   parsed: Parsed
 ): Result<{ characterId: string; projectId: string; workspace: Workspace }> {
@@ -792,7 +792,7 @@ function trackOf(parsed: Parsed): Result<ImageTrack> {
 
   return typeof flag === "string" && TRACKS.has(flag)
     ? ok(flag as ImageTrack)
-    : err(new UsageError(`--track — dozwolone: ${imageTracks.join(", ")}`));
+    : err(new UsageError(`--track, dozwolone: ${imageTracks.join(", ")}`));
 }
 
 /** `--artifact` accepts the same words the stage file uses as keys. */
@@ -811,7 +811,7 @@ function artifactsOf(parsed: Parsed): Result<readonly CharacterArtifact[]> {
     ? ok(known)
     : err(
         new UsageError(
-          `--artifact "${unknown.join(", ")}" — dozwolone: ${CHARACTER_ARTIFACTS.join(", ")}`
+          `--artifact "${unknown.join(", ")}", dozwolone: ${CHARACTER_ARTIFACTS.join(", ")}`
         )
       );
 }
@@ -888,12 +888,12 @@ function renderCharacter(
   const headline = `Postać "${report.name}" (${scope.characterId}), tor ${report.track}`;
   const lines = [
     mode === "dry-run"
-      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      ? `Próba na sucho: nic nie zapisano, nic nie wysłano. ${headline}`
       : headline,
   ];
 
   for (const outcome of report.artifacts) {
-    lines.push(`  ${outcome.artifact}: ${outcome.state} — ${outcome.note}`);
+    lines.push(`  ${outcome.artifact}: ${outcome.state}, ${outcome.note}`);
 
     for (const reference of outcome.references) {
       lines.push(`      ← ${reference.path}  ${reference.sha256.slice(0, 12)}`);
@@ -909,7 +909,7 @@ function renderCharacter(
   }
 
   if (report.created.length > 0) {
-    lines.push("  ! obrazy przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+    lines.push("  ! obrazy przeszły walidację; to nie to samo co przyjęcie ich przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -932,7 +932,7 @@ function renderCharacterStatus(headline: string, status: CharacterStatus): strin
 
   for (const entry of status.artifacts) {
     const mark = entry.approved ? "zatwierdzony" : entry.state;
-    lines.push(`  ${entry.artifact}: ${mark} — ${entry.note}`);
+    lines.push(`  ${entry.artifact}: ${mark}, ${entry.note}`);
   }
 
   for (const problem of status.problems) {
@@ -973,7 +973,7 @@ async function checkCharacterStage(
   return result.ok
     ? ok(
         renderCharacterStatus(
-          `Postać "${result.data.name}" (${characterId.data}), tor ${track.data} — etap 2${result.data.approved ? ", zatwierdzony w całości" : ""}`,
+          `Postać "${result.data.name}" (${characterId.data}), tor ${track.data}, etap 2${result.data.approved ? ", zatwierdzony w całości" : ""}`,
           result.data
         )
       )
@@ -1009,7 +1009,7 @@ async function checkReferencesStage(
   return result.ok
     ? ok(
         renderReferencesStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — etap 5${result.data.approved ? ", zatwierdzony w całości" : ""}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, etap 5${result.data.approved ? ", zatwierdzony w całości" : ""}`,
           result.data
         )
       )
@@ -1045,7 +1045,7 @@ async function checkOpeningFrameStage(
   return result.ok
     ? ok(
         renderOpeningFrameStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — etap 6${result.data.approved ? ", zatwierdzony" : ""}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, etap 6${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data
         )
       )
@@ -1078,7 +1078,7 @@ async function checkClipsStage(
   return result.ok
     ? ok(
         renderClipsStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — etap 7${result.data.approved ? ", zatwierdzony w całości" : ""}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, etap 7${result.data.approved ? ", zatwierdzony w całości" : ""}`,
           result.data
         )
       )
@@ -1111,7 +1111,7 @@ async function checkAssemblyStage(
   return result.ok
     ? ok(
         renderAssemblyStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — etap 8${result.data.approved ? ", przyjęty w całości" : ""}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, etap 8${result.data.approved ? ", przyjęty w całości" : ""}`,
           result.data
         )
       )
@@ -1152,7 +1152,7 @@ async function approveCharacterStage(parsed: Parsed, approval: Approval): Promis
   return result.ok
     ? ok(
         renderCharacterStatus(
-          `Postać "${characterId.data}" na torze ${track.data} — zatwierdzono: ${artifacts.data.join(", ")}`,
+          `Postać "${characterId.data}" na torze ${track.data}, zatwierdzono: ${artifacts.data.join(", ")}`,
           result.data
         )
       )
@@ -1188,7 +1188,7 @@ async function approveReferencesStage(parsed: Parsed, approval: Approval): Promi
   return result.ok
     ? ok(
         renderReferencesStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono: ${artifacts.join(", ")}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono: ${artifacts.join(", ")}`,
           result.data
         )
       )
@@ -1227,7 +1227,7 @@ async function approveOpeningFrameStage(
   return result.ok
     ? ok(
         renderOpeningFrameStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono klatkę otwarcia`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono klatkę otwarcia`,
           result.data
         )
       )
@@ -1255,7 +1255,7 @@ async function approveClipsStage(parsed: Parsed, approval: Approval): Promise<Re
   return result.ok
     ? ok(
         renderClipsStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono`,
           result.data
         )
       )
@@ -1267,8 +1267,8 @@ async function approveClipsStage(parsed: Parsed, approval: Approval): Promise<Re
  *
  * A flag is required upstream for two reasons: several candidates exist, so a
  * bare command is ambiguous, and accepting one of them opens a gate that spends
- * money. Neither holds at the last row — one artifact per track, and nothing
- * below it to buy. Written anyway, it is still checked.
+ * money. Neither holds at the last row, one artifact per track, and nothing
+ * below it to buy. Written anyway; it is still checked.
  */
 async function approveAssemblyStage(parsed: Parsed, approval: Approval): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
@@ -1291,7 +1291,7 @@ async function approveAssemblyStage(parsed: Parsed, approval: Approval): Promise
   return result.ok
     ? ok(
         renderAssemblyStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — całość przyjęta`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, całość przyjęta`,
           result.data
         )
       )
@@ -1435,7 +1435,7 @@ async function runApprove(argv: readonly string[]): Promise<Result<string>> {
   if (stage !== "screenplay" && stage !== "shot-list" && stage !== "prompt-package") {
     return err(
       new UsageError(
-        `--stage "${String(stage)}" — dozwolone: prepare, screenplay, character, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design`
+        `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design`
       )
     );
   }
@@ -1526,7 +1526,7 @@ function maxOutputTokensOf(parsed: Parsed, fallback = DEFAULT_MAX_OUTPUT_TOKENS)
 }
 
 /**
- * `--dry-run` prints the prompt itself, not a byte count — the same promise
+ * `--dry-run` prints the prompt itself, not a byte count, the same promise
  * stage 1 makes, for the same reason: the preview exists so a person can read
  * what a paid call would send.
  */
@@ -1539,10 +1539,10 @@ function renderShotListGenerate(
   const lines =
     mode === "dry-run"
       ? [
-          `Próba na sucho — nic nie zapisano, nic nie wysłano. Lista ujęć ${projectId}/${episodeId}`,
-          "  OPENAI_API_KEY nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+          `Próba na sucho: nic nie zapisano, nic nie wysłano. Lista ujęć ${projectId}/${episodeId}`,
+          "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
         ]
-      : [`Lista ujęć ${projectId}/${episodeId} — próba ${report.runId ?? ""}`];
+      : [`Lista ujęć ${projectId}/${episodeId}, próba ${report.runId ?? ""}`];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -1556,7 +1556,7 @@ function renderShotListGenerate(
     lines.push(
       `  obsada w kadrze: ${verdict.castSeen.length === 0 ? "nikt z obsady" : verdict.castSeen.join(", ")}`
     );
-    lines.push("  ! pokrycie i sumy czasów się zgadzają — inscenizacja wymaga oceny człowieka");
+    lines.push("  ! pokrycie i sumy czasów się zgadzają; inscenizacja wymaga oceny człowieka");
   }
 
   for (const problem of report.problems) {
@@ -1579,7 +1579,7 @@ function renderShotList(
   episodeId: string,
   mode: "apply" | "dry-run"
 ): string {
-  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+  const lines = [mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline];
 
   if (status.verdict !== null) {
     lines.push(
@@ -1593,7 +1593,7 @@ function renderShotList(
 
   if (status.status === "completed" && !status.approved && status.problems.length === 0) {
     lines.push(
-      `  ! plik przeszedł walidację — to nie to samo co przyjęcie go przez człowieka: aimator approve ${projectId} ${episodeId} --stage shot-list`
+      `  ! plik przeszedł walidację; to nie to samo co przyjęcie go przez człowieka: aimator approve ${projectId} ${episodeId} --stage shot-list`
     );
   }
 
@@ -1671,7 +1671,7 @@ async function runShotList(argv: readonly string[]): Promise<Result<string>> {
 }
 
 /**
- * `--dry-run` prints the prompt itself, not a byte count — the same promise
+ * `--dry-run` prints the prompt itself, not a byte count, the same promise
  * stages 1 and 3 make. It also names the gate stage 4 alone has: the canonical
  * images, which are checked on both tracks and never sent.
  */
@@ -1684,11 +1684,11 @@ function renderPackageGenerate(
   const lines =
     mode === "dry-run"
       ? [
-          `Próba na sucho — nic nie zapisano, nic nie wysłano. Pakiet promptów ${projectId}/${episodeId}`,
-          "  OPENAI_API_KEY nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+          `Próba na sucho: nic nie zapisano, nic nie wysłano. Pakiet promptów ${projectId}/${episodeId}`,
+          "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
           "  obrazy postaci nie są wysyłane: pakiet jest wspólny dla obu torów, więc niesie same identyfikatory hero:<id>",
         ]
-      : [`Pakiet promptów ${projectId}/${episodeId} — próba ${report.runId ?? ""}`];
+      : [`Pakiet promptów ${projectId}/${episodeId}, próba ${report.runId ?? ""}`];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -1696,7 +1696,7 @@ function renderPackageGenerate(
 
   if (report.verdict !== null) {
     lines.push(...describePackage(report.verdict));
-    lines.push("  ! graf i przypisania się zgadzają — kierunek wymaga oceny człowieka");
+    lines.push("  ! graf i przypisania się zgadzają; kierunek wymaga oceny człowieka");
   }
 
   for (const problem of report.problems) {
@@ -1738,7 +1738,7 @@ function renderPackageStatus(
   episodeId: string,
   mode: "apply" | "dry-run"
 ): string {
-  const lines = [mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline];
+  const lines = [mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline];
 
   lines.push(...describePackage(status.verdict));
 
@@ -1748,7 +1748,7 @@ function renderPackageStatus(
 
   if (status.status === "completed" && !status.approved && status.problems.length === 0) {
     lines.push(
-      `  ! pliki przeszły walidację — to nie to samo co przyjęcie ich przez człowieka: aimator approve ${projectId} ${episodeId} --stage prompt-package`
+      `  ! pliki przeszły walidację; to nie to samo co przyjęcie ich przez człowieka: aimator approve ${projectId} ${episodeId} --stage prompt-package`
     );
   }
 
@@ -1770,7 +1770,7 @@ function promptsModelOf(parsed: Parsed): Result<string | null> {
 /**
  * `prompt-package show`: exactly what a later stage would send, for free.
  *
- * Stage 4 publishes half a prompt — the direction for one frame — so a person
+ * Stage 4 publishes half a prompt, the direction for one frame, so a person
  * approving the package is approving something they cannot see in the shape it
  * will be sent in. This closes that gap, and it is the same composer stages 5
  * to 7 send with: one implementation, two readers.
@@ -1816,7 +1816,7 @@ const ATTACHMENT_STATE: Record<Attachment["state"], string> = {
 
 function renderSendPlan(plan: SendPlan, projectId: string, episodeId: string): string {
   const lines = [
-    `Pakiet promptów ${projectId}/${episodeId}, tor ${plan.track} — nic nie wysłano, nic nie zapisano`,
+    `Pakiet promptów ${projectId}/${episodeId}, tor ${plan.track}, nic nie wysłano, nic nie zapisano`,
     `  kadr ${plan.size} (${plan.aspectRatio}); tor przyjmuje najwyżej ${plan.limit} referencji; składacz w wersji ${plan.promptVersion}`,
   ];
   // Naming an artifact narrows the summary to it: somebody who asked to read
@@ -1830,7 +1830,7 @@ function renderSendPlan(plan: SendPlan, projectId: string, episodeId: string): s
 
     for (const [index, attachment] of one.attachments.entries()) {
       lines.push(
-        `      Image ${index + 1} = ${attachment.id} → ${attachment.path} — ${ATTACHMENT_STATE[attachment.state]}`
+        `      Image ${index + 1} = ${attachment.id} → ${attachment.path}, ${ATTACHMENT_STATE[attachment.state]}`
       );
     }
 
@@ -1954,7 +1954,7 @@ function renderReferences(
   const headline = `Obrazy referencyjne ${projectId}/${episodeId}, tor ${report.track}, kadr ${report.size}`;
   const lines = [
     mode === "dry-run"
-      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      ? `Próba na sucho: nic nie zapisano, nic nie wysłano. ${headline}`
       : headline,
     mode === "dry-run"
       ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
@@ -1962,7 +1962,7 @@ function renderReferences(
   ];
 
   for (const one of report.artifacts) {
-    lines.push(`  ${one.id}: ${one.state} — ${one.note}`);
+    lines.push(`  ${one.id}: ${one.state}, ${one.note}`);
 
     for (const attachment of one.attachments) {
       lines.push(`      ← ${attachment.path}  ${attachment.sha256.slice(0, 12)}`);
@@ -1978,7 +1978,7 @@ function renderReferences(
   }
 
   if (report.created.length > 0) {
-    lines.push("  ! obrazy przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+    lines.push("  ! obrazy przeszły walidację; to nie to samo co przyjęcie ich przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -1996,7 +1996,7 @@ function renderReferencesStatus(headline: string, status: ReferencesStatus): str
   const lines = [headline];
 
   for (const one of status.artifacts) {
-    lines.push(`  ${one.id}: ${one.approved ? "zatwierdzona" : one.state} — ${one.note}`);
+    lines.push(`  ${one.id}: ${one.approved ? "zatwierdzona" : one.state}, ${one.note}`);
   }
 
   for (const problem of status.problems) {
@@ -2084,12 +2084,12 @@ function renderOpeningFrame(
   const headline = `Klatka otwarcia ${projectId}/${episodeId}, tor ${report.track}, kadr ${report.size}`;
   const lines = [
     mode === "dry-run"
-      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      ? `Próba na sucho: nic nie zapisano, nic nie wysłano. ${headline}`
       : headline,
     mode === "dry-run"
       ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
       : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
-    `  ${report.artifact.id}: ${report.artifact.state} — ${report.artifact.note}`,
+    `  ${report.artifact.id}: ${report.artifact.state}, ${report.artifact.note}`,
   ];
 
   for (const attachment of report.artifact.attachments) {
@@ -2105,7 +2105,7 @@ function renderOpeningFrame(
   }
 
   if (report.created.length > 0) {
-    lines.push("  ! klatka przeszła walidację — to nie to samo co przyjęcie jej przez człowieka");
+    lines.push("  ! klatka przeszła walidację; to nie to samo co przyjęcie jej przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -2120,7 +2120,7 @@ function renderOpeningFrame(
 function renderOpeningFrameStatus(headline: string, status: OpeningFrameStatus): string {
   const lines = [
     headline,
-    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzona" : status.artifact.state} — ${status.artifact.note}`,
+    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzona" : status.artifact.state}, ${status.artifact.note}`,
   ];
 
   for (const problem of status.problems) {
@@ -2206,15 +2206,15 @@ function renderClips(
   const bill = `obrazów: ${report.paidImages}, wideo: ${report.paidVideos}`;
   const lines = [
     mode === "dry-run"
-      ? `Próba na sucho — nic nie zapisano, nic nie wysłano. ${headline}`
+      ? `Próba na sucho: nic nie zapisano, nic nie wysłano. ${headline}`
       : headline,
     mode === "dry-run"
-      ? `  płatnych wywołań do wykonania — ${bill}`
-      : `  płatnych wywołań wykonanych — ${bill}`,
+      ? `  płatnych wywołań do wykonania, ${bill}`
+      : `  płatnych wywołań wykonanych, ${bill}`,
   ];
 
   for (const outcome of report.artifacts) {
-    lines.push(`  ${outcome.id} (${outcome.kind}): ${outcome.state} — ${outcome.note}`);
+    lines.push(`  ${outcome.id} (${outcome.kind}): ${outcome.state}, ${outcome.note}`);
 
     for (const attachment of outcome.attachments) {
       lines.push(`      ← ${attachment.path}  ${attachment.sha256.slice(0, 12)}`);
@@ -2230,7 +2230,7 @@ function renderClips(
   }
 
   if (report.created.length > 0) {
-    lines.push("  ! wyniki przeszły walidację — to nie to samo co przyjęcie ich przez człowieka");
+    lines.push("  ! wyniki przeszły walidację; to nie to samo co przyjęcie ich przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -2258,10 +2258,10 @@ function renderAssembly(
 ): string {
   const headline = `Montaż ${projectId}/${episodeId}, tor ${report.track}`;
   const lines = [
-    mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline,
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
     `  silnik: ${report.engine ?? "nieustalony"}`,
     `  plan ${report.plannedSeconds}s, klipy ${report.actualSeconds}s`,
-    `  ${report.artifact.id}: ${report.artifact.state} — ${report.artifact.note}`,
+    `  ${report.artifact.id}: ${report.artifact.state}, ${report.artifact.note}`,
   ];
 
   for (const clip of report.cut) {
@@ -2277,7 +2277,7 @@ function renderAssembly(
   }
 
   if (report.artifact.state === "published") {
-    lines.push("  ! odcinek przeszedł walidację — to nie to samo co obejrzenie go przez człowieka");
+    lines.push("  ! odcinek przeszedł walidację; to nie to samo co obejrzenie go przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -2288,7 +2288,7 @@ function renderAssembly(
 function renderAssemblyStatus(headline: string, status: AssemblyStatus): string {
   const lines = [
     headline,
-    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state} — ${status.artifact.note}`,
+    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state}, ${status.artifact.note}`,
   ];
 
   for (const problem of status.problems) {
@@ -2305,7 +2305,7 @@ function renderClipsStatus(headline: string, status: ClipsStatus): string {
 
   for (const artifact of status.artifacts) {
     lines.push(
-      `  ${artifact.id} (${artifact.kind}): ${artifact.approved ? "zatwierdzony" : artifact.state} — ${artifact.note}`
+      `  ${artifact.id} (${artifact.kind}): ${artifact.approved ? "zatwierdzony" : artifact.state}, ${artifact.note}`
     );
   }
 
@@ -2321,7 +2321,7 @@ function renderClipsStatus(headline: string, status: ClipsStatus): string {
 /**
  * Stage 7 is the first command with two paid call sites, so it has two model
  * flags and no bare `--model`: one image model per track draws its entry
- * frames, and one video model — the same on both tracks — renders its clips.
+ * frames, and one video model, the same on both tracks, renders its clips.
  */
 function imageModelFlagOf(parsed: Parsed, track: ImageTrack): Result<string | null> {
   const flag = parsed.values["image-model"];
@@ -2369,7 +2369,7 @@ async function runClip(argv: readonly string[]): Promise<Result<string>> {
   if (typeof parsed.data.values.model === "string") {
     return err(
       new UsageError(
-        "--model nie wystarczy w etapie 7 — są dwa płatne wywołania: --image-model <id> rysuje klatki wejściowe, --video-model <id> renderuje klipy"
+        "--model nie wystarczy w etapie 7, są dwa płatne wywołania: --image-model <id> rysuje klatki wejściowe, --video-model <id> renderuje klipy"
       )
     );
   }
@@ -2425,12 +2425,12 @@ async function runClip(argv: readonly string[]): Promise<Result<string>> {
 }
 
 /**
- * Stage 8 — the only generate command with no model flag and no key.
+ * Stage 8, the only generate command with no model flag and no key.
  *
  * It buys nothing, so there is nothing to choose a model for; what it needs is
  * a program on this machine, which `AIMATOR_FFMPEG` points at when it is not
  * simply `ffmpeg` on PATH. `--artifact` narrows nothing either, because the
- * stage makes one file per track — but a wrong value is still refused rather
+ * stage makes one file per track, but a wrong value is still refused rather
  * than ignored.
  */
 async function runAssembly(argv: readonly string[]): Promise<Result<string>> {
@@ -2485,7 +2485,7 @@ async function runAssembly(argv: readonly string[]): Promise<Result<string>> {
  * Stage 9's shared half: the script, then the lines it authorises buying.
  *
  * Two model flags rather than one, because this stage buys from two providers
- * and a flag that did not say which model it meant would be worse than none —
+ * and a flag that did not say which model it meant would be worse than none,
  * the same refusal stage 7 makes about `--model`.
  */
 async function runNarrationGenerate(argv: readonly string[]): Promise<Result<string>> {
@@ -2671,11 +2671,11 @@ function renderDirection(
   const { delivery } = report;
   const lines = [
     mode === "dry-run"
-      ? `Próba na sucho — nic nie zapisano. Narrator projektu "${projectId}"`
+      ? `Próba na sucho: nic nie zapisano. Narrator projektu "${projectId}"`
       : `Narrator projektu "${projectId}" czyta tak:`,
-    `  stability ${delivery.stability} — niżej znaczy szerszy zakres emocji, wyżej monotonnie`,
-    `  style ${delivery.style} — wyżej znaczy mocniejszy charakter głosu`,
-    `  speed ${delivery.speed} — poniżej 1 zwalnia czytanie`,
+    `  stability ${delivery.stability}, niżej znaczy szerszy zakres emocji, wyżej monotonnie`,
+    `  style ${delivery.style}, wyżej znaczy mocniejszy charakter głosu`,
+    `  speed ${delivery.speed}, poniżej 1 zwalnia czytanie`,
     `  similarity ${delivery.similarityBoost}`,
     `  speaker-boost ${delivery.speakerBoost ? "tak" : "nie"}`,
   ];
@@ -2696,7 +2696,7 @@ function renderDirection(
 /**
  * Stage 10's shared half: the cue sheet, then the stems it authorises buying.
  *
- * Three model flags, because this stage buys from three call sites — one text
+ * Three model flags, because this stage buys from three call sites, one text
  * model writes the sheet, one music model composes a bed and one effect model
  * renders a sound. A flag that did not say which model it meant would be worse
  * than none, which is the refusal stage 7 already makes about `--model`.
@@ -2804,7 +2804,7 @@ async function runSoundDesignMix(argv: readonly string[]): Promise<Result<string
 /**
  * Stage 10's levels: how loud this series sits and how far the bed gives way.
  *
- * A project-level command, like stage 9's direction and for the same reason —
+ * A project-level command, like stage 9's direction and for the same reason,
  * and it writes its own file rather than stage 9's, because how loud the music
  * is says nothing about how the narrator read, and must not lapse a recording.
  */
@@ -2858,12 +2858,12 @@ function renderLevels(report: LevelsReport, projectId: string, mode: "apply" | "
   const { levels } = report;
   const lines = [
     mode === "dry-run"
-      ? `Próba na sucho — nic nie zapisano. Miks projektu "${projectId}"`
+      ? `Próba na sucho: nic nie zapisano. Miks projektu "${projectId}"`
       : `Miks projektu "${projectId}" siedzi tak:`,
-    `  music-db ${levels.musicDb} — podkład względem tego, jak go kupiono; niżej znaczy dalej`,
-    `  effects-db ${levels.effectsDb} — efekty; one mają być słyszalne`,
-    `  duck-db ${levels.duckDb} — o tyle podkład ustępuje, kiedy ktoś mówi`,
-    `  duck-release ${levels.duckReleaseMs} ms — jak szybko wraca po kwestii`,
+    `  music-db ${levels.musicDb}, podkład względem tego, jak go kupiono; niżej znaczy dalej`,
+    `  effects-db ${levels.effectsDb}, efekty; one mają być słyszalne`,
+    `  duck-db ${levels.duckDb}, o tyle podkład ustępuje, kiedy ktoś mówi`,
+    `  duck-release ${levels.duckReleaseMs} ms, jak szybko wraca po kwestii`,
   ];
 
   for (const path of report.created) {
@@ -2916,7 +2916,7 @@ async function runNarration(argv: readonly string[]): Promise<Result<string>> {
  *
  * Calls and characters are printed together because neither alone is the
  * number a person needs: every other stage's call count is its bill, and here
- * it is not. No price — that is the account holder's business, and this tool
+ * it is not. No price; that is the account holder's business, and this tool
  * has never guessed one.
  */
 function renderNarration(
@@ -2927,8 +2927,8 @@ function renderNarration(
 ): string {
   const headline = `Narracja ${projectId}/${episodeId}`;
   const lines = [
-    mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline,
-    `  skrypt: ${report.script.state} — ${report.script.note}`,
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
+    `  skrypt: ${report.script.state}, ${report.script.note}`,
     `  do kupienia: ${report.calls} wywołań, ${report.characters} znaków`,
   ];
 
@@ -2937,13 +2937,13 @@ function renderNarration(
   // not guess with somebody else's account.
   if (report.contextCharacters > 0) {
     lines.push(
-      `  + ${report.contextCharacters} znaków kontekstu (previous_text/next_text) — dostawca nie podaje, czy je rozlicza`
+      `  + ${report.contextCharacters} znaków kontekstu (previous_text/next_text), dostawca nie podaje, czy je rozlicza`
     );
   }
 
   for (const line of report.lines) {
     lines.push(
-      `      ${line.id}: ${line.state} — ${line.note}, ${line.characters} znaków${line.seconds === null ? "" : `, ${line.seconds}s`}`
+      `      ${line.id}: ${line.state}, ${line.note}, ${line.characters} znaków${line.seconds === null ? "" : `, ${line.seconds}s`}`
     );
   }
 
@@ -2972,7 +2972,7 @@ function renderMix(
 ): string {
   const headline = `Miks ${projectId}/${episodeId}, tor ${report.track}`;
   const lines = [
-    mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline,
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
     `  silnik: ${report.engine ?? "nieustalony"}`,
     `  film trwa ${report.actualSeconds}s`,
     `  narrated.mp4: ${report.state}`,
@@ -2993,7 +2993,7 @@ function renderMix(
   }
 
   if (report.state === "published") {
-    lines.push("  ! plik przeszedł walidację — to nie to samo co odsłuchanie go przez człowieka");
+    lines.push("  ! plik przeszedł walidację; to nie to samo co odsłuchanie go przez człowieka");
   }
 
   lines.push(`Dalej: ${report.nextStep}`);
@@ -3004,11 +3004,11 @@ function renderMix(
 function renderNarrationStatus(headline: string, status: NarrationStatus): string {
   const lines = [
     headline,
-    `  script: ${status.script.approved ? "zatwierdzony" : status.script.state} — ${status.script.note}, ${status.totalCharacters} znaków`,
+    `  script: ${status.script.approved ? "zatwierdzony" : status.script.state}, ${status.script.note}, ${status.totalCharacters} znaków`,
   ];
 
   for (const line of status.lines) {
-    lines.push(`      ${line.id}: ${line.approved ? "zatwierdzona" : line.state} — ${line.note}`);
+    lines.push(`      ${line.id}: ${line.approved ? "zatwierdzona" : line.state}, ${line.note}`);
   }
 
   for (const problem of status.problems) {
@@ -3023,7 +3023,7 @@ function renderNarrationStatus(headline: string, status: NarrationStatus): strin
 function renderMixStatus(headline: string, status: MixStatus): string {
   const lines = [
     headline,
-    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state} — ${status.artifact.note}`,
+    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state}, ${status.artifact.note}`,
   ];
 
   for (const problem of status.problems) {
@@ -3041,7 +3041,7 @@ function renderMixStatus(headline: string, status: MixStatus): string {
  * The count of calls is not the bill here: this provider rates music and
  * effects per minute of generated audio, so one call for a ninety-second bed
  * and one for a half-second click are the same number and nothing like the
- * same money. Both are printed, per cue and in total — and neither is a price.
+ * same money. Both are printed, per cue and in total, and neither is a price.
  */
 function renderSoundDesign(
   report: SoundDesignReport,
@@ -3051,13 +3051,13 @@ function renderSoundDesign(
 ): string {
   const headline = `Dźwięk ${projectId}/${episodeId}`;
   const lines = [
-    mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline,
-    `  arkusz: ${report.sheet.state} — ${report.sheet.note}`,
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
+    `  arkusz: ${report.sheet.state}, ${report.sheet.note}`,
     `  do kupienia: ${report.calls} wywołań, ${report.seconds}s dźwięku`,
   ];
 
   for (const cue of report.cues) {
-    lines.push(`      ${cue.id} (${cue.kind}): ${cue.state} — ${cue.note}, ${cue.seconds}s`);
+    lines.push(`      ${cue.id} (${cue.kind}): ${cue.state}, ${cue.note}, ${cue.seconds}s`);
   }
 
   for (const path of report.created) {
@@ -3086,8 +3086,8 @@ function renderMaster(
   const headline = `Pełna ścieżka ${projectId}/${episodeId}, tor ${report.track}`;
   const { levels } = report;
   const lines = [
-    mode === "dry-run" ? `Próba na sucho — nic nie zapisano. ${headline}` : headline,
-    `  ${report.state} — film trwa ${report.actualSeconds}s, silnik ${report.engine ?? "nieznany"}`,
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
+    `  ${report.state}, film trwa ${report.actualSeconds}s, silnik ${report.engine ?? "nieznany"}`,
     `  poziomy: music ${levels.musicDb} dB, efekty ${levels.effectsDb} dB, ducking ${levels.duckDb} dB / ${levels.duckReleaseMs} ms`,
   ];
 
@@ -3113,11 +3113,11 @@ function renderMaster(
 function renderSoundDesignStatus(headline: string, status: SoundDesignStatus): string {
   const lines = [
     headline,
-    `  cues: ${status.sheet.approved ? "zatwierdzony" : status.sheet.state} — ${status.sheet.note}, ${status.totalSeconds}s`,
+    `  cues: ${status.sheet.approved ? "zatwierdzony" : status.sheet.state}, ${status.sheet.note}, ${status.totalSeconds}s`,
   ];
 
   for (const cue of status.cues) {
-    lines.push(`      ${cue.id}: ${cue.approved ? "zatwierdzony" : cue.state} — ${cue.note}`);
+    lines.push(`      ${cue.id}: ${cue.approved ? "zatwierdzony" : cue.state}, ${cue.note}`);
   }
 
   for (const problem of status.problems) {
@@ -3132,7 +3132,7 @@ function renderSoundDesignStatus(headline: string, status: SoundDesignStatus): s
 function renderMasterStatus(headline: string, status: MasterStatus): string {
   const lines = [
     headline,
-    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state} — ${status.artifact.note}`,
+    `  ${status.artifact.id}: ${status.artifact.approved ? "zatwierdzony" : status.artifact.state}, ${status.artifact.note}`,
   ];
 
   for (const problem of status.problems) {
@@ -3170,7 +3170,7 @@ async function checkSoundDesignStage(
     return result.ok
       ? ok(
           renderSoundDesignStatus(
-            `Odcinek "${episodeId.data}" — etap 10, muzyka i efekty${result.data.approved ? ", zatwierdzone" : ""}`,
+            `Odcinek "${episodeId.data}", etap 10, muzyka i efekty${result.data.approved ? ", zatwierdzone" : ""}`,
             result.data
           )
         )
@@ -3188,7 +3188,7 @@ async function checkSoundDesignStage(
   return result.ok
     ? ok(
         renderMasterStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — etap 10, pełna ścieżka${result.data.approved ? ", zatwierdzona" : ""}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, etap 10, pełna ścieżka${result.data.approved ? ", zatwierdzona" : ""}`,
           result.data
         )
       )
@@ -3216,7 +3216,7 @@ async function approveSoundDesignStage(
     return result.ok
       ? ok(
           renderSoundDesignStatus(
-            `Odcinek "${episodeId.data}" — zatwierdzono muzykę i efekty etapu 10`,
+            `Odcinek "${episodeId.data}", zatwierdzono muzykę i efekty etapu 10`,
             result.data
           )
         )
@@ -3239,7 +3239,7 @@ async function approveSoundDesignStage(
   return result.ok
     ? ok(
         renderMasterStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono pełną ścieżkę`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono pełną ścieżkę`,
           result.data
         )
       )
@@ -3272,7 +3272,7 @@ async function checkSoundtrackStage(
     return result.ok
       ? ok(
           renderNarrationStatus(
-            `Odcinek "${episodeId.data}" — etap 9, słowa${result.data.approved ? ", zatwierdzone" : ""}`,
+            `Odcinek "${episodeId.data}", etap 9, słowa${result.data.approved ? ", zatwierdzone" : ""}`,
             result.data
           )
         )
@@ -3290,7 +3290,7 @@ async function checkSoundtrackStage(
   return result.ok
     ? ok(
         renderMixStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — etap 9, miks${result.data.approved ? ", zatwierdzony" : ""}`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, etap 9, miks${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data
         )
       )
@@ -3315,7 +3315,7 @@ async function approveSoundtrackStage(parsed: Parsed, approval: Approval): Promi
     return result.ok
       ? ok(
           renderNarrationStatus(
-            `Odcinek "${episodeId.data}" — zatwierdzono słowa etapu 9`,
+            `Odcinek "${episodeId.data}", zatwierdzono słowa etapu 9`,
             result.data
           )
         )
@@ -3338,7 +3338,7 @@ async function approveSoundtrackStage(parsed: Parsed, approval: Approval): Promi
   return result.ok
     ? ok(
         renderMixStatus(
-          `Odcinek "${episodeId.data}", tor ${track.data} — zatwierdzono miks`,
+          `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono miks`,
           result.data
         )
       )
@@ -3471,14 +3471,14 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
     return result;
   }
 
-  const stage0 = render(`Projekt "${projectId.data}" — etap 0 gotowy`, result.data, "apply");
+  const stage0 = render(`Projekt "${projectId.data}", etap 0 gotowy`, result.data, "apply");
   const [, episodeId] = parsed.data.positionals;
 
   if (episodeId === undefined) {
     return ok(stage0);
   }
 
-  // Naming an episode widens the check to its text stages. Nothing is written —
+  // Naming an episode widens the check to its text stages. Nothing is written,
   // a check reports drift, it never records it.
   const scope = { episodeId, projectId: projectId.data, workspace: workspace.data };
   const stage1 = await checkScreenplay(scope);
@@ -3490,7 +3490,7 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
   const lines = [
     stage0,
     renderScreenplay(
-      `Odcinek "${episodeId}" — etap 1: ${stage1.data.status}${stage1.data.approved ? ", zatwierdzony" : ""}`,
+      `Odcinek "${episodeId}", etap 1: ${stage1.data.status}${stage1.data.approved ? ", zatwierdzony" : ""}`,
       stage1.data,
       projectId.data,
       episodeId,
@@ -3506,7 +3506,7 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
   lines.push(
     renderShotList(
-      `Odcinek "${episodeId}" — etap 3: ${stage3.data.status}${stage3.data.approved ? ", zatwierdzony" : ""}`,
+      `Odcinek "${episodeId}", etap 3: ${stage3.data.status}${stage3.data.approved ? ", zatwierdzony" : ""}`,
       stage3.data,
       projectId.data,
       episodeId,
@@ -3522,7 +3522,7 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
   lines.push(
     renderPackageStatus(
-      `Odcinek "${episodeId}" — etap 4: ${stage4.data.status}${stage4.data.approved ? ", zatwierdzony" : ""}`,
+      `Odcinek "${episodeId}", etap 4: ${stage4.data.status}${stage4.data.approved ? ", zatwierdzony" : ""}`,
       stage4.data,
       projectId.data,
       episodeId,
@@ -3535,7 +3535,7 @@ async function runCheck(argv: readonly string[]): Promise<Result<string>> {
 
 /**
  * argv in, outcome out. Filesystem effects live in lib/project; streams and
- * exit codes live in bin.ts — which is what keeps this testable by calling a
+ * exit codes live in bin.ts, which is what keeps this testable by calling a
  * function instead of spawning a process.
  */
 export async function run(argv: string[]): Promise<Result<string>> {

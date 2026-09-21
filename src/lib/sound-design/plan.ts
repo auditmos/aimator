@@ -31,7 +31,7 @@ import { validateSoundDesign } from "./validate.js";
  * Internal to the sound-design module: what stage 10 reads, and whether it may
  * act.
  *
- * Two gates, because two halves that cost different things — stage 9's shape,
+ * Two gates, because two halves that cost different things, stage 9's shape,
  * one row down.
  *
  * **Buying the stems** waits on the approved shot list and, for the stems
@@ -40,15 +40,15 @@ import { validateSoundDesign } from "./validate.js";
  * under, and a thunderclap does not care whether anybody has recorded the
  * narrator yet. The two stages can run side by side.
  *
- * **Mixing** waits on this track's approved `episode.mp4`, on every stem, and
- * — when the episode's mode carries speech — on this track's approved
+ * **Mixing** waits on this track's approved `episode.mp4`, on every stem, and,
+ * when the episode's mode carries speech, on this track's approved
  * `narrated.mp4` and on the accepted lines behind it.
  *
  * That last gate is the one worth defending, because it looks like the mistake
  * stage 8 names: holding a stage hostage to a file it never opens. Stage 10
  * builds the full mix from `episode.mp4` and the lossless stems rather than
  * from `narrated.mp4`, so it genuinely does not read those bytes. What it
- * reads is the **yes** on them — and that yes is the only evidence anywhere
+ * reads is the **yes** on them, and that yes is the only evidence anywhere
  * that the narration lands in the right place over this film, which is a fact
  * stage 10 reuses rather than re-establishes. `narrated.mp4` does not become a
  * dead end; it becomes the one place that placement can be heard without music
@@ -132,7 +132,7 @@ function carriesSpeech(settings: EpisodeSettings): boolean {
  *
  * It does not read the prompt package: nothing here carries an instruction to
  * an image or video model, so a hash of bytes nobody sent would describe a
- * question nobody asked — the same reason stage 9 does not record it either.
+ * question nobody asked, the same reason stage 9 does not record it either.
  */
 export async function readStage10Inputs(input: Stage10Scope): Promise<Result<Stage10Inputs>> {
   const paths = resolvePaths(input);
@@ -170,7 +170,7 @@ export async function readStage10Inputs(input: Stage10Scope): Promise<Result<Sta
   const shotList = await readDigest(paths.data.episode.shotList);
 
   if (!shotList.ok) {
-    gate.push(`brakuje ${relative(paths.data.episode.shotList)} — etap 10 nie ma z czego pisać`);
+    gate.push(`brakuje ${relative(paths.data.episode.shotList)}, etap 10 nie ma z czego pisać`);
   }
 
   const stage = await readJson(paths.data.episode.soundDesignStage, stageFileSchema);
@@ -258,7 +258,7 @@ export async function readAcceptedStems(input: Stage10Scope): Promise<Result<Acc
   // beside the others rather than die on it, which every gate here promises.
   if (sheet === null || !digest.ok) {
     return ok({
-      gate: ["nie ma arkusza cue — uruchom najpierw: sound-design generate"],
+      gate: ["nie ma arkusza cue, uruchom najpierw: sound-design generate"],
       inputs: [],
       stems: [],
     });
@@ -313,7 +313,7 @@ export async function readAcceptedStems(input: Stage10Scope): Promise<Result<Acc
   }
 
   if (stems.length === 0) {
-    gate.push("żaden stem nie jest gotowy — nie ma czego położyć na obrazie");
+    gate.push("żaden stem nie jest gotowy, nie ma czego położyć na obrazie");
   }
 
   return ok({ gate, inputs, stems });
@@ -342,7 +342,7 @@ async function readStem(
 
   if (!bytes.ok || record?.status !== "completed") {
     return {
-      gate: [`${cue.id}: nie ma dźwięku — cue nie zostało kupione`],
+      gate: [`${cue.id}: nie ma dźwięku, cue nie zostało kupione`],
       recorded: null,
       stem: null,
     };
@@ -394,7 +394,7 @@ interface TrackState {
  *
  * Two approvals rather than one. `episode.mp4` because its frames are what the
  * full mix copies through. `narrated.mp4` because the yes on it is the only
- * evidence that the narration lands correctly over *this* film — and only when
+ * evidence that the narration lands correctly over *this* film, and only when
  * the episode's mode carries speech, since a film with no narrator has no
  * narrated cut to wait for and demanding one would be a gate with nothing
  * behind it.
@@ -419,7 +419,7 @@ export async function readTrackState(
   };
 
   if (record === undefined || record.status !== "completed") {
-    gate.push(`nie ma zmontowanego odcinka na torze ${input.track} — etap 8 go nie ukończył`);
+    gate.push(`nie ma zmontowanego odcinka na torze ${input.track}, etap 8 go nie ukończył`);
   }
 
   if (!cut.ok) {
@@ -448,11 +448,11 @@ export async function readTrackState(
 
     if (narrated === undefined || narrated.status !== "completed") {
       gate.push(
-        `nie ma narracji położonej na obrazie na torze ${input.track} — etap 9 nie ukończył miksu`
+        `nie ma narracji położonej na obrazie na torze ${input.track}, etap 9 nie ukończył miksu`
       );
     } else if (narrated.review.status !== "approved") {
       gate.push(
-        `narracja na torze ${input.track} czeka na ocenę człowieka — to jedyne miejsce, w którym słychać samo jej umieszczenie, i etap 10 z tej zgody korzysta`
+        `narracja na torze ${input.track} czeka na ocenę człowieka, to jedyne miejsce, w którym słychać samo jej umieszczenie, i etap 10 z tej zgody korzysta`
       );
     }
   }
@@ -500,7 +500,7 @@ export interface PlacedSound {
  * of the film is refused and the message names the remedy.
  *
  * Two things differ from speech, and both are the nature of the material
- * rather than an exception. **Effects may overlap each other** — two things
+ * rather than an exception. **Effects may overlap each other**, two things
  * can happen at once, and only a narrator cannot talk over himself. And **a
  * bed that falls short of the film is reported, not refused**: that is a gap,
  * which is stage 8's kind of drift, rather than an overlap, which is stage 7's
@@ -536,7 +536,7 @@ export function placeSounds(input: {
 
     if (sound.kind === "effect" && ends > input.actualSeconds) {
       problems.push(
-        `${sound.id} kończy się w ${ends}s, a film trwa ${input.actualSeconds}s — efekt nie mieści się w odcinku; skróć go w arkuszu cue albo przesuń jego kotwicę`
+        `${sound.id} kończy się w ${ends}s, a film trwa ${input.actualSeconds}s, efekt nie mieści się w odcinku; skróć go w arkuszu cue albo przesuń jego kotwicę`
       );
     }
 
@@ -553,7 +553,7 @@ export function placeSounds(input: {
   return { placed, problems };
 }
 
-/** Seconds, to the thousandth — the precision an audio delay is spelled in. */
+/** Seconds, to the thousandth, the precision an audio delay is spelled in. */
 function round(seconds: number): number {
   return Math.round(seconds * 1000) / 1000;
 }
@@ -580,7 +580,7 @@ export function musicGap(placed: readonly PlacedSound[], actualSeconds: number):
   return gap <= 0
     ? []
     : [
-        `podkład kończy się w ${last}s, a film trwa ${actualSeconds}s — ostatnie ${gap}s gra bez muzyki, bo klipy wróciły dłuższe niż plan; to meldunek, nie błąd`,
+        `podkład kończy się w ${last}s, a film trwa ${actualSeconds}s, ostatnie ${gap}s gra bez muzyki, bo klipy wróciły dłuższe niż plan; to meldunek, nie błąd`,
       ];
 }
 
@@ -590,7 +590,7 @@ export function musicGap(placed: readonly PlacedSound[], actualSeconds: number):
  *
  * Two of the four modes are closed by this stage: `music-and-effects` and
  * `narration` are exactly what stages 9 and 10 produce between them. The other
- * two are not, and the missing half is not music — it is **character
+ * two are not, and the missing half is not music; it is **character
  * dialogue**, which no stage in this pipeline produces and none does after
  * this one. Rule 7 says an absence is reported rather than filled with a
  * guess, so it is stated the way stage 8 states silence and stage 2 states a
@@ -603,6 +603,6 @@ export function missingDialogue(settings: EpisodeSettings): readonly string[] {
   }
 
   return [
-    `odcinek deklaruje audio: ${settings.audio}, czyli mowę postaci — etap 10 składa muzykę, efekty i narrację, a dialogów postaci nie wytwarza żaden etap tego potoku`,
+    `odcinek deklaruje audio: ${settings.audio}, czyli mowę postaci, etap 10 składa muzykę, efekty i narrację, a dialogów postaci nie wytwarza żaden etap tego potoku`,
   ];
 }

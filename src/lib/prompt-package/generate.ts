@@ -39,7 +39,7 @@ import { type PromptPackage, validatePromptPackage } from "./validate.js";
  * The order of operations is the contract and lives in `lib/text-model`:
  * nothing is written in `--dry-run`, the stage file records `submitted` before
  * the POST, and nothing retries on its own. What stays here is what is about a
- * prompt package — the gate, the structural verdict, and the tree of files this
+ * prompt package, the gate, the structural verdict, and the tree of files this
  * stage publishes.
  */
 
@@ -87,7 +87,7 @@ class Stage4BlockedError extends Error {
 /**
  * Why a paid call may not happen. Empty means it may.
  *
- * A dry run never reads the key, so it must not claim the key is missing — it
+ * A dry run never reads the key, so it must not claim the key is missing, it
  * says what it did not check instead. Claiming to have found an absence you
  * never looked for is the same lie as claiming a success you never had.
  */
@@ -101,9 +101,7 @@ function blockers(input: GenerateInput, stage4: Stage4Inputs): readonly string[]
   }
 
   if (input.model === null || input.model === "") {
-    problems.push(
-      "brak modelu tekstowego — wskaż go przez --model <id> albo AIMATOR_PROMPTS_MODEL"
-    );
+    problems.push("brak modelu tekstowego, wskaż go przez --model <id> albo AIMATOR_PROMPTS_MODEL");
   }
 
   if (input.mode !== "dry-run" && (input.apiKey === null || input.apiKey === "")) {
@@ -153,7 +151,7 @@ export async function generatePromptPackage(
 
   // Read before the attempt starts: `submitted` lands on disk before the POST
   // and empties the outputs, so after it there is no record of what this stage
-  // published last time — and both preserving and sweeping need exactly that.
+  // published last time, and both preserving and sweeping need exactly that.
   const previous = await previousOutputs(stage4.data.paths.episode.promptPackageStage);
   const attempt = await runTextStage(
     {
@@ -342,7 +340,7 @@ async function publish(
  * Removes prompt files the previous package published and this one does not.
  *
  * A regeneration that plans fewer references would otherwise leave `R07.md`
- * behind, describing an image nothing points at any more — and `prompts/` is
+ * behind, describing an image nothing points at any more, and `prompts/` is
  * read as a list of what the episode still needs. Only files this stage itself
  * recorded as outputs are ever removed.
  */
@@ -384,7 +382,7 @@ async function refuse(
 
   return err(
     new Error(
-      `${reason}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
+      `${reason}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
     )
   );
 }

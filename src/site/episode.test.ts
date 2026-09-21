@@ -10,7 +10,7 @@ import { type Encoder, freezeRelease } from "./episode.js";
  * Freezing, through the module entry.
  *
  * The workspace it reads is built by the shared fixture through each stage's
- * own entry, because what is under test is the crossing — which files a release
+ * own entry, because what is under test is the crossing, which files a release
  * takes out of a finished episode, what it measures, and what it refuses.
  * The engine is injected for the reason `makeCut` brings its own muxer: the
  * fixture's pictures are structurally valid rather than decodable, and ffmpeg
@@ -48,14 +48,14 @@ function answer(): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
       {
         dependsOn: ["hero:ewa"],
         id: "R02",
         kind: "prop",
         prompt: "Alpaka bez wgnieceń.",
-        subject: "Alpaca toy — uncompressed",
+        subject: "Alpaca toy, uncompressed",
       },
     ],
     review: "Do rozstrzygnięcia: skala alpaki.",
@@ -154,10 +154,8 @@ describe("freezeRelease", () => {
     await freeze(engine());
 
     const stills = (await registry()).tracks[0].stills as { label: string; subject: string }[];
-    expect(stills.find((still) => still.label === "R01")?.subject).toBe("Living room — evening");
-    expect(stills.find((still) => still.label === "R02")?.subject).toBe(
-      "Alpaca toy — uncompressed"
-    );
+    expect(stills.find((still) => still.label === "R01")?.subject).toBe("Living room, evening");
+    expect(stills.find((still) => still.label === "R02")?.subject).toBe("Alpaca toy, uncompressed");
   });
 
   it("should cut the poster from the web encode, not from the original", async () => {

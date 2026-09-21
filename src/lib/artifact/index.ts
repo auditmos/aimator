@@ -59,7 +59,7 @@ interface NewRecordInput {
   readonly status?: ArtifactRecord["status"];
 }
 
-/** A stage file with no artifacts yet — the starting point every stage writes onto. */
+/** A stage file with no artifacts yet, the starting point every stage writes onto. */
 export function emptyStage(stage: StageName): StageFile {
   return { artifacts: {}, stage, version: 1 };
 }
@@ -72,8 +72,8 @@ export function manualProducer(): Producer {
 /**
  * What a local engine produced: bytes nobody typed and no model drew.
  *
- * `engine` is the name and version of the program that wrote them — `ffmpeg
- * 7.1.1`, not `ffmpeg` — because the version is the half that decides whether
+ * `engine` is the name and version of the program that wrote them, `ffmpeg
+ * 7.1.1`, not `ffmpeg`, because the version is the half that decides whether
  * the same inputs give the same file back. It lands in `model` for the reason
  * the schema gives: this field is "which engine produced these bytes", and a
  * paid stage happens to answer it with a model id.

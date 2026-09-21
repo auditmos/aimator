@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * The release registry: `site/releases/<version>.json`, one file per published
  * release. It is the only place a release is declared, and it is deliberately
- * data rather than code — a release is a fact about bytes that already exist,
+ * data rather than code, a release is a fact about bytes that already exist,
  * not a program.
  *
  * Every media file it names is verified against the sha256 recorded here
@@ -38,7 +38,7 @@ const still = z.object({
   sha256: z.string().regex(SHA256),
   /**
    * The subject line the prompt package gave it. English in both language
-   * versions of the page, because it is the text a model received — rule 9.
+   * versions of the page, because it is the text a model received, rule 9.
    */
   subject: z.string().min(1),
   width: z.number().int().positive(),

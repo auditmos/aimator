@@ -87,17 +87,17 @@ export interface ShotListShot {
    * Every stage from 5 on attaches these entries verbatim beside its prompt,
    * and the contract says it reads them through this function. Returning the
    * block that was already parsed is what stops a second Markdown parser from
-   * appearing downstream — which would be the same "two versions of one truth"
+   * appearing downstream, which would be the same "two versions of one truth"
    * that keeps `shot-list.json` from existing.
    */
   readonly text: string;
 }
 
 /**
- * The plan as data — what stage 4 reads instead of parsing Markdown again.
+ * The plan as data, what stage 4 reads instead of parsing Markdown again.
  *
  * `scenes` comes from the screenplay rather than from the shot list: the shot
- * list is checked against the screenplay's timeline, it does not restate it.
+ * list is checked against the screenplay's timeline; it does not restate it.
  */
 export interface ShotList {
   /** Cast ids that appear in at least one shot, in roster order. Reported. */
@@ -151,7 +151,7 @@ function sections(text: string): Result<readonly string[]> {
   if (names.join("|") !== SECTIONS.join("|")) {
     return fail(
       "sections",
-      `lista ujęć ma niepoprawne sekcje albo ich kolejność — wymagane dokładnie, w tej kolejności: ${SECTIONS.join(", ")}`
+      `lista ujęć ma niepoprawne sekcje albo ich kolejność, wymagane dokładnie, w tej kolejności: ${SECTIONS.join(", ")}`
     );
   }
 
@@ -188,7 +188,7 @@ function items(
   if (matches.length === 0 || matches.length !== all.length) {
     return fail(
       "item-heading",
-      `brak pozycji albo niepoprawny nagłówek: ${kind} — wymagany format: ${shape}`
+      `brak pozycji albo niepoprawny nagłówek: ${kind}, wymagany format: ${shape}`
     );
   }
 
@@ -256,7 +256,7 @@ function readClips(body: string, maxClipSeconds: number): Result<readonly ShotLi
     if (Number(item.head[1]) !== index + 1) {
       return fail(
         "clip-order",
-        `klipy muszą mieć kolejne numery od C01 — napotkano ${id} na pozycji ${index + 1}`
+        `klipy muszą mieć kolejne numery od C01, napotkano ${id} na pozycji ${index + 1}`
       );
     }
 
@@ -289,7 +289,7 @@ function readClips(body: string, maxClipSeconds: number): Result<readonly ShotLi
     if (!allowed.includes(reference)) {
       return fail(
         "clip-reference",
-        `${id}: Reference "${reference}" — dozwolone tutaj: ${allowed.join(", ")}`
+        `${id}: Reference "${reference}", dozwolone tutaj: ${allowed.join(", ")}`
       );
     }
 
@@ -316,7 +316,7 @@ function readCast(
     if (!(CAST_ID.test(name) && roster.some((member) => member.id === name))) {
       return fail(
         "cast",
-        `${context}: "${name}" nie jest identyfikatorem obsady — dozwolone: ${roster.map((member) => member.id).join(", ")} albo none`
+        `${context}: "${name}" nie jest identyfikatorem obsady, dozwolone: ${roster.map((member) => member.id).join(", ")} albo none`
       );
     }
 
@@ -359,7 +359,7 @@ function readShotHeading(item: Item, index: number, cursor: number): Result<Shot
   if (Number(item.head[1]) !== index + 1) {
     return fail(
       "shot-order",
-      `ujęcia muszą mieć kolejne numery od U01 — napotkano ${id} na pozycji ${index + 1}`
+      `ujęcia muszą mieć kolejne numery od U01, napotkano ${id} na pozycji ${index + 1}`
     );
   }
 
@@ -372,7 +372,7 @@ function readShotHeading(item: Item, index: number, cursor: number): Result<Shot
   if (start !== cursor) {
     return fail(
       "shot-coverage",
-      `${id}: zaczyna się w ${start}s, a poprzednie ujęcie skończyło się w ${cursor}s — luka, nakładka albo przestawienie`
+      `${id}: zaczyna się w ${start}s, a poprzednie ujęcie skończyło się w ${cursor}s, luka, nakładka albo przestawienie`
     );
   }
 
@@ -440,14 +440,14 @@ function readShotBody(
   if (hasText && context.settings.subtitles === "none") {
     return fail(
       "text",
-      `${head.id}: tekst ekranowy mimo subtitles=none — jedyna dozwolona wartość pola Text to "none"`
+      `${head.id}: tekst ekranowy mimo subtitles=none, jedyna dozwolona wartość pola Text to "none"`
     );
   }
 
   if (hasText && !scene.hasText) {
     return fail(
       "text",
-      `${head.id}: tekst ekranowy, którego scena ${head.sceneId} nie miała — etap 3 przenosi napisy ze scenariusza, nie wymyśla nowych`
+      `${head.id}: tekst ekranowy, którego scena ${head.sceneId} nie miała, etap 3 przenosi napisy ze scenariusza, nie wymyśla nowych`
     );
   }
 
@@ -544,7 +544,7 @@ function checkClipCoverage(
 
 /**
  * The structural contract, checked against the screenplay and the episode's own
- * decisions — and the plan, returned as data.
+ * decisions, and the plan, returned as data.
  *
  * Deliberately says nothing about quality: a plan that passes every rule here
  * is a correctly shaped plan and nothing more, which is why approval is a
@@ -554,7 +554,7 @@ export function validateShotList(input: ValidateInput): Result<ShotList> {
   if (input.text.trim().startsWith("```")) {
     return fail(
       "code-fence",
-      "lista ujęć jest opakowana blokiem kodu — oczekiwano samego dokumentu Markdown"
+      "lista ujęć jest opakowana blokiem kodu, oczekiwano samego dokumentu Markdown"
     );
   }
 
@@ -605,14 +605,14 @@ export function validateShotList(input: ValidateInput): Result<ShotList> {
   // Full scene coverage needs no check of its own: the shots are contiguous
   // from second 0 to the episode's end and each one lies inside the scene it
   // names, so a scene with no shot is arithmetically impossible. What is not
-  // implied is the text rule — a scene's caption can be dropped on the way in.
+  // implied is the text rule, a scene's caption can be dropped on the way in.
   for (const scene of scenes.data) {
     const assigned = shots.data.filter((shot) => shot.scene === scene.id);
 
     if (scene.hasText && !assigned.some((shot) => shot.hasText)) {
       return fail(
         "text",
-        `${scene.id}: scena ma tekst ekranowy, którego nie niesie żadne jej ujęcie — napis zniknąłby z odcinka`
+        `${scene.id}: scena ma tekst ekranowy, którego nie niesie żadne jej ujęcie, napis zniknąłby z odcinka`
       );
     }
   }

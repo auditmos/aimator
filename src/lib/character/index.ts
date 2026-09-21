@@ -1,9 +1,9 @@
 /**
- * Stage 2 — character. The first image stage, and the first that branches into
+ * Stage 2, character. The first image stage, and the first that branches into
  * two model tracks.
  *
- * It consumes only stage-0 artifacts — `project.json`, `project.md` and, when
- * a character's basis is `photographs`, that character's own `sources/` — and
+ * It consumes only stage-0 artifacts, `project.json`, `project.md` and, when
+ * a character's basis is `photographs`, that character's own `sources/`, and
  * produces, in order, `card.png`, eight standalone views and `hero.png` under
  * `characters/<character-id>/<track>/`, beside one `character.stage.json` that
  * records all ten as separate artifacts.

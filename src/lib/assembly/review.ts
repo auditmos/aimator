@@ -25,8 +25,8 @@ import {
  * eight approvals above it. Those said that each shot is right; this one says
  * that these clips, in this order, are the film. Three things exist only in the
  * whole and in no part of it: the rhythm across the cuts, the continuity at the
- * seams — stage 7's chain guarantees what an entry frame was *drawn from*, not
- * where a fourteen-second render actually ended up — and the film's real
+ * seams, stage 7's chain guarantees what an entry frame was *drawn from*, not
+ * where a fourteen-second render actually ended up, and the film's real
  * length. They are two levels of judgement, not one repeated.
  *
  * `check` reads and reports; it writes nothing. `approve` repeats the whole
@@ -55,7 +55,7 @@ export interface AssemblyStatus {
 }
 
 type ApproveScope = Stage8Scope & {
-  /** Narrows nothing — there is one artifact — but a wrong value is refused. */
+  /** Narrows nothing; there is one artifact, but a wrong value is refused. */
   readonly artifacts: readonly string[];
   readonly mode: WriteMode;
   readonly note: string | null;
@@ -77,7 +77,7 @@ class AssemblyStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The inputs as they now stand — what an approval re-records. */
+  /** The inputs as they now stand, what an approval re-records. */
   readonly inputs: readonly RecordedFile[];
   readonly stage8: Stage8Inputs;
   readonly status: AssemblyStatus;
@@ -174,7 +174,7 @@ async function inspect(input: Stage8Scope): Promise<Result<Inspection>> {
         ...blocking,
         ...inputsChanged.map(
           (path) =>
-            `${path}: zmienił się od czasu montażu — obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmontuj go od nowa: aimator assembly generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
+            `${path}: zmienił się od czasu montażu, obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmontuj go od nowa: aimator assembly generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
         ),
         ...soundtrack(stage8.data),
       ],
@@ -189,7 +189,7 @@ async function inspect(input: Stage8Scope): Promise<Result<Inspection>> {
  * No decoder and no ffmpeg: `check` has to work on whatever machine the
  * workspace is sitting on, which is the reason `lib/video-model` reads boxes in
  * the first place. The comparison is against the sum of the clips rather than
- * against `durationSeconds`, for the reason the cut itself uses — that sum is
+ * against `durationSeconds`, for the reason the cut itself uses, that sum is
  * what the film is.
  */
 async function verdictOf(
@@ -207,7 +207,7 @@ async function verdictOf(
   if (digest.data.sha256 !== output.sha256) {
     return {
       blocking: [
-        `${label}: nie zgadza się z zapisanym hashem — wynik został zmieniony poza narzędziem`,
+        `${label}: nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`,
       ],
       note: "bajty nie zgadzają się z rekordem",
       seconds: null,
@@ -235,11 +235,11 @@ async function verdictOf(
 /** The declared sound mode nothing in this pipeline fulfils. Reported, never enforced. */
 function soundtrack(stage8: Stage8Inputs): readonly string[] {
   return [
-    `odcinek deklaruje audio: ${stage8.audio}, a żaden etap nie produkuje ścieżki dźwiękowej — episode.mp4 jest niemy`,
+    `odcinek deklaruje audio: ${stage8.audio}, a żaden etap nie produkuje ścieżki dźwiękowej, episode.mp4 jest niemy`,
   ];
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkAssembly(input: Stage8Scope): Promise<Result<AssemblyStatus>> {
   const inspection = await inspect(input);
 
@@ -252,7 +252,7 @@ export async function checkAssembly(input: Stage8Scope): Promise<Result<Assembly
  * `--artifact` is not required, and that is a decision rather than a copy of
  * stage 6's. A flag is demanded upstream for two reasons: several candidates
  * exist, so a bare command is ambiguous, and the act opens a gate that spends
- * money. Neither holds at the last row of the table — one artifact per track,
+ * money. Neither holds at the last row of the table, one artifact per track,
  * and nothing below it to buy.
  */
 export async function approveAssembly(input: ApproveScope): Promise<Result<AssemblyStatus>> {
@@ -261,7 +261,7 @@ export async function approveAssembly(input: ApproveScope): Promise<Result<Assem
   if (named.length > 0) {
     return err(
       new AssemblyStateError(
-        `--artifact "${named.join(", ")}" — etap 8 ma jeden artefakt na tor: ${EPISODE_CUT}`
+        `--artifact "${named.join(", ")}", etap 8 ma jeden artefakt na tor: ${EPISODE_CUT}`
       )
     );
   }

@@ -68,14 +68,14 @@ function answer(extraReferences = 0, clips: 2 | 3 = 2): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą i zamkniętym oknem po lewej.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
       {
         dependsOn: ["hero:tata", "R01"],
         id: "R02",
         kind: "prop",
         prompt: "Pluszowa alpaka, ucho ugięte kontaktem z policzkiem.",
-        subject: "Alpaca toy — contact-bent ear",
+        subject: "Alpaca toy, contact-bent ear",
       },
       ...extra,
     ],
@@ -84,8 +84,8 @@ function answer(extraReferences = 0, clips: 2 | 3 = 2): string {
 }
 
 /**
- * Stages 0 to 4. `approvePackage` defaults to accepted here — unlike stage 5's
- * fixture, which leaves it pending — because most of what this module does is
+ * Stages 0 to 4. `approvePackage` defaults to accepted here, unlike stage 5's
+ * fixture, which leaves it pending, because most of what this module does is
  * only reachable once somebody has accepted the package.
  */
 function upstream(
@@ -169,16 +169,16 @@ describe("readSendPlan", () => {
     const sent = await plan("gpt-image", ["R02"]);
     const { text } = artifact(sent, "R02");
 
-    expect(text).toContain("REFERENCE INPUTS — IN THIS ORDER");
+    expect(text).toContain("REFERENCE INPUTS, IN THIS ORDER");
     expect(text).toContain("Image 1 = hero:tata — the canonical image of Tata");
-    expect(text).toContain("Image 2 = R01 — location reference: Living room — evening");
+    expect(text).toContain("Image 2 = R01 — location reference: Living room, evening");
   });
 
   it("should put the numbered block ahead of the direction that names those ids", async () => {
     await upstream();
     const { text } = artifact(await plan("gpt-image", ["R02"]), "R02");
     const block = text?.indexOf("Image 1 = hero:tata") ?? -1;
-    const direction = text?.indexOf("# R02 — Alpaca toy — contact-bent ear") ?? -1;
+    const direction = text?.indexOf("# R02, Alpaca toy, contact-bent ear") ?? -1;
 
     expect(block).toBeGreaterThanOrEqual(0);
     expect(direction).toBeGreaterThan(block);
@@ -196,7 +196,7 @@ describe("readSendPlan", () => {
     const sent = await plan("gpt-image", ["R01"]);
 
     expect(sent.size).toBe("2816x1584");
-    expect(artifact(sent, "R01").text).toContain("2816x1584 pixels — the 16:9 film frame");
+    expect(artifact(sent, "R01").text).toContain("2816x1584 pixels, the 16:9 film frame");
   });
 
   it("should draw both tracks in the same frame, so the two results compare", async () => {

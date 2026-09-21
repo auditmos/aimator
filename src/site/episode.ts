@@ -37,7 +37,7 @@ import {
  * about the film, so they belong to the publisher that needs them.
  *
  * What it will not do is write the prose. Every text a reader sees comes out as
- * `TODO`, and `buildSite` refuses a registry that still says so — an unwritten
+ * `TODO`, and `buildSite` refuses a registry that still says so: an unwritten
  * description is undecided, and a gate that blocks is the only honest answer to
  * a decision nobody has made.
  */
@@ -53,7 +53,7 @@ const TODO = "TODO";
  * This is rule 7 one level up from the pipeline: a description nobody has
  * written is undecided, so the gate blocks rather than publishing the word
  * `TODO` to the internet. `freezeRelease` reports these, and `buildSite`
- * refuses on them — one walk, so the two can never disagree about what counts.
+ * refuses on them, one walk, so the two can never disagree about what counts.
  */
 export function unwrittenFields(value: unknown, path = ""): string[] {
   if (value === TODO) {
@@ -136,7 +136,7 @@ interface FreezeInput {
 /**
  * The engine, injected exactly as `lib/assembly` injects a `Muxer`. Freezing is
  * a long sequence of decisions around four short operations, and only these
- * four need a media tool — so a test can prove the sequence without one.
+ * four need a media tool, so a test can prove the sequence without one.
  */
 export interface Encoder {
   /** One frame of the finished film, for the page's player. */
@@ -166,7 +166,7 @@ async function ffmpeg(args: string[], what: string): Promise<void> {
 /**
  * The real engine. `probe` reads the produced file back rather than the source
  * it came from: every number the registry records describes the bytes a browser
- * will fetch. `check` deliberately avoids a decoder — this is not `check`, it
+ * will fetch. `check` deliberately avoids a decoder; this is not `check`, it
  * is an operator's tool that already requires ffmpeg on the machine.
  */
 const encoder: Encoder = {
@@ -274,7 +274,7 @@ async function freeze(input: FreezeInput, engine: Encoder): Promise<FreezeReport
   const registryFile = join(input.root, "site", "releases", `${input.version}.json`);
   if (await exists(registryFile)) {
     throw new FreezeError(
-      `wydanie ${input.version} już istnieje. Opublikowanego wydania się nie nadpisuje — wybierz nowy numer.`
+      `wydanie ${input.version} już istnieje. Opublikowanego wydania się nie nadpisuje, wybierz nowy numer.`
     );
   }
 
@@ -359,7 +359,7 @@ async function freeze(input: FreezeInput, engine: Encoder): Promise<FreezeReport
     const paths = episodeTrackPaths(episode.data, track satisfies ImageTrack);
     // biome-ignore lint/performance/noAwaitInLoops: one track encoded at a time
     if (!(await exists(paths.mixedVideo))) {
-      throw new FreezeError(`brak ${track}/mixed.mp4 — ten tor nie ma jeszcze gotowego filmu.`);
+      throw new FreezeError(`brak ${track}/mixed.mp4, ten tor nie ma jeszcze gotowego filmu.`);
     }
 
     const video = `${track}-mixed.mp4`;
@@ -410,7 +410,7 @@ async function freeze(input: FreezeInput, engine: Encoder): Promise<FreezeReport
       // biome-ignore lint/performance/noAwaitInLoops: one card checked at a time
       if (!(await exists(card))) {
         throw new FreezeError(
-          `brak karty postaci ${member.id} na torze ${track} — etap 2 nie jest skończony.`
+          `brak karty postaci ${member.id} na torze ${track}, etap 2 nie jest skończony.`
         );
       }
       stills.push(

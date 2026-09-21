@@ -52,7 +52,7 @@ const settingsShape = {
   /**
    * The longest clip stage 3 may plan. An episode decision rather than a stage-3
    * flag, because `check` has to re-validate the shot list offline long after
-   * the command that produced it — a limit that lived only in a flag would have
+   * the command that produced it, a limit that lived only in a flag would have
    * to be retyped to mean anything, and a limit that lived only in a run archive
    * would make the archive load-bearing state.
    *
@@ -66,7 +66,7 @@ const settingsShape = {
 };
 
 /**
- * The decisions stage 0's own gate requires — the five that stages 1 and 2
+ * The decisions stage 0's own gate requires, the five that stages 1 and 2
  * consume. `maxClipSeconds` is deliberately absent: it is stage 3's input, so
  * stage 3 gates it. Making the character stage wait on a video-clip length
  * would be the same over-constraint as making it wait on an episode.
@@ -103,7 +103,7 @@ export const draftSettingsSchema = z.strictObject({
 /**
  * One member of the cast: who the image stage draws, and from what.
  *
- * `name` is not decoration — it is what the prompt tells the model to render,
+ * `name` is not decoration; it is what the prompt tells the model to render,
  * and it is the word the project rules use for that character. The id is the
  * directory it lives in; the name is the person.
  */
@@ -118,7 +118,7 @@ export const projectFileSchema = z.strictObject({
   aspectRatio: z.string().regex(ASPECT_RATIO, "expected an aspect ratio such as 16:9").nullable(),
   /**
    * The cast, keyed by character id. An empty roster is "nobody has said who is
-   * in this series", which the readiness gate refuses — a project with no
+   * in this series", which the readiness gate refuses, a project with no
    * declared character used to mean "exactly one, anonymous", and that silent
    * default is what let a two-character series produce one character.
    */
@@ -130,7 +130,7 @@ export const projectFileSchema = z.strictObject({
    * It sits here rather than in `episode.json` or an environment variable for
    * the reason the cast sits here: it recurs between episodes. A variable would
    * let the second episode get a different narrator from a different shell with
-   * nothing on disk saying anybody decided that — the same silent default that
+   * nothing on disk saying anybody decided that, the same silent default that
    * let a two-character series produce one. An episode field would make the
    * series answer the question again per episode, with nothing binding the
    * answers together.
@@ -148,7 +148,7 @@ export const projectFileSchema = z.strictObject({
 /**
  * The shape before the cast existed: one project, one anonymous character.
  *
- * Read only by `character new`, which is the one command that can convert it —
+ * Read only by `character new`, which is the one command that can convert it,
  * and it converts nothing by itself. A v1 file recorded a basis for a character
  * nobody had named, so carrying that basis onto whichever member happens to be
  * declared first would be inventing an answer. Every named character starts
@@ -176,13 +176,13 @@ export type CharacterEntry = z.infer<typeof characterSchema>;
 export type DraftSettings = z.infer<typeof draftSettingsSchema>;
 export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;
-/** Every episode decision made — the shape a later stage is allowed to read. */
+/** Every episode decision made, the shape a later stage is allowed to read. */
 export type ReadySettings = z.infer<typeof readySettingsSchema>;
 /**
  * The stage-3 shape: the same decisions, with the clip limit no longer null.
  *
  * A narrowing of `ReadySettings` rather than a schema of its own, because the
- * bytes on disk are the same bytes — what differs is only which stage insists
+ * bytes on disk are the same bytes, what differs is only which stage insists
  * the decision has been made.
  */
 export type ShotListSettings = ReadySettings & { readonly maxClipSeconds: number };

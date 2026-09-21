@@ -26,12 +26,12 @@ import {
  *
  * Its gate reads **another stage's** per-track results. Stage 5's graph waited
  * on references it had drawn itself; the opening frame waits on `R01` and on
- * `hero:ewa`, accepted on this track — a dependency that crosses a stage
+ * `hero:ewa`, accepted on this track, a dependency that crosses a stage
  * boundary without crossing a track one.
  *
  * And there is exactly **one** artifact. Everything stage 5 needed in order to
- * talk about a set — a list of targets, a count of ready roots, a series that
- * stops halfway — collapses to a single record, and the flags that existed to
+ * talk about a set, a list of targets, a count of ready roots, a series that
+ * stops halfway, collapses to a single record, and the flags that existed to
  * disambiguate one of six have nothing here to disambiguate.
  */
 
@@ -40,7 +40,7 @@ export const STAGE = "opening-frame";
 
 /**
  * The artifact key, the output's file name and the only value `--artifact`
- * accepts — the same string `lib/media-prompt` already plans the frame under,
+ * accepts, the same string `lib/media-prompt` already plans the frame under,
  * so the two never need translating into each other.
  */
 export const OPENING_FRAME = "opening-frame";
@@ -71,7 +71,7 @@ export interface Stage6Paths {
 }
 
 export interface Stage6Inputs {
-  /** Why nothing may be drawn at all — an unapproved or unread package. */
+  /** Why nothing may be drawn at all, an unapproved or unread package. */
   readonly gate: readonly string[];
   /** The frame this episode plans, with its attachments and its blockers. */
   readonly opening: PlannedArtifact;
@@ -103,7 +103,7 @@ function resolvePaths(input: Stage6Scope): Result<Stage6Paths> {
  * Everything stage 6 consumes.
  *
  * `compose` decides whether the prompt is built in full, and when it is, the
- * composition happens in the same pass that hashes the attachments — so the
+ * composition happens in the same pass that hashes the attachments, so the
  * bytes a paid call carries are the bytes this read just verified, rather than
  * bytes trusted from a stage file written at some earlier moment.
  */
@@ -131,7 +131,7 @@ export async function readStage6Inputs(
   if (opening === undefined) {
     return err(
       new Stage6BlockedError([
-        "pakiet promptów nie planuje klatki otwarcia — etap 4 zawsze ją planuje, więc ten manifest jest niekompletny",
+        "pakiet promptów nie planuje klatki otwarcia, etap 4 zawsze ją planuje, więc ten manifest jest niekompletny",
       ])
     );
   }

@@ -69,7 +69,7 @@ const sourceUrl = (release: Release): string =>
 
 function renderStill(release: Release, track: ReleaseTrack, still: ReleaseStill): string {
   const url = mediaUrl(release.version, still.file);
-  const alt = `${still.label} — ${still.subject}`;
+  const alt = `${still.label}, ${still.subject}`;
   return `<li><figure><a href="${url}"><img src="${url}" width="${still.width}" height="${still.height}" loading="lazy" alt="${escapeHtml(alt)}, ${escapeHtml(track.label)}"></a>
     <figcaption><strong>${escapeHtml(still.label)}</strong> · ${escapeHtml(still.subject)}<br>JPEG · ${still.width} × ${still.height}</figcaption></figure></li>`;
 }
@@ -115,7 +115,7 @@ function renderDocuments(release: Release, texts: ReleaseTexts): string {
   });
   return `<section class="documents" aria-labelledby="documents-${release.version.replaceAll(".", "-")}">
     <h4 id="documents-${release.version.replaceAll(".", "-")}">${both("Dokumenty etapów", "Stage documents")}</h4>
-    <p>${both("Tekstowa strona produkcji. Te pliki są wspólne dla obu torów — opisują historię, a nie obrazy.", "The production's text side. These files are shared by both tracks: they describe the story, not the pictures.")}</p>
+    <p>${both("Tekstowa strona produkcji. Te pliki są wspólne dla obu torów, bo opisują historię, a nie obrazy.", "The production's text side. These files are shared by both tracks: they describe the story, not the pictures.")}</p>
     ${entries.join("")}</section>`;
 }
 
@@ -173,7 +173,7 @@ export function renderRelease(release: Release, texts: ReleaseTexts): RenderedRe
     "",
     ...release.documents.map(
       (document, index) =>
-        `- Stage ${document.stage} — ${document.label}: [${document.file}](${documentUrl(release.version, document.file)}). ${release.en?.documents?.[index]?.description ?? document.description}`
+        `- Stage ${document.stage} (${document.label}): [${document.file}](${documentUrl(release.version, document.file)}). ${release.en?.documents?.[index]?.description ?? document.description}`
     ),
     "",
     `[View this release](/releases/${release.version}/)`,

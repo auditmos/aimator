@@ -32,7 +32,7 @@ describe("env", () => {
   /**
    * Stage 8's engine, and the only variable in this file that is not a model
    * or a key: it points at a program on this machine. Optional because the
-   * usual answer is `ffmpeg` on PATH — and unlike a model, a name that is
+   * usual answer is `ffmpeg` on PATH, and unlike a model, a name that is
    * simply "the one everybody installs" is not a decision anybody has to make.
    */
   it("should expose the muxer path as an optional string", () => {
@@ -40,8 +40,8 @@ describe("env", () => {
   });
 
   /**
-   * Stage 9 buys twice, from two providers, so it carries two model variables
-   * — one per call site, exactly as every stage above it does. Neither is the
+   * Stage 9 buys twice, from two providers, so it carries two model variables,
+   * one per call site, exactly as every stage above it does. Neither is the
    * narrator's voice: that is a creative decision recurring across episodes,
    * so it is stored in `project.json` beside the cast rather than left to
    * whichever shell happens to run the command.
@@ -61,7 +61,7 @@ describe("env", () => {
   /**
    * Stage 10 has three of its own, because it has three paid call sites: one
    * text model writes the cue sheet and two audio models make the sound. The
-   * key for the last two is stage 9's — the key follows the provider, the
+   * key for the last two is stage 9's, the key follows the provider, the
    * variable follows the call site.
    */
   it("should expose the stage-10 cue-sheet model as an optional string", () => {

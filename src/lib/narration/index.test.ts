@@ -118,7 +118,7 @@ function answer(): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
     ],
     review: "Do rozstrzygnięcia: skala alpaki.",
@@ -175,7 +175,7 @@ describe("validateNarration", () => {
 
   /**
    * The rule the module stands on. A model that wrote a better sentence than
-   * the screenplay's would be writing the film, which is stage 1's job — and
+   * the screenplay's would be writing the film, which is stage 1's job, and
    * the refusal says so rather than merely refusing.
    */
   it("should refuse a sentence the shot list does not contain", async () => {
@@ -290,7 +290,7 @@ describe("validateNarration", () => {
  * Stage 9 end to end, through the module entry.
  *
  * The transports are instrumented rather than replaced by the fixture's,
- * because for a stage that bills per call the count *is* the assertion — and
+ * because for a stage that bills per call the count *is* the assertion, and
  * here there is a second one the other stages never needed: this provider
  * charges per character, so what a preview promises has to be both.
  */
@@ -328,7 +328,7 @@ interface Calls {
   /**
    * Every speech request, in order: what was said, how long it was, and the
    * whole body as the provider received it. The body is kept because half of
-   * what stage 9 decides never appears in the text — how the narrator performs,
+   * what stage 9 decides never appears in the text, how the narrator performs,
    * what is said either side, and which seed was asked for.
    */
   readonly spoken: { characters: number; sent: Record<string, unknown>; text: string }[];
@@ -481,7 +481,7 @@ describe("generateNarration", () => {
 
   /**
    * Accepting the script is what authorises buying every sentence in it, so
-   * until somebody has read it nothing may be bought — and the run says so
+   * until somebody has read it nothing may be bought, and the run says so
    * rather than quietly doing nothing.
    */
   it("should buy nothing until a human has read the script", async () => {
@@ -623,11 +623,11 @@ describe("generateMix", () => {
 });
 
 /**
- * How the narrator performs — stage 9's own decision, in stage 9's own file.
+ * How the narrator performs, stage 9's own decision, in stage 9's own file.
  *
  * The bug this answers was not in any line of code. Stage 9 had nowhere to say
  * how the narrator reads, so every call went out on the provider's defaults,
- * and those defaults are `stability: 0.5` with `style: 0` — which the provider
+ * and those defaults are `stability: 0.5` with `style: 0`, which the provider
  * itself describes as trending monotone. The recordings sounded flat and no
  * amount of re-buying would have changed that, because nothing in the pipeline
  * was ever asked the question.
@@ -714,7 +714,7 @@ describe("narration direction", () => {
  * Half of what stage 9 decides never appears in the text: how the narrator
  * performs, what is said either side of this line, and which seed was asked
  * for. None of it is visible in the script or in the published WAV, so it is
- * asserted where it is observable — on the request itself.
+ * asserted where it is observable, on the request itself.
  */
 describe("what stage 9 puts on the wire", () => {
   async function buy(): Promise<Calls> {
@@ -734,7 +734,7 @@ describe("what stage 9 puts on the wire", () => {
   /**
    * The provider's defaults are sent explicitly rather than by omission. An
    * archive that leaves them out cannot answer what produced these bytes, and
-   * that is the one question the archive exists for — the defaults are the
+   * that is the one question the archive exists for, the defaults are the
    * provider's to change, not ours to assume.
    */
   it("should state the provider's defaults rather than stay silent", async () => {
@@ -767,7 +767,7 @@ describe("what stage 9 puts on the wire", () => {
   /**
    * The other half of why the first take sounded flat: every line was bought as
    * if it were the only sentence in the film. The neighbours are derived from
-   * the script rather than stored — they *are* the neighbouring lines, so a
+   * the script rather than stored, they *are* the neighbouring lines, so a
    * second copy of them would drift the first time somebody re-lifts it.
    */
   it("should hand each line what is said either side of it", async () => {
@@ -782,7 +782,7 @@ describe("what stage 9 puts on the wire", () => {
   /**
    * A seed per attempt, not per sentence. Re-deriving a recorded attempt has to
    * ask for the same reading, but `--regenerate` exists because somebody did
-   * not like what came back — and a seed fixed to the sentence would sell them
+   * not like what came back, and a seed fixed to the sentence would sell them
    * the same reading twice.
    */
   it("should ask for a seed, and a different one per attempt", async () => {
@@ -848,7 +848,7 @@ describe("what stage 9 puts on the wire", () => {
  * A recording bought before anybody decided how the narrator reads holds no
  * entry for `narration.json` at all, so nothing drifts and nothing is reported.
  * Left alone, `check` would present a reading nobody chose as one somebody
- * approved — which is the exact failure the review exists to prevent.
+ * approved, which is the exact failure the review exists to prevent.
  */
 describe("checkNarration after the reading changes", () => {
   it("should report lines bought before anybody decided how it reads", async () => {
@@ -885,7 +885,7 @@ describe("checkNarration after the reading changes", () => {
  * What a preview says to do next, once there is nothing left to mix.
  *
  * A dry run that points at the command it just told you is finished sends a
- * person back round a loop they have already closed — and here it points past
+ * person back round a loop they have already closed, and here it points past
  * the one thing stage 9 actually needs from them, which is listening to the
  * narration over the picture and saying yes.
  */

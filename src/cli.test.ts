@@ -405,7 +405,7 @@ describe("opening-frame", () => {
     expect(result.text).toContain("<episode-id>");
   });
 
-  /** One artifact, so the flag is optional — but it must still parse. */
+  /** One artifact, so the flag is optional, but it must still parse. */
   it("should accept --artifact opening-frame without calling it unknown", async () => {
     const result = await cli(
       "opening-frame",
@@ -733,8 +733,8 @@ describe("--stage sound-design", () => {
 });
 
 /**
- * Every decibel this stage takes is normally negative — a bed sits *under* a
- * voice — so `--music-db -22` is the ordinary case rather than an edge one.
+ * Every decibel this stage takes is normally negative, a bed sits *under* a
+ * voice, so `--music-db -22` is the ordinary case rather than an edge one.
  * `parseArgs` refuses it on its own, because it cannot tell a value starting
  * with a dash from the next option, and the `--music-db=-22` spelling that
  * does work is a trap rather than an interface.

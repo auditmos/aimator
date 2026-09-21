@@ -49,7 +49,7 @@ import {
  *
  * **Placement is refused rather than nudged.** A line that would talk over the
  * next one, or run past the end of the film, stops the mix and names the
- * remedy — because where a line sits comes from a plan a human approved, and
+ * remedy, because where a line sits comes from a plan a human approved, and
  * this is stage 7's refusal rather than stage 8's acceptance. It costs nothing:
  * the recordings stay bought and re-mixing after a fix is free.
  */
@@ -70,7 +70,7 @@ export interface MixReport {
 }
 
 interface MixInput {
-  /** Narrows nothing — there is one artifact per track — but a wrong value is refused. */
+  /** Narrows nothing; there is one artifact per track, but a wrong value is refused. */
   readonly artifacts: readonly string[];
   readonly episodeId: string;
   readonly mode: WriteMode;
@@ -87,7 +87,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -110,7 +110,7 @@ function intent(finished: boolean, blocked: boolean): MixReport["state"] {
  * `--dry-run`: the whole placement, the engine, and no write.
  *
  * What it says to do next has to account for a mix that already exists, or it
- * sends a person back round a loop they have already closed — and past the one
+ * sends a person back round a loop they have already closed, and past the one
  * thing this stage actually needs from them, which is listening to the
  * narration over the picture and saying yes. So a finished mix answers the same
  * way `idle` does; only an unfinished one points at the mix.
@@ -176,7 +176,7 @@ export async function generateMix(input: MixInput): Promise<Result<MixReport>> {
   if (named.length > 0) {
     return err(
       new Stage9BlockedError([
-        `--artifact "${named.join(", ")}" — miks produkuje jeden artefakt na tor: ${NARRATED}`,
+        `--artifact "${named.join(", ")}", miks produkuje jeden artefakt na tor: ${NARRATED}`,
         "kwestie kupuje 'narration generate'; tutaj nie ma czego zawężać",
       ])
     );
@@ -230,13 +230,13 @@ export async function generateMix(input: MixInput): Promise<Result<MixReport>> {
   };
 
   if (input.mode === "dry-run") {
-    // The raw field is enough here, and stage 10's is not — which is a real
+    // The raw field is enough here, and stage 10's is not, which is a real
     // difference rather than an inconsistency. Every input of *this* mix is
     // gated: the script, each bought line and `episode.mp4` all have to be
     // approved before the mix may happen at all, so an input that drifted has
     // already put a problem in `problems` and `blocked` answers first. Stage
-    // 10 has one input nothing gates — `mix.json`, whose whole point is to be
-    // turned freely — so there the approval has to be checked against the
+    // 10 has one input nothing gates, `mix.json`, whose whole point is to be
+    // turned freely, so there the approval has to be checked against the
     // bytes. If an ungated input ever appears here, this stops being true.
     return ok(
       preview(input, report, problems, missingSound(stage9.data.settings), {
@@ -431,7 +431,7 @@ function drift(placed: readonly PlacedLine[]): readonly string[] {
     : [
         `dryf klipów przesunął kotwice: ${moved
           .map((line) => `${line.id} ${line.plannedSeconds}s → ${line.atSeconds}s`)
-          .join(", ")} — położono je wobec filmu, który istnieje, nie wobec planu`,
+          .join(", ")}, położono je wobec filmu, który istnieje, nie wobec planu`,
       ];
 }
 

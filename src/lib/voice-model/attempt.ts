@@ -43,7 +43,7 @@ import {
  * The order of operations here is the whole contract of a billed call, and it
  * is the one `lib/image-model` already wrote down: `submitted` lands on disk
  * before the POST, so an attempt that dies mid-call is visibly one that may
- * already have been charged — for this one line, not for the script around it.
+ * already have been charged, for this one line, not for the script around it.
  * Nothing retries on its own.
  *
  * Resuming costs nothing, which is what a speech call has in common with an
@@ -51,7 +51,7 @@ import {
  * an archived answer *is* the line. A validator bug must never be billable.
  *
  * The `producer` records the voice beside the model, because this record
- * answers one question — what would have to run again to get these bytes — and
+ * answers one question, what would have to run again to get these bytes, and
  * for speech the honest answer is both. `promptVersion` stays null: nothing of
  * ours is an instruction here. The text is the film's own words, travelling
  * verbatim, and a version number on somebody else's sentence would be a lie
@@ -115,7 +115,7 @@ function write(path: string, text: string): Promise<Result<readonly string[]>> {
 /**
  * One utterance's record, merged into the file rather than replacing it.
  *
- * Stage 9 owns a set — the script and one record per line — so replacing the
+ * Stage 9 owns a set, the script and one record per line, so replacing the
  * file the way a single-artifact text stage does would erase every record
  * nobody touched.
  */
@@ -139,7 +139,7 @@ async function readStage(path: string, name: StageName): Promise<StageFile> {
  * Derived rather than stored, and from the run id rather than from the
  * sentence, because the two things a seed has to do pull in opposite
  * directions. Re-deriving the reading of a *recorded* attempt must give the
- * same request, and the run id is recorded — so it does. But `--regenerate`
+ * same request, and the run id is recorded, so it does. But `--regenerate`
  * exists because somebody did not like what came back, and a seed fixed to the
  * sentence would hand them the same reading for a second charge. A new attempt
  * gets a new id, so it gets a new seed.
@@ -213,7 +213,7 @@ async function resume(
   if (!saved.ok || (status !== null && status >= 400)) {
     return err(
       artifact.blocked([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej nagrania${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
+        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej nagrania${status === null ? "" : ` (HTTP ${status})`}, mogła zostać rozliczona`,
         `sprawdź ${toWorkspacePath(call.workspace.root, run.root)}; nową płatną próbę zaczyna wyłącznie --regenerate`,
       ])
     );
@@ -221,7 +221,7 @@ async function resume(
 
   // The saved line was read from the script recorded beside it. Publishing it
   // against a changed script would attach a recording to a sentence nobody
-  // asked for — and here that is not a subtlety: it would put words in the
+  // asked for, and here that is not a subtlety: it would put words in the
   // film that the approved script does not contain.
   const changed = record.inputs.filter(
     (entry) =>
@@ -232,7 +232,7 @@ async function resume(
     return err(
       artifact.blocked([
         ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "zapisane nagranie czyta inne zdanie — nową płatną próbę zaczyna --regenerate",
+        "zapisane nagranie czyta inne zdanie, nową płatną próbę zaczyna --regenerate",
       ])
     );
   }
@@ -285,7 +285,7 @@ async function attempt(
   }
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
-  // then visibly an attempt that may already have been billed — for this one
+  // then visibly an attempt that may already have been billed, for this one
   // line, not for the whole script.
   const submitted = withRecord(
     stage,
@@ -415,7 +415,7 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }

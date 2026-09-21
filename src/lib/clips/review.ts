@@ -27,11 +27,11 @@ import {
  *
  * `check` reads and reports; it writes nothing. `approve` repeats the whole
  * verification and only then records acceptance, bound to the digest of one
- * result at a time — because each is a separate creative judgement and because
+ * result at a time, because each is a separate creative judgement and because
  * the next link's gate reads them separately. Accepting a clip is what lets the
  * next entry frame be drawn, and accepting that frame is what lets the next
  * clip be rendered, so an approval that spilled across the set would open gates
- * nobody looked through — at the price of a video each time.
+ * nobody looked through, at the price of a video each time.
  *
  * The verdict differs by medium and the reading does not: an entry frame is
  * judged as an image in the film frame, a clip as a video of the length the
@@ -81,7 +81,7 @@ class ClipStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The inputs as they now stand, per target — what an approval re-records. */
+  /** The inputs as they now stand, per target, what an approval re-records. */
   readonly inputs: Map<string, readonly RecordedFile[]>;
   readonly stage: StageFile;
   readonly stagePath: string;
@@ -144,7 +144,7 @@ async function verdictOf(
   if (digest.data.sha256 !== output.sha256) {
     return {
       blocking: [
-        `${label}: ${output.path} nie zgadza się z zapisanym hashem — wynik został zmieniony poza narzędziem`,
+        `${label}: ${output.path} nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`,
       ],
       note: "bajty nie zgadzają się z rekordem",
     };
@@ -179,7 +179,7 @@ async function verdictOf(
 
   return {
     blocking: [],
-    note: `${checked.data.width}x${checked.data.height}, ${checked.data.seconds}s${ended ? "" : " — bez końcówki, klip kontynuujący nie ma z czego wyjść"}`,
+    note: `${checked.data.width}x${checked.data.height}, ${checked.data.seconds}s${ended ? "" : ", bez końcówki, klip kontynuujący nie ma z czego wyjść"}`,
   };
 }
 
@@ -207,7 +207,7 @@ async function inspectOne(
   }
 
   if (record.status === "submitted") {
-    const unfinished = `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca${record.jobId === null ? "" : ` (zadanie ${record.jobId})`} — powtórz polecenie, żeby ją dokończyć bez drugiej opłaty`;
+    const unfinished = `${label}: próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca${record.jobId === null ? "" : ` (zadanie ${record.jobId})`}, powtórz polecenie, żeby ją dokończyć bez drugiej opłaty`;
 
     return {
       blocking: [unfinished],
@@ -229,7 +229,7 @@ async function inspectOne(
     blocking,
     status: {
       // Approval is bound to bytes: a recorded "approved" that no longer
-      // verifies is not an approval, it is a stale claim.
+      // verifies is not an approval; it is a stale claim.
       approved:
         record.review.status === "approved" && blocking.length === 0 && inputsChanged.length === 0,
       id: target.name,
@@ -264,12 +264,12 @@ async function inspect(input: Stage7Scope): Promise<Result<Inspection>> {
     problems.push(...one.blocking);
 
     // Drift is reported beside the blocking problems and revokes the approval
-    // just as loudly — but it is not one of them. The result is intact; it was
+    // just as loudly, but it is not one of them. The result is intact; it was
     // made from something that has since changed, and reading it again beside
     // the new version is exactly what an approval is.
     for (const path of one.status.inputsChanged) {
       problems.push(
-        `${path}: zmienił się od czasu powstania ${target.name} — obejrzyj wynik jeszcze raz obok nowej wersji i zatwierdź ponownie albo kup go ponownie: aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate --artifact ${target.name}`
+        `${path}: zmienił się od czasu powstania ${target.name}, obejrzyj wynik jeszcze raz obok nowej wersji i zatwierdź ponownie albo kup go ponownie: aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate --artifact ${target.name}`
       );
     }
   }
@@ -300,10 +300,10 @@ function nextStepOf(input: Stage7Scope, artifacts: readonly ClipState[]): string
 
   return missing.length > 0
     ? `aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track}`
-    : `etap 7 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny — dalej etap 8, montaż`;
+    : `etap 7 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 8, montaż`;
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkClips(input: Stage7Scope): Promise<Result<ClipsStatus>> {
   const inspection = await inspect(input);
 
@@ -327,7 +327,7 @@ export async function approveClips(input: ApproveScope): Promise<Result<ClipsSta
 
   if (named.length > 0) {
     return err(
-      new ClipStateError(`--artifact "${named.join(", ")}" — oczekiwano formy C01 albo entry:C02`)
+      new ClipStateError(`--artifact "${named.join(", ")}", oczekiwano formy C01 albo entry:C02`)
     );
   }
 

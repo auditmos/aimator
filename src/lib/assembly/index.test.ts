@@ -23,7 +23,7 @@ import { approveAssembly, checkAssembly, generateAssembly } from "./index.js";
  * as `fetch` is in a paid stage, so no test ever spawns a process.
  */
 
-/** Three clips of ten planned seconds each — the shot list `three-clips` cuts. */
+/** Three clips of ten planned seconds each, the shot list `three-clips` cuts. */
 const CLIP_IDS = ["C01", "C02", "C03"] as const;
 const PLANNED_SECONDS = 30;
 /** What a 24 fps renderer actually hands back for ten ordered seconds. */
@@ -53,7 +53,7 @@ function answer(): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
     ],
     review: "Do rozstrzygnięcia: skala alpaki.",
@@ -81,7 +81,7 @@ interface Fake {
  * An ffmpeg that is present and does its job, or one that is not there at all.
  *
  * `seconds` is what the file it writes turns out to run, so a test can hand the
- * stage a cut that does not add up to its own inputs — which is the one verdict
+ * stage a cut that does not add up to its own inputs, which is the one verdict
  * stage 8 passes on its own work rather than on somebody else's.
  */
 function muxer(options: { absent?: boolean; seconds?: number } = {}): Fake {
@@ -202,8 +202,8 @@ describe("generateAssembly gates", () => {
   /**
    * The table says stage 8 consumes approved clips, and that is the whole gate:
    * every clip the shot list plans, finished and accepted on this track. The
-   * entry frames and end frames are not in the cut — an entry frame is already
-   * the first frame of its own clip — so asking after them would be a gate on a
+   * entry frames and end frames are not in the cut, an entry frame is already
+   * the first frame of its own clip, so asking after them would be a gate on a
    * file this stage never opens.
    */
   it("should refuse to cut until every clip the plan names is accepted here", async () => {
@@ -244,7 +244,7 @@ describe("generateAssembly gates", () => {
     expect(await present(join(trackDir(), "episode.mp4"))).toBe(false);
   });
 
-  /** One artifact per track, so `--artifact` narrows nothing — but it is read. */
+  /** One artifact per track, so `--artifact` narrows nothing, but it is read. */
   it("should refuse an --artifact that is not the episode", async () => {
     await upstream();
     await makeTrack({ root, track: "gpt-image", workspace });
@@ -290,7 +290,7 @@ describe("generateAssembly", () => {
 
   /**
    * Every clip is a recorded input, so redrawing one is drift the next check
-   * reports — the same contract every stage above this one already keeps.
+   * reports, the same contract every stage above this one already keeps.
    */
   it("should record every clip it cut, by path and digest", async () => {
     await upstream();
@@ -417,7 +417,7 @@ describe("checkAssembly and approveAssembly", () => {
   /**
    * A clip redrawn after the cut is input drift: the approval expires, `check`
    * says so, and re-approving is a person watching the episode again beside the
-   * new version — exactly as it is everywhere above this stage.
+   * new version, exactly as it is everywhere above this stage.
    */
   it("should let a redrawn clip expire the approval without failing validation", async () => {
     await upstream();

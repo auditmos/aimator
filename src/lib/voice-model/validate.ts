@@ -4,7 +4,7 @@ import { err, ok, type Result } from "../result.js";
  * Internal to the voice-model module: the verdict on bought speech, and the two
  * limits that belong to any utterance rather than to one stage.
  *
- * Pure and offline, like the image and video verdicts and for the same reason —
+ * Pure and offline, like the image and video verdicts and for the same reason,
  * it decides whether a line that has already been paid for may be published, so
  * it must never need a network, a secret or a decoder of its own.
  *
@@ -31,7 +31,7 @@ const PCM = 1;
  * Refused rather than truncated, for the reason `clipDuration` refuses a length
  * no video model renders: a tool that quietly sent half a sentence would change
  * what the film says on nobody's authority. The remedy is upstream and the
- * message says so — an utterance is one continuous stretch of speech, and one
+ * message says so, an utterance is one continuous stretch of speech, and one
  * that runs past this is really two.
  */
 const MAX_CHARACTERS = 5000;
@@ -84,7 +84,7 @@ export function billedCharacters(text: string): number {
  * The neighbouring lines are handed to the provider so a sentence bought on its
  * own is read as part of a paragraph. They are never rendered, so on any
  * ordinary reading of "billed per character of text converted to audio" they
- * cost nothing — but the provider's billing page does not say so, and this tool
+ * cost nothing, but the provider's billing page does not say so, and this tool
  * has never guessed with somebody else's account. So the number is reported
  * beside the bill rather than folded into it, and the preview says which is
  * which. If it turns out these are charged for, the figure to add is already on
@@ -108,7 +108,7 @@ export function utteranceLength(text: string): Result<number> {
   const characters = billedCharacters(text.trim());
 
   if (characters === 0) {
-    return err(new UtteranceError(0, "kwestia jest pusta — nie ma czego przeczytać"));
+    return err(new UtteranceError(0, "kwestia jest pusta, nie ma czego przeczytać"));
   }
 
   return characters <= MAX_CHARACTERS
@@ -116,7 +116,7 @@ export function utteranceLength(text: string): Result<number> {
     : err(
         new UtteranceError(
           characters,
-          `kwestia ma ${characters} znaków, a model czyta najwyżej ${MAX_CHARACTERS} w jednym wywołaniu — skróć ją w skrypcie narracji albo rozbij na dwie wypowiedzi`
+          `kwestia ma ${characters} znaków, a model czyta najwyżej ${MAX_CHARACTERS} w jednym wywołaniu, skróć ją w skrypcie narracji albo rozbij na dwie wypowiedzi`
         )
       );
 }
@@ -127,7 +127,7 @@ export function utteranceLength(text: string): Result<number> {
  * Nothing is compared against an order, because nothing was ordered: a voice
  * provider is handed a sentence and hands back however long saying it took.
  * That length is the whole of what the mix needs and the whole of what this can
- * honestly report — which is why the decision about a line that does not fit
+ * honestly report, which is why the decision about a line that does not fit
  * belongs to the stage laying it down, not here.
  */
 export function validateSpeech(bytes: Buffer): Result<SpeechVerdict> {
@@ -148,7 +148,7 @@ export function validateSpeech(bytes: Buffer): Result<SpeechVerdict> {
     return err(
       new SpeechError(
         "malformed",
-        "odpowiedź nie jest plikiem WAV — zachowano ją do sprawdzenia; zwykle jest to komunikat błędu dostawcy"
+        "odpowiedź nie jest plikiem WAV, zachowano ją do sprawdzenia; zwykle jest to komunikat błędu dostawcy"
       )
     );
   }
@@ -158,7 +158,7 @@ export function validateSpeech(bytes: Buffer): Result<SpeechVerdict> {
 
   if (format === null || data === null || format.end - format.body < 16) {
     return err(
-      new SpeechError("malformed", "WAV jest niekompletny — brak bloku fmt albo bloku data")
+      new SpeechError("malformed", "WAV jest niekompletny, brak bloku fmt albo bloku data")
     );
   }
 
@@ -168,7 +168,7 @@ export function validateSpeech(bytes: Buffer): Result<SpeechVerdict> {
     return err(
       new SpeechError(
         "unsupported",
-        `WAV niesie kodowanie ${encoding}, a ten werdykt czyta wyłącznie PCM — zachowano oryginał`
+        `WAV niesie kodowanie ${encoding}, a ten werdykt czyta wyłącznie PCM, zachowano oryginał`
       )
     );
   }
@@ -184,7 +184,7 @@ export function validateSpeech(bytes: Buffer): Result<SpeechVerdict> {
 
   if (samples === 0) {
     return err(
-      new SpeechError("empty", "kwestia jest pusta — WAV nie niesie ani jednej próbki dźwięku")
+      new SpeechError("empty", "kwestia jest pusta, WAV nie niesie ani jednej próbki dźwięku")
     );
   }
 
@@ -209,8 +209,8 @@ interface Chunk {
 /**
  * The first chunk of an id, among the children of the RIFF body.
  *
- * A RIFF file is a chain of chunks — four characters, a little-endian length,
- * a payload padded to an even boundary — and an encoder is free to put chunks
+ * A RIFF file is a chain of chunks, four characters, a little-endian length,
+ * a payload padded to an even boundary, and an encoder is free to put chunks
  * in front of the ones that matter. So the chain is walked rather than assumed:
  * a reader that took `fmt ` to be at offset twelve would work against one
  * encoder and quietly misread another.

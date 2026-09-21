@@ -1,5 +1,5 @@
 /**
- * One billed audio call — music or a sound effect — and what is true of any
+ * One billed audio call, music or a sound effect, and what is true of any
  * cue a stage buys.
  *
  * It is a module rather than a flag in `lib/voice-model` for the reason
@@ -13,7 +13,7 @@
  *
  * Two endpoints behind one entry, with `lib/image-model`'s precedent: that one
  * holds two providers and two endpoints because "which endpoint, and how the
- * bytes travel" is true of any image. Here it is truer still — one provider,
+ * bytes travel" is true of any image. Here it is truer still, one provider,
  * one key, one container, one verdict, one lifecycle, and a body that differs
  * by which of two things is being asked for. Splitting them would have made
  * two modules whose only difference is a URL and a field name.
@@ -28,7 +28,7 @@
  * lands, how loud it sits, and the words it uses for a refusal.
  *
  * **On the bill.** This provider rates both products per minute of generated
- * audio and charges at the moment of generation rather than at download — so a
+ * audio and charges at the moment of generation rather than at download, so a
  * regeneration is a second full charge, not a top-up. The count of calls is
  * therefore not the bill, exactly as it stopped being the bill at stage 9, and
  * a stage using this module prints seconds beside calls. Prices are not stated

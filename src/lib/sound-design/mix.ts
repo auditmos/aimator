@@ -51,8 +51,8 @@ import {
  * about to accept.
  *
  * **`narrated.mp4` is neither overwritten nor invalidated.** It becomes a
- * reviewed intermediate — the only artifact anywhere in which the narration's
- * placement can be heard with nothing else in the way — and the yes on it is
+ * reviewed intermediate, the only artifact anywhere in which the narration's
+ * placement can be heard with nothing else in the way, and the yes on it is
  * what this stage gates on rather than reproduces.
  *
  * **The stems are laid down as they came.** No stretching, no re-timing: those
@@ -72,7 +72,7 @@ export interface MasterReport {
   readonly created: readonly string[];
   /** The local engine, once it has answered. `null` when it could not be asked. */
   readonly engine: string | null;
-  /** How the mix sits — sent explicitly, so the archive answers for these bytes. */
+  /** How the mix sits, sent explicitly, so the archive answers for these bytes. */
   readonly levels: MixLevels;
   readonly nextStep: string;
   readonly problems: readonly string[];
@@ -84,7 +84,7 @@ export interface MasterReport {
 }
 
 interface MasterInput {
-  /** Narrows nothing — there is one artifact per track — but a wrong value is refused. */
+  /** Narrows nothing; there is one artifact per track, but a wrong value is refused. */
   readonly artifacts: readonly string[];
   readonly episodeId: string;
   readonly mode: WriteMode;
@@ -101,7 +101,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -126,7 +126,7 @@ function intent(finished: boolean, blocked: boolean): MasterReport["state"] {
  * `--dry-run`: the whole placement, the levels, the engine, and no write.
  *
  * What it says to do next has to account for a mix that already exists, or it
- * sends a person back round a loop they have already closed — and past the one
+ * sends a person back round a loop they have already closed, and past the one
  * thing this stage actually needs from them, which is listening to the whole
  * film and saying yes. So a finished mix answers the same way `idle` does; only
  * an unfinished one points at the mix.
@@ -154,7 +154,7 @@ function preview(
  * Whether this mix still carries a valid yes.
  *
  * Never the raw `review.status` on its own. An approval is bound to the bytes
- * it was given for, so a recorded input that has moved since lapses it — which
+ * it was given for, so a recorded input that has moved since lapses it, which
  * is exactly what `check` reports and what a preview must not contradict. The
  * comparison is against the inputs *this run* would record, so it costs no
  * extra read: the files have already been opened to decide whether the mix may
@@ -172,7 +172,7 @@ function accepted(
 
   // Both directions, and the second is not symmetry for its own sake. A mix
   // made before anybody dialled the levels holds no entry for `mix.json` at
-  // all, so nothing in it can drift — and a check that only looked for moved
+  // all, so nothing in it can drift, and a check that only looked for moved
   // bytes would call that mix current after somebody changed how the series
   // sounds. An input that has appeared since lapses an approval exactly as one
   // that has moved does.
@@ -226,7 +226,7 @@ export async function generateMaster(input: MasterInput): Promise<Result<MasterR
   if (named.length > 0) {
     return err(
       new Stage10BlockedError([
-        `--artifact "${named.join(", ")}" — miks produkuje jeden artefakt na tor: ${MIXED}`,
+        `--artifact "${named.join(", ")}", miks produkuje jeden artefakt na tor: ${MIXED}`,
         "stemy kupuje 'sound-design generate'; tutaj nie ma czego zawężać",
       ])
     );
@@ -513,7 +513,7 @@ function drift(placed: readonly PlacedSound[]): readonly string[] {
     : [
         `dryf klipów przesunął kotwice: ${moved
           .map((sound) => `${sound.id} ${sound.plannedSeconds}s → ${sound.atSeconds}s`)
-          .join(", ")} — położono je wobec filmu, który istnieje, nie wobec planu`,
+          .join(", ")}, położono je wobec filmu, który istnieje, nie wobec planu`,
       ];
 }
 

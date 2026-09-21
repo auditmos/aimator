@@ -1,5 +1,5 @@
 /**
- * Stage 5 — reference images. The first stage where the two tracks really part
+ * Stage 5, reference images. The first stage where the two tracks really part
  * company: one package, two independent sets of images, two separate reviews.
  *
  * It consumes the approved prompt package and produces
@@ -27,7 +27,7 @@
  *
  * There is no `--republish`: this stage publishes exactly the bytes the
  * provider returned, so it has no renderer whose mistake would need undoing. A
- * bought answer that failed to publish is already free to retry — the record
+ * bought answer that failed to publish is already free to retry, the record
  * stays `submitted` and repeating the command finishes it from the archive.
  */
 

@@ -10,19 +10,19 @@ import { billedCharacters, utteranceLength } from "../voice-model/index.js";
  * Every line's text has to occur, word for word, inside the shot it names.
  *
  * That is what makes the script a derivation rather than a second version of
- * the same truth. The narrator's sentences already exist — stage 1's prompt
+ * the same truth. The narrator's sentences already exist, stage 1's prompt
  * asks for them in the film's language whenever the episode's sound mode
  * permits speech, and stage 3 carries them into each shot's `Audio` prose. What
  * does not exist is any machine-readable form of them: they sit in a sentence
  * that also describes the music, the rain and the thunder, and pulling them out
- * with a parser would be a parser over prose — the thing stage 3 refused when
+ * with a parser would be a parser over prose, the thing stage 3 refused when
  * it made cast ids the binding instead of names, and stage 4 refused when it
  * put the dependency graph in JSON instead of in sentences.
  *
  * So a model does the lifting, because reading prose is what a model is for,
  * and this function proves the lift was a lift. A sentence the shot list does
  * not contain fails here, which means stage 9 cannot put words in the film that
- * nobody approved — and an edited shot list stops the script validating rather
+ * nobody approved, and an edited shot list stops the script validating rather
  * than silently disagreeing with it.
  *
  * What the model genuinely adds is the part no approved artifact holds: an id
@@ -50,7 +50,7 @@ export interface NarrationLine {
   readonly text: string;
 }
 
-/** The script as data — what the buying and the mixing read instead of Markdown. */
+/** The script as data, what the buying and the mixing read instead of Markdown. */
 export interface NarrationScript {
   /** Every line in the order they are spoken, which is the order of the film. */
   readonly lines: readonly NarrationLine[];
@@ -128,7 +128,7 @@ export function validateNarration(input: ValidateInput): Result<NarrationScript>
   const problems: string[] = [];
 
   if (CODE_FENCE.test(input.text)) {
-    problems.push("dokument zawiera blok kodu — skrypt narracji jest prozą i nagłówkami");
+    problems.push("dokument zawiera blok kodu, skrypt narracji jest prozą i nagłówkami");
   }
 
   const found = sections(input.text);
@@ -168,7 +168,7 @@ function readLines(
 
   if (blocks.length === 0) {
     problems.push(
-      'sekcja "Lines" nie ma ani jednej kwestii — odcinek z narracją, w którym narrator nic nie mówi, nie jest decyzją, tylko brakiem'
+      'sekcja "Lines" nie ma ani jednej kwestii, odcinek z narracją, w którym narrator nic nie mówi, nie jest decyzją, tylko brakiem'
     );
 
     return [];
@@ -189,7 +189,7 @@ function readLines(
     // downstream can straighten out.
     if (previous !== null && line.atSeconds <= previous.atSeconds) {
       problems.push(
-        `${line.id}: zaczyna się w ${line.atSeconds}s, czyli nie później niż ${previous.id} w ${previous.atSeconds}s — narracja biegnie do przodu`
+        `${line.id}: zaczyna się w ${line.atSeconds}s, czyli nie później niż ${previous.id} w ${previous.atSeconds}s, narracja biegnie do przodu`
       );
     }
 
@@ -258,7 +258,7 @@ function readLine(
 
   if (id !== expected) {
     problems.push(
-      `kwestia ${id} stoi tam, gdzie oczekiwano ${expected} — numeracja biegnie po kolei od N01`
+      `kwestia ${id} stoi tam, gdzie oczekiwano ${expected}, numeracja biegnie po kolei od N01`
     );
   }
 
@@ -295,7 +295,7 @@ function readLine(
   // what the narrator says, stage 9 only decides which of it is spoken when.
   if (!flatten(shot.text).includes(text)) {
     problems.push(
-      `${id}: tej kwestii nie ma w ujęciu ${shotId} — narracja jest podnoszona z zatwierdzonej listy ujęć, nigdy dopisywana; jeśli scenariusz ma powiedzieć coś nowego, poprawka należy do etapu 1`
+      `${id}: tej kwestii nie ma w ujęciu ${shotId}, narracja jest podnoszona z zatwierdzonej listy ujęć, nigdy dopisywana; jeśli scenariusz ma powiedzieć coś nowego, poprawka należy do etapu 1`
     );
   }
 

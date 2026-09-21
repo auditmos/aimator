@@ -8,8 +8,8 @@ import { answerSchema, type PackageAnswer } from "./prompt.js";
  *
  * One paid answer becomes two kinds of file, and the split is the point. The
  * prose goes to `prompts/**`, one file per future paid call, because the unit a
- * human accepts has to be the unit a later stage sends. Everything else — ids,
- * kinds, one-line subjects, the dependency graph, the reference assignments —
+ * human accepts has to be the unit a later stage sends. Everything else, ids,
+ * kinds, one-line subjects, the dependency graph, the reference assignments,
  * goes to `prompt-package.json`, because a graph written in prose is a graph
  * nobody can check.
  *
@@ -47,7 +47,7 @@ class AnswerError extends Error {
  * clips after the first.
  *
  * Whether those clips are the shot list's clips is a different question, and
- * `validatePromptPackage` answers it — against the shot list as it stands now,
+ * `validatePromptPackage` answers it, against the shot list as it stands now,
  * so that `check` asks it again long after this answer was bought.
  */
 export function readPackageAnswer(text: string): Result<PackageAnswer> {
@@ -84,7 +84,7 @@ export function readPackageAnswer(text: string): Result<PackageAnswer> {
 
   if (blank.length > 0) {
     return err(
-      new AnswerError("empty-prompt", `puste prompty: ${blank.join(", ")} — nie ma czego wysłać`)
+      new AnswerError("empty-prompt", `puste prompty: ${blank.join(", ")}, nie ma czego wysłać`)
     );
   }
 
@@ -98,7 +98,7 @@ export function readPackageAnswer(text: string): Result<PackageAnswer> {
     : err(
         new AnswerError(
           "entry-frames",
-          `klatki wejściowe muszą dotyczyć dokładnie klipów po pierwszym, w kolejności — oczekiwano ${expected.join(",") || "żadnej"}, otrzymano ${got.join(",") || "żadnej"}`
+          `klatki wejściowe muszą dotyczyć dokładnie klipów po pierwszym, w kolejności, oczekiwano ${expected.join(",") || "żadnej"}, otrzymano ${got.join(",") || "żadnej"}`
         )
       );
 }
@@ -110,7 +110,7 @@ export function renderPackage(answer: PackageAnswer): Rendered {
     ...answer.references.map((one) => ({
       id: one.id,
       kind: "reference" as const,
-      text: document(`${one.id} — ${one.subject.trim()}`, one.prompt),
+      text: document(`${one.id}, ${one.subject.trim()}`, one.prompt),
     })),
     ...answer.clips.map((clip) => ({
       id: clip.id,
@@ -120,7 +120,7 @@ export function renderPackage(answer: PackageAnswer): Rendered {
     ...answer.entryFrames.map((frame) => ({
       id: frame.clipId,
       kind: "entry-frame" as const,
-      text: document(`${frame.clipId} — entry frame`, frame.prompt),
+      text: document(`${frame.clipId}, entry frame`, frame.prompt),
     })),
   ];
 
@@ -151,7 +151,7 @@ export function renderPackage(answer: PackageAnswer): Rendered {
  * The heading is English for the same reason the direction is: this whole file
  * is sent to an image or video model, and the heading is the first line it
  * reads. Instructing the model to write English while this function wrote
- * Polish into the same file would have left half the rule unenforced — the half
+ * Polish into the same file would have left half the rule unenforced, the half
  * nobody could see by reading the prompt.
  */
 function document(heading: string, prompt: string): string {

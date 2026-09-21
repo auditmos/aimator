@@ -114,7 +114,7 @@ describe("clipDuration", () => {
  *
  * What is asserted here is the order of operations around the POST, because
  * that order *is* the contract of a billed call: the job id reaches disk as
- * soon as it exists, nothing is retried on its own, a finished job is never
+ * soon as it exists; nothing is retried on its own, a finished job is never
  * bought twice, and an answer that cannot be published keeps its archive so
  * fixing the tool costs nothing.
  */
@@ -149,7 +149,7 @@ describe("runVideoStage", () => {
    * is exactly what a later run has to discover before it starts another.
    *
    * An id this instance never issued is treated as a job that finished while
-   * nobody was watching — which is what a resumed attempt actually meets.
+   * nobody was watching, which is what a resumed attempt actually meets.
    */
   function provider(
     options: { endFrame?: boolean; fail?: boolean; polls?: number; still?: Buffer } = {}
@@ -221,8 +221,8 @@ describe("runVideoStage", () => {
   }
 
   /**
-   * A wait that does not wait, and — when the job is one this test means to
-   * abandon — moves the clock instead, so the module's own thirty-minute
+   * A wait that does not wait, and, when the job is one this test means to
+   * abandon, moves the clock instead, so the module's own thirty-minute
    * patience is what ends the loop rather than a knob added for a test.
    */
   function waiting(impatient: boolean): (ms: number) => Promise<void> {
@@ -405,7 +405,7 @@ describe("runVideoStage", () => {
 
   /**
    * A job the provider reported as failed was not rendered and not billed, so
-   * starting over is safe and needs no `--regenerate` — demanding one would
+   * starting over is safe and needs no `--regenerate`, demanding one would
    * make a refusal look like a purchase.
    */
   it("should let a failed job be tried again without --regenerate", async () => {

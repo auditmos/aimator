@@ -21,14 +21,14 @@ export const env = createEnv({
     /**
      * Stage 10's two audio call sites: `AIMATOR_MUSIC_MODEL` composes a bed and
      * this one renders a sound effect. **One variable each for both tracks**,
-     * like the video model and the voice model and for the same reason —
+     * like the video model and the voice model and for the same reason,
      * neither is *drawn*, so neither has any idea which of the two films it
      * will end up under.
      *
      * Two variables rather than one, because they are two endpoints with two
      * models behind them: a shared one would mean that choosing how the score
      * sounds quietly chose how a thunderclap does, which nobody decided. The
-     * key for both is `ELEVENLABS_API_KEY`, shared with stage 9 — the key
+     * key for both is `ELEVENLABS_API_KEY`, shared with stage 9, the key
      * follows the provider, the variable follows the call site.
      */
     AIMATOR_EFFECTS_MODEL: z.string().min(1).optional(),
@@ -38,7 +38,7 @@ export const env = createEnv({
      * The only variable here that names a program rather than a model or a
      * key, and the only one whose absence has a sensible answer: every other
      * one refuses a default because a model nobody chose is not a decision,
-     * while "the ffmpeg on PATH" is not a choice between engines — it is the
+     * while "the ffmpeg on PATH" is not a choice between engines; it is the
      * engine, wherever this machine keeps it. The escape hatch exists for a
      * build that is not on PATH, not for picking a different tool.
      */
@@ -54,7 +54,7 @@ export const env = createEnv({
     AIMATOR_MUSIC_MODEL: z.string().min(1).optional(),
     /**
      * The text model stage 9 lifts the narration script with. Its own variable,
-     * like every other paid call site — and separate from the voice model below
+     * like every other paid call site, and separate from the voice model below
      * because stage 9 buys from two providers: one writes down what the
      * narrator says, the other says it.
      */
@@ -69,7 +69,7 @@ export const env = createEnv({
     AIMATOR_PROMPTS_MODEL: z.string().min(1).optional(),
     /**
      * The text model stage 1 sends the screenplay prompt to. Optional because
-     * `--dry-run` has to work without it — and because a default here would be
+     * `--dry-run` has to work without it, and because a default here would be
      * a model choice nobody made, on a command that spends money.
      */
     AIMATOR_SCREENPLAY_MODEL: z.string().min(1).optional(),
@@ -89,7 +89,7 @@ export const env = createEnv({
      */
     AIMATOR_SOUND_MODEL: z.string().min(1).optional(),
     /**
-     * The video model stage 7 renders every clip with — **one variable, not one
+     * The video model stage 7 renders every clip with, **one variable, not one
      * per track**, unlike the image models above.
      *
      * The per-track rule exists because the two tracks are *drawn* side by side
@@ -97,7 +97,7 @@ export const env = createEnv({
      * both from one shell an edit between commands. A clip is not drawn: it is
      * rendered from a frame that track already produced, by a model chosen
      * once. So the axis here is the call site, as it is for every text stage,
-     * and the tracks still differ in the only way that matters — a clip starts
+     * and the tracks still differ in the only way that matters, a clip starts
      * on its own track's entry frame.
      *
      * Optional because `--dry-run` has to work without it, and without a
@@ -105,14 +105,14 @@ export const env = createEnv({
      */
     AIMATOR_VIDEO_MODEL: z.string().min(1).optional(),
     /**
-     * The speech model stage 9 reads the narration with — **one variable for
+     * The speech model stage 9 reads the narration with, **one variable for
      * both tracks**, for the reason the video model is one: a spoken sentence
      * is not drawn. A voice reading a line has no idea which of the two films
      * it will sit over, so the axis is the call site.
      *
      * It is the model, never the voice. Which voice reads the series is a
      * creative decision that recurs across episodes, exactly as the cast does,
-     * so it lives in `project.json` — a variable would let the second episode
+     * so it lives in `project.json`, a variable would let the second episode
      * get a different narrator from a different shell with nothing on disk
      * saying anybody decided that.
      */

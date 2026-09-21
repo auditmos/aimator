@@ -8,13 +8,13 @@ import { effectLength, musicLength, validateAudio } from "./index.js";
  * Stage 9 could read a line's length out of twenty-four bytes because it chose
  * the container it bought in. Stage 10 cannot: neither the music endpoint nor
  * the sound-effect one offers WAV, and the raw PCM they do offer has no header
- * at all — so the channel count would be a guess, and a wrong guess states a
+ * at all, so the channel count would be a guess, and a wrong guess states a
  * length twice the truth silently. MP3 it is, and the price of that is a walk
  * over every frame rather than a read of one header.
  *
- * Walking is what makes it exact. The objection stage 9 raised against MP3 —
+ * Walking is what makes it exact. The objection stage 9 raised against MP3,
  * that its length is known only to whoever counts frames "against a table of
- * bitrates, hoping the stream is constant" — is answered by not hoping: each
+ * bitrates, hoping the stream is constant", is answered by not hoping: each
  * frame header declares its own bitrate, so a variable-rate stream comes out
  * right for the same reason a constant one does.
  */
@@ -88,7 +88,7 @@ describe("validateAudio", () => {
 
 /**
  * The two lengths a stage may ask this provider for, refused rather than
- * clamped — the same reading `clipDuration` gives a duration no video model
+ * clamped, the same reading `clipDuration` gives a duration no video model
  * renders. Quietly shortening a cue would change what the film sounds like on
  * nobody's authority, and the remedy is upstream in every case.
  */

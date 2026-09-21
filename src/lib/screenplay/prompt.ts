@@ -5,7 +5,7 @@ import type { EpisodeSettings } from "../project/index.js";
  * Internal to the screenplay module: the instruction half of the paid call.
  *
  * A constant rather than a Markdown file beside the source, because tsup
- * bundles `src/` and only `src/` — a sibling `.md` would simply not exist in
+ * bundles `src/` and only `src/`, a sibling `.md` would simply not exist in
  * `dist/`, and the failure would show up as a paid call with an empty prompt.
  *
  * `PROMPT_VERSION` is declared, never derived from a hash of this file.
@@ -228,11 +228,11 @@ export function buildPrompt(input: PromptInput): string {
 # Production settings
 
 ${serialize(settings)}
-# Project rules — original source material
+# Project rules, original source material
 
 ${input.rules}
 
-# Episode description — original source material
+# Episode description, original source material
 
 ${input.source}`;
 }

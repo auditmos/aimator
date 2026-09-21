@@ -42,7 +42,7 @@ import { type ImageVerdict, readImageResponse, validateImage } from "./validate.
  *
  * The order of operations here is the whole contract of a billed call.
  * `submitted` lands on disk before the POST, so an attempt that dies mid-call
- * is visibly one that may already have been charged — for this one image, not
+ * is visibly one that may already have been charged, for this one image, not
  * for the series around it. Nothing retries on its own.
  *
  * Resuming costs nothing, which is what separates an image stage from a text
@@ -196,7 +196,7 @@ async function resume(
   if (!saved.ok || (status !== null && status >= 400)) {
     return err(
       artifact.blocked([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
+        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`}, mogła zostać rozliczona`,
         `sprawdź ${toWorkspacePath(call.workspace.root, run.root)}; nową płatną próbę zaczyna wyłącznie --regenerate`,
       ])
     );
@@ -213,7 +213,7 @@ async function resume(
     return err(
       artifact.blocked([
         ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "zapisana odpowiedź opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
+        "zapisana odpowiedź opisuje inne wejście, nową płatną próbę zaczyna --regenerate",
       ])
     );
   }
@@ -270,7 +270,7 @@ async function attempt(
   }
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
-  // then visibly an attempt that may already have been billed — for this one
+  // then visibly an attempt that may already have been billed, for this one
   // image, not for the whole series.
   const submitted = withRecord(
     stage,
@@ -422,7 +422,7 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }
@@ -494,7 +494,7 @@ function alphaNote(
 
   return `${prefix}${verdict.width}x${verdict.height}, ale bez kanału alfa${
     track === "seedream"
-      ? " — seedream nie ma przełącznika tła, przezroczystość była proszona wyłącznie w promptcie; oceń krawędzie"
-      : " — mimo background=transparent; oceń, czy nadaje się do kompozytowania"
+      ? ", seedream nie ma przełącznika tła, przezroczystość była proszona wyłącznie w promptcie; oceń krawędzie"
+      : ", mimo background=transparent; oceń, czy nadaje się do kompozytowania"
   }`;
 }

@@ -10,7 +10,7 @@ import type { EpisodeSettings } from "../project/index.js";
  *
  * Rule 9 decides the language, as everywhere: this task is an instruction, so
  * it is English. The shot list it works from is material and travels verbatim,
- * in whatever language it was authored in — and the sentences the model lifts
+ * in whatever language it was authored in, and the sentences the model lifts
  * out of it stay in that language too, because they are the film's own words.
  * The request is therefore bilingual, by design.
  *
@@ -50,7 +50,7 @@ quotation marks and the words that introduce the speaker, such as
 This is checked mechanically. A sentence that is not in its shot is rejected and
 the whole script is refused, however much better it reads. If the narration
 needs to say something the shots do not contain, that is a correction to the
-screenplay and it belongs to stage 1 — not to you.
+screenplay and it belongs to stage 1, not to you.
 
 Do not translate anything. The narrator's words go into the film in the
 language they were written in, which is the episode's \`language\` setting. This
@@ -61,7 +61,7 @@ instruction is in English; the material is not, and it stays as it is.
 Two things, and only these:
 
 - **Which prose is speech.** An \`Audio\` field describes sound: rain, a low
-  roll of thunder, a warm instrumental phrase, and — sometimes — a sentence the
+  roll of thunder, a warm instrumental phrase, and, sometimes, a sentence the
   narrator says. Only the last of those is a line. A shot whose audio is only
   music and effects has no line, and most shots will have none.
 - **When each line begins**, in the seconds of the plan. A line must begin
@@ -122,7 +122,7 @@ were unsure about. Do not call the result approved.`;
  * The screenplay is deliberately absent. Stage 3 already carried the narration
  * into the shots, the shot list is what the lift is checked against, and a
  * second copy of the same sentences would invite the model to prefer whichever
- * version read better — which is exactly the drift two files holding one truth
+ * version read better, which is exactly the drift two files holding one truth
  * always produce.
  */
 export function buildPrompt(input: PromptInput): string {
@@ -138,11 +138,11 @@ export function buildPrompt(input: PromptInput): string {
 # Production settings
 
 ${serialize(settings)}
-# Project rules — original source material
+# Project rules, original source material
 
 ${input.rules}
 
-# Shot list — the approved source for this script
+# Shot list, the approved source for this script
 
 ${input.shotList}`;
 }

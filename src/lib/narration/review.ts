@@ -41,7 +41,7 @@ import { validateNarration } from "./validate.js";
  * cannot be answered anywhere else: does the narrator land in the right place
  * over *this* picture. It is not a repetition of the line reviews above it, in
  * the same way stage 8's review of the whole is not a repetition of eight clip
- * reviews — a line that is perfectly read can still arrive two seconds late.
+ * reviews, a line that is perfectly read can still arrive two seconds late.
  *
  * `check` reads and reports; it writes nothing. `approve` repeats the whole
  * verification and only then records acceptance, bound to the bytes as they
@@ -167,7 +167,7 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
   const [output] = record.outputs;
 
   if (output === undefined || output.sha256 !== text.data.sha256) {
-    blocking.push("narration.md: nie zgadza się z zapisanym hashem — plik zmieniono poza próbą");
+    blocking.push("narration.md: nie zgadza się z zapisanym hashem, plik zmieniono poza próbą");
   }
 
   // Re-validated against the plan as it stands, exactly as a shot list is
@@ -211,7 +211,7 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
         ...blocking,
         ...scriptChanged.map(
           (path) =>
-            `${path}: zmienił się od czasu spisania skryptu — przeczytaj skrypt jeszcze raz i zatwierdź ponownie`
+            `${path}: zmienił się od czasu spisania skryptu, przeczytaj skrypt jeszcze raz i zatwierdź ponownie`
         ),
         ...lines.problems,
         ...missingSound(stage9.data.settings),
@@ -256,7 +256,7 @@ function nextStep(
  * Whether this line was bought before anybody decided how the narrator reads.
  *
  * `changedInputs` cannot see this, and the difference matters. It compares the
- * inputs a record *holds* against the bytes on disk — but a recording made
+ * inputs a record *holds* against the bytes on disk, but a recording made
  * before `narration.json` existed holds no entry for it at all, so nothing
  * drifts and nothing is reported. The absence is therefore checked directly:
  * a line read on the provider's defaults is not a line read the way this series
@@ -312,7 +312,7 @@ async function readLineState(
   if (record.status === "submitted") {
     return {
       problems: [
-        `${line.id}: rekord "submitted" bez opublikowanego nagrania — powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
+        `${line.id}: rekord "submitted" bez opublikowanego nagrania, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
       ],
       state: {
         ...ABSENT,
@@ -337,8 +337,8 @@ async function readLineState(
       ...blocking,
       ...inputsChanged.map((path) =>
         stale && path === direction?.path
-          ? `${line.id}: kupiona zanim ktokolwiek zdecydował, jak narrator czyta — poszła na domyślnych ustawieniach dostawcy; nowe brzmienie kupuje wyłącznie --regenerate`
-          : `${line.id}: ${path} zmienił się od czasu nagrania — odsłuchaj je jeszcze raz`
+          ? `${line.id}: kupiona zanim ktokolwiek zdecydował, jak narrator czyta, poszła na domyślnych ustawieniach dostawcy; nowe brzmienie kupuje wyłącznie --regenerate`
+          : `${line.id}: ${path} zmienił się od czasu nagrania, odsłuchaj je jeszcze raz`
       ),
     ],
     state: {
@@ -374,7 +374,7 @@ function bytesProblems(
   ];
 }
 
-/** Reads and reports the shared half. Writes nothing — that is what makes it safe. */
+/** Reads and reports the shared half. Writes nothing; that is what makes it safe. */
 export async function checkNarration(input: Stage9Scope): Promise<Result<NarrationStatus>> {
   const inspection = await inspect(input);
 
@@ -392,7 +392,7 @@ export async function approveNarration(input: ApproveScope): Promise<Result<Narr
   if (input.artifacts.length === 0) {
     return err(
       new NarrationStateError(
-        `--artifact jest wymagane: ${SCRIPT} albo N01[,N02] — przyjęcie skryptu uruchamia kupowanie każdej kwestii, a przyjęcie kwestii otwiera miks`
+        `--artifact jest wymagane: ${SCRIPT} albo N01[,N02], przyjęcie skryptu uruchamia kupowanie każdej kwestii, a przyjęcie kwestii otwiera miks`
       )
     );
   }
@@ -410,7 +410,7 @@ export async function approveNarration(input: ApproveScope): Promise<Result<Narr
   if (unknown.length > 0) {
     return err(
       new NarrationStateError(
-        `--artifact "${unknown.join(", ")}" — etap 9 zna tutaj ${[...known].join(", ")}`
+        `--artifact "${unknown.join(", ")}", etap 9 zna tutaj ${[...known].join(", ")}`
       )
     );
   }
@@ -568,7 +568,7 @@ async function inspectMix(
         ...blocking,
         ...inputsChanged.map(
           (path) =>
-            `${path}: zmienił się od czasu miksu — obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmiksuj go od nowa: aimator narration mix ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
+            `${path}: zmienił się od czasu miksu, obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmiksuj go od nowa: aimator narration mix ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
         ),
         ...missingSound(stage9.data.settings),
       ],
@@ -591,7 +591,7 @@ export async function approveMix(
   if (named.length > 0) {
     return err(
       new NarrationStateError(
-        `--artifact "${named.join(", ")}" — miks ma jeden artefakt na tor: ${NARRATED}`
+        `--artifact "${named.join(", ")}", miks ma jeden artefakt na tor: ${NARRATED}`
       )
     );
   }

@@ -13,15 +13,15 @@ import type { EpisodeSettings } from "../project/index.js";
  * this file that carries it.** Stage 9's task was easy to word because the
  * thing it asked for was a copy: the narrator's words already existed, and the
  * instruction only had to forbid touching them. Here the thing asked for is a
- * translation of purpose **without** a translation of words — the model reads
+ * translation of purpose **without** a translation of words, the model reads
  * Polish prose describing rain, thunder and an evening theme, and writes an
  * English instruction to a music model. The shot list travels verbatim beside
  * this task, as always; what comes back is English, because it is an
  * instruction and instructions are English.
  *
  * Nothing downstream checks that, which is why it is said three times here.
- * The verdict is stage 4's kind — it judges the wiring and never reads a
- * prompt — so the instruction and the human who approves the sheet are the
+ * The verdict is stage 4's kind, it judges the wiring and never reads a
+ * prompt, so the instruction and the human who approves the sheet are the
  * whole of rule 9's enforcement in this stage. A parser was tried and removed;
  * `validate.ts` says why.
  */
@@ -41,7 +41,7 @@ Produce the cue sheet for one episode of an animated series: the music that
 plays under it, and the discrete sound effects that happen in it.
 
 The \`Audio\` field of every shot below already describes what the episode
-sounds like — rain on a window, a low roll of thunder, a gentle evening theme,
+sounds like, rain on a window, a low roll of thunder, a gentle evening theme,
 and sometimes a sentence the narrator says. Your work is to turn that
 description into instructions two audio models can act on, and to place each
 one on the timeline of the approved plan.
@@ -75,8 +75,8 @@ lyrics for a voice, and never ask for a track that has singing in it.
   where the film genuinely breaks in two and the seam is meant to be heard.
 - **Which sounds are events.** A thunderclap, a door, two playful accents on a
   head turn. These are bought one at a time, anchored at the second they
-  happen, and each is between 0.5 and 30 seconds long. Continuous atmosphere —
-  rain that runs under a whole scene, room tone — belongs in the music cue, not
+  happen, and each is between 0.5 and 30 seconds long. Continuous atmosphere,
+  rain that runs under a whole scene, room tone, belongs in the music cue, not
   here: it is a bed, and the effect model does not make beds.
 
 # Output format
@@ -138,7 +138,7 @@ anything you were unsure how to render. Do not call the result approved.`;
  * The shot list is embedded unmodified: its digest is recorded alongside the
  * result, and a digest that describes bytes nobody sent would be worthless.
  * The request is therefore bilingual, exactly as the invariant says it should
- * be — English instruction, material in its own language.
+ * be, English instruction, material in its own language.
  *
  * The screenplay and the prompt package are deliberately absent. Stage 3
  * already carried every description of sound into the shots, and a second copy
@@ -159,11 +159,11 @@ export function buildPrompt(input: PromptInput): string {
 # Production settings
 
 ${serialize(settings)}
-# Project rules — original source material
+# Project rules, original source material
 
 ${input.rules}
 
-# Shot list — the approved source for this cue sheet
+# Shot list, the approved source for this cue sheet
 
 ${input.shotList}`;
 }

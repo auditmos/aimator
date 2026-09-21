@@ -166,7 +166,7 @@ describe("initProject", () => {
     await makeProject();
     const rules = await readFile(join(root, "projects/demo/project.md"), "utf8");
     expect(rules).toContain("TODO(etap-0)");
-    expect(rules).toContain("# Demo — zasady wspólne");
+    expect(rules).toContain("# Demo, zasady wspólne");
   });
 
   it("should record the project file digest in the stage record", async () => {
@@ -684,7 +684,7 @@ describe("setNarratorVoice", () => {
    * Undecided is written down as undecided. A fresh project carries the key
    * with a null in it rather than leaving it out, so "nobody has chosen a
    * narrator" is a fact the file states instead of one a reader infers from an
-   * absence — which is the whole of rule 7 in one field.
+   * absence, which is the whole of rule 7 in one field.
    */
   it("should start undecided rather than absent", async () => {
     await makeProject();

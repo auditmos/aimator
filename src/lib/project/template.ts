@@ -2,14 +2,14 @@
  * Internal to the project module. The shared-rules document is scaffolded with
  * explicit markers rather than prose, so "has the human actually filled this
  * in?" is a file read instead of a judgement call. Ported from the source
- * project's series template, which had the same sections but no marker — there
+ * project's series template, which had the same sections but no marker, there
  * the check was "is the file nonempty", and placeholders slipped through.
  */
 
 export const PLACEHOLDER = "TODO(etap-0)";
 
 export function renderRules(title: string): string {
-  return `# ${title} — zasady wspólne
+  return `# ${title}, zasady wspólne
 
 > Uzupełnij każdy ${PLACEHOLDER} zatwierdzonymi ustaleniami, a następnie usuń ten cytat.
 > Nie kopiuj ustawień ani fabuły innego projektu jako domyślnych.
@@ -29,10 +29,10 @@ export function renderRules(title: string): string {
   deformacji. To co innego niż proporcje obrazu i trzeba ustalić jedno i drugie.
 - Stałe cechy wyglądu i stroju: ${PLACEHOLDER} kolor i kształt włosów, krój i barwa stroju,
   cechy szczególne. Przy \`characterBasis: "description"\` **to jest jedyne wejście etapu
-  postaci** — czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.
+  postaci**, czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.
 - Stała obsada drugoplanowa: ${PLACEHOLDER} albo jawne „brak stałej obsady".
 - Relacje i wspólne zasady rysowania postaci: ${PLACEHOLDER} jak postacie mają się do siebie
-  skalą — kto jest ile wyższy i czy głowy są tej samej wielkości — oraz co jest rysowane
+  skalą, kto jest ile wyższy i czy głowy są tej samej wielkości, oraz co jest rysowane
   identycznie u każdej z nich. Proporcja podana osobno dla każdej postaci **nie wystarcza**:
   dwie niezależne proporcje nie wyznaczają jeszcze relacji między nimi, a etap postaci
   rysuje każdą osobno.

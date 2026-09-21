@@ -54,7 +54,7 @@ import { PLACEHOLDER, renderRules } from "./template.js";
 export type { ReadySettings as EpisodeSettings, ShotListSettings } from "./schema.js";
 
 /**
- * Stage 0 — preparation. The only stage that legitimately ingests material
+ * Stage 0, preparation. The only stage that legitimately ingests material
  * from outside the workspace, which is exactly why it copies those bytes in
  * and records their digest: from here on every stage consumes an artifact a
  * previous stage produced, never a file someone happened to have lying around.
@@ -70,7 +70,7 @@ const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
  */
 const readyNext = (projectId: string, noEpisodes = false): string =>
   noEpisodes
-    ? `etap 0 zatwierdzony dla samego projektu. Etap 2 może ruszyć — zacznij od podglądu:
+    ? `etap 0 zatwierdzony dla samego projektu. Etap 2 może ruszyć, zacznij od podglądu:
   aimator character generate ${projectId} <character-id> --track <gpt-image|seedream> --dry-run
 Etap 1 czeka na odcinek: aimator episode add ${projectId} --source <NN-tytul.md>`
     : `etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:
@@ -101,7 +101,7 @@ export interface Stage0Inputs {
    * is on screen by cast id, which is the only binding stage 4 can follow back
    * to an image: Polish prose inflects "Ewa" into "Ewy" and "Ewie", so matching
    * a name out of the text would be guesswork. This is the stage-0 roster, not
-   * the stage-2 images — stage 3 still does not depend on stage 2.
+   * the stage-2 images, stage 3 still does not depend on stage 2.
    */
   readonly cast: readonly CastMember[];
   readonly inputs: readonly RecordedFile[];
@@ -224,7 +224,7 @@ async function resolveProject(input: ProjectInput): Promise<Result<ProjectPaths>
     return err(
       new ProjectStateError(
         "missing-project",
-        `projekt "${input.projectId}" nie istnieje — utwórz go przez: aimator project init ${input.projectId} --title "..."`
+        `projekt "${input.projectId}" nie istnieje, utwórz go przez: aimator project init ${input.projectId} --title "..."`
       )
     );
   }
@@ -237,7 +237,7 @@ async function resolveProject(input: ProjectInput): Promise<Result<ProjectPaths>
  *
  * A v1 file recorded one basis for a character nobody had named. Carrying that
  * onto whichever member gets declared first would be inventing an answer, so
- * the conversion drops it and every named character starts undecided — which
+ * the conversion drops it and every named character starts undecided, which
  * `check` then reports until somebody decides. A v1 file that already holds
  * photographs is refused outright: those bytes belong to a person, and this
  * function has no way to know which one.
@@ -260,7 +260,7 @@ async function readProjectFile(path: string): Promise<Result<ProjectFile>> {
     return err(
       new InvalidInputError(
         "characters",
-        `${path} pochodzi sprzed obsady i trzyma ${legacy.data.characterSources.length} zdjęć przypisanych do nienazwanej postaci — zadeklaruj postać przez "aimator character new", a potem dodaj te zdjęcia do niej przez "aimator character add"; pliki zostają tam, gdzie są`
+        `${path} pochodzi sprzed obsady i trzyma ${legacy.data.characterSources.length} zdjęć przypisanych do nienazwanej postaci, zadeklaruj postać przez "aimator character new", a potem dodaj te zdjęcia do niej przez "aimator character add"; pliki zostają tam, gdzie są`
       )
     );
   }
@@ -346,7 +346,7 @@ async function resolveCharacter(input: CharacterInput): Promise<Result<ResolvedC
     ? err(
         new ProjectStateError(
           "missing-character",
-          `postać "${input.characterId}" nie jest w obsadzie projektu "${input.projectId}" — zadeklaruj ją przez: aimator character new ${input.projectId} ${input.characterId} --name "..."`
+          `postać "${input.characterId}" nie jest w obsadzie projektu "${input.projectId}", zadeklaruj ją przez: aimator character new ${input.projectId} ${input.characterId} --name "..."`
         )
       )
     : ok({ entry, file: file.data, paths: paths.data, project: project.data });
@@ -357,7 +357,7 @@ async function resolveCharacter(input: CharacterInput): Promise<Result<ResolvedC
  *
  * The roster is the decision the tool used to skip. Before it, a project with
  * no declared character meant "exactly one, anonymous", so a series whose rules
- * described two people produced one — and which one was left to the model.
+ * described two people produced one, and which one was left to the model.
  * Whom to declare is a judgement about recurrence: a character whose identity
  * must survive across episodes belongs here, a face seen once is a stage-5
  * reference image instead.
@@ -385,7 +385,7 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
     return err(
       new ProjectStateError(
         "already-exists",
-        `postać "${input.characterId}" jest już w obsadzie — etap 0 nie nadpisuje zatwierdzonych ustaleń`
+        `postać "${input.characterId}" jest już w obsadzie, etap 0 nie nadpisuje zatwierdzonych ustaleń`
       )
     );
   }
@@ -396,7 +396,7 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
     return err(
       new InvalidInputError(
         "name",
-        "postać potrzebuje nazwy — to ona trafia do promptu etapu postaci i to jej szuka model w zasadach projektu"
+        "postać potrzebuje nazwy, to ona trafia do promptu etapu postaci i to jej szuka model w zasadach projektu"
       )
     );
   }
@@ -421,7 +421,7 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
         nextStep: `zdecyduj, skąd bierze się wygląd: aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
         problems: lapsed
           ? [
-              `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+              `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`,
             ]
           : [],
         ready: false,
@@ -441,7 +441,7 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
     return err(
       new ProjectStateError(
         "already-exists",
-        `projekt "${input.projectId}" już istnieje w ${paths.data.root} — etap 0 nie nadpisuje zatwierdzonych ustaleń`
+        `projekt "${input.projectId}" już istnieje w ${paths.data.root}, etap 0 nie nadpisuje zatwierdzonych ustaleń`
       )
     );
   }
@@ -497,7 +497,7 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
         nextStep: `zadeklaruj obsadę: aimator character new ${input.projectId} <postać> --name <nazwa>`,
         problems: [
-          "project.json: obsada jest pusta — wymień każdą powracającą postać serii; jednorazowe pojawienie to referencja etapu 5, nie postać",
+          "project.json: obsada jest pusta, wymień każdą powracającą postać serii; jednorazowe pojawienie to referencja etapu 5, nie postać",
         ],
         ready: false,
         reused: [],
@@ -534,7 +534,7 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
     return err(
       new ProjectStateError(
         "duplicate-number",
-        `numer odcinka ${identity.data.number} jest już zajęty przez "${clash}" — numer wyznacza katalog wyników, więc musi być unikalny`
+        `numer odcinka ${identity.data.number} jest już zajęty przez "${clash}", numer wyznacza katalog wyników, więc musi być unikalny`
       )
     );
   }
@@ -549,7 +549,7 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
     return err(
       new ProjectStateError(
         "already-exists",
-        `odcinek "${identity.data.id}" już istnieje — etap 0 nie nadpisuje źródła`
+        `odcinek "${identity.data.id}" już istnieje, etap 0 nie nadpisuje źródła`
       )
     );
   }
@@ -668,15 +668,15 @@ function describeSettingsError(merged: DraftSettings): string {
   }
 
   if (merged.audio !== null && !audioModes.includes(merged.audio)) {
-    problems.push(`--audio "${merged.audio}" — dozwolone: ${audioModes.join(", ")}`);
+    problems.push(`--audio "${merged.audio}", dozwolone: ${audioModes.join(", ")}`);
   }
 
   if (merged.sourceNature !== null && !sourceNatures.includes(merged.sourceNature)) {
-    problems.push(`--nature "${merged.sourceNature}" — dozwolone: ${sourceNatures.join(", ")}`);
+    problems.push(`--nature "${merged.sourceNature}", dozwolone: ${sourceNatures.join(", ")}`);
   }
 
   if (merged.language !== null && !LANGUAGE_CODE.test(merged.language)) {
-    problems.push(`--language "${merged.language}" — oczekiwano kodu języka, np. pl lub en-GB`);
+    problems.push(`--language "${merged.language}", oczekiwano kodu języka, np. pl lub en-GB`);
   }
 
   if (
@@ -684,7 +684,7 @@ function describeSettingsError(merged: DraftSettings): string {
     merged.subtitles !== "none" &&
     !LANGUAGE_CODE.test(merged.subtitles)
   ) {
-    problems.push(`--subtitles "${merged.subtitles}" — oczekiwano kodu języka albo "none"`);
+    problems.push(`--subtitles "${merged.subtitles}", oczekiwano kodu języka albo "none"`);
   }
 
   if (
@@ -694,7 +694,7 @@ function describeSettingsError(merged: DraftSettings): string {
       merged.maxClipSeconds > 60)
   ) {
     problems.push(
-      `--max-clip ${merged.maxClipSeconds} — liczba całkowita od 1 do 60 (plan montażowy, nie zmierzony limit dostawcy wideo)`
+      `--max-clip ${merged.maxClipSeconds}, liczba całkowita od 1 do 60 (plan montażowy, nie zmierzony limit dostawcy wideo)`
     );
   }
 
@@ -765,7 +765,7 @@ export async function setEpisodeSettings(input: SetSettingsInput): Promise<Resul
 
   if (lapsed) {
     problems.push(
-      `akceptacja odcinka "${input.episodeId}" wygasła — zmiana decyzji unieważnia ją; zatwierdź ponownie przez: aimator approve ${input.projectId}`
+      `akceptacja odcinka "${input.episodeId}" wygasła, zmiana decyzji unieważnia ją; zatwierdź ponownie przez: aimator approve ${input.projectId}`
     );
   }
 
@@ -849,13 +849,13 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
 
   if (entry.basis === "description") {
     problems.push(
-      `podstawa postaci "${entry.name}" zmieniona z opisu na zdjęcia — opis jej wyglądu w project.md przestaje być wejściem etapu postaci`
+      `podstawa postaci "${entry.name}" zmieniona z opisu na zdjęcia, opis jej wyglądu w project.md przestaje być wejściem etapu postaci`
     );
   }
 
   if (lapsed) {
     problems.push(
-      `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`
+      `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`
     );
   }
 
@@ -864,7 +864,7 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
         approved: false,
         created,
         nextStep:
-          "materiały postaci mają status pending — oceny dokonasz w etapie postaci, nie tutaj",
+          "materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj",
         problems,
         ready: false,
         reused,
@@ -890,7 +890,7 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
     return err(
       new InvalidInputError(
         "basis",
-        `podstawy "photographs" nie deklaruje się pustą ręką — dodaj zdjęcia przez: aimator character add ${input.projectId} ${input.characterId} --source <plik>`
+        `podstawy "photographs" nie deklaruje się pustą ręką, dodaj zdjęcia przez: aimator character add ${input.projectId} ${input.characterId} --source <plik>`
       )
     );
   }
@@ -911,11 +911,11 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
         created: [],
         nextStep:
           input.basis === "description"
-            ? `opis wyglądu "${entry.name}" w project.md jest jedynym wejściem etapu postaci — musi być konkretny`
+            ? `opis wyglądu "${entry.name}" w project.md jest jedynym wejściem etapu postaci, musi być konkretny`
             : `aimator check ${input.projectId}`,
         problems: lapsed
           ? [
-              `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+              `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`,
             ]
           : [],
         ready: false,
@@ -928,7 +928,7 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
  * Casts the narrator.
  *
  * It sits among the stage-0 commands rather than inside stage 9 because a voice
- * is a property of the series, not of one episode's soundtrack — the same
+ * is a property of the series, not of one episode's soundtrack, the same
  * reason `aspectRatio` and the roster are decided here and merely consumed
  * below. Recording it revokes the project's approval like any other decision,
  * because approval is bound to the file as it stands.
@@ -960,7 +960,7 @@ export async function setNarratorVoice(input: SetVoiceInput): Promise<Result<Sta
         nextStep: `aimator check ${input.projectId}`,
         problems: lapsed
           ? [
-              `akceptacja projektu wygasła — zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+              `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`,
             ]
           : [],
         ready: false,
@@ -973,13 +973,13 @@ export async function setNarratorVoice(input: SetVoiceInput): Promise<Result<Sta
  * Everything a later stage may read from stage 0, in one call.
  *
  * It exists so no other module has to know that the rules are in `project.md`,
- * the decisions in `episode.json` and the ingested text in `source.md` — the
+ * the decisions in `episode.json` and the ingested text in `source.md`, the
  * layout stays stage 0's business. The four digests come back with the bytes,
  * because a stage that records what it consumed must record the same bytes it
  * actually read.
  *
  * Missing decisions are an error: without them there is nothing to ask a model
- * for. A missing *approval* is not — it comes back as `approved: false` with
+ * for. A missing *approval* is not, it comes back as `approved: false` with
  * the reasons, so a dry run can still show what would be sent while the paid
  * path refuses.
  */
@@ -1020,7 +1020,7 @@ export async function readStage0Inputs(
     return err(
       new NotReadyError([
         ...missingSettings(episode.data.settings).map(
-          (field) => `odcinek "${input.episodeId}": brak decyzji — ${field}`
+          (field) => `odcinek "${input.episodeId}": brak decyzji, ${field}`
         ),
         ...(file.data.aspectRatio === null ? ["project.json: aspectRatio nie jest ustalony"] : []),
       ])
@@ -1130,7 +1130,7 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
 
   if (verdict.lapsed) {
     problems.push(
-      `project.md zmienił się po akceptacji — te zasady nikt jeszcze nie przyjął; zatwierdź ponownie: aimator approve ${input.projectId}`
+      `project.md zmienił się po akceptacji, te zasady nikt jeszcze nie przyjął; zatwierdź ponownie: aimator approve ${input.projectId}`
     );
   }
 
@@ -1139,7 +1139,7 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
   // file it never opens.
   if (verdict.noEpisodes) {
     problems.push(
-      `projekt nie ma jeszcze żadnego odcinka — etap 2 tego nie potrzebuje, etap 1 tak: aimator episode add ${input.projectId} --source <NN-tytul.md>`
+      `projekt nie ma jeszcze żadnego odcinka, etap 2 tego nie potrzebuje, etap 1 tak: aimator episode add ${input.projectId} --source <NN-tytul.md>`
     );
   }
 
@@ -1312,7 +1312,7 @@ async function inspectStage0(workspace: Workspace, project: ProjectPaths): Promi
 /**
  * The layout rule, verified rather than merely stated. Digests answer "is what
  * we recorded still there"; this answers the other half, "is there something
- * here we never wrote" — which is how a leftover directory survives a tool
+ * here we never wrote", which is how a leftover directory survives a tool
  * upgrade and quietly contradicts the rules document beside it.
  */
 async function checkLayout(
@@ -1322,7 +1322,7 @@ async function checkLayout(
 ): Promise<void> {
   for (const path of await emptyDirectories(project.root)) {
     problems.push(
-      `${toWorkspacePath(workspace.root, path)}: katalog nic nie zawiera — usuń go; katalog powstaje dopiero wtedy, gdy etap coś do niego zapisze`
+      `${toWorkspacePath(workspace.root, path)}: katalog nic nie zawiera, usuń go; katalog powstaje dopiero wtedy, gdy etap coś do niego zapisze`
     );
   }
 }
@@ -1339,7 +1339,7 @@ function checkDecisions(file: ProjectFile, problems: string[]): void {
   // nobody has said who is in the series, and that is not an answer.
   if (cast.length === 0) {
     problems.push(
-      `project.json: obsada jest pusta — wymień każdą powracającą postać przez "aimator character new ${file.id} <postać> --name <nazwa>"; postać widziana raz to referencja etapu 5, nie postać`
+      `project.json: obsada jest pusta, wymień każdą powracającą postać przez "aimator character new ${file.id} <postać> --name <nazwa>"; postać widziana raz to referencja etapu 5, nie postać`
     );
     return;
   }
@@ -1347,11 +1347,11 @@ function checkDecisions(file: ProjectFile, problems: string[]): void {
   for (const [characterId, entry] of cast) {
     if (entry.basis === null) {
       problems.push(
-        `project.json: postać "${characterId}" nie ma ustalonej podstawy — zdecyduj, czy powstaje ze zdjęć (aimator character add ${file.id} ${characterId} --source <plik>) czy z opisu w project.md (aimator character describe ${file.id} ${characterId})`
+        `project.json: postać "${characterId}" nie ma ustalonej podstawy, zdecyduj, czy powstaje ze zdjęć (aimator character add ${file.id} ${characterId} --source <plik>) czy z opisu w project.md (aimator character describe ${file.id} ${characterId})`
       );
     } else if (entry.basis === "photographs" && entry.sources.length === 0) {
       problems.push(
-        `project.json: postać "${characterId}" ma podstawę photographs, ale nie ma ani jednego zdjęcia — etap postaci nie miałby od czego zacząć`
+        `project.json: postać "${characterId}" ma podstawę photographs, ale nie ma ani jednego zdjęcia, etap postaci nie miałby od czego zacząć`
       );
     }
   }
@@ -1386,7 +1386,7 @@ interface Stage0Verdict {
 /**
  * `project.md`'s recorded digest is the rules somebody accepted, not something
  * a stage produced. Rewriting the file therefore revokes the approval rather
- * than breaking validation — exactly like changing an episode decision does.
+ * than breaking validation, exactly like changing an episode decision does.
  *
  * The distinction is load-bearing. `approve` refuses whatever fails validation
  * and is also the only thing that records a new digest for these bytes, so
@@ -1457,7 +1457,7 @@ async function checkEpisode(
   const missing = missingSettings(episode.data.settings);
 
   if (missing.length > 0) {
-    problems.push(`odcinek "${episodeId}": brak decyzji — ${missing.join(", ")}`);
+    problems.push(`odcinek "${episodeId}": brak decyzji, ${missing.join(", ")}`);
   } else if (!readySettingsSchema.safeParse(episode.data.settings).success) {
     problems.push(`odcinek "${episodeId}": ustawienia nie przechodzą walidacji`);
   }
@@ -1497,7 +1497,7 @@ export interface Stage0Character {
  * the character stage does not depend on one and may run beside stage 1.
  *
  * An undecided basis is an error: without it there is nothing to draw from.
- * A missing *approval* is not — it comes back as `approved: false` with the
+ * A missing *approval* is not, it comes back as `approved: false` with the
  * reasons, so a dry run can still show what would be sent while the paid path
  * refuses.
  */
@@ -1515,7 +1515,7 @@ export async function readStage0Character(
   if (entry.basis === null) {
     return err(
       new NotReadyError([
-        `postać "${input.characterId}" nie ma ustalonej podstawy — aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
+        `postać "${input.characterId}" nie ma ustalonej podstawy, aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
       ])
     );
   }

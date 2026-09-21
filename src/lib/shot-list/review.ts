@@ -20,7 +20,7 @@ import { type ShotList, validateShotList } from "./validate.js";
  * Internal to the shot-list module: verification, and the approval that sits on
  * top of it but is never implied by it.
  *
- * `check` reads and reports; it writes nothing, not even `needsReview` — that
+ * `check` reads and reports; it writes nothing, not even `needsReview`, that
  * belongs to the dependent stage, at the moment it runs. `approve` repeats the
  * whole verification and only then records a human's acceptance, bound to the
  * digest of the shot list as it stands.
@@ -65,7 +65,7 @@ class ShotListStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The inputs as they stand now — what an approval re-records. */
+  /** The inputs as they stand now, what an approval re-records. */
   readonly inputs: readonly RecordedFile[];
   readonly stage: StageFile | null;
   readonly stagePath: string;
@@ -103,7 +103,7 @@ async function inspect(input: Stage3Scope): Promise<Result<Inspection>> {
         approved: false,
         inputsChanged: [],
         problems: [
-          `odcinek "${input.episodeId}": etap 3 jeszcze nie powstał — aimator shot-list generate ${input.projectId} ${input.episodeId}`,
+          `odcinek "${input.episodeId}": etap 3 jeszcze nie powstał, aimator shot-list generate ${input.projectId} ${input.episodeId}`,
         ],
         status: "absent",
         verdict: null,
@@ -119,7 +119,7 @@ async function inspect(input: Stage3Scope): Promise<Result<Inspection>> {
   }
 
   if (record.status === "submitted") {
-    const unfinished = `odcinek "${input.episodeId}": próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca — mogła zostać rozliczona; nową próbę zaczyna --regenerate`;
+    const unfinished = `odcinek "${input.episodeId}": próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca, mogła zostać rozliczona; nową próbę zaczyna --regenerate`;
 
     return ok({
       blocking: [unfinished],
@@ -140,12 +140,12 @@ async function inspect(input: Stage3Scope): Promise<Result<Inspection>> {
 
   const verdict = await judge(stage3.data, blocking);
   // Drift is reported beside the blocking problems and revokes the approval
-  // just as loudly — but it is not one of them. The plan is intact; it is
+  // just as loudly, but it is not one of them. The plan is intact; it is
   // unread for these inputs, and `approve` is what reads it.
   const inputsChanged = changedInputs(record.inputs, stage3.data.inputs);
   const lapsed = inputsChanged.map(
     (path) =>
-      `${path}: zmienił się od czasu ułożenia listy ujęć — tych wejść nikt jeszcze nie przyjął; przeczytaj listę jeszcze raz i zatwierdź ją ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage shot-list`
+      `${path}: zmienił się od czasu ułożenia listy ujęć, tych wejść nikt jeszcze nie przyjął; przeczytaj listę jeszcze raz i zatwierdź ją ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage shot-list`
   );
   const problems = [...blocking, ...lapsed];
 
@@ -156,7 +156,7 @@ async function inspect(input: Stage3Scope): Promise<Result<Inspection>> {
     stagePath: paths.episode.shotListStage,
     status: {
       // Approval is bound to bytes: a recorded "approved" that no longer
-      // verifies is not an approval, it is a stale claim.
+      // verifies is not an approval; it is a stale claim.
       approved: isApproved(stage.data) && problems.length === 0,
       inputsChanged,
       problems,
@@ -195,7 +195,7 @@ async function judge(stage3: Stage3Inputs, problems: string[]): Promise<ShotList
   return null;
 }
 
-/** Reads and reports. Writes nothing — that is what makes it safe to run. */
+/** Reads and reports. Writes nothing; that is what makes it safe to run. */
 export async function checkShotList(input: Stage3Scope): Promise<Result<ShotListStatus>> {
   const inspection = await inspect(input);
 
@@ -208,7 +208,7 @@ export async function checkShotList(input: Stage3Scope): Promise<Result<ShotList
  *
  * It refuses over anything that does not verify: an approval written on top of
  * a failing plan or an unfinished attempt would be a claim the later stages
- * have no way to doubt. An edited input is not that — the plan still covers the
+ * have no way to doubt. An edited input is not that, the plan still covers the
  * screenplay on disk, so the digests are re-recorded and the approval proceeds,
  * rather than leaving the episode to buy a second shot list.
  */

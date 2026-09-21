@@ -36,8 +36,8 @@ import { projectPaths, type Workspace } from "../workspace.js";
  * does apply is different: **this decision cannot be made before it is
  * heard.** Refusing the first mix until somebody dials a number would demand
  * an answer nobody is in a position to form, and a mix costs nothing to redo.
- * So these are a starting point rather than an answer — and, exactly as
- * delivery does, they are sent **explicitly** on every invocation, so the run
+ * So these are a starting point rather than an answer, and, exactly as
+ * delivery does; they are sent **explicitly** on every invocation, so the run
  * archive states what produced these bytes instead of leaving a reader to
  * guess what the defaults were that month.
  */
@@ -135,7 +135,7 @@ export async function readLevels(input: {
   if (!parsed.ok) {
     return err(
       new LevelsError(
-        `mix.json nie daje się odczytać: ${parsed.error.message} — popraw plik albo usuń go, żeby wrócić do wartości startowych`
+        `mix.json nie daje się odczytać: ${parsed.error.message}, popraw plik albo usuń go, żeby wrócić do wartości startowych`
       )
     );
   }
@@ -195,12 +195,12 @@ export async function setLevels(input: SetLevelsInput): Promise<Result<LevelsRep
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
         levels,
         nextStep: `aimator check ${input.projectId}`,
-        // Said plainly rather than left to be discovered — but note what is
+        // Said plainly rather than left to be discovered, but note what is
         // *not* said: no bought stem and no bought line is affected, because
         // this file is a recorded input of the mix alone. That is the whole
         // reason it is not inside `narration.json`.
         problems: [
-          "miksy zrobione przed tą zmianą brzmią inaczej — check zgłosi je jako nieaktualne; ponowny miks nic nie kosztuje i niczego nie dokupuje",
+          "miksy zrobione przed tą zmianą brzmią inaczej, check zgłosi je jako nieaktualne; ponowny miks nic nie kosztuje i niczego nie dokupuje",
         ],
       })
     : written;

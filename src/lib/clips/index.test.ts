@@ -23,7 +23,7 @@ import { approveClips, checkClips, generateClips } from "./index.js";
  * It is the first stage that buys two kinds of media, and the first whose gate
  * is a chain: an entry frame waits for the accepted end of the clip before it,
  * that clip waits for its own entry frame, and every link is a human saying yes.
- * Both facts are what these tests are about — everything else is borrowed from
+ * Both facts are what these tests are about, everything else is borrowed from
  * `lib/image-model`, `lib/video-model` and `lib/media-prompt`, which have their
  * own.
  *
@@ -60,7 +60,7 @@ function answer(clipIds: readonly string[]): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
     ],
     review: "Do rozstrzygnięcia: skala alpaki.",
@@ -81,7 +81,7 @@ function upstream(shape: ShotListShape = "three-clips"): Promise<void> {
   });
 }
 
-/** Stage 5 and stage 6 on one track, both accepted — stage 7's starting point. */
+/** Stage 5 and stage 6 on one track, both accepted, stage 7's starting point. */
 async function makeOpeningFrame(track: ImageTrack, approve = true): Promise<void> {
   await generateReferences({
     apiKey: API_KEY,
@@ -266,7 +266,7 @@ describe("generateClips", () => {
 
   /**
    * The first clip starts on the opening frame and the second opens a new
-   * scene, so both are runnable at once — one video and one image, from two
+   * scene, so both are runnable at once, one video and one image, from two
    * different providers, in one command.
    */
   it("should buy what the gates allow, in both media at once", async () => {
@@ -358,7 +358,7 @@ describe("generateClips", () => {
       "maxClipSeconds"
     );
     // No video job was ever started. The entry frame of a later clip is drawn,
-    // because nothing about it is unrenderable — only C01's three seconds are.
+    // because nothing about it is unrenderable, only C01's three seconds are.
     expect(
       api.calls.filter((call) => call.method === "POST" && call.url.includes("/tasks"))
     ).toHaveLength(0);
@@ -454,7 +454,7 @@ describe("--republish", () => {
 
   /**
    * An entry frame is published exactly as the image model drew it, so there is
-   * no renderer there whose mistake would need undoing — and saying so is more
+   * no renderer there whose mistake would need undoing, and saying so is more
    * useful than quietly doing nothing.
    */
   it("should refuse to republish an entry frame", async () => {

@@ -19,7 +19,7 @@ import type { ShotList, ShotListShot } from "../shot-list/index.js";
  * The precedent that does apply is **stage 4's**. That stage also writes
  * English instructions out of a Polish shot list, also sends the two side by
  * side in one bilingual request, and also judges its own answer with a
- * verdict that **never reads a prompt** — only the wiring around it. Stage 10
+ * verdict that **never reads a prompt**, only the wiring around it. Stage 10
  * takes the same bargain:
  *
  * | proved here | left to the human |
@@ -36,7 +36,7 @@ import type { ShotList, ShotListShot } from "../shot-list/index.js";
  *
  * **Rule 9 is not enforced here, and that is the precedent rather than a
  * lapse.** The instruction tells the model to answer in English, exactly as
- * stage 4's does, and stage 4's validator does not check the language either —
+ * stage 4's does, and stage 4's validator does not check the language either,
  * it is the one that established "never reads a prompt". A check was tried and
  * removed: the only cheap test is for the film language's own letters, and a
  * Polish sentence can be written without a single one of them, so it would
@@ -81,7 +81,7 @@ export interface EffectCue {
   readonly text: string;
 }
 
-/** The sheet as data — what the buying and the mixing read instead of Markdown. */
+/** The sheet as data, what the buying and the mixing read instead of Markdown. */
 export interface SoundDesignSheet {
   /** How many paid calls this sheet authorises. Printed beside the seconds. */
   readonly calls: number;
@@ -190,7 +190,7 @@ export function validateSoundDesign(input: ValidateInput): Result<SoundDesignShe
   const problems: string[] = [];
 
   if (CODE_FENCE.test(input.text)) {
-    problems.push("dokument zawiera blok kodu — arkusz cue jest prozą i nagłówkami");
+    problems.push("dokument zawiera blok kodu, arkusz cue jest prozą i nagłówkami");
   }
 
   const found = sections(input.text);
@@ -234,7 +234,7 @@ function readMusic(body: string, shotList: ShotList, problems: string[]): readon
 
   if (blocks.length === 0) {
     problems.push(
-      'sekcja "Music" nie ma ani jednego cue — odcinek deklaruje muzykę, a arkusz bez niej jest brakiem, nie decyzją'
+      'sekcja "Music" nie ma ani jednego cue, odcinek deklaruje muzykę, a arkusz bez niej jest brakiem, nie decyzją'
     );
 
     return [];
@@ -263,7 +263,7 @@ function readMusic(body: string, shotList: ShotList, problems: string[]): readon
 
     if (id !== expected) {
       problems.push(
-        `cue ${id} stoi tam, gdzie oczekiwano ${expected} — numeracja biegnie po kolei od M01`
+        `cue ${id} stoi tam, gdzie oczekiwano ${expected}, numeracja biegnie po kolei od M01`
       );
     }
 
@@ -275,7 +275,7 @@ function readMusic(body: string, shotList: ShotList, problems: string[]): readon
     // playing at once, and neither is a decision anybody made.
     if (start !== covered) {
       problems.push(
-        `${id} zaczyna się w ${start}s, a poprzedni podkład skończył się w ${covered}s — podkład kafeluje film bez dziur i bez zakładek`
+        `${id} zaczyna się w ${start}s, a poprzedni podkład skończył się w ${covered}s, podkład kafeluje film bez dziur i bez zakładek`
       );
     }
 
@@ -309,7 +309,7 @@ function readMusic(body: string, shotList: ShotList, problems: string[]): readon
 
   if (cues.length > 0 && covered !== shotList.durationSeconds) {
     problems.push(
-      `podkład kończy się w ${covered}s, a plan trwa ${shotList.durationSeconds}s — film bez muzyki na końcu jest ciszą, której nikt nie zamówił`
+      `podkład kończy się w ${covered}s, a plan trwa ${shotList.durationSeconds}s, film bez muzyki na końcu jest ciszą, której nikt nie zamówił`
     );
   }
 
@@ -321,7 +321,7 @@ function readMusic(body: string, shotList: ShotList, problems: string[]): readon
  *
  * This is the check that stands where stage 9's "lifted, never invented"
  * stands. It cannot read the prompt and does not try; what it proves is that
- * the model walked the whole plan — a shot it skipped and a shot it made up
+ * the model walked the whole plan, a shot it skipped and a shot it made up
  * both surface here as a disagreement between what the cue claims and what its
  * own seconds contain.
  */
@@ -332,7 +332,7 @@ function checkShots(cue: MusicCue, within: readonly ShotListShot[], problems: st
 
   if (missing.length > 0) {
     problems.push(
-      `${cue.id} obejmuje ${cue.start}-${cue.end}s, więc leżą w nim ujęcia ${missing.join(", ")}, których nie wymienia — każde ujęcie ma być policzone, bo tylko to dowodzi, że model przeczytał cały plan`
+      `${cue.id} obejmuje ${cue.start}-${cue.end}s, więc leżą w nim ujęcia ${missing.join(", ")}, których nie wymienia, każde ujęcie ma być policzone, bo tylko to dowodzi, że model przeczytał cały plan`
     );
   }
 
@@ -345,7 +345,7 @@ function checkShots(cue: MusicCue, within: readonly ShotListShot[], problems: st
 
 function checkText(id: string, text: string, problems: string[]): void {
   if (text === "") {
-    problems.push(`${id}: cue nie ma treści — nie ma czego zamówić`);
+    problems.push(`${id}: cue nie ma treści, nie ma czego zamówić`);
   }
 }
 
@@ -359,7 +359,7 @@ function readEffects(
 
   if (blocks.length === 0) {
     problems.push(
-      'sekcja "Effects" nie ma ani jednego cue — wszystkie cztery tryby dźwięku obejmują efekty, więc arkusz bez nich jest brakiem, nie decyzją'
+      'sekcja "Effects" nie ma ani jednego cue, wszystkie cztery tryby dźwięku obejmują efekty, więc arkusz bez nich jest brakiem, nie decyzją'
     );
 
     return [];
@@ -375,11 +375,11 @@ function readEffects(
       continue;
     }
 
-    // Effects run forward like the film. Unlike speech they may overlap — two
+    // Effects run forward like the film. Unlike speech they may overlap, two
     // things can happen at once, and only a narrator cannot talk over himself.
     if (previous !== null && cue.atSeconds < previous.atSeconds) {
       problems.push(
-        `${cue.id}: zaczyna się w ${cue.atSeconds}s, czyli wcześniej niż ${previous.id} w ${previous.atSeconds}s — efekty biegną do przodu`
+        `${cue.id}: zaczyna się w ${cue.atSeconds}s, czyli wcześniej niż ${previous.id} w ${previous.atSeconds}s, efekty biegną do przodu`
       );
     }
 
@@ -416,7 +416,7 @@ function readEffect(
 
   if (id !== expected) {
     problems.push(
-      `cue ${id} stoi tam, gdzie oczekiwano ${expected} — numeracja biegnie po kolei od E01`
+      `cue ${id} stoi tam, gdzie oczekiwano ${expected}, numeracja biegnie po kolei od E01`
     );
   }
 
@@ -432,7 +432,7 @@ function readEffect(
   const seconds = effectLength(round(Number(length.replace(",", "."))));
 
   // The anchor is a second of the approved plan, so it has to sit inside the
-  // shot that claims it — the same rule stage 9 gives an utterance, and for
+  // shot that claims it, the same rule stage 9 gives an utterance, and for
   // the same reason: an effect belongs to what is on screen when it happens.
   if (atSeconds < shot.start || atSeconds >= shot.end) {
     problems.push(
@@ -448,7 +448,7 @@ function readEffect(
 
   if (round(atSeconds + seconds.data) > shotList.durationSeconds) {
     problems.push(
-      `${id}: kończy się w ${round(atSeconds + seconds.data)}s, a plan trwa ${shotList.durationSeconds}s — skróć efekt albo przesuń jego kotwicę`
+      `${id}: kończy się w ${round(atSeconds + seconds.data)}s, a plan trwa ${shotList.durationSeconds}s, skróć efekt albo przesuń jego kotwicę`
     );
   }
 

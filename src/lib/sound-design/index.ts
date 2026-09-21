@@ -1,5 +1,5 @@
 /**
- * Stage 10 — the sound design. Music and effects, and the film with every
+ * Stage 10, the sound design. Music and effects, and the film with every
  * sound it has.
  *
  * The declared row 10 said music and effects were an **input**, brought in by
@@ -7,7 +7,7 @@
  * came from. It does not survive contact with the rest of the contract:
  * pulling outside files into the workspace is stage 0's monopoly, so "a person
  * brings them" was a rewrite of stage 0 under another name. Stage 10 buys them
- * instead, from ElevenLabs — which is not a fourth provider but a fourth and
+ * instead, from ElevenLabs, which is not a fourth provider but a fourth and
  * fifth paid call site at the one this pipeline already uses for speech.
  *
  * Five things are worth knowing before reading further.
@@ -16,15 +16,15 @@
  * place.** Stage 9 could prove its script honest by finding every sentence
  * word for word inside the shot it names. Stage 10 cannot: a music prompt is
  * an instruction, which rule 9 writes in English, and the `Audio` prose it
- * comes from is material, which rule 9 forbids translating — so copying is
+ * comes from is material, which rule 9 forbids translating, so copying is
  * illegal in both directions and there is no match to look for. What replaces
  * it is stage 4's bargain: a wiring verdict that never reads a prompt, and a
  * human who does. Rule 9 is carried by the instruction and by that reader, not
- * by a parser — see `validate.ts`, where a parser was tried and taken out.
+ * by a parser, see `validate.ts`, where a parser was tried and taken out.
  *
  * **The stems are shared; only the mix is per track.** A bed has no idea which
  * of the two films it will sit under, and the two differ only by the drift
- * their clips came back with — so buying twice would be paying for a
+ * their clips came back with, so buying twice would be paying for a
  * directory. Stage 9's precedent, read to the letter.
  *
  * **The bill is seconds, not calls.** This provider rates music and effects
@@ -35,7 +35,7 @@
  *
  * **It rebuilds rather than laying music over `narrated.mp4`.** The picture is
  * a stream copy of the approved `episode.mp4`, the speech comes from the
- * lossless lines stage 9 bought, and the stems come from here — so the speech
+ * lossless lines stage 9 bought, and the stems come from here, so the speech
  * is encoded exactly once, and the music can step back under a voice, which is
  * only possible when the voice is an input of the graph rather than already
  * inside it. `narrated.mp4` is neither overwritten nor invalidated: it becomes

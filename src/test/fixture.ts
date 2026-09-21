@@ -32,7 +32,7 @@ import { type ImageTrack, imageTracks, type Workspace } from "../lib/workspace.j
  * threshold this repository promotes at, so it is promoted here.
  *
  * It is **not** a domain module. Nothing under `src/lib` imports it, `src/index.ts`
- * does not re-export it and `tsup` does not bundle it — it lives under `src/test`
+ * does not re-export it and `tsup` does not bundle it; it lives under `src/test`
  * so that a reader looking at the layer table in AGENTS.md does not have to
  * wonder which layer it belongs to. The answer is none of them.
  *
@@ -43,7 +43,7 @@ import { type ImageTrack, imageTracks, type Workspace } from "../lib/workspace.j
  * HTTP calls. That file is the only place a stage's output is written from
  * outside it, and it is written in the shape `lib/artifact` defines.
  *
- * What it deliberately does **not** own is the prompt package's `answer` — the
+ * What it deliberately does **not** own is the prompt package's `answer`, the
  * manifest each test's model returns. That manifest is the dependency graph
  * under test: stage 5 wants two roots and a dependent, stage 6 wants a frame
  * with one reference to wait for, and `media-prompt` wants a package big enough
@@ -59,8 +59,8 @@ const CAST = ["ewa", "tata"] as const;
 /** The film frame of a 16:9 episode: what both tracks render and validate. */
 export const FRAME = { height: 1584, width: 2816 };
 
-/** `project.md` — the art direction every stage reads and no stage invents. */
-export const RULES = "# Ewa — zasady wspólne\n\nPłaskie 2D. Paleta dziesięciu barw.\n";
+/** `project.md`, the art direction every stage reads and no stage invents. */
+export const RULES = "# Ewa, zasady wspólne\n\nPłaskie 2D. Paleta dziesięciu barw.\n";
 
 /**
  * A structurally valid PNG of a given size, built rather than committed as a
@@ -84,7 +84,7 @@ export function png(width: number, height: number, fill = 0): Buffer {
 }
 
 /**
- * A structurally valid JPEG of a given size, built the same way — because the
+ * A structurally valid JPEG of a given size, built the same way, because the
  * video provider hands the frame a clip ended on back as a JPEG, whatever the
  * rest of the pipeline draws in.
  *
@@ -116,7 +116,7 @@ export function jpeg(width: number, height: number): Buffer {
 
 /**
  * A structurally valid MP4 of a given frame and duration, built rather than
- * committed as a binary — the same reason `png` is built.
+ * committed as a binary, the same reason `png` is built.
  *
  * It carries exactly what the verdict reads: an `ftyp`, an `mvhd` holding the
  * timescale and duration, and one `trak` whose `tkhd` holds the frame. `audio`
@@ -141,7 +141,7 @@ export function mp4(options: {
 
 /**
  * A structurally valid PCM WAV of a given length, built rather than committed
- * as a binary — the same reason `mp4` is built.
+ * as a binary, the same reason `mp4` is built.
  *
  * It carries exactly what the verdict reads: a RIFF/WAVE header, an `fmt `
  * chunk stating the rate, the channels and the depth, and a `data` chunk whose
@@ -186,7 +186,7 @@ const MPEG2_RATES = [22_050, 24_000, 16_000];
 
 /**
  * A structurally valid Layer III MP3 of a given length, built rather than
- * committed as a binary — the same reason `mp4` and `wav` are built.
+ * committed as a binary, the same reason `mp4` and `wav` are built.
  *
  * It carries exactly what the verdict reads: a chain of frame headers, each
  * declaring its own version, bitrate, sample rate and channel mode. `bitrate`
@@ -370,7 +370,7 @@ function screenplay(): string {
  * What the narrator says in one shot, when the episode has a narrator.
  *
  * Stage 9 lifts these sentences rather than writing them, and its validator
- * proves the lift by finding each one inside the shot it names — so a fixture
+ * proves the lift by finding each one inside the shot it names, so a fixture
  * that wants a narrated episode has to put the words where stage 1 would have
  * put them: in the prose of the Audio field, beside the music and the rain.
  */
@@ -413,19 +413,19 @@ function shot(
 /**
  * A shot list the stage-3 validator accepts: two clips, four shots, both
  * characters on screen. `castSeen` is what stage 4's gate reads, so both members
- * of the roster appear — a fixture with one would make the two-track hero gate
+ * of the roster appear, a fixture with one would make the two-track hero gate
  * untestable.
  *
  * `three-clips` is the same episode cut three ways instead of two, and it exists
  * because two clips can only show one way of seeding a later one. Stage 7 needs
  * both: a clip that continues the previous one out of its end frame, and a clip
  * that opens a new scene and continues nothing. `unrenderable-clip` is that same
- * cut with a first clip of three seconds — legal for stage 3, which only caps
+ * cut with a first clip of three seconds, legal for stage 3, which only caps
  * the longest clip, and shorter than any video model renders, which is what
  * stage 7 has to refuse before it spends anything.
  *
  * These are options rather than the only shape because the manifest a test
- * brings has to name exactly the clips the shot list plans — so switching
+ * brings has to name exactly the clips the shot list plans, so switching
  * everybody to three clips would silently rewrite what stages 5 and 6 assert.
  */
 export type ShotListShape = "three-clips" | "two-clips" | "unrenderable-clip";
@@ -512,7 +512,7 @@ function threeClips(narrated: boolean): string {
  * Stage 3 accepts it: `maxClipSeconds` caps the longest clip and says nothing
  * about the shortest, and every shot still sits inside one scene and sums to
  * the episode's duration. The video model does not render anything under four
- * seconds, so this is the plan stage 7 has to refuse — before it spends.
+ * seconds, so this is the plan stage 7 has to refuse, before it spends.
  */
 function unrenderableClips(narrated: boolean): string {
   return [
@@ -584,7 +584,7 @@ interface Recorder {
  * The prompt a request carried, whichever shape it travelled in.
  *
  * gpt-image splits its endpoint by whether references are attached, and the one
- * that takes them — `/v1/images/edits` — is multipart, where every field is a
+ * that takes them, `/v1/images/edits`, is multipart, where every field is a
  * form entry rather than a JSON key. Reading only the JSON shape makes an
  * assertion about rule 8 pass against an empty string.
  */
@@ -734,7 +734,7 @@ interface UpstreamOptions {
    *
    * Cast here rather than by the test, because that is when a real series casts
    * one: `project.json` is a recorded input of every stage below it, so naming
-   * a narrator after the shot list has been accepted is input drift — real,
+   * a narrator after the shot list has been accepted is input drift, real,
    * correct, and paid for with a re-approval nobody wants inside a fixture.
    */
   readonly voiceId?: string;
@@ -897,7 +897,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
  * It exists for the stages *below* stage 7, which need a track that is done
  * rather than a track they are testing. The build-up is the same three calls
  * and three approvals every time, and stage 8 would have been the fourth copy
- * of the stage 5-to-6 chain — the threshold this repository promotes at.
+ * of the stage 5-to-6 chain, the threshold this repository promotes at.
  *
  * It deliberately does **not** replace the instrumented transports stages 5, 6
  * and 7 bring to their own tests. Those count calls, because the count is the
@@ -1083,7 +1083,7 @@ function videoProvider(clipSeconds: Readonly<Record<string, number>>): typeof fe
  * muxer.
  *
  * The clips this fixture builds are structurally valid MP4s rather than
- * decodable ones — they carry the boxes every verdict reads and nothing else —
+ * decodable ones; they carry the boxes every verdict reads and nothing else,
  * so a real ffmpeg has nothing to concatenate. That is the right trade: the
  * real engine is exercised where it is the thing under test, in
  * `muxer.test.ts`, against inputs it made itself. Here what matters is that
@@ -1174,8 +1174,8 @@ const CLIP_HEADING = /### (C\d{2,}) \|/;
 /**
  * Which clip a video request is for, read from the shots the prompt quotes.
  *
- * The request carries no identifier of its own — rule 8 keeps ids out of a
- * model's instructions — so the fixture reads the one place the clip's name
+ * The request carries no identifier of its own, rule 8 keeps ids out of a
+ * model's instructions, so the fixture reads the one place the clip's name
  * legitimately appears: the verbatim shot-list entries the composer attaches.
  */
 function clipIdOf(body: unknown): string {

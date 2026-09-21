@@ -4,8 +4,8 @@ import { err, ok, type Result } from "../result.js";
 /**
  * Internal to the video-model module: the paid job, and nothing else.
  *
- * `fetch` is injected so every rule around the call — no retry, the key never
- * reaching disk, a refusal being an error rather than a blank clip — is
+ * `fetch` is injected so every rule around the call, no retry, the key never
+ * reaching disk, a refusal being an error rather than a blank clip, is
  * testable without spending anything.
  *
  * A clip differs from an image in the one way that shapes this whole module:
@@ -34,7 +34,7 @@ const RESOLUTION = "1080p";
 /**
  * The ratio is inherited from the first frame, and it has to be: the provider
  * requires `adaptive` whenever a request pins its opening frame. That is not a
- * limitation here but the right answer — the entry frame was drawn in the
+ * limitation here but the right answer, the entry frame was drawn in the
  * episode's `aspectRatio`, so the clip inherits a decision stage 0 stored
  * rather than one this module would have to restate.
  */
@@ -152,7 +152,7 @@ async function call(
     return err(
       new VideoCallError(
         null,
-        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas) — nie ponawiam; sprawdź, czy próba nie została rozliczona",
+        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas), nie ponawiam; sprawdź, czy próba nie została rozliczona",
         { cause }
       )
     );
@@ -185,7 +185,7 @@ export function httpFailure(transport: Transport): Error | null {
 
   return new VideoCallError(
     transport.httpStatus,
-    `API zwróciło HTTP ${transport.httpStatus} — nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
+    `API zwróciło HTTP ${transport.httpStatus}, nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
   );
 }
 
@@ -272,7 +272,7 @@ export async function downloadAsset(input: {
     return err(
       new VideoCallError(
         null,
-        `nie udało się pobrać ${input.what} spod adresu zwróconego przez API — zadanie jest już opłacone, a adres żyje 24 h, więc powtórz to samo polecenie zamiast --regenerate`,
+        `nie udało się pobrać ${input.what} spod adresu zwróconego przez API, zadanie jest już opłacone, a adres żyje 24 h, więc powtórz to samo polecenie zamiast --regenerate`,
         { cause }
       )
     );
@@ -282,7 +282,7 @@ export async function downloadAsset(input: {
     return err(
       new VideoCallError(
         response.status,
-        `pobranie ${input.what} zwróciło HTTP ${response.status} — zadanie jest już opłacone; powtórz polecenie, adres żyje 24 h`
+        `pobranie ${input.what} zwróciło HTTP ${response.status}, zadanie jest już opłacone; powtórz polecenie, adres żyje 24 h`
       )
     );
   }

@@ -34,7 +34,7 @@ import { type SoundDesignSheet, validateSoundDesign } from "./validate.js";
 /**
  * Internal to the sound-design module: the command that buys the sound.
  *
- * Two halves, and it does the next one the gates allow — stage 9's shape, and
+ * Two halves, and it does the next one the gates allow, stage 9's shape, and
  * stage 2's before it. First the cue sheet, in one paid text call. Then the
  * stems, one paid audio call each, and only once a human has accepted the
  * sheet, because accepting the sheet is what authorises buying every cue in it.
@@ -45,7 +45,7 @@ import { type SoundDesignSheet, validateSoundDesign } from "./validate.js";
  * the bill because the provider rates **per minute of generated audio**. One
  * call for a ninety-second bed and one call for a half-second click are the
  * same number and nothing like the same money. So calls and seconds are both
- * printed, per cue and in total, and neither is a price — prices are the
+ * printed, per cue and in total, and neither is a price, prices are the
  * account holder's business and this tool has never guessed one.
  *
  * The other thing worth saying out loud: this provider charges **at
@@ -105,7 +105,7 @@ interface GenerateInput {
 /**
  * Why a paid call may not happen. Empty means it may.
  *
- * A dry run never reads a key, so it must not claim one is missing — it says
+ * A dry run never reads a key, so it must not claim one is missing, it says
  * what it did not check instead. Claiming to have found an absence you never
  * looked for is the same lie as claiming a success you never had.
  */
@@ -113,18 +113,18 @@ function blockers(input: GenerateInput, stage10: Stage10Inputs): readonly string
   const problems = [...stage10.gate];
 
   if (input.model === null || input.model === "") {
-    problems.push("brak modelu tekstowego — wskaż go przez --model <id> albo AIMATOR_SOUND_MODEL");
+    problems.push("brak modelu tekstowego, wskaż go przez --model <id> albo AIMATOR_SOUND_MODEL");
   }
 
   if (input.musicModel === null || input.musicModel === "") {
     problems.push(
-      "brak modelu muzycznego — wskaż go przez --music-model <id> albo AIMATOR_MUSIC_MODEL"
+      "brak modelu muzycznego, wskaż go przez --music-model <id> albo AIMATOR_MUSIC_MODEL"
     );
   }
 
   if (input.effectsModel === null || input.effectsModel === "") {
     problems.push(
-      "brak modelu efektów — wskaż go przez --effects-model <id> albo AIMATOR_EFFECTS_MODEL"
+      "brak modelu efektów, wskaż go przez --effects-model <id> albo AIMATOR_EFFECTS_MODEL"
     );
   }
 
@@ -143,7 +143,7 @@ function blockers(input: GenerateInput, stage10: Stage10Inputs): readonly string
 
 /** The provider's billing, said where somebody will read it before spending. */
 const BILLING =
-  "ElevenLabs wycenia muzykę i efekty ZA MINUTĘ wygenerowanego dźwięku i nalicza opłatę przy GENERACJI, nie przy pobraniu — więc --regenerate to druga pełna opłata, nie dopłata";
+  "ElevenLabs wycenia muzykę i efekty ZA MINUTĘ wygenerowanego dźwięku i nalicza opłatę przy GENERACJI, nie przy pobraniu, więc --regenerate to druga pełna opłata, nie dopłata";
 
 export async function generateSoundDesign(
   input: GenerateInput
@@ -431,7 +431,7 @@ async function publishSheet(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }

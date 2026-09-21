@@ -36,7 +36,7 @@ export interface Stage3Paths {
 export interface Stage3Inputs {
   readonly cast: readonly CastMember[];
   /**
-   * Why a paid call may not happen yet. Empty means the upstream is in order —
+   * Why a paid call may not happen yet. Empty means the upstream is in order,
    * the model and the key are the command's own business, not this module's.
    */
   readonly gate: readonly string[];
@@ -107,14 +107,14 @@ export async function readStage3Inputs(input: Stage3Scope): Promise<Result<Stage
   const screenplay = await readDigest(paths.data.episode.screenplay);
 
   if (!screenplay.ok) {
-    gate.push(`brakuje ${relative(paths.data.episode.screenplay)} — etap 3 nie ma czego planować`);
+    gate.push(`brakuje ${relative(paths.data.episode.screenplay)}, etap 3 nie ma czego planować`);
   }
 
   const { maxClipSeconds } = stage0.data.settings;
 
   if (maxClipSeconds === null) {
     gate.push(
-      `odcinek "${input.episodeId}": brak decyzji — maxClipSeconds; ustaw ją przez: aimator episode set ${input.projectId} ${input.episodeId} --max-clip <1-60>`
+      `odcinek "${input.episodeId}": brak decyzji, maxClipSeconds; ustaw ją przez: aimator episode set ${input.projectId} ${input.episodeId} --max-clip <1-60>`
     );
   }
 

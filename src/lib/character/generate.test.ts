@@ -142,7 +142,7 @@ async function makeStage0(approve = true): Promise<void> {
   );
 
   // Stage 0 is approved project-wide, and a project with no episode is not a
-  // finished stage 0 — even though stage 2 itself never reads an episode.
+  // finished stage 0, even though stage 2 itself never reads an episode.
   const source = join(root, "01-Burza.md");
   await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
   await addEpisode({
@@ -450,7 +450,7 @@ describe("generateCharacter resume", () => {
   /**
    * The card is the one artifact whose inputs are exactly stage 0's, so a
    * resume that compared a record against stage 0 alone passed for it and
-   * refused for every other image — a view carries `card.png` among its inputs,
+   * refused for every other image, a view carries `card.png` among its inputs,
    * and the comparison read that as drift. The effect was a second charge for
    * an image already bought, on nine artifacts out of ten.
    */

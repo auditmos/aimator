@@ -33,8 +33,8 @@ function installed(): boolean {
 
 describe("ffmpeg", () => {
   /**
-   * The refusal is the whole of what stage 8 does without an engine — there is
-   * no second road — so the message has to name both remedies.
+   * The refusal is the whole of what stage 8 does without an engine, there is
+   * no second road, so the message has to name both remedies.
    */
   it("should refuse by name when the program is not there", async () => {
     const result = await ffmpeg("aimator-no-such-muxer").version();
@@ -63,7 +63,7 @@ describe("ffmpeg", () => {
  * A fake muxer asserts that the stage called it; only the program can say
  * whether what it was told is a thing ffmpeg does. So this synthesises its own
  * inputs with the engine, mixes them, and reads the result back with the same
- * box reader `check` uses — no decoder, no second tool.
+ * box reader `check` uses, no decoder, no second tool.
  */
 describe("ffmpeg mix", () => {
   let scratch = "";
@@ -140,7 +140,7 @@ describe("ffmpeg mix", () => {
   /**
    * The picture is passed through, so the narrated file runs exactly as long as
    * the cut it was made from. Audio shorter than the film must never shorten
-   * the film — the frames are somebody's accepted bytes.
+   * the film, the frames are somebody's accepted bytes.
    */
   it.runIf(installed())(
     "should keep the film's own length when the speech is shorter",

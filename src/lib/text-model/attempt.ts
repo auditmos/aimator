@@ -34,7 +34,7 @@ import {
  * Internal to the text-model module: one billed text call, start to finish.
  *
  * Promoted here when stage 4 became the *third* text stage to repeat the same
- * dance — take the lock, archive the prompt and the request, write `submitted`
+ * dance, take the lock, archive the prompt and the request, write `submitted`
  * before the POST, archive whatever came back, resume from a saved answer
  * instead of paying twice, publish only what validates. Stages 1 and 3 had two
  * copies of it that had already begun to differ in their comments; a third copy
@@ -137,7 +137,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -157,7 +157,7 @@ function write(path: string, text: string): Promise<Result<readonly string[]>> {
  * A text stage used to own exactly one artifact, so writing the whole file was
  * the same thing as writing its record. Stage 9 broke that: its shared file
  * holds the script beside every line bought from it, and replacing the file
- * when the script is re-lifted would erase recordings somebody paid for — the
+ * when the script is re-lifted would erase recordings somebody paid for, the
  * failure `lib/image-model` avoids for the same reason, ten images down.
  */
 async function writeRecord<T>(
@@ -281,7 +281,7 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
  *
  * The run id and the producer are kept: this is the same attempt, and its
  * `promptVersion` still names the prompt that really produced the answer. What
- * changed is on this side — a validator or a renderer — and pretending a new
+ * changed is on this side, a validator or a renderer, and pretending a new
  * attempt happened would put a date and an id on work nobody did.
  *
  * It refuses on drifted inputs for the reason `resume` does: the saved answer
@@ -296,7 +296,7 @@ async function republish<T>(
   if (record === undefined) {
     return err(
       stage.blocked([
-        `nie ma czego opublikować ponownie — ${stage.what} nie ma jeszcze żadnej próby`,
+        `nie ma czego opublikować ponownie, ${stage.what} nie ma jeszcze żadnej próby`,
       ])
     );
   }
@@ -321,7 +321,7 @@ async function republish<T>(
     return err(
       stage.blocked([
         ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "zapisana odpowiedź opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
+        "zapisana odpowiedź opisuje inne wejście, nową płatną próbę zaczyna --regenerate",
       ])
     );
   }
@@ -335,13 +335,13 @@ async function republish<T>(
 }
 
 /**
- * What to do with an attempt that already exists. `null` means "nothing —
+ * What to do with an attempt that already exists. `null` means "nothing,
  * go ahead and pay".
  *
  * A `submitted` record whose archive still holds the response is the case this
  * exists for: that answer is bought and paid for, so re-deriving a verdict from
  * it must cost nothing. Otherwise a bug in a validator would be billable, and
- * the first one was. This is not an automatic retry — nothing is sent.
+ * the first one was. This is not an automatic retry; nothing is sent.
  */
 async function resume<T>(
   call: TextCall,
@@ -375,7 +375,7 @@ async function resume<T>(
   if (!response.ok || (status !== null && status >= 400)) {
     return err(
       stage.blocked([
-        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`} — mogła zostać rozliczona`,
+        `próba ${record.runId} zapisała status "submitted", ale nie ma z niej użytecznej odpowiedzi${status === null ? "" : ` (HTTP ${status})`}, mogła zostać rozliczona`,
         "wywołanie idzie ze store: false, więc nie ma zadania do odpytania; nową płatną próbę zaczyna wyłącznie --regenerate",
       ])
     );
@@ -391,7 +391,7 @@ async function resume<T>(
     return err(
       stage.blocked([
         ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "zapisana odpowiedź opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
+        "zapisana odpowiedź opisuje inne wejście, nową płatną próbę zaczyna --regenerate",
       ])
     );
   }

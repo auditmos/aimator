@@ -63,7 +63,7 @@ function greatestCommonDivisor(a: number, b: number): number {
  * A ratio neither track can render is refused rather than rounded into one
  * they can. That is the same refusal the reference limit makes, one level up.
  *
- * It answers in the request's own spelling — `2816x1584` — because that is what
+ * It answers in the request's own spelling, `2816x1584`, because that is what
  * both providers take and what the PNG verdict compares against. Width and
  * height never travel apart, so they are never handed over apart.
  */
@@ -72,7 +72,7 @@ export function frameSize(aspectRatio: string): Result<string> {
 
   if (match === null) {
     return err(
-      new FrameError(aspectRatio, `niepoprawne proporcje obrazu "${aspectRatio}" — oczekiwano w:h`)
+      new FrameError(aspectRatio, `niepoprawne proporcje obrazu "${aspectRatio}", oczekiwano w:h`)
     );
   }
 
@@ -89,7 +89,7 @@ export function frameSize(aspectRatio: string): Result<string> {
     return err(
       new FrameError(
         aspectRatio,
-        `proporcje "${aspectRatio}" leżą poza zakresem, jaki przyjmują tory obrazowe (od 1:3 do 3:1) — zmień aspectRatio projektu, bo narzędzie nie zaokrągli kadru za ciebie`
+        `proporcje "${aspectRatio}" leżą poza zakresem, jaki przyjmują tory obrazowe (od 1:3 do 3:1), zmień aspectRatio projektu, bo narzędzie nie zaokrągli kadru za ciebie`
       )
     );
   }

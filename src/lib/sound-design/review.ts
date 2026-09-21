@@ -30,7 +30,7 @@ import { validateSoundDesign } from "./validate.js";
  * Internal to the sound-design module: verification, and the approval on top
  * of it.
  *
- * Two levels, because stage 10 produces at two levels — and the two questions
+ * Two levels, because stage 10 produces at two levels, and the two questions
  * are genuinely different, exactly as they are one row up.
  *
  * The **shared** review is about the sound itself: does this cue sheet
@@ -40,7 +40,7 @@ import { validateSoundDesign } from "./validate.js";
  *
  * The **per-track** review is the contract's "ocena odsłuchu", and it cannot
  * be answered anywhere else: does the whole thing play over *this* picture. It
- * is not a repetition of the cue reviews above it — a bed that is beautiful on
+ * is not a repetition of the cue reviews above it, a bed that is beautiful on
  * its own can still fight the narrator, and only this file has both in it at
  * once.
  *
@@ -167,7 +167,7 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
   const [output] = record.outputs;
 
   if (output === undefined || output.sha256 !== text.data.sha256) {
-    blocking.push("sound-design.md: nie zgadza się z zapisanym hashem — plik zmieniono poza próbą");
+    blocking.push("sound-design.md: nie zgadza się z zapisanym hashem, plik zmieniono poza próbą");
   }
 
   // Re-validated against the plan as it stands, exactly as a shot list is
@@ -206,7 +206,7 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
         ...blocking,
         ...sheetChanged.map(
           (path) =>
-            `${path}: zmienił się od czasu spisania arkusza — przeczytaj arkusz jeszcze raz i zatwierdź ponownie`
+            `${path}: zmienił się od czasu spisania arkusza, przeczytaj arkusz jeszcze raz i zatwierdź ponownie`
         ),
         ...cues.problems,
         ...missingDialogue(stage10.data.settings),
@@ -279,14 +279,14 @@ async function readCueState(
     };
   }
 
-  // A record that stopped at `submitted` may already have been billed — and
+  // A record that stopped at `submitted` may already have been billed, and
   // here a second attempt is the full price again, not a top-up. Repeating the
   // command finishes it from the archive instead. Said before somebody reaches
   // for --regenerate.
   if (record.status === "submitted") {
     return {
       problems: [
-        `${cue.id}: rekord "submitted" bez opublikowanego dźwięku — powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
+        `${cue.id}: rekord "submitted" bez opublikowanego dźwięku, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
       ],
       state: {
         ...ABSENT,
@@ -306,7 +306,7 @@ async function readCueState(
     problems: [
       ...blocking,
       ...inputsChanged.map(
-        (path) => `${cue.id}: ${path} zmienił się od czasu zakupu — odsłuchaj go jeszcze raz`
+        (path) => `${cue.id}: ${path} zmienił się od czasu zakupu, odsłuchaj go jeszcze raz`
       ),
     ],
     state: {
@@ -345,7 +345,7 @@ function bytesProblems(
   ];
 }
 
-/** Reads and reports the shared half. Writes nothing — that is what makes it safe. */
+/** Reads and reports the shared half. Writes nothing; that is what makes it safe. */
 export async function checkSoundDesign(input: Stage10Scope): Promise<Result<SoundDesignStatus>> {
   const inspection = await inspect(input);
 
@@ -364,7 +364,7 @@ export async function approveSoundDesign(input: ApproveScope): Promise<Result<So
   if (input.artifacts.length === 0) {
     return err(
       new SoundDesignStateError(
-        `--artifact jest wymagane: ${CUES} albo M01[,E02] — przyjęcie arkusza uruchamia kupowanie każdego cue, a przyjęcie stemu otwiera miks`
+        `--artifact jest wymagane: ${CUES} albo M01[,E02], przyjęcie arkusza uruchamia kupowanie każdego cue, a przyjęcie stemu otwiera miks`
       )
     );
   }
@@ -382,7 +382,7 @@ export async function approveSoundDesign(input: ApproveScope): Promise<Result<So
   if (unknown.length > 0) {
     return err(
       new SoundDesignStateError(
-        `--artifact "${unknown.join(", ")}" — etap 10 zna tutaj ${[...known].join(", ")}`
+        `--artifact "${unknown.join(", ")}", etap 10 zna tutaj ${[...known].join(", ")}`
       )
     );
   }
@@ -552,7 +552,7 @@ async function inspectMaster(
         ...blocking,
         ...inputsChanged.map(
           (path) =>
-            `${path}: zmienił się od czasu miksu — obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmiksuj go od nowa: aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
+            `${path}: zmienił się od czasu miksu, obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmiksuj go od nowa: aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
         ),
         ...missingDialogue(stage10.data.settings),
       ],
@@ -576,7 +576,7 @@ export async function approveMaster(
   if (named.length > 0) {
     return err(
       new SoundDesignStateError(
-        `--artifact "${named.join(", ")}" — pełny miks ma jeden artefakt na tor: ${MIXED}`
+        `--artifact "${named.join(", ")}", pełny miks ma jeden artefakt na tor: ${MIXED}`
       )
     );
   }

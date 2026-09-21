@@ -27,15 +27,15 @@ import { manifestSchema } from "./validate.js";
  * look like on the other side, so the model wrote them blind and `prompts/**`
  * came out carrying `hero:ewa` as a bare string no image model could resolve.
  * The fix is not a renderer that patches the text later: it is telling the
- * planner what the sender guarantees, so that every package — this episode's
- * and every future one — is written against a binding that actually holds.
+ * planner what the sender guarantees, so that every package, this episode's
+ * and every future one, is written against a binding that actually holds.
  *
  * The answer is English for the same kind of reason. Version 1 said "write in
- * the production language", which reached for `language` — a field the contract
+ * the production language", which reached for `language`, a field the contract
  * defines as the language of the screenplay and of what is spoken on screen.
  * Everything this stage returns is an instruction to an image or video model, so
  * it follows the invariant that governs instructions, not the one that governs
- * the film. The material those models work from — `project.md`, `shot-list.md` —
+ * the film. The material those models work from, `project.md`, `shot-list.md`,
  * still travels verbatim in whatever language it was written, because its digest
  * is recorded and a translation would be a second version of the same truth.
  */
@@ -81,7 +81,7 @@ export const PACKAGE_FORMAT: ResponseFormat = {
 
 function jsonSchema(): Readonly<Record<string, unknown>> {
   // The provider's strict dialect takes no `$schema` keyword, and no length or
-  // pattern constraint — which is why the Zod schemas above carry none either,
+  // pattern constraint, which is why the Zod schemas above carry none either,
   // and why every such rule lives in `validate.ts`, where it can name the
   // identifier it objected to.
   const { $schema, ...rest } = z.toJSONSchema(answerSchema) as Record<string, unknown>;
@@ -93,7 +93,7 @@ interface PromptInput {
   readonly aspectRatio: string;
   /** The roster, with the names the project rules use. */
   readonly cast: readonly CastMember[];
-  /** Cast ids with an approved canonical image — the closed `hero:` vocabulary. */
+  /** Cast ids with an approved canonical image, the closed `hero:` vocabulary. */
   readonly heroes: readonly string[];
   /** `project.md`, verbatim. */
   readonly rules: string;
@@ -118,18 +118,18 @@ not a line of the film: the prompts are sent to those models and the subjects ar
 printed in their attachment list. The episode's \`language\` setting below is the
 language of the screenplay and of what is spoken on screen; it does not apply to
 you. The project rules and the shot list reach those models in their original
-language, unmodified — do not translate, paraphrase or restate them.
+language, unmodified, do not translate, paraphrase or restate them.
 
 ## What you are writing, and what you are not
 
 You are writing four kinds of creative direction, each of which will later
 become one paid image or video call:
 
-- one **opening frame** — the single starting instant of the first shot;
-- a numbered set of **references** (R01, R02, ...) — the supporting character,
+- one **opening frame**, the single starting instant of the first shot;
+- a numbered set of **references** (R01, R02, ...), the supporting character,
   location and prop images every later frame will be drawn from;
 - one **clip** direction per clip of the shot list;
-- one **entry frame** per clip except the first — the single starting instant of
+- one **entry frame** per clip except the first, the single starting instant of
   that clip. The first clip's entry frame *is* the opening frame, so it has none
   of its own.
 
@@ -151,7 +151,7 @@ it is drawn.
   on a character's canonical image or on a lower-numbered reference. That is
   what keeps the graph acyclic, so write the anchors before what rests on them.
 - \`kind\` is \`character\`, \`location\` or \`prop\`. \`subject\` is a **single-line
-  label** naming the asset and its state, not a description — the description
+  label** naming the asset and its state, not a description, the description
   belongs in \`prompt\`. It is read twice: by a person reviewing the package, and
   by every model this reference is attached to, because the attachment list below
   prints it beside the id.
@@ -159,7 +159,7 @@ it is drawn.
   what angle, in what state, with what a later frame will need to read off it.
   Not a list of assets, and not a scene.
 - \`dependsOn\` is never empty. A character's canonical image is a **style and
-  scale anchor** for other characters — never copy its identity, face or hair
+  scale anchor** for other characters, never copy its identity, face or hair
   onto anybody else.
 - Plan separate references for separate prop states where continuity depends on
   them, and for a character appearance the canonical image does not already
@@ -183,21 +183,21 @@ it is drawn.
   provider limits; none of that is decided yet, and no track is chosen here.
   The same package serves every image track.
 
-## How your prompts reach the model — the attachment contract
+## How your prompts reach the model, the attachment contract
 
 Every prompt you write is sent **together with the images it assigns**, as real
 reference attachments, and the stage that sends it puts an ordered list ahead of
 your text. What the model reads looks like this:
 
-    REFERENCE INPUTS — IN THIS ORDER
-    Image 1 = hero:ewa — the canonical image of Ewa; binding for identity.
-    Image 2 = R05 — the living room: couch, rug and closed window.
+    REFERENCE INPUTS, IN THIS ORDER
+    Image 1 = hero:ewa, the canonical image of Ewa; binding for identity.
+    Image 2 = R05, the living room: couch, rug and closed window.
     <your prompt>
 
 So an id you write **is resolvable**, because it is guaranteed to appear in that
 list beside its role. Use ids in the prose exactly where you need to point at one
-specific attachment — "keep the toy's identity from R02", "hero:ewa is binding
-for the face" — and prefer them over a description whenever two references could
+specific attachment, "keep the toy's identity from R02", "hero:ewa is binding
+for the face", and prefer them over a description whenever two references could
 be confused for one another. Never write a filename, a path or a track name; the
 id is resolved to a file by the sending stage, per track, which is what lets one
 package serve both.
@@ -276,15 +276,15 @@ The \`heroes\` list is the closed vocabulary of canonical-image ids. Each names
 one character whose appearance has already been settled and accepted as an
 image; the image itself is attached by the stage that draws from it, not here.
 
-\`language\` and \`subtitles\` describe the film — what is spoken and captioned on
+\`language\` and \`subtitles\` describe the film, what is spoken and captioned on
 screen. They say nothing about this answer, which is written in English.
 
 ${serialize(settings)}
-# Project rules — the art direction for this production
+# Project rules, the art direction for this production
 
 ${input.rules}
 
-# Shot list — the approved plan these prompts must serve
+# Shot list, the approved plan these prompts must serve
 
 ${input.shotList}`;
 }

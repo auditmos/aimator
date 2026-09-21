@@ -11,7 +11,7 @@
  * ones read.
  *
  * The bucket stays private. Nothing reaches it except through this worker, on
- * the site's own origin — which is also what lets the page keep
+ * the site's own origin, which is also what lets the page keep
  * `default-src 'self'` and what keeps a download link a download.
  */
 

@@ -9,12 +9,12 @@ import { err, ok, type Result } from "./result.js";
  * It lived inside `lib/assembly` while stage 8 was its only caller, because
  * `AGENTS.md` says a module promoted for one caller is a widened interface
  * bought with nothing. Stage 9 is the second caller and it is the same program,
- * so the promotion happens here — at the caller, not at the guess.
+ * so the promotion happens here, at the caller, not at the guess.
  *
  * It is injected the way `fetch` is injected into a paid stage, and for the
  * same reason: every rule around the cut and the mix has to be testable without
  * running the program. What it hides is the whole of what this repository knows
- * about ffmpeg — where it is, which version answered, how each operation is
+ * about ffmpeg, where it is, which version answered, how each operation is
  * spelled, and how to tell a refusal from a crash.
  *
  * **It exposes operations, never a process.** There is no `run(args)` here, and
@@ -24,7 +24,7 @@ import { err, ok, type Result } from "./result.js";
  *
  * **Picture is copied, never re-encoded.** Both tracks render at one resolution
  * and one frame rate from one video model, so the concat demuxer's precondition
- * genuinely holds — and a re-encode would put pixels into the film that nobody
+ * genuinely holds, and a re-encode would put pixels into the film that nobody
  * accepted, which is the same thing rule 6 and the bytes-bound approval forbid a
  * step above. `mix` holds to it too: it adds a sound track to an approved cut
  * and passes every frame through untouched. Where the precondition does not
@@ -50,7 +50,7 @@ const TIMEOUT_MS = 10 * 60_000;
  * `execFile` kills the process when this is exceeded, which on a run that had
  * already written the file would turn a success into a reported failure. The
  * engine is also asked for `-loglevel warning`, so what lands here is what it
- * complained about rather than a progress counter — which is what the archive
+ * complained about rather than a progress counter, which is what the archive
  * is for, and what keeps a long episode from ever approaching the limit.
  */
 const MAX_OUTPUT = 4 * 1024 * 1024;
@@ -58,7 +58,7 @@ const VERSION = /^ffmpeg version (\S+)/;
 /**
  * The rate every line is resampled to before it is mixed.
  *
- * It matches what stage 9 buys, so the usual case resamples nothing — but the
+ * It matches what stage 9 buys, so the usual case resamples nothing, but the
  * provider decides what it hands back, and `amix` refuses streams that
  * disagree about their rate. Stating it here makes the graph total rather than
  * dependent on a setting two modules away.
@@ -76,7 +76,7 @@ export interface ConcatInput {
 export interface ConcatReport {
   /** The exact invocation, for the archive. It carries no secret: there is none. */
   readonly argv: readonly string[];
-  /** The engine's name and version — what `producer.model` records. */
+  /** The engine's name and version, what `producer.model` records. */
   readonly engine: string;
   readonly stderr: string;
 }
@@ -187,7 +187,7 @@ async function version(binary: string): Promise<Result<string>> {
     ? err(
         new MuxError(
           "incompatible",
-          `"${binary}" odpowiedział, ale nie przedstawił się jako ffmpeg — montaż potrzebuje ffmpeg`
+          `"${binary}" odpowiedział, ale nie przedstawił się jako ffmpeg, montaż potrzebuje ffmpeg`
         )
       )
     : ok(`ffmpeg ${found[1]}`);
@@ -251,7 +251,7 @@ async function concat(binary: string, input: ConcatInput): Promise<Result<Concat
  * What the speech is encoded to, and the one encode this module performs.
  *
  * An MP4 does not carry the WAV a voice provider returns, so the choice is not
- * between encoding and not encoding — it is between encoding once, here, into
+ * between encoding and not encoding; it is between encoding once, here, into
  * the file a human is about to accept, or encoding twice on the way to it. The
  * lossless lines stay on disk as the bytes that were bought.
  */
@@ -269,7 +269,7 @@ const SPEECH_CODEC = ["-c:a", "aac", "-b:a", "192k"] as const;
  *
  * `apad` with `-shortest` is what keeps the film its own length. Without the
  * pad, the mixed audio ends after the last sentence and `-shortest` would cut
- * the picture there — frames a human accepted, discarded by an argument. With
+ * the picture there, frames a human accepted, discarded by an argument. With
  * it, the audio is endless and the picture is what ends.
  */
 async function mix(binary: string, input: MixInput): Promise<Result<ConcatReport>> {
@@ -281,7 +281,7 @@ async function mix(binary: string, input: MixInput): Promise<Result<ConcatReport
 
   if (input.lines.length === 0) {
     return err(
-      new MuxError("incompatible", "miks bez jednej kwestii nie jest miksem — nie ma czego położyć")
+      new MuxError("incompatible", "miks bez jednej kwestii nie jest miksem, nie ma czego położyć")
     );
   }
 
@@ -338,7 +338,7 @@ async function mix(binary: string, input: MixInput): Promise<Result<ConcatReport
  *
  * **It is built from `episode.mp4` and the lossless stems, never from
  * `narrated.mp4`.** Laying music over the narrated cut would encode the speech
- * a second time, and — worse — would make ducking dishonest, because the voice
+ * a second time, and, worse, would make ducking dishonest, because the voice
  * would already be inside the signal the music was supposed to step back
  * under. Here the speech is an input of its own, so it is encoded exactly
  * once, into the file a human is about to accept.
@@ -364,7 +364,7 @@ async function master(binary: string, input: MasterInput): Promise<Result<Concat
     return err(
       new MuxError(
         "incompatible",
-        "pełny miks bez muzyki i bez efektów nie jest pełnym miksem — nie ma czego położyć"
+        "pełny miks bez muzyki i bez efektów nie jest pełnym miksem, nie ma czego położyć"
       )
     );
   }
@@ -445,8 +445,8 @@ async function master(binary: string, input: MasterInput): Promise<Result<Concat
  * How hard the compressor squeezes, from how far the bed should drop.
  *
  * `sidechaincompress` takes a ratio rather than a target level, so the knob a
- * person actually dials — "the music drops nine decibels while somebody is
- * talking" — is converted here rather than being asked for in the engine's own
+ * person actually dials, "the music drops nine decibels while somebody is
+ * talking", is converted here rather than being asked for in the engine's own
  * units. A ratio of one changes nothing, which is what a duck of zero means.
  */
 function duckRatio(duckDb: number): number {
@@ -457,7 +457,7 @@ function duckRatio(duckDb: number): number {
  * The concat list, in the demuxer's own format.
  *
  * It is written into the run archive rather than into a temporary file, because
- * it is the one description of what this cut actually was — and an archive that
+ * it is the one description of what this cut actually was, and an archive that
  * held the arguments but not the list would record half the invocation.
  */
 async function writeList(input: ConcatInput): Promise<Result<true>> {
@@ -485,7 +485,7 @@ function dirOf(path: string): string {
  * A non-zero exit is data, not an exception: ffmpeg refuses loudly and the
  * refusal is what a person needs to read. Only a program that could not be
  * started at all is an error of its own, because that is the one case with a
- * different remedy — install it, or point `AIMATOR_FFMPEG` at it.
+ * different remedy, install it, or point `AIMATOR_FFMPEG` at it.
  */
 function spawn(binary: string, args: readonly string[]): Promise<Result<ProcessResult>> {
   return new Promise((resolve) => {
@@ -501,7 +501,7 @@ function spawn(binary: string, args: readonly string[]): Promise<Result<ProcessR
             err(
               new MuxError(
                 "absent",
-                `nie znaleziono ffmpeg ("${binary}") — zainstaluj go albo wskaż ścieżkę przez AIMATOR_FFMPEG; etap 8 nie ma drugiej drogi i niczego nie przekoduje`,
+                `nie znaleziono ffmpeg ("${binary}"), zainstaluj go albo wskaż ścieżkę przez AIMATOR_FFMPEG; etap 8 nie ma drugiej drogi i niczego nie przekoduje`,
                 { cause: error }
               )
             )
@@ -520,7 +520,7 @@ function spawn(binary: string, args: readonly string[]): Promise<Result<ProcessR
  * The exit code, as a number.
  *
  * `execFile` reports a signal or a timeout without a numeric code, so a failure
- * that carries no number still has to read as a failure — `1` rather than the
+ * that carries no number still has to read as a failure, `1` rather than the
  * `0` a missing field would otherwise be mistaken for.
  */
 function exitCodeOf(failure: (Error & { code?: number | string }) | null): number {

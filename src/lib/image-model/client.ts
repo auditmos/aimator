@@ -5,8 +5,8 @@ import type { ImageTrack } from "../workspace.js";
 /**
  * Internal to the image-model module: the paid call, per track, and nothing else.
  *
- * `fetch` is injected so every rule around the call — no retry, the key never
- * reaching disk, a refusal being an error rather than a blank image — is
+ * `fetch` is injected so every rule around the call, no retry, the key never
+ * reaching disk, a refusal being an error rather than a blank image, is
  * testable without spending anything.
  *
  * The tracks differ in three ways that matter further up. gpt-image posts
@@ -158,7 +158,7 @@ export async function callImage(input: {
     return err(
       new ImageCallError(
         null,
-        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas) — nie ponawiam; sprawdź, czy próba nie została rozliczona",
+        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas), nie ponawiam; sprawdź, czy próba nie została rozliczona",
         { cause }
       )
     );
@@ -191,7 +191,7 @@ export function httpFailure(transport: Transport): Error | null {
 
   return new ImageCallError(
     transport.httpStatus,
-    `API zwróciło HTTP ${transport.httpStatus} — nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
+    `API zwróciło HTTP ${transport.httpStatus}, nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body)}`
   );
 }
 
@@ -254,7 +254,7 @@ function wireBody(request: ImageRequest): FormData | string {
    * `/images/generations` takes JSON, where `n` is a number; `/images/edits`
    * takes multipart, where every field is a string because that is all a form
    * can carry. Sharing one record between them sent `"n": "1"` as JSON and the
-   * API rejected the request — so the shapes are built separately on purpose.
+   * API rejected the request, so the shapes are built separately on purpose.
    */
   const settings = {
     background: request.background,
@@ -309,7 +309,7 @@ export async function downloadImage(input: {
     return err(
       new ImageCallError(
         null,
-        "nie udało się pobrać obrazu spod adresu zwróconego przez API — obraz jest już opłacony, a adres żyje 24 h, więc powtórz to samo polecenie zamiast --regenerate",
+        "nie udało się pobrać obrazu spod adresu zwróconego przez API, obraz jest już opłacony, a adres żyje 24 h, więc powtórz to samo polecenie zamiast --regenerate",
         { cause }
       )
     );
@@ -319,7 +319,7 @@ export async function downloadImage(input: {
     return err(
       new ImageCallError(
         response.status,
-        `pobranie obrazu zwróciło HTTP ${response.status} — obraz jest już opłacony; powtórz polecenie, adres żyje 24 h`
+        `pobranie obrazu zwróciło HTTP ${response.status}, obraz jest już opłacony; powtórz polecenie, adres żyje 24 h`
       )
     );
   }

@@ -27,7 +27,7 @@ import { type ShotList, validateShotList } from "./validate.js";
  * The order of operations is the contract, and it lives in `lib/text-model`
  * rather than here: nothing is written in `--dry-run`, the stage file records
  * `submitted` before the POST, and nothing retries on its own. What stays here
- * is what is about a shot list — the gate, the structural verdict, and the one
+ * is what is about a shot list, the gate, the structural verdict, and the one
  * file this stage publishes.
  */
 
@@ -73,7 +73,7 @@ class Stage3BlockedError extends Error {
 /**
  * Why a paid call may not happen. Empty means it may.
  *
- * A dry run never reads the key, so it must not claim the key is missing — it
+ * A dry run never reads the key, so it must not claim the key is missing, it
  * says what it did not check instead. Claiming to have found an absence you
  * never looked for is the same lie as claiming a success you never had.
  */
@@ -82,7 +82,7 @@ function blockers(input: GenerateInput, stage3: Stage3Inputs): readonly string[]
 
   if (input.model === null || input.model === "") {
     problems.push(
-      "brak modelu tekstowego — wskaż go przez --model <id> albo AIMATOR_SHOTLIST_MODEL"
+      "brak modelu tekstowego, wskaż go przez --model <id> albo AIMATOR_SHOTLIST_MODEL"
     );
   }
 
@@ -223,7 +223,7 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }

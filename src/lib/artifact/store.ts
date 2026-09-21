@@ -123,7 +123,7 @@ export function serialize(value: unknown): string {
  * can only see what a stage recorded; it is blind to a leftover from an older
  * version of the tool, from a stage that failed between `mkdir` and its first
  * write, or from a hand-made folder. This is the other direction of that
- * question. Dotfiles do not count as contents — an `.DS_Store` is the
+ * question. Dotfiles do not count as contents, an `.DS_Store` is the
  * filesystem talking, not the pipeline.
  */
 export async function emptyDirectories(root: string): Promise<readonly string[]> {

@@ -8,7 +8,7 @@ import { buildPrompt, validatePromptPackage } from "./index.js";
  * prompt a paid call would carry.
  *
  * Every case here is about the binding to the shot list, because that is what
- * the stage exists to establish — the plan already said who is on screen in
+ * the stage exists to establish, the plan already said who is on screen in
  * which clip, and a package that contradicts it plans images nobody can draw.
  */
 
@@ -266,11 +266,11 @@ describe("buildPrompt", () => {
   /**
    * The planner writes ids into prose an image model will read. That is only
    * legitimate because the sending stage promises to print the list those ids
-   * appear in — so the promise has to be in the prompt, not merely honoured
+   * appear in, so the promise has to be in the prompt, not merely honoured
    * later by whoever assembles the request.
    */
   it("should show the planner the attachment list its ids will be read beside", () => {
-    expect(prompt).toContain("REFERENCE INPUTS — IN THIS ORDER");
+    expect(prompt).toContain("REFERENCE INPUTS, IN THIS ORDER");
     expect(prompt).toContain("Image 1 = hero:ewa");
   });
 

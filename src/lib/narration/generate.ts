@@ -37,14 +37,14 @@ import { type NarrationLine, type NarrationScript, validateNarration } from "./v
  * It has two halves and does the next one the gates allow, which is the shape
  * stage 2 has and for the same reason: the gates leave exactly one of them
  * executable. First the script, in one paid text call. Then the lines, one paid
- * speech call each, and only once a human has accepted the script — because
+ * speech call each, and only once a human has accepted the script, because
  * accepting the script is what authorises buying every sentence in it.
  *
  * The number this prints before it spends is **two numbers**. Every stage above
  * prints how many paid calls it is about to make, and for an image or a clip
  * that is the bill. Here it is not: this provider charges per character of the
  * text it is handed, so a count of calls says nothing about what an episode
- * costs. Both are printed, per line and in total, and neither is a price —
+ * costs. Both are printed, per line and in total, and neither is a price,
  * prices are the account holder's business and this tool has never guessed one.
  */
 
@@ -72,7 +72,7 @@ export interface NarrationReport {
    *
    * The provider documents `previous_text` and `next_text` but does not say
    * whether they are charged for. Neither is rendered, so on any ordinary
-   * reading of "billed per character converted to audio" they are free — but
+   * reading of "billed per character converted to audio" they are free, but
    * this tool does not guess with somebody else's account, so the figure is on
    * screen and labelled as the one to add if that reading turns out wrong.
    */
@@ -110,7 +110,7 @@ interface GenerateInput {
 /**
  * Why a paid call may not happen. Empty means it may.
  *
- * A dry run never reads a key, so it must not claim one is missing — it says
+ * A dry run never reads a key, so it must not claim one is missing, it says
  * what it did not check instead. Claiming to have found an absence you never
  * looked for is the same lie as claiming a success you never had.
  */
@@ -119,12 +119,12 @@ function blockers(input: GenerateInput, stage9: Stage9Inputs): readonly string[]
 
   if (input.model === null || input.model === "") {
     problems.push(
-      "brak modelu tekstowego — wskaż go przez --model <id> albo AIMATOR_NARRATION_MODEL"
+      "brak modelu tekstowego, wskaż go przez --model <id> albo AIMATOR_NARRATION_MODEL"
     );
   }
 
   if (input.voiceModel === null || input.voiceModel === "") {
-    problems.push("brak modelu mowy — wskaż go przez --voice-model <id> albo AIMATOR_VOICE_MODEL");
+    problems.push("brak modelu mowy, wskaż go przez --voice-model <id> albo AIMATOR_VOICE_MODEL");
   }
 
   if (input.mode !== "dry-run") {
@@ -209,7 +209,7 @@ async function readScript(
 /**
  * What the narrator says either side of a line, taken from the script itself.
  *
- * Derived, never stored — rule 7's mirror. The neighbouring lines *are* the
+ * Derived, never stored, rule 7's mirror. The neighbouring lines *are* the
  * neighbouring lines, so writing them down anywhere would be a second copy of
  * the script that drifts the first time somebody re-lifts it. The provider uses
  * them so a sentence bought on its own is read as part of a paragraph rather
@@ -436,7 +436,7 @@ async function publishScript(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }

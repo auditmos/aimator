@@ -6,7 +6,7 @@ import { err, ok, type Result } from "../result.js";
  *
  * Pure and offline on purpose. This is the half of stage 1 that has to be
  * right before any money is spent, and it is also the half that decides
- * whether a paid response may be published at all — so it must be runnable
+ * whether a paid response may be published at all, so it must be runnable
  * against a file that already exists, with no network anywhere near it.
  *
  * Structure only. Whether the story is any good is a separate question that
@@ -117,7 +117,7 @@ function sectionBounds(text: string): Result<readonly { end: number; start: numb
     return err(
       new ScreenplayFormatError(
         "sections",
-        `scenariusz ma niepoprawne sekcje albo ich kolejność — wymagane dokładnie, w tej kolejności: ${SECTIONS.join(", ")}`
+        `scenariusz ma niepoprawne sekcje albo ich kolejność, wymagane dokładnie, w tej kolejności: ${SECTIONS.join(", ")}`
       )
     );
   }
@@ -146,7 +146,7 @@ function readScenes(sceneText: string): Result<readonly Scene[]> {
     return err(
       new ScreenplayFormatError(
         "scene-heading",
-        "brak scen albo niepoprawny nagłówek sceny — wymagany format: ### S01 | 15s | miejsce i pora dnia"
+        "brak scen albo niepoprawny nagłówek sceny, wymagany format: ### S01 | 15s | miejsce i pora dnia"
       )
     );
   }
@@ -166,7 +166,7 @@ function readScenes(sceneText: string): Result<readonly Scene[]> {
       return err(
         new ScreenplayFormatError(
           "scene-order",
-          `sceny muszą mieć kolejne numery od S01 — napotkano S${scene.id} na pozycji ${index + 1}`
+          `sceny muszą mieć kolejne numery od S01, napotkano S${scene.id} na pozycji ${index + 1}`
         )
       );
     }
@@ -210,7 +210,7 @@ function readFields(scene: Scene, settings: EpisodeSettings): Result<boolean> {
       return err(
         new ScreenplayFormatError(
           "subtitles",
-          `scena S${scene.id}: tekst ekranowy mimo subtitles=none — jedyna dozwolona wartość pola Text to "none"`
+          `scena S${scene.id}: tekst ekranowy mimo subtitles=none, jedyna dozwolona wartość pola Text to "none"`
         )
       );
     }
@@ -299,7 +299,7 @@ export function validateScreenplay(
     return err(
       new ScreenplayFormatError(
         "code-fence",
-        "scenariusz jest opakowany blokiem kodu — oczekiwano samego dokumentu Markdown"
+        "scenariusz jest opakowany blokiem kodu, oczekiwano samego dokumentu Markdown"
       )
     );
   }

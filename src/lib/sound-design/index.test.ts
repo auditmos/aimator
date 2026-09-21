@@ -48,8 +48,8 @@ import {
  * that never reads a prompt.** It proves that every shot of the plan was
  * accounted for, that nothing was invented for a shot that does not exist,
  * that the bed covers the film end to end, and that every length is one the
- * provider will actually render. What it cannot prove — whether the English
- * says what the Polish says — is what the human approves, exactly as a human
+ * provider will actually render. What it cannot prove, whether the English
+ * says what the Polish says, is what the human approves, exactly as a human
  * approves stage 4's prompts.
  */
 
@@ -140,7 +140,7 @@ function answer(): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
     ],
     review: "Do rozstrzygnięcia: skala alpaki.",
@@ -180,7 +180,7 @@ describe("validateSoundDesign", () => {
   /**
    * The unit this provider rates in. Stage 9 had to print characters beside
    * calls because the count of calls stopped being the bill; here it is
-   * seconds of audio, for the same reason and with the same consequence — one
+   * seconds of audio, for the same reason and with the same consequence, one
    * number would lie.
    */
   it("should total the seconds of audio the sheet will ask for", async () => {
@@ -284,12 +284,12 @@ describe("validateSoundDesign", () => {
   /**
    * The boundary this stage inherits from stage 4, pinned so nobody adds a
    * prose parser later. Rule 9 puts the cue sheet in English and the
-   * instruction says so — but the verdict **never reads a prompt**, which is
+   * instruction says so, but the verdict **never reads a prompt**, which is
    * the rule stage 4 established, and it does not read this one either.
    *
    * A check was tried here and taken out. The only cheap test is for the film
-   * language's own letters, and this very sentence — "Delikatny instrumentalny
-   * motyw wieczorny" — is Polish without a single one of them. It would have
+   * language's own letters, and this very sentence, "Delikatny instrumentalny
+   * motyw wieczorny", is Polish without a single one of them. It would have
    * refused honest English quoting a name while letting pasted Polish through,
    * which is worse than the human who reads the sheet before any audio is
    * bought.
@@ -312,7 +312,7 @@ describe("validateSoundDesign", () => {
 
   /**
    * Every sound mode this pipeline offers includes effects, so a sheet with
-   * none is a gap rather than a decision — the same reading stage 9 gives a
+   * none is a gap rather than a decision, the same reading stage 9 gives a
    * narrated episode whose script says nothing.
    */
   it("should refuse a sheet with no effect in it at all", async () => {
@@ -358,7 +358,7 @@ interface Calls {
  * One transport for the three call sites, counting each separately.
  *
  * Counting "calls" alone would be counting two different bills added together,
- * exactly as it would at stage 9 — and here it would be worse, because the two
+ * exactly as it would at stage 9, and here it would be worse, because the two
  * audio call sites are rated per second of what they produce, so a count says
  * nothing at all about what an episode costs.
  */
@@ -699,7 +699,7 @@ describe("checkSoundDesign", () => {
 
   /**
    * `dialogue` is the half stage 10 does not close, and saying so at every
-   * check is the contract's "reported, not enforced" — the same way stage 8
+   * check is the contract's "reported, not enforced", the same way stage 8
    * reports silence and stage 9 reported the missing music.
    */
   it("should report what it still cannot make", async () => {
@@ -713,7 +713,7 @@ describe("checkSoundDesign", () => {
     })) as { data: NarrationStatus | { problems: readonly string[] }; ok: boolean };
 
     // This episode declares `narration`, which stages 9 and 10 close between
-    // them — so nothing about dialogue is reported for it.
+    // them, so nothing about dialogue is reported for it.
     expect(status.ok ? status.data.problems.join(" ") : "").not.toContain("dialog");
   });
 });
@@ -740,7 +740,7 @@ describe("generateMaster", () => {
    * Row 10's gate, kept as declared, and this is the test that proves it is
    * about the **yes** rather than about the file. Stage 10 builds from
    * `episode.mp4` and the stems rather than from `narrated.mp4`, so it never
-   * opens those bytes — but the yes on them is the only evidence anywhere that
+   * opens those bytes, but the yes on them is the only evidence anywhere that
    * the narration lands correctly over this film, and this stage reuses that
    * fact rather than re-establishing it. Here the narrated cut exists and is
    * valid; only the human is missing, and that alone is enough.
@@ -799,7 +799,7 @@ describe("generateMaster", () => {
 
   /**
    * The levels are a knob somebody turns by ear, so they live in their own
-   * file — and changing them must lapse the mix they produced and **nothing
+   * file, and changing them must lapse the mix they produced and **nothing
    * else**, which is the whole reason they are not inside `narration.json`.
    */
   it("should carry the stored levels into the mix and report them", async () => {
@@ -935,8 +935,8 @@ describe("what the full mix hands the engine, and what it refuses", () => {
   }
 
   /**
-   * The whole of decision five, asserted. The picture is `episode.mp4` — not
-   * `narrated.mp4` — and the speech arrives as its own input rather than
+   * The whole of decision five, asserted. The picture is `episode.mp4`, not
+   * `narrated.mp4`, and the speech arrives as its own input rather than
    * already baked into the video. That is what lets the speech be encoded
    * exactly once, and it is the only arrangement in which music can honestly
    * step back under a voice.
@@ -979,7 +979,7 @@ describe("what the full mix hands the engine, and what it refuses", () => {
   /**
    * Stage 8's reading, inherited. A bed that stops a fraction before the
    * picture does is a gap rather than a collision, and refusing a film over it
-   * would be a refusal with no remedy behind it — the clips came back longer
+   * would be a refusal with no remedy behind it, the clips came back longer
    * than the plan ordered and nobody downstream can change that.
    */
   it("should report a bed that stops short of the film rather than refusing it", async () => {
@@ -999,7 +999,7 @@ describe("what the full mix hands the engine, and what it refuses", () => {
  * What a preview says to do next, once there is nothing left to mix.
  *
  * A dry run that points at the command it just told you is finished sends a
- * person back round a loop they have already closed — and here it points past
+ * person back round a loop they have already closed, and here it points past
  * the one thing the pipeline actually needs from them, which is a human
  * listening to the whole film and saying yes.
  */
@@ -1060,7 +1060,7 @@ describe("the next step a preview names", () => {
  * "Approved" is never the raw field on its own: an approval is bound to the
  * bytes it was given for, so a recorded input that has moved since lapses it.
  * A dry run reading only `review.status` would tell somebody their film is
- * accepted while `check` told them the opposite — which is worse than the
+ * accepted while `check` told them the opposite, which is worse than the
  * unhelpful answer it replaced, because it is wrong rather than merely stale.
  */
 describe("what a preview may call accepted", () => {

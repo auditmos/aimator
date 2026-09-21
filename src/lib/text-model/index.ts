@@ -4,7 +4,7 @@
  * It started as transport alone, promoted out of `lib/screenplay` when the shot
  * list became the second stage to make the same call. Stage 4 made it the
  * third, and the thing being copied by then was no longer the request: it was
- * the order of operations — take the lock, archive the prompt, write
+ * the order of operations, take the lock, archive the prompt, write
  * `submitted` before the POST, resume from a saved answer rather than pay
  * twice, publish only what validates. That order *is* the contract, so it lives
  * here rather than in three places that can drift apart.

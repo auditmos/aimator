@@ -22,7 +22,7 @@ interface Approval {
 /**
  * The honesty gate: an artifact is only what the stage recorded if its bytes
  * still hash to the digest written beside it. Editing a result outside the
- * tool is allowed — silently carrying its old provenance forward is not.
+ * tool is allowed, silently carrying its old provenance forward is not.
  */
 export async function verifyOutputs(
   workspace: Workspace,
@@ -44,7 +44,7 @@ export async function verifyOutputs(
       problems.push(`${label}: brakuje ${output.path}`);
     } else if (digest.data.sha256 !== output.sha256) {
       problems.push(
-        `${label}: ${output.path} nie zgadza się z zapisanym hashem — wynik został zmieniony poza narzędziem`
+        `${label}: ${output.path} nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`
       );
     }
   }
@@ -130,7 +130,7 @@ export function withOutputs(
  * A recorded input whose bytes have changed is a lapsed consent, not a broken
  * result: the output is still exactly what the stage produced, it just answers
  * a question that has since been reworded. The same situation as `project.md`
- * edited after stage 0 was approved — and the contract already says that
+ * edited after stage 0 was approved, and the contract already says that
  * counting it as a validation failure would make `approve` refuse in the one
  * place able to repair it, leaving the episode blocked for good.
  *

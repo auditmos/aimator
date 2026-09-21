@@ -18,12 +18,12 @@ import {
  * Almost none of it is this module's own work, and that is the point. What one
  * reference is drawn from, which files those identifiers resolve to on this
  * track, and whether a human has accepted each of them are all answered by
- * `lib/media-prompt` — because stages 6 and 7 ask exactly the same questions
+ * `lib/media-prompt`, because stages 6 and 7 ask exactly the same questions
  * about the same manifest, and a second answer here would be a second opinion.
  *
  * What is left for stage 5 is its own half: which references this invocation is
  * about, and the three obstacles that belong to the command rather than to the
- * plan — an unapproved package, a model nobody chose and a key nobody set.
+ * plan, an unapproved package, a model nobody chose and a key nobody set.
  *
  * This is the first stage whose gate sits **inside its own set of results**.
  * R04 waits for R03 and R06 waits for R01 and R02, on this track, which is why
@@ -62,7 +62,7 @@ export interface Stage5Paths {
 }
 
 export interface Stage5Inputs {
-  /** Why nothing may be drawn at all — an unapproved or unread package. */
+  /** Why nothing may be drawn at all, an unapproved or unread package. */
   readonly gate: readonly string[];
   readonly paths: Stage5Paths;
   readonly plan: SendPlan;
@@ -91,7 +91,7 @@ function resolvePaths(input: Stage5Scope): Result<Stage5Paths> {
 }
 
 /**
- * Everything stage 5 consumes, for the references named — or for all of them.
+ * Everything stage 5 consumes, for the references named, or for all of them.
  *
  * `targets` decides which prompts are composed in full, and the composition
  * happens in the same pass that hashes the attachments. That is deliberate: the
@@ -130,7 +130,7 @@ export async function readStage5Inputs(
  * whose dependencies are accepted and which has not been drawn yet.
  *
  * Stage 2 draws exactly one step at a time, but that was a consequence rather
- * than a principle — its gates leave exactly one artifact runnable. Here the
+ * than a principle, its gates leave exactly one artifact runnable. Here the
  * graph has several independent roots, so copying the consequence instead of
  * the reason would mean refusing work the tool knows is allowed. Safety comes
  * from elsewhere: one record and one `submitted` per image, a series that stops

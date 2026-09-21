@@ -37,7 +37,7 @@ import { type Release, releaseSchema } from "./schema.js";
  *
  * A release's bytes live in two places, split by what they are. **Text is
  * committed**: the episode's source file and each stage's document sit under
- * `site/`, because they are small, they are worth reading in a diff, and the
+ * `site/`, because they are small; they are worth reading in a diff, and the
  * page quotes them rather than linking them. **Media go to R2**: films and
  * stills are streamed, not read, and a bucket is the only copy of them that
  * survives the laptop that made them.

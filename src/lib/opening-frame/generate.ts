@@ -24,7 +24,7 @@ import {
  *
  * It is stage 5's command with the set taken out. One artifact means no target
  * list, no count of runnable roots and no series that has to stay legible after
- * failing halfway — so what stage 5 needed a hundred lines to say carefully,
+ * failing halfway, so what stage 5 needed a hundred lines to say carefully,
  * this says once.
  *
  * The number of paid calls is still reported, and still before the POST rather
@@ -49,7 +49,7 @@ const MODEL_NAME: Record<ImageTrack, string> = {
 
 /** What happened to the frame, in the words a person reads. */
 export interface OpeningFrameOutcome {
-  /** The images this call carried, by path and digest — never the bytes. */
+  /** The images this call carried, by path and digest, never the bytes. */
   readonly attachments: readonly RecordedFile[];
   readonly id: string;
   readonly note: string;
@@ -67,7 +67,7 @@ export interface OpeningFrameReport {
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
-   * How many billed image calls this invocation is about — zero or one. A
+   * How many billed image calls this invocation is about, zero or one. A
    * preview states what it would spend; a real run states what it spent.
    */
   readonly paidCalls: number;
@@ -82,8 +82,8 @@ interface GenerateInput {
   readonly apiKey: string | null;
   /**
    * Accepted for symmetry with every other stage's command, and refused unless
-   * it names this stage's one artifact. It narrows nothing — there is nothing
-   * to narrow — so leaving it out is the normal way to call this.
+   * it names this stage's one artifact. It narrows nothing; there is nothing
+   * to narrow, so leaving it out is the normal way to call this.
    */
   readonly artifacts: readonly string[];
   readonly episodeId: string;
@@ -101,7 +101,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -111,7 +111,7 @@ class LockError extends Error {
 /**
  * Why a paid call may not happen at all. Empty means it may.
  *
- * A dry run never reads the key, so it must not claim the key is missing — it
+ * A dry run never reads the key, so it must not claim the key is missing, it
  * says what it did not check instead. Claiming to have found an absence you
  * never looked for is the same lie as claiming a success you never had.
  */
@@ -120,7 +120,7 @@ function blockers(input: GenerateInput, stage6: Stage6Inputs): readonly string[]
 
   if (input.model === null || input.model === "") {
     problems.push(
-      `brak modelu obrazowego dla toru ${input.track} — wskaż go przez --model <id> albo ${MODEL_NAME[input.track]}`
+      `brak modelu obrazowego dla toru ${input.track}, wskaż go przez --model <id> albo ${MODEL_NAME[input.track]}`
     );
   }
 
@@ -131,7 +131,7 @@ function blockers(input: GenerateInput, stage6: Stage6Inputs): readonly string[]
   return problems;
 }
 
-/** What one call carried, by path and digest — never the bytes. */
+/** What one call carried, by path and digest, never the bytes. */
 function attachmentsOf(artifact: PlannedArtifact): readonly RecordedFile[] {
   return artifact.attachments
     .filter((one) => one.sha256 !== null)
@@ -146,7 +146,7 @@ export async function generateOpeningFrame(
   if (named.length > 0) {
     return err(
       new Stage6BlockedError([
-        `--artifact "${named.join(", ")}" — etap 6 rysuje wyłącznie klatkę otwarcia, czyli ${OPENING_FRAME}`,
+        `--artifact "${named.join(", ")}", etap 6 rysuje wyłącznie klatkę otwarcia, czyli ${OPENING_FRAME}`,
         "referencje należą do etapu 5, a klipy i klatki wejściowe do etapu 7",
       ])
     );
@@ -214,7 +214,7 @@ function idle(input: GenerateInput, stage6: Stage6Inputs): OpeningFrameReport {
     created: [],
     nextStep: waiting
       ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`
-      : `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny — dalej etap 7, klipy`,
+      : `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 7, klipy`,
     paidCalls: 0,
     problems: waiting ? ["klatka czeka na ocenę człowieka"] : [],
     ready: !waiting,
@@ -228,7 +228,7 @@ function idle(input: GenerateInput, stage6: Stage6Inputs): OpeningFrameReport {
  *
  * A finished result outranks a shut gate: the question a preview answers is
  * "what would this command do", and what it would do to an image it is not
- * allowed to redraw is nothing — regardless of what the gate says about an
+ * allowed to redraw is nothing, regardless of what the gate says about an
  * image it would not be drawing anyway.
  */
 function verdictOf(
@@ -252,7 +252,7 @@ function verdictOf(
  * `--dry-run`: the full plan, with no network, no secret and no write.
  *
  * It shows the prompt in full even when the gate is shut, because that is what
- * a preview is for — and it counts the call it would actually make, which is
+ * a preview is for, and it counts the call it would actually make, which is
  * zero when the frame is already drawn. Stage 5 got this wrong once, counting
  * finished results as purchases and overstating the bill on the one command a
  * person runs to find out what something costs.
@@ -287,7 +287,7 @@ function preview(
     problems: [
       ...problems,
       ...(blocked ? stage6.opening.blockers : []),
-      `${KEY_NAME[input.track]} nie był czytany — próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
+      `${KEY_NAME[input.track]} nie był czytany, próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
     ],
     ready: runnable,
     size: stage6.plan.size,
@@ -304,7 +304,7 @@ async function runOne(
   if (target.text === null) {
     return err(
       new Stage6BlockedError([
-        "nie ma czego wysłać — etap 4 nie opublikował promptu klatki otwarcia",
+        "nie ma czego wysłać, etap 4 nie opublikował promptu klatki otwarcia",
       ])
     );
   }

@@ -13,7 +13,7 @@ import type { CastMember, ShotListSettings } from "../project/index.js";
  * recorded in the artifact, so "which prompt produced this" stays answerable
  * from the workspace alone.
  *
- * The instructions carry craft — the scene/shot/clip distinction, coverage,
+ * The instructions carry craft, the scene/shot/clip distinction, coverage,
  * continuity across a cut, on-screen text carried rather than invented. They
  * carry no art direction: the medium, palette, styling and opening composition
  * come from `project.md`, and the plan's shape comes from the screenplay.
@@ -203,11 +203,11 @@ export function buildPrompt(input: PromptInput): string {
 # Production settings
 
 ${serialize(settings)}
-# Project rules — original source material
+# Project rules, original source material
 
 ${input.rules}
 
-# Screenplay — the approved source for this plan
+# Screenplay, the approved source for this plan
 
 ${input.screenplay}`;
 }

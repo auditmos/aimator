@@ -3,8 +3,8 @@ import { err, ok, type Result } from "../result.js";
 /**
  * Internal to the voice-model module: the paid call, and nothing else.
  *
- * `fetch` is injected so every rule around the call — no retry, the key never
- * reaching disk, a refusal being an error rather than a blank line — is
+ * `fetch` is injected so every rule around the call, no retry, the key never
+ * reaching disk, a refusal being an error rather than a blank line, is
  * testable without spending anything.
  *
  * This provider differs from the other three in one way that shapes the whole
@@ -15,7 +15,7 @@ import { err, ok, type Result } from "../result.js";
  *
  * The output format is a constant of the call site rather than a decision,
  * exactly as an endpoint is. It is WAV because the verdict on a bought line has
- * to be readable offline, with no decoder — see `validate.ts`.
+ * to be readable offline, with no decoder, see `validate.ts`.
  */
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech";
@@ -38,7 +38,7 @@ const MAX_BYTES = 50_000_000;
  * The shape lives here because it is true of any utterance; *which* numbers
  * this series uses is a decision the stage stores and hands over. Every field
  * carries the provider's own documented default, so an undecided project sends
- * exactly what it would have sent anyway — but it sends it **explicitly**,
+ * exactly what it would have sent anyway, but it sends it **explicitly**,
  * which is the point. A request archive that omits the settings cannot answer
  * what produced these bytes, and that is the question the archive exists for.
  */
@@ -58,8 +58,8 @@ export interface SpeechDelivery {
  *
  * Not billed as speech and never rendered: the provider takes it as context so
  * a sentence bought on its own is read as part of a paragraph rather than as an
- * isolated announcement. It is **derived** from the approved script — the
- * neighbouring lines are the neighbouring lines — which is why nothing stores
+ * isolated announcement. It is **derived** from the approved script, the
+ * neighbouring lines are the neighbouring lines, which is why nothing stores
  * it. `null` means this line has no neighbour on that side.
  */
 export interface SpeechContext {
@@ -117,7 +117,7 @@ class SpeechCallError extends Error {
  *
  * The voice comes from the stage because it comes from `project.json`: which
  * voice reads the series is casting, and casting is not a fact about how bytes
- * travel. What this module decides is the part true of any line — which
+ * travel. What this module decides is the part true of any line, which
  * endpoint, which container, and that there is exactly one call per utterance.
  */
 export function buildRequest(input: {
@@ -197,7 +197,7 @@ export async function callSpeech(input: {
     return err(
       new SpeechCallError(
         null,
-        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas) — nie ponawiam; sprawdź, czy próba nie została rozliczona",
+        "wywołanie API nie doszło do skutku (sieć albo przekroczony czas), nie ponawiam; sprawdź, czy próba nie została rozliczona",
         { cause }
       )
     );
@@ -244,7 +244,7 @@ export function httpFailure(transport: SpeechTransport): Error | null {
 
   return new SpeechCallError(
     transport.httpStatus,
-    `API zwróciło HTTP ${transport.httpStatus} — nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body ?? "")}`
+    `API zwróciło HTTP ${transport.httpStatus}, nie ponawiam wywołania. Odpowiedź dostawcy: ${providerMessage(transport.body ?? "")}`
   );
 }
 

@@ -22,7 +22,7 @@ export const sha256Schema = z.string().regex(SHA256, "expected a lowercase sha25
  * backwards for a moment and is right. Stage 9 was named before anyone knew
  * there would be a row below it; by the time this one arrived, the name that
  * described it was taken. Renaming stage 9's would have invalidated every
- * `soundtrack.stage.json` already on disk — a rename that costs a human their
+ * `soundtrack.stage.json` already on disk, a rename that costs a human their
  * recorded approvals to fix a word. So stage 10 takes the name the film
  * industry uses for exactly what it does, music and effects, and the two do
  * not collide.
@@ -58,7 +58,7 @@ const reviewSchema = z.strictObject({
  *
  * `local` is the third and it arrived with stage 8, which is neither: nobody
  * typed a cut and no model rendered one. It exists because this record answers
- * one question — what would have to run again to get these bytes — and for a
+ * one question, what would have to run again to get these bytes, and for a
  * locally muxed file the honest answer is the engine and its version. Two
  * releases of a muxer do not necessarily write the same container out of the
  * same clips, and a record saying `manual` would make that unanswerable from

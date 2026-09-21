@@ -55,8 +55,8 @@ const HERO = "hero:";
 const OPENING = "opening-frame";
 const ENTRY = "entry:";
 /**
- * The frame a clip ends on. Stage 4 never writes this id — it has no word for a
- * frame that does not exist until a clip has been rendered and accepted — so it
+ * The frame a clip ends on. Stage 4 never writes this id; it has no word for a
+ * frame that does not exist until a clip has been rendered and accepted, so it
  * is minted here, by the sender, and printed in the attachment list like any
  * other. Rule 8 binds the planning stage to ids the sender will list; it does
  * not stop the sender from carrying one the planner could not have known.
@@ -106,7 +106,7 @@ export interface SendPlan {
   readonly aspectRatio: string;
   /** How many references this track carries in one request. */
   readonly limit: number;
-  /** Why nothing here may be sent at all — an unapproved or unread package. */
+  /** Why nothing here may be sent at all, an unapproved or unread package. */
   readonly problems: readonly string[];
   /**
    * Which version of this composer wrapped the direction.
@@ -290,8 +290,8 @@ function stateOf(
  * The frame a clip ended on, read from that clip's own record.
  *
  * Asked of the record rather than built from a name, because the still is
- * published in whatever format the video provider handed back — a JPEG, in
- * practice — and the record is the one place that says which file it actually
+ * published in whatever format the video provider handed back, a JPEG, in
+ * practice, and the record is the one place that says which file it actually
  * is. A path guessed from an extension would report a frame that exists as
  * missing, which is the worst kind of gate: one that blocks over a spelling.
  *
@@ -312,7 +312,7 @@ function endFrameOf(
   return {
     path: recorded === undefined ? absent : workspacePath(scope.input.workspace, recorded.path),
     record,
-    role: `the accepted final frame of ${clipId} — reproduce this instant exactly, advancing nothing`,
+    role: `the accepted final frame of ${clipId}, reproduce this instant exactly, advancing nothing`,
   };
 }
 
@@ -327,7 +327,7 @@ function locate(
     return ok({
       path: paths.openingFrameImage,
       record: scope.stages.openingFrame?.artifacts[OPENING],
-      role: "the accepted opening frame of this episode — the exact instant this clip starts on",
+      role: "the accepted opening frame of this episode, the exact instant this clip starts on",
     });
   }
 
@@ -339,7 +339,7 @@ function locate(
       ? ok({
           path: file.data,
           record: scope.stages.clips?.artifacts[id],
-          role: `the accepted entry frame of ${clipId} — the exact instant this clip starts on`,
+          role: `the accepted entry frame of ${clipId}, the exact instant this clip starts on`,
         })
       : file;
   }
@@ -429,7 +429,7 @@ function attachmentBlocker(scope: Scope, attachment: Attachment): string | null 
   if (attachment.id.startsWith(HERO)) {
     const characterId = attachment.id.slice(HERO.length);
 
-    return `${where}: obraz postaci nie jest zatwierdzony na torze ${scope.input.track} — aimator check ${scope.input.projectId} ${characterId} --stage character --track ${scope.input.track}`;
+    return `${where}: obraz postaci nie jest zatwierdzony na torze ${scope.input.track}, aimator check ${scope.input.projectId} ${characterId} --stage character --track ${scope.input.track}`;
   }
 
   if (attachment.state === "absent") {
@@ -437,14 +437,14 @@ function attachmentBlocker(scope: Scope, attachment: Attachment): string | null 
   }
 
   return attachment.state === "changed"
-    ? `${where}: bajty nie zgadzają się z zapisanym hashem — plik zmieniono poza narzędziem`
-    : `${where}: powstał, ale nikt go jeszcze nie przyjął — oceń go i zatwierdź`;
+    ? `${where}: bajty nie zgadzają się z zapisanym hashem, plik zmieniono poza narzędziem`
+    : `${where}: powstał, ale nikt go jeszcze nie przyjął, oceń go i zatwierdź`;
 }
 
 /** What is missing, in the words of the stage that has to produce it. */
 function missing(id: string, track: ImageTrack): string {
   if (id === OPENING) {
-    return `klatka otwarcia nie powstała na torze ${track} — to etap 6`;
+    return `klatka otwarcia nie powstała na torze ${track}, to etap 6`;
   }
 
   if (id.startsWith(ENTRY)) {
@@ -452,7 +452,7 @@ function missing(id: string, track: ImageTrack): string {
   }
 
   return id.startsWith(END)
-    ? `końcówka klipu ${id.slice(END.length)} jeszcze nie istnieje na torze ${track} — powstaje razem z tym klipem`
+    ? `końcówka klipu ${id.slice(END.length)} jeszcze nie istnieje na torze ${track}, powstaje razem z tym klipem`
     : `jeszcze nie powstał na torze ${track}`;
 }
 
@@ -512,7 +512,7 @@ function enumerate(scope: Scope): readonly Artifact[] {
       name: clip.id,
       // A video request carries the frame it starts on and nothing else: the
       // provider treats a pinned first frame and reference images as mutually
-      // exclusive modes. The clip's own reference list is not lost — it is what
+      // exclusive modes. The clip's own reference list is not lost; it is what
       // the entry frame below was drawn from, which is where those images do
       // their work.
       referenceIds: [index === 0 ? OPENING : `${ENTRY}${clip.id}`],
@@ -528,7 +528,7 @@ function enumerate(scope: Scope): readonly Artifact[] {
     }
 
     // What the shot list says this clip is seeded from decides what its entry
-    // frame is drawn from — not whether it is drawn. A clip that continues the
+    // frame is drawn from, not whether it is drawn. A clip that continues the
     // action starts from the accepted end of the one before it, so that frame
     // leads the attachment list and the direction says to advance nothing; a
     // clip that opens a new scene continues nothing and carries only its own
@@ -601,7 +601,7 @@ async function planOne(
     .filter((problem): problem is string => problem !== null);
 
   if (direction === null) {
-    blockers.push(`brakuje ${relative} — etap 4 nie opublikował promptu dla ${artifact.name}`);
+    blockers.push(`brakuje ${relative}, etap 4 nie opublikował promptu dla ${artifact.name}`);
   }
 
   // The limit is an image track's: how many references one drawing request
@@ -609,7 +609,7 @@ async function planOne(
   // nothing here for that limit to be about.
   if (artifact.kind !== "clip" && attachments.length > scope.limit) {
     blockers.push(
-      `${artifact.name}: ${attachments.length} referencji, a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit} — zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
+      `${artifact.name}: ${attachments.length} referencji, a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}, zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
     );
   }
 
@@ -710,7 +710,7 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
   if (status.data.verdict === null) {
     return err(
       new SendPlanError(
-        `odcinek "${input.episodeId}": pakiet promptów nie jest gotowy — etapy obrazowe nie mają planu`,
+        `odcinek "${input.episodeId}": pakiet promptów nie jest gotowy, etapy obrazowe nie mają planu`,
         status.data.problems
       )
     );
@@ -751,7 +751,7 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
   if (unknown.length > 0) {
     return err(
       new SendPlanError(
-        `--artifact "${unknown.join(", ")}" — ten pakiet planuje: ${[...known].join(", ")}`
+        `--artifact "${unknown.join(", ")}", ten pakiet planuje: ${[...known].join(", ")}`
       )
     );
   }

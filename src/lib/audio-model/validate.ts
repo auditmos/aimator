@@ -4,7 +4,7 @@ import { err, ok, type Result } from "../result.js";
  * Internal to the audio-model module: the verdict on bought music and effects,
  * and the three lengths that belong to any cue rather than to one stage.
  *
- * Pure and offline, like every other verdict here and for the same reason — it
+ * Pure and offline, like every other verdict here and for the same reason, it
  * decides whether bytes somebody has already paid for may be published, so it
  * must never need a network, a secret or a decoder of its own.
  *
@@ -13,21 +13,21 @@ import { err, ok, type Result } from "../result.js";
  * channels and the size of the data block in twenty-four bytes, and the length
  * of a line is arithmetic. That option does not exist here. The music endpoint
  * and the sound-effect endpoint document exactly one family of containers
- * between them — MP3, raw PCM, µ-law, A-law and Opus — and no WAV at all. Raw
+ * between them, MP3, raw PCM, µ-law, A-law and Opus, and no WAV at all. Raw
  * PCM would be the lossless choice, but it carries **no header**: the sample
  * rate would be known from the format asked for, the channel count would not,
  * and a wrong guess states a length twice or half the truth without a word.
  *
  * So the verdict walks. Stage 9's objection to MP3 was that its length is
  * known only to whoever counts frames "against a table of bitrates, hoping the
- * stream is constant" — and the answer is to not hope: every frame header
+ * stream is constant", and the answer is to not hope: every frame header
  * declares its own bitrate and its own rate, so a variable stream is read as
  * exactly as a constant one. That is the same trade stage 7 made reading MP4
  * boxes rather than calling a decoder, and it costs a hundred lines rather
  * than twenty-four bytes. Stating the cost is the point; it is not free.
  *
  * Structure only. Whether the music is any good is a separate question no byte
- * inspection gets to answer — and nothing here is compared against what was
+ * inspection gets to answer, and nothing here is compared against what was
  * ordered, because what to do about a bed that came back short is the laying
  * stage's decision, not this one's.
  */
@@ -49,7 +49,7 @@ const MPEG25_RATES = [11_025, 12_000, 8000, 0];
  *
  * `music_length_ms` takes 3000 to 600000 and `duration_seconds` on an effect
  * takes 0.5 to 30. They are constants of the call site exactly as an endpoint
- * is — nobody in this pipeline decided them and nobody here may move them.
+ * is, nobody in this pipeline decided them and nobody here may move them.
  */
 const MUSIC = { max: 600, min: 3 } as const;
 const EFFECT = { max: 30, min: 0.5 } as const;
@@ -97,7 +97,7 @@ function bounded(
   return err(
     new CueLengthError(
       seconds,
-      `${what} trwa ${seconds}s, a dostawca komponuje od ${limit.min}s do ${limit.max}s — ${remedy}`
+      `${what} trwa ${seconds}s, a dostawca komponuje od ${limit.min}s do ${limit.max}s, ${remedy}`
     )
   );
 }
@@ -108,7 +108,7 @@ export function musicLength(seconds: number): Result<number> {
     seconds,
     MUSIC,
     "podkład",
-    "popraw arkusz cue, a jeśli to długość odcinka jest poza zakresem — etap 0"
+    "popraw arkusz cue, a jeśli to długość odcinka jest poza zakresem, etap 0"
   );
 }
 
@@ -169,7 +169,7 @@ function tagOffset(mpeg1: boolean, mono: boolean): number {
  *
  * Every field that decides a length is read out of the header itself, which is
  * what makes the walk exact. A reserved value in any of them means this is not
- * a frame — a sync pattern happens by chance inside audio data often enough
+ * a frame, a sync pattern happens by chance inside audio data often enough
  * that the rest of the header is the only thing that tells them apart.
  */
 function readFrame(bytes: Buffer, at: number): Frame | null {
@@ -252,7 +252,7 @@ function skipTag(bytes: Buffer): number {
  *
  * Nothing is compared against what was ordered. The provider may hand back a
  * little more or a little less than the length asked for, and what to do about
- * that is the laying stage's decision — a bed that falls short of the film is
+ * that is the laying stage's decision, a bed that falls short of the film is
  * a gap to be reported, an effect that overruns its shot is a refusal. Deciding
  * either here would put one answer where the contract wants two.
  */
@@ -305,7 +305,7 @@ export function validateAudio(bytes: Buffer): Result<AudioVerdict> {
     return err(
       new AudioError(
         "empty",
-        "odpowiedź nie niesie ani jednej ramki MP3 — zachowano ją do sprawdzenia; zwykle jest to komunikat błędu dostawcy"
+        "odpowiedź nie niesie ani jednej ramki MP3, zachowano ją do sprawdzenia; zwykle jest to komunikat błędu dostawcy"
       )
     );
   }

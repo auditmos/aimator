@@ -22,8 +22,8 @@ import { approveOpeningFrame, checkOpeningFrame, generateOpeningFrame } from "./
  * It is the first stage whose gate reads another stage's per-track results: the
  * opening frame waits for the references its manifest entry names, accepted on
  * this track and no other. It is also the first with exactly one artifact, so
- * the flags stage 5 needed to disambiguate a set — `--artifact` on a regenerate,
- * on an approval — have nothing here to disambiguate, and their absence is a
+ * the flags stage 5 needed to disambiguate a set, `--artifact` on a regenerate,
+ * on an approval, have nothing here to disambiguate, and their absence is a
  * tested promise rather than an oversight.
  *
  * Stages 0 to 4 come from `src/test/fixture`, built through their own entries.
@@ -41,7 +41,7 @@ let workspace: Workspace = { root: "" };
 
 /**
  * The opening frame depends on `hero:ewa` and `R01`, so stage 6's gate has one
- * thing to wait for that stage 5 had to draw first — which is the whole point
+ * thing to wait for that stage 5 had to draw first, which is the whole point
  * of the stage's position in the pipeline.
  */
 function answer(): string {
@@ -66,7 +66,7 @@ function answer(): string {
         id: "R01",
         kind: "location",
         prompt: "Salon z niską kanapą.",
-        subject: "Living room — evening",
+        subject: "Living room, evening",
       },
     ],
     review: "Do rozstrzygnięcia: skala alpaki przy twarzy taty.",
@@ -353,7 +353,7 @@ describe("checkOpeningFrame", () => {
 });
 
 describe("approveOpeningFrame", () => {
-  /** One artifact, so the command itself is the naming — no flag to repeat. */
+  /** One artifact, so the command itself is the naming, no flag to repeat. */
   it("should accept the frame without an --artifact flag", async () => {
     await upstream();
     await makeReferences("gpt-image");

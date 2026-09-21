@@ -23,7 +23,7 @@ import { approvePromptPackage, checkPromptPackage, generatePromptPackage } from 
  * never implied.
  *
  * The gate on the canonical images is what makes this stage different from the
- * two text stages before it, so it is exercised per track — one track ready is
+ * two text stages before it, so it is exercised per track, one track ready is
  * deliberately not enough for an artifact both tracks share.
  */
 
@@ -208,7 +208,7 @@ async function generate(
  * An accepted canonical image for one character on one track, written directly.
  *
  * Stage 2 is exercised by its own tests; what stage 4 needs from it is only the
- * fact its gate reads — a finished, accepted `hero.png` whose bytes still hash
+ * fact its gate reads, a finished, accepted `hero.png` whose bytes still hash
  * to what the record says.
  */
 async function makeHero(characterId: string, track: string, approved = true): Promise<void> {
@@ -483,7 +483,7 @@ describe("generatePromptPackage", () => {
     const entry = await readFile(join(episodeDir(), "prompts", "entry-frames", "C02.md"), "utf8");
 
     expect(opening.split("\n")[0]).toBe("# Opening frame");
-    expect(entry.split("\n")[0]).toBe("# C02 — entry frame");
+    expect(entry.split("\n")[0]).toBe("# C02, entry frame");
   });
 
   it("should keep the prose out of the manifest and the wiring out of the prompts", async () => {

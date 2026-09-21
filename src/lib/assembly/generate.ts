@@ -33,7 +33,7 @@ import {
  * and the two differences that follow from that are the whole of what is new.
  *
  * **`--regenerate` guards an approval, not a wallet.** Everywhere upstream the
- * flag exists because a new attempt is a new charge. Here nothing is bought —
+ * flag exists because a new attempt is a new charge. Here nothing is bought,
  * but a finished cut carries a human's yes, and silently overwriting it would
  * withdraw that yes on nobody's authority. "Nic nie ponawia się samo" holds
  * even when repeating is free.
@@ -55,7 +55,7 @@ export interface CutOutcome {
 }
 
 export interface AssemblyReport {
-  /** The sum of the clips as they actually came back — what the cut runs. */
+  /** The sum of the clips as they actually came back, what the cut runs. */
   readonly actualSeconds: number;
   /** Whether every clip the plan names is accepted on this track. */
   readonly approved: boolean;
@@ -74,7 +74,7 @@ export interface AssemblyReport {
 }
 
 interface GenerateInput {
-  /** Narrows nothing — there is one artifact — but a wrong value is refused. */
+  /** Narrows nothing; there is one artifact, but a wrong value is refused. */
   readonly artifacts: readonly string[];
   readonly episodeId: string;
   readonly mode: WriteMode;
@@ -91,7 +91,7 @@ class LockError extends Error {
 
   constructor(path: string) {
     super(
-      `inna próba trzyma blokadę ${path} — po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
+      `inna próba trzyma blokadę ${path}, po awarii upewnij się, że poprzedni proces nie działa, zanim usuniesz ten plik`
     );
     this.name = "LockError";
     this.path = path;
@@ -104,7 +104,7 @@ export async function generateAssembly(input: GenerateInput): Promise<Result<Ass
   if (named.length > 0) {
     return err(
       new Stage8BlockedError([
-        `--artifact "${named.join(", ")}" — etap 8 montuje jeden artefakt na tor: ${EPISODE_CUT}`,
+        `--artifact "${named.join(", ")}", etap 8 montuje jeden artefakt na tor: ${EPISODE_CUT}`,
         "klipy należą do etapu 7; tutaj nie ma czego zawężać",
       ])
     );
@@ -222,7 +222,7 @@ function idle(input: GenerateInput, stage8: Stage8Inputs, engine: string | null)
  */
 function silence(stage8: Stage8Inputs): readonly string[] {
   return [
-    `odcinek deklaruje audio: ${stage8.audio}, a żaden etap nie produkuje ścieżki dźwiękowej — episode.mp4 jest niemy`,
+    `odcinek deklaruje audio: ${stage8.audio}, a żaden etap nie produkuje ścieżki dźwiękowej, episode.mp4 jest niemy`,
   ];
 }
 
@@ -248,7 +248,7 @@ function arithmetic(stage8: Stage8Inputs): {
  *
  * Stated, never corrected. Stage 7 publishes a clip at the length it arrived
  * rather than trimming it to the order, and those are the bytes somebody
- * accepted — so trimming them here would put a film together out of frames
+ * accepted, so trimming them here would put a film together out of frames
  * nobody approved.
  */
 function drift(stage8: Stage8Inputs): readonly string[] {
@@ -257,7 +257,7 @@ function drift(stage8: Stage8Inputs): readonly string[] {
   return difference === 0
     ? []
     : [
-        `dryf długości: plan ${stage8.plannedSeconds}s, klipy ${stage8.actualSeconds}s, różnica ${difference > 0 ? "+" : ""}${difference}s — sklejono to, co wróciło, nic nie przycięto`,
+        `dryf długości: plan ${stage8.plannedSeconds}s, klipy ${stage8.actualSeconds}s, różnica ${difference > 0 ? "+" : ""}${difference}s, sklejono to, co wróciło, nic nie przycięto`,
       ];
 }
 

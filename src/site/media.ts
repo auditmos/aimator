@@ -8,9 +8,9 @@ import { promisify } from "node:util";
  * wrangler spells an upload stays in here, so a bucket rename or a move to the
  * S3 API is one file's problem.
  *
- * It holds media and nothing else. A release's text — the episode's source
- * file and each stage's document — is committed to the repository instead,
- * because it is small, it is worth reading in a diff, and the page quotes it
+ * It holds media and nothing else. A release's text, the episode's source
+ * file and each stage's document, is committed to the repository instead,
+ * because it is small; it is worth reading in a diff, and the page quotes it
  * rather than linking it. The split is the point: git keeps what a person
  * reads, R2 keeps what a browser streams.
  */
@@ -58,8 +58,8 @@ function contentType(file: string): string {
  * Deliberately unconditional: the caller has already checked the bytes against
  * the sha256 the registry recorded, so re-uploading can only ever write the
  * same file again. Skipping what is already there would need a HEAD, which
- * wrangler does not offer, and the alternative — a second list of what has been
- * published — is the drift rule 7 exists to prevent.
+ * wrangler does not offer, and the alternative, a second list of what has been
+ * published, is the drift rule 7 exists to prevent.
  */
 export async function putMedia(version: string, file: string, path: string): Promise<void> {
   const key = mediaKey(version, file);

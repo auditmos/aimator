@@ -29,13 +29,13 @@ import {
  * Two things are this stage's own and everything else is borrowed.
  *
  * **The edit plan is derived, never stored.** The contract named an
- * `edit-plan.json` as stage 8's input, and no stage ever wrote one — because
+ * `edit-plan.json` as stage 8's input, and no stage ever wrote one, because
  * every field it could hold is already in the approved shot list: the order of
  * the clips, their absolute seconds, and the fact that they tile the episode
  * without a gap. Writing it out would be `shot-list.json` under another name,
  * and stages 3 and 4 both refused that for the same reason: two files holding
  * one truth drift at the first hand correction, and the one a human corrects is
- * the other one. Rule 7 is satisfied rather than bent — a hard cut between
+ * the other one. Rule 7 is satisfied rather than bent, a hard cut between
  * clips that tile without a gap is what the plan *says*, not a default standing
  * in for an answer nobody gave. A dissolve or a re-ordering would be the new
  * decision, and there is no field that carries one, so this stage does not make
@@ -56,7 +56,7 @@ export const STAGE = "assembly";
  * The artifact key, and the only value `--artifact` accepts.
  *
  * `episode` rather than `assembly`, because the key names the thing produced
- * and not the producing of it — the same reading that makes the file
+ * and not the producing of it, the same reading that makes the file
  * `episode.mp4` and the state file `assembly.stage.json`.
  */
 export const EPISODE_CUT = "episode";
@@ -100,7 +100,7 @@ export interface ClipCut {
 }
 
 export interface Stage8Inputs {
-  /** The sum of what actually came back — what the cut will run. */
+  /** The sum of what actually came back, what the cut will run. */
   readonly actualSeconds: number;
   readonly aspectRatio: string;
   /**
@@ -109,7 +109,7 @@ export interface Stage8Inputs {
    * reported rather than to be acted on.
    */
   readonly audio: string;
-  /** The clips in the plan's order — the whole of the edit decision list. */
+  /** The clips in the plan's order, the whole of the edit decision list. */
   readonly cut: readonly ClipCut[];
   /** Why nothing may be cut at all: an unapproved plan, or a clip nobody accepted. */
   readonly gate: readonly string[];
@@ -144,7 +144,7 @@ function resolvePaths(input: Stage8Scope): Result<Stage8Paths> {
  * One clip, read once: its digest, its own duration, and whether it may be cut.
  *
  * The duration comes from `lib/video-model`'s verdict rather than from a stored
- * number, because no stage stores one — and the verdict is the right question
+ * number, because no stage stores one, and the verdict is the right question
  * anyway: it says both how long this file runs and whether it is still the clip
  * the plan bought. Reading the bytes is what a digest needs regardless, so the
  * two answers cost one read.
@@ -174,7 +174,7 @@ async function readClip(
     return {
       ...base,
       actualSeconds: null,
-      blockers: [`${plan.id}: nie ma klipu na torze ${input.track} — etap 7 go nie ukończył`],
+      blockers: [`${plan.id}: nie ma klipu na torze ${input.track}, etap 7 go nie ukończył`],
       recorded: null,
     };
   }
@@ -219,8 +219,8 @@ async function readClip(
  * Everything stage 8 consumes, and every reason it may not run.
  *
  * It does not read the prompt package: the cut carries no instruction to any
- * model, so a hash of bytes nobody sent would describe a question nobody asked
- * — the same reason stage 3 does not record `source.md`.
+ * model, so a hash of bytes nobody sent would describe a question nobody asked,
+ * the same reason stage 3 does not record `source.md`.
  */
 export async function readStage8Inputs(input: Stage8Scope): Promise<Result<Stage8Inputs>> {
   const paths = resolvePaths(input);
@@ -291,7 +291,7 @@ export async function readStage8Inputs(input: Stage8Scope): Promise<Result<Stage
       // One gate covers stage 0 arithmetically, exactly as stage 3's does: the
       // project files are recorded inputs of the shot list, so editing one
       // revokes its approval and this refuses without a rule of its own.
-      ...(plan.data.approved ? [] : ["lista ujęć nie jest zatwierdzona — bez niej nie ma montażu"]),
+      ...(plan.data.approved ? [] : ["lista ujęć nie jest zatwierdzona, bez niej nie ma montażu"]),
       ...cut.flatMap((one) => one.blockers),
     ],
     inputs: [
@@ -306,7 +306,7 @@ export async function readStage8Inputs(input: Stage8Scope): Promise<Result<Stage
   });
 }
 
-/** Seconds, to the hundredth — the precision a movie header actually carries. */
+/** Seconds, to the hundredth, the precision a movie header actually carries. */
 export function round(seconds: number): number {
   return Math.round(seconds * 100) / 100;
 }

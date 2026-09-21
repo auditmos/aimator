@@ -1,10 +1,10 @@
 /**
- * Stage 4 — prompt package. The first stage that joins the text side of the
+ * Stage 4, prompt package. The first stage that joins the text side of the
  * pipeline to the image side.
  *
  * It consumes the approved `shot-list.md` plus the stage-0 decisions every
  * stage reads, and it refuses to spend until every character the shot list puts
- * on screen has an accepted `hero.png` — **on both image tracks**. That gate is
+ * on screen has an accepted `hero.png`, **on both image tracks**. That gate is
  * the new thing here: a text stage waiting on an image, and a per-track
  * condition on an artifact both tracks share.
  *
@@ -14,7 +14,7 @@
  * `runs/<runId>/`.
  *
  * Two files, two kinds of truth, no overlap. `prompts/**` holds one file per
- * future paid call, carrying only that call's creative direction — it is what a
+ * future paid call, carrying only that call's creative direction; it is what a
  * human rereads and what stages 5 to 7 send. `prompt-package.json` holds the
  * wiring: identifiers, kinds, one-line subjects, the dependency graph and the
  * reference assignments, because a graph written in prose is a graph nobody can

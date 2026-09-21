@@ -52,7 +52,7 @@ import {
  * The order of operations here is the whole contract of a billed job, and it
  * differs from an image's in one place that matters. `submitted` lands on disk
  * before the POST, as everywhere; but the POST answers with an id rather than
- * with the work, so that id is written the moment it exists — before the first
+ * with the work, so that id is written the moment it exists, before the first
  * poll, before anything can go wrong. An attempt that dies mid-render is then
  * an attempt that can be finished by asking, instead of one that has to be
  * bought again.
@@ -81,7 +81,7 @@ interface VideoCall {
    * the provider sent, it decides what the still that came with the clip is and
    * what to call it. A mistake there shows up *after* publication, on a record
    * that already says `completed`, and the contract is explicit that a bought
-   * answer must stay re-derivable for free — otherwise a bug in this file would
+   * answer must stay re-derivable for free, otherwise a bug in this file would
    * be billable at the price of a video.
    */
   readonly republish?: boolean;
@@ -223,7 +223,7 @@ async function resume(
   record: StageFile["artifacts"][string]
 ): Promise<Result<VideoAttempt> | null> {
   // A finished clip is never bought a second time, whatever the caller asked
-  // for. The stage above already declines to ask — but "nothing is billed
+  // for. The stage above already declines to ask, but "nothing is billed
   // twice" is this module's promise, not a courtesy it relies on upstream.
   if (record.status === "completed") {
     return err(
@@ -246,7 +246,7 @@ async function resume(
   if (record.jobId === null) {
     return err(
       artifact.blocked([
-        `próba ${record.runId} zapisała status "submitted" bez identyfikatora zadania — mogła zostać rozliczona`,
+        `próba ${record.runId} zapisała status "submitted" bez identyfikatora zadania, mogła zostać rozliczona`,
         `sprawdź ${toWorkspacePath(call.workspace.root, run.root)}; nową płatną próbę zaczyna wyłącznie --regenerate`,
       ])
     );
@@ -263,7 +263,7 @@ async function resume(
     return err(
       artifact.blocked([
         ...changed.map((entry) => `${entry.path}: zmienił się od czasu próby ${record.runId}`),
-        "uruchomione zadanie opisuje inne wejście — nową płatną próbę zaczyna --regenerate",
+        "uruchomione zadanie opisuje inne wejście, nową płatną próbę zaczyna --regenerate",
       ])
     );
   }
@@ -296,7 +296,7 @@ async function resume(
  *
  * It keeps the attempt's `runId` and `producer`, because this is that same
  * attempt: what changed is on this side of the wire. The review goes back to
- * pending, as it does after any write of a result — the files are not the ones
+ * pending, as it does after any write of a result, the files are not the ones
  * somebody accepted, even when the difference is a name.
  */
 async function fromArchive(
@@ -311,7 +311,7 @@ async function fromArchive(
   if (!saved.ok) {
     return err(
       artifact.blocked([
-        `${artifact.key}: próba ${record.runId} nie zachowała odpowiedzi — nie ma czego opublikować ponownie`,
+        `${artifact.key}: próba ${record.runId} nie zachowała odpowiedzi, nie ma czego opublikować ponownie`,
         "wynik da się odzyskać tylko z archiwum, a to archiwum go nie ma",
       ])
     );
@@ -375,7 +375,7 @@ async function attempt(
   }
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
-  // then visibly an attempt that may already have been billed — for this one
+  // then visibly an attempt that may already have been billed, for this one
   // clip, not for the series around it.
   const submitted = withRecord(
     stage,
@@ -433,7 +433,7 @@ async function attempt(
     return err(
       artifact.blocked([
         `${artifact.key}: ${finished.data.failed}`,
-        "nie zostało wyrenderowane ani rozliczone — powtórz polecenie, --regenerate nie jest potrzebne",
+        "nie zostało wyrenderowane ani rozliczone, powtórz polecenie, --regenerate nie jest potrzebne",
       ])
     );
   }
@@ -457,7 +457,7 @@ interface Succeeded {
  * How a job ended: with a result, or with the provider's own account of why
  * not. A discriminated pair rather than a nullable result, because the two are
  * acted on differently and the provider's words are the useful half of a
- * failure — "the job failed" is advice nobody can follow.
+ * failure, "the job failed" is advice nobody can follow.
  */
 type Ending = { readonly failed: string } | { readonly done: Succeeded };
 
@@ -466,7 +466,7 @@ type Ending = { readonly failed: string } | { readonly done: Succeeded };
  *
  * `null` means the provider abandoned the job: not rendered, not billed, and
  * therefore safe to start again. A timeout is not an error either in any sense
- * that costs money — the record keeps its job id, so the next run of the same
+ * that costs money, the record keeps its job id, so the next run of the same
  * command picks the clip up where this one left it.
  */
 async function awaitJob(
@@ -514,7 +514,7 @@ async function awaitJob(
       return err(
         artifact.blocked([
           `${artifact.key}: zadanie ${jobId} nadal się renderuje (status "${task.data.status}") po ${Math.round(POLL_TIMEOUT_MS / 60_000)} minutach`,
-          "jest już opłacone i zapisane — powtórz to samo polecenie, żeby je odebrać; --regenerate kupiłoby drugie",
+          "jest już opłacone i zapisane, powtórz to samo polecenie, żeby je odebrać; --regenerate kupiłoby drugie",
         ])
       );
     }
@@ -660,7 +660,7 @@ async function publish(
 
     return err(
       new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)} — to błąd formatu wyniku, nie powód do --regenerate.`
+        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)}, to błąd formatu wyniku, nie powód do --regenerate.`
       )
     );
   }
@@ -738,7 +738,7 @@ function note(verdict: VideoVerdict, endFrame: boolean, resumed: boolean): strin
   const prefix = resumed ? "odebrano opłacone zadanie, bez drugiej opłaty; " : "";
   const frame = endFrame
     ? ""
-    : " — bez końcówki: dostawca nie zwrócił ostatniej klatki, więc klip kontynuujący nie ma z czego wyjść";
+    : ", bez końcówki: dostawca nie zwrócił ostatniej klatki, więc klip kontynuujący nie ma z czego wyjść";
 
   return `${prefix}${verdict.width}x${verdict.height}, ${verdict.seconds}s${frame}`;
 }
