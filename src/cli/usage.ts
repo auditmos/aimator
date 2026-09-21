@@ -12,6 +12,7 @@ import { USAGE as REFERENCES } from "./stages/references.js";
 import { USAGE as SCREENPLAY } from "./stages/screenplay.js";
 import { USAGE as SHOT_LIST } from "./stages/shot-list.js";
 import { USAGE as SOUND_DESIGN } from "./stages/sound-design.js";
+import { USAGE as STATUS } from "./status.js";
 
 /** The glossary of the flags several stages share. */
 const FLAGS = `  --audio      music-and-effects | dialogue | narration | dialogue-and-narration
@@ -67,7 +68,7 @@ export const USAGE = [
   ASSEMBLY,
   NARRATION,
   SOUND_DESIGN,
-  ["Wspólne:", CHECK, APPROVE].join("\n"),
+  ["Wspólne:", STATUS, CHECK, APPROVE].join("\n"),
   FLAGS,
   CAST_NOTE,
   GLOBAL,

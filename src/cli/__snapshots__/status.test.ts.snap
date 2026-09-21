@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`status --json > should give every stage, track and character a cell in one of five states 1`] = `
+[
+  "0 przygotowanie: approved",
+  "1 scenariusz: approved",
+  "2/ewa/gpt-image postać ewa: ready",
+  "2/ewa/seedream postać ewa: ready",
+  "2/tata/gpt-image postać tata: ready",
+  "2/tata/seedream postać tata: ready",
+  "3 lista ujęć: approved",
+  "4 pakiet promptów: approved",
+  "5/gpt-image referencje: approved",
+  "5/seedream referencje: ready",
+  "6/gpt-image klatka otwarcia: approved",
+  "6/seedream klatka otwarcia: blocked",
+  "7/gpt-image klipy: approved",
+  "7/seedream klipy: ready",
+  "8/gpt-image montaż: approved",
+  "8/seedream montaż: blocked",
+  "9 narracja, słowa: blocked",
+  "9/gpt-image narracja, miks: blocked",
+  "9/seedream narracja, miks: blocked",
+  "10 muzyka i efekty, arkusz: ready",
+  "10/gpt-image muzyka i efekty, miks: blocked",
+  "10/seedream muzyka i efekty, miks: blocked",
+]
+`;

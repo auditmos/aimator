@@ -100,6 +100,8 @@ src/
 │   ├── common.ts     # Internal: the grammar under every command
 │   ├── check.ts      # Internal: the cross-stage command that writes nothing
 │   ├── approve.ts    # Internal: the cross-stage command that records a yes
+│   ├── status.ts     # Internal: the ladder of one episode, and the one "Dalej:"
+│   ├── status.test.ts
 │   ├── imports.test.ts # The shape: one export at the entry, no stage reaching
 │   │                   #            into another
 │   └── stages/       # Internal: usage fragment, flags, dispatch, renderers
@@ -577,11 +579,22 @@ lives there and each stage's model flag does not. **No stage file imports anothe
 by `cli/imports.test.ts` rather than remembered, because the one failure this split can have
 is a stage reaching into another's renderers, and that reads as an ordinary import.
 
-`check` and `approve` are the two commands that are nobody's stage, so they sit beside the
-entry and call into the stage files. That direction is the only one allowed: a dispatcher may
-know its stages, a stage may never know its siblings. The usage text is assembled the same
-way, from the fragments the stages own, so a stage that grows a flag writes it in its own
-file and `usage.ts` does not change.
+`check`, `approve` and `status` are the three commands that are nobody's stage, so they sit
+beside the entry and call into the stage files. That direction is the only one allowed: a
+dispatcher may know its stages, a stage may never know its siblings. The usage text is
+assembled the same way, from the fragments the stages own, so a stage that grows a flag
+writes it in its own file and `usage.ts` does not change.
+
+`status` is the odd one of the three, and the odd thing about it is deliberate: it calls the
+stages' `check` functions in `src/lib` rather than the CLI's stage files, because what it
+needs is each stage's **object**, not each stage's rendered text. It is also the only place
+that reads a lock file, and the contract says why: a stage that has written nothing yet and
+a stage that is writing right now are identical in every artifact they own, so "w toku" has
+no other evidence. Everything else about a cell is read off what `check` already answers.
+It deliberately does **not** rebuild the gate graph: where a stage reports its gate in an
+artifact's note rather than in `problems`, the cell reads `ready` and the stage's own
+`--dry-run` is what refuses. A second copy of that graph would drift from the first, which
+is the trade [docs/pipeline.md](docs/pipeline.md) records rather than hides.
 
 ### Growth path
 

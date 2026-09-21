@@ -483,6 +483,9 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     T,
     "--dry-run",
   ],
+  // No `--dry-run`: the one command that cannot write or spend, whichever way
+  // it is called, so there is no second mode of it to freeze.
+  "  status <id> <episode-id> [--json]": ["status", ...ON],
 };
 
 beforeAll(async () => {

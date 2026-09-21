@@ -249,6 +249,66 @@ Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od et
 postacie identyfikatorami z **obsady etapu 0**, a nie ich obrazami; te są potrzebne dopiero
 w etapie 4.
 
+## Stan odcinka: `status`
+
+`aimator status <id> <episode-id> [--json]` odpowiada na jedno pytanie, którego żaden etap
+nie umie zadać sam: **gdzie jesteśmy i co jest następnym krokiem.** Woła `check` każdego
+etapu, na obu torach i na każdej postaci, i składa odpowiedzi w drabinę. Niczego nie
+zapisuje i niczego nie kupuje; jest poleceniem kontrolnym, więc obowiązuje go ten sam
+niezmiennik co `check`: rozjazd jest raportowany, nigdy zapisywany.
+
+**Komórka** to jedno pytanie o jeden artefakt albo jeden ich komplet. Etapy tekstowe mają
+po jednej (`0`, `1`, `3`, `4`), etap 2 ma jedną na postać i tor (`2/ewa/gpt-image`), etapy
+5–8 po jednej na tor (`5/seedream`), a etapy 9 i 10 po jednej wspólnej i po jednej na tor
+(`9`, `9/gpt-image`), bo ich artefakty siedzą na dwóch poziomach drzewa.
+
+**Pięć stanów**, wykluczających się w tej kolejności:
+
+| Stan | Znaczy | Skąd się bierze |
+|---|---|---|
+| `running` „w toku" | etap właśnie pisze | plik blokady etapu istnieje |
+| `approved` „zatwierdzony" | człowiek powiedział tak | `approved` z `check` |
+| `review` „do przeglądu" | coś przeszło walidację i czeka na człowieka | artefakt w stanie `completed` bez akceptacji |
+| `blocked` „zablokowany" | etap czeka na cudzą decyzję albo odmawia | `problems` z `check`, albo odmowa całego `check` |
+| `ready` „gotowy do generowania" | bramka otwarta, nic jeszcze nie powstało | nic z powyższych |
+
+Kolejność jest umową, nie porządkiem alfabetycznym. Blokada wygrywa ze wszystkim, bo etap,
+który właśnie pisze, nie mówi o sobie prawdy w żadnym ze swoich plików. Akceptacja wygrywa
+z resztą, bo jest jedynym stanem, który wytwarza człowiek. Dopiero potem to, co czeka na
+ocenę, potem to, co jest odmówione, a `ready` jest tym, co zostało.
+
+**Powód blokady** jest cytatem, nie streszczeniem: to `problems` etapu, jego własnymi
+słowami. Etap 5 bez zatwierdzonego etapu 4 mówi o etapie 4, bo tak mówi jego `check`.
+
+**Dokładnie jedno „Dalej:"** dla całego odcinka: pierwsza komórka drabiny, którą człowiek
+może ruszyć, czyli pierwsza w stanie `ready` albo `review`. Komenda jest **składana tutaj**,
+a nie podnoszona z `nextStep` etapu, i to jest świadome: `nextStep` bywa prozą („etap 6 dla
+odcinka … jest kompletny"), a linia „Dalej:" ma być komendą, którą da się wkleić.
+`status` bez żadnej ruszalnej komórki nie drukuje „Dalej:" wcale, tylko zdanie o tym, że
+odcinek jest zamknięty.
+
+Czego ten stan **nie** wie: bramki, których etap nie zgłasza w `problems`. Etap 7 trzyma
+swoją w notatkach artefaktów („klatka otwarcia nie powstała na torze seedream, to etap 6"),
+więc jego komórka mówi `ready`, a nie `blocked`, i dopiero `clip generate --dry-run`
+odmawia. To wada raportu etapu 7, nie drabiny: `status` z założenia nie odtwarza grafu
+bramek, bo druga kopia tego grafu rozjechałaby się z pierwszą.
+
+### Kształt `--json`
+
+`--json` wypisuje **ten sam obiekt, który renderuje tekst**, i ustala kształt dla każdej
+kolejnej komendy, która tę flagę dostanie:
+
+- **jedno pole identyfikujące komendę**, `command`, tu `"status"`;
+- **reszta to obiekty etapów bez zmian**: `cells[].status` niesie dokładnie to, co zwrócił
+  `check` tego etapu, co do pola. Nie powstaje osobny format i nie ma warstwy tłumaczącej;
+- **odmowa zostaje w `Result`**. `--json` zmienia wyłącznie gałąź powodzenia, więc nieznany
+  projekt daje ten sam błąd tej samej klasy co bez flagi, a plik wykonywalny drukuje go na
+  stderr z kodem wyjścia 1.
+
+Poza tym obiekt niesie `projectId`, `episodeId`, `next` (`{ cell, command }` albo `null`)
+i listę `cells`, a każda komórka: `id`, `stage`, `track`, `character`, `state`, `reason`,
+`nextStep`, `title` i `status`.
+
 ## Etap 0: szczegóły
 
 Jedyny etap, który legalnie wciąga materiał spoza katalogu roboczego. Właśnie dlatego

@@ -1595,3 +1595,38 @@ Próba na sucho: nic nie zapisano. Pełna ścieżka ewa/01-burza, tor gpt-image
   ! nie znaleziono ffmpeg ("/nonexistent/aimator-ffmpeg"), zainstaluj go albo wskaż ścieżkę przez AIMATOR_FFMPEG; etap 8 nie ma drugiej drogi i niczego nie przekoduje
 Dalej: usuń powyższe przeszkody przed miksem"
 `;
+
+exports[`every command >   status <id> <episode-id> [--json] 1`] = `
+"ok
+Odcinek "01-burza" projektu "ewa"
+  0. przygotowanie: zatwierdzony
+  1. scenariusz: zatwierdzony
+  2. postać ewa, tor gpt-image: gotowy do generowania
+  2. postać ewa, tor seedream: gotowy do generowania
+  2. postać tata, tor gpt-image: gotowy do generowania
+  2. postać tata, tor seedream: gotowy do generowania
+  3. lista ujęć: zatwierdzony
+  4. pakiet promptów: zatwierdzony
+  5. referencje, tor gpt-image: zatwierdzony
+  5. referencje, tor seedream: gotowy do generowania
+  6. klatka otwarcia, tor gpt-image: zatwierdzony
+  6. klatka otwarcia, tor seedream: zablokowany
+      ! R01 (projects/ewa/episodes/01-burza/seedream/references/R01.png): jeszcze nie powstał na torze seedream
+  7. klipy, tor gpt-image: zatwierdzony
+  7. klipy, tor seedream: gotowy do generowania
+  8. montaż, tor gpt-image: zatwierdzony
+  8. montaż, tor seedream: zablokowany
+      ! C01: nie ma klipu na torze seedream, etap 7 go nie ukończył; C02: nie ma klipu na torze seedream, etap 7 go nie ukończył; odcinek deklaruje audio: narration, a żaden etap nie produkuje ścieżki dźwiękowej, episode.mp4 jest niemy
+  9. narracja, słowa: zablokowany
+      ! nikt nie obsadził narratora, wskaż głos przez: aimator project voice ewa --voice-id <id>; odcinek deklaruje audio: narration, co obejmuje muzykę i efekty, etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku
+  9. narracja, miks, tor gpt-image: zablokowany
+      ! odcinek deklaruje audio: narration, co obejmuje muzykę i efekty, etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku
+  9. narracja, miks, tor seedream: zablokowany
+      ! nie ma zmontowanego odcinka na torze seedream, etap 8 go nie ukończył; brakuje projects/ewa/episodes/01-burza/seedream/episode.mp4; odcinek deklaruje audio: narration, co obejmuje muzykę i efekty, etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku
+  10. muzyka i efekty, arkusz: gotowy do generowania
+  10. muzyka i efekty, miks, tor gpt-image: zablokowany
+      ! nie ma narracji położonej na obrazie na torze gpt-image, etap 9 nie ukończył miksu
+  10. muzyka i efekty, miks, tor seedream: zablokowany
+      ! nie ma zmontowanego odcinka na torze seedream, etap 8 go nie ukończył; brakuje projects/ewa/episodes/01-burza/seedream/episode.mp4
+Dalej: aimator character generate ewa ewa --track gpt-image"
+`;

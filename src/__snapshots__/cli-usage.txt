@@ -146,6 +146,14 @@ Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
     się przed nim, jest MELDUNKIEM, pierwsze to zderzenie, drugie to dryf.
 
 Wspólne:
+  status <id> <episode-id> [--json]
+    Jedno pytanie zamiast kilkunastu: stan każdego etapu odcinka, osobno na
+    każdym torze i na każdej postaci, w jednym z pięciu stanów, z powodem
+    blokady, i dokładnie jedno "Dalej:" dla całego odcinka. Woła check każdego
+    etapu; niczego nie zapisuje i niczego nie wydaje.
+    --json wypisuje ten sam obiekt, który renderuje tekst: pole command mówi,
+    która komenda go wypisała, a każda komórka niesie obiekt swojego etapu bez
+    zmian. Odmowa zostaje w Result, dokładnie jak bez flagi.
   check <id> [<episode-id>]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
