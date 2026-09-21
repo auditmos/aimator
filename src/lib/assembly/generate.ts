@@ -66,6 +66,12 @@ export interface AssemblyReport {
   /** The local engine, once it has answered. `null` when it could not be asked. */
   readonly engine: string | null;
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   /** What the approved shot list adds up to. */
   readonly plannedSeconds: number;
   readonly problems: readonly string[];
@@ -171,7 +177,8 @@ function preview(
     nextStep: blocked
       ? "usuń powyższe przeszkody przed montażem"
       : `aimator assembly generate ${input.projectId} ${input.episodeId} --track ${input.track}`,
-    problems: [...problems, ...silence(stage8)],
+    notices: silence(stage8),
+    problems,
     ready: !(blocked || finished),
     track: input.track,
   };
@@ -206,7 +213,8 @@ function idle(input: GenerateInput, stage8: Stage8Inputs, engine: string | null)
     nextStep: approved
       ? `odcinek "${input.episodeId}" na torze ${input.track} jest zmontowany i przyjęty`
       : `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-    problems: silence(stage8),
+    notices: silence(stage8),
+    problems: [],
     ready: false,
     track: input.track,
   };
@@ -384,7 +392,10 @@ async function cut(input: GenerateInput, stage8: Stage8Inputs): Promise<Result<A
     created,
     engine: muxed.data.engine,
     nextStep: `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-    problems: [...drift(stage8), ...silence(stage8)],
+    // Both are reports: the cut happened, it is the length the clips came
+    // back as, and nothing was trimmed to make the arithmetic tidy.
+    notices: [...drift(stage8), ...silence(stage8)],
+    problems: [],
     ready: true,
     track: input.track,
   });

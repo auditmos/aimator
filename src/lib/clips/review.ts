@@ -274,6 +274,19 @@ async function inspect(input: Stage7Scope): Promise<Result<Inspection>> {
     }
   }
 
+  // A blocker refuses the **stage** only when the stage has nothing left to
+  // buy. The gate here is a chain, so a later clip is almost always waiting for
+  // an earlier one; listing every link would call a track refused while
+  // `clip generate` would buy something on it this second. What is a refusal is
+  // a track with nothing buyable, which is what a missing opening frame makes.
+  const unfinished = stage7.data.targets.filter(
+    (one) => stage7.data.stage.artifacts[one.name]?.status !== "completed"
+  );
+  const stalled =
+    unfinished.length > 0 && unfinished.every((one) => one.blockers.length > 0)
+      ? unfinished.flatMap((one) => one.blockers)
+      : [];
+
   return ok({
     blocking,
     inputs,
@@ -283,7 +296,7 @@ async function inspect(input: Stage7Scope): Promise<Result<Inspection>> {
       approved: artifacts.length > 0 && artifacts.every((one) => one.approved),
       artifacts,
       nextStep: nextStepOf(input, artifacts),
-      problems: [...stage7.data.gate, ...problems],
+      problems: [...stage7.data.gate, ...stalled, ...problems],
       track: input.track,
     },
   });

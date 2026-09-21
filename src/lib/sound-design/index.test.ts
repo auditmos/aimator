@@ -584,7 +584,7 @@ describe("generateSoundDesign", () => {
   it("should say that a regeneration is a second full charge", async () => {
     const preview = await generate(transport(), { mode: "dry-run" });
 
-    expect(preview.ok ? preview.data.problems.join(" ") : "").toContain("GENERACJI");
+    expect(preview.ok ? preview.data.notices.join(" ") : "").toContain("GENERACJI");
   });
 
   it("should write the cue sheet in one paid text call and buy nothing yet", async () => {
@@ -991,7 +991,8 @@ describe("what the full mix hands the engine, and what it refuses", () => {
     const result = await master();
 
     expect(result.ok ? result.data.state : null).toBe("published");
-    expect(result.ok ? result.data.problems.join(" ") : "").toContain("gra bez muzyki");
+    expect(result.ok ? result.data.notices.join(" ") : "").toContain("gra bez muzyki");
+    expect(result.ok ? result.data.problems : null).toEqual([]);
   });
 });
 

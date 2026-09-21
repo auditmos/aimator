@@ -50,6 +50,12 @@ export interface AssemblyStatus {
   readonly approved: boolean;
   readonly artifact: CutState;
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly track: ImageTrack;
 }
@@ -129,7 +135,8 @@ async function inspect(input: Stage8Scope): Promise<Result<Inspection>> {
           state: "absent",
         },
         nextStep: `aimator assembly generate ${input.projectId} ${input.episodeId} --track ${input.track}`,
-        problems: [...stage8.data.gate, ...soundtrack(stage8.data)],
+        notices: soundtrack(stage8.data),
+        problems: stage8.data.gate,
         track: input.track,
       },
     });
@@ -165,6 +172,7 @@ async function inspect(input: Stage8Scope): Promise<Result<Inspection>> {
       nextStep: approved
         ? `odcinek "${input.episodeId}" na torze ${input.track} jest zmontowany i przyjęty`
         : `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
+      notices: soundtrack(stage8.data),
       problems: [
         // The gate is reported beside the cut's own verdict, not only before
         // there is a cut: a clip that lost its approval after the episode was
@@ -176,7 +184,6 @@ async function inspect(input: Stage8Scope): Promise<Result<Inspection>> {
           (path) =>
             `${path}: zmienił się od czasu montażu, obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmontuj go od nowa: aimator assembly generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
         ),
-        ...soundtrack(stage8.data),
       ],
       track: input.track,
     },

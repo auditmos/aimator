@@ -246,7 +246,6 @@ function renderLevels(report: LevelsReport, projectId: string, mode: "apply" | "
   for (const problem of report.problems) {
     lines.push(`  ! ${problem}`);
   }
-
   lines.push(`Dalej: ${report.nextStep}`);
 
   return lines.join("\n");
@@ -301,6 +300,10 @@ function renderSoundDesign(
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of report.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   if (report.prompt !== null) {
     lines.push("", "--- prompt ---", report.prompt);
   }
@@ -338,6 +341,10 @@ function renderMaster(
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of report.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   lines.push(`Dalej: ${report.nextStep}`);
 
   return lines.join("\n");
@@ -357,6 +364,10 @@ function renderSoundDesignStatus(headline: string, status: SoundDesignStatus): s
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of status.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   lines.push(`Dalej: ${status.nextStep}`);
 
   return lines.join("\n");
@@ -370,6 +381,10 @@ function renderMasterStatus(headline: string, status: MasterStatus): string {
 
   for (const problem of status.problems) {
     lines.push(`  ! ${problem}`);
+  }
+
+  for (const notice of status.notices) {
+    lines.push(`  · ${notice}`);
   }
 
   lines.push(`Dalej: ${status.nextStep}`);

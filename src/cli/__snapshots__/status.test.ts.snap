@@ -15,7 +15,7 @@ exports[`status --json > should give every stage, track and character a cell in 
   "6/gpt-image klatka otwarcia: approved",
   "6/seedream klatka otwarcia: blocked",
   "7/gpt-image klipy: approved",
-  "7/seedream klipy: ready",
+  "7/seedream klipy: blocked",
   "8/gpt-image montaż: approved",
   "8/seedream montaż: blocked",
   "9 narracja, słowa: blocked",

@@ -18,6 +18,7 @@ import {
   CUES,
   MIXED,
   missingDialogue,
+  readAcceptedStems,
   readStage10Inputs,
   readTrackState,
   STAGE,
@@ -64,6 +65,12 @@ export interface SoundDesignStatus {
   readonly approved: boolean;
   readonly cues: readonly CueState[];
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly sheet: CueState;
   /** The whole bill, in the unit the provider rates: seconds of audio. */
@@ -74,6 +81,12 @@ export interface MasterStatus {
   readonly approved: boolean;
   readonly artifact: CueState;
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly track: ImageTrack;
 }
@@ -152,7 +165,8 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
         approved: false,
         cues: [],
         nextStep: `aimator sound-design generate ${input.projectId} ${input.episodeId}`,
-        problems: [...stage10.data.gate, ...missingDialogue(stage10.data.settings)],
+        notices: missingDialogue(stage10.data.settings),
+        problems: stage10.data.gate,
         sheet: {
           ...ABSENT,
           id: CUES,
@@ -201,6 +215,7 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
       approved,
       cues: cues.states,
       nextStep: nextStep(input, sheetApproved, cues.states),
+      notices: missingDialogue(stage10.data.settings),
       problems: [
         ...stage10.data.gate,
         ...blocking,
@@ -209,7 +224,6 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
             `${path}: zmienił się od czasu spisania arkusza, przeczytaj arkusz jeszcze raz i zatwierdź ponownie`
         ),
         ...cues.problems,
-        ...missingDialogue(stage10.data.settings),
       ],
       sheet: {
         approved: sheetApproved,
@@ -461,6 +475,17 @@ async function inspectMaster(
     return track;
   }
 
+  // Two gates here as well, and for stage 9's reason: the narrated cut has
+  // to be accepted and so does every stem that would sit on it. A check that
+  // reported only the first would call a track ready that the mix command
+  // refuses, which is the one thing the ladder above must never be told.
+  const stems = await readAcceptedStems(input);
+
+  if (!stems.ok) {
+    return stems;
+  }
+
+  const gate = [...track.data.gate, ...stems.data.gate];
   const paths = episodeTrackPaths(stage10.data.paths.episode, input.track);
   const record = track.data.stage.artifacts[MIXED];
 
@@ -474,7 +499,8 @@ async function inspectMaster(
         approved: false,
         artifact: { ...ABSENT, id: MIXED, note: "jeszcze nie zmiksowany", state: "absent" },
         nextStep: `aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track}`,
-        problems: [...track.data.gate, ...missingDialogue(stage10.data.settings)],
+        notices: missingDialogue(stage10.data.settings),
+        problems: gate,
         track: input.track,
       },
     });
@@ -547,14 +573,14 @@ async function inspectMaster(
       nextStep: approved
         ? `odcinek "${input.episodeId}" na torze ${input.track} ma pełną ścieżkę i jest przyjęty`
         : `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
+      notices: missingDialogue(stage10.data.settings),
       problems: [
-        ...track.data.gate,
+        ...gate,
         ...blocking,
         ...inputsChanged.map(
           (path) =>
             `${path}: zmienił się od czasu miksu, obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmiksuj go od nowa: aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
         ),
-        ...missingDialogue(stage10.data.settings),
       ],
       track: input.track,
     },

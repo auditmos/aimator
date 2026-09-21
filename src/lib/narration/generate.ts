@@ -80,6 +80,12 @@ export interface NarrationReport {
   readonly created: readonly string[];
   readonly lines: readonly LineOutcome[];
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   /** `--dry-run` only: the exact text the script call would send. */
   readonly prompt: string | null;
@@ -281,7 +287,8 @@ function preview(
     nextStep: blocked
       ? "usuń powyższe przeszkody przed płatnym wywołaniem"
       : `aimator narration generate ${input.projectId} ${input.episodeId}`,
-    problems: [...problems, ...missingSound(stage9.settings)],
+    notices: missingSound(stage9.settings),
+    problems,
     prompt: stage9.prompt,
     ready: !blocked,
     runId: null,
@@ -305,7 +312,8 @@ function waiting(
     created: [],
     lines,
     nextStep: `przeczytaj skrypt i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${SCRIPT}`,
-    problems: missingSound(stage9.settings),
+    notices: missingSound(stage9.settings),
+    problems: [],
     prompt: null,
     ready: false,
     runId: null,
@@ -357,7 +365,8 @@ async function lift(input: GenerateInput, stage9: Stage9Inputs): Promise<Result<
       state: "blocked" as const,
     })),
     nextStep: `przeczytaj skrypt i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${SCRIPT}`,
-    problems: missingSound(stage9.settings),
+    notices: missingSound(stage9.settings),
+    problems: [],
     prompt: null,
     ready: true,
     runId: attempt.data.runId,
@@ -586,7 +595,8 @@ async function buy(
     nextStep: pending
       ? `aimator narration generate ${input.projectId} ${input.episodeId}`
       : `odsłuchaj kwestie i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${bought.map((one) => one.id).join(",")}`,
-    problems: missingSound(stage9.settings),
+    notices: missingSound(stage9.settings),
+    problems: [],
     prompt: null,
     ready: true,
     runId: null,

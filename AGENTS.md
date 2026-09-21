@@ -591,10 +591,14 @@ needs is each stage's **object**, not each stage's rendered text. It is also the
 that reads a lock file, and the contract says why: a stage that has written nothing yet and
 a stage that is writing right now are identical in every artifact they own, so "w toku" has
 no other evidence. Everything else about a cell is read off what `check` already answers.
-It deliberately does **not** rebuild the gate graph: where a stage reports its gate in an
-artifact's note rather than in `problems`, the cell reads `ready` and the stage's own
-`--dry-run` is what refuses. A second copy of that graph would drift from the first, which
-is the trade [docs/pipeline.md](docs/pipeline.md) records rather than hides.
+It deliberately does **not** rebuild the gate graph; a second copy of it would drift from
+the first at the first hand correction. What it reads instead is `problems`, which makes
+the split between a **refusal** and a **report** load-bearing rather than cosmetic: a stage
+puts every reason it would refuse in `problems`, and everything it says without refusing in
+`notices`. Stage 8's silent cut, stage 9's missing music and stage 10's missing dialogue are
+notices; the ladder would call all three tracks blocked if they were not. The CLI prints
+`!` for the first and `·` for the second, and [docs/pipeline.md](docs/pipeline.md) carries
+the invariant.
 
 ### Growth path
 

@@ -252,7 +252,6 @@ function renderDirection(
   for (const problem of report.problems) {
     lines.push(`  ! ${problem}`);
   }
-
   lines.push(`Dalej: ${report.nextStep}`);
 
   return lines.join("\n");
@@ -318,6 +317,10 @@ function renderNarration(
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of report.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   if (report.prompt !== null) {
     lines.push("", "--- prompt ---", report.prompt);
   }
@@ -355,6 +358,10 @@ function renderMix(
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of report.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   if (report.state === "published") {
     lines.push("  ! plik przeszedł walidację; to nie to samo co odsłuchanie go przez człowieka");
   }
@@ -378,6 +385,10 @@ function renderNarrationStatus(headline: string, status: NarrationStatus): strin
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of status.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   lines.push(`Dalej: ${status.nextStep}`);
 
   return lines.join("\n");
@@ -391,6 +402,10 @@ function renderMixStatus(headline: string, status: MixStatus): string {
 
   for (const problem of status.problems) {
     lines.push(`  ! ${problem}`);
+  }
+
+  for (const notice of status.notices) {
+    lines.push(`  · ${notice}`);
   }
 
   lines.push(`Dalej: ${status.nextStep}`);

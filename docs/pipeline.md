@@ -163,6 +163,18 @@ Obowiązują we wszystkich etapach.
   tak nie przejdzie: scenariusz waliduje się wtedy wobec nowych decyzji odcinka, a lista
   ujęć wobec scenariusza w takim kształcie, w jakim leży, więc wcześniej wywraca się na
   walidacji strukturalnej.
+- **Odmowa to nie meldunek, i mieszkają w osobnych polach.** `problems` niesie wyłącznie to,
+  co zatrzymuje etap: zamkniętą bramkę, nieprzechodzącą walidację, rozjazd wejścia.
+  `notices` niesie to, co etap mówi, nie odmawiając: deklarację, której nikt w tym potoku
+  nie spełnia (niemy `episode.mp4` etapu 8, brak muzyki w etapie 9, brak dialogów
+  w etapie 10), dryf długości po zmiksowaniu, cennik dostawcy przed zakupem. W tekście
+  `!` to odmowa, `·` to meldunek. Rozdział istnieje, bo czyta je maszyna: `status`
+  wyprowadza „zablokowany" wyłącznie z `problems`, więc meldunek wrzucony między odmowy
+  kłamałby na drabinie, a odmowa schowana w notatce artefaktu kłamałaby tak samo w drugą
+  stronę. **Każdy etap ma trzymać w `problems` wszystkie swoje odmowy** — także te, które
+  dotyczą pojedynczego artefaktu, o ile zatrzymują cały etap. Etap 7 zgłasza tak swój
+  łańcuch dopiero wtedy, gdy na torze nie ma już nic do kupienia, bo klip czekający na
+  poprzednika nie jest odmową, dopóki obok da się kupić klatkę wejściową.
 - **`needsReview` nigdy nie czyści się samo.** Wpisuje go etap zależny w chwili
   uruchomienia. `check` tylko raportuje rozjazd; polecenie kontrolne niczego nie zapisuje.
 - **Stan `submitted` zapisuje się przed płatnym POST-em.** Przerwana próba zostawia więc
@@ -287,11 +299,10 @@ odcinka … jest kompletny"), a linia „Dalej:" ma być komendą, którą da si
 `status` bez żadnej ruszalnej komórki nie drukuje „Dalej:" wcale, tylko zdanie o tym, że
 odcinek jest zamknięty.
 
-Czego ten stan **nie** wie: bramki, których etap nie zgłasza w `problems`. Etap 7 trzyma
-swoją w notatkach artefaktów („klatka otwarcia nie powstała na torze seedream, to etap 6"),
-więc jego komórka mówi `ready`, a nie `blocked`, i dopiero `clip generate --dry-run`
-odmawia. To wada raportu etapu 7, nie drabiny: `status` z założenia nie odtwarza grafu
-bramek, bo druga kopia tego grafu rozjechałaby się z pierwszą.
+Drabina **nie odtwarza grafu bramek** i nigdy nie będzie: druga kopia tego grafu
+rozjechałaby się z pierwszą przy pierwszej ręcznej poprawce. Stan komórki jest dokładnie
+tak dobry, jak `problems` etapu, i to etap odpowiada za to, żeby były tam wszystkie jego
+odmowy — patrz niezmiennik „odmowa to nie meldunek" wyżej.
 
 ### Kształt `--json`
 
@@ -307,7 +318,9 @@ kolejnej komendy, która tę flagę dostanie:
 
 Poza tym obiekt niesie `projectId`, `episodeId`, `next` (`{ cell, command }` albo `null`)
 i listę `cells`, a każda komórka: `id`, `stage`, `track`, `character`, `state`, `reason`,
-`nextStep`, `title` i `status`.
+`nextStep`, `title` i `status`. Meldunki etapu nie wchodzą do `reason`: jadą tam, gdzie
+etap je zapisał, w `status.notices`, bo `reason` odpowiada na pytanie „dlaczego stoi",
+a meldunek na to pytanie nie odpowiada.
 
 ## Etap 0: szczegóły
 

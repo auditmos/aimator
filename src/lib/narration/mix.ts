@@ -63,6 +63,12 @@ export interface MixReport {
   /** Where each line landed on this track, and where the plan put it. */
   readonly lines: readonly PlacedLine[];
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly ready: boolean;
   readonly state: "blocked" | "planned" | "published" | "skipped";
@@ -128,7 +134,8 @@ function preview(
   return {
     ...report,
     nextStep: nextStep(input, { ...state, blocked }),
-    problems: [...problems, ...audio],
+    notices: audio,
+    problems,
     ready: !(blocked || finished),
     state: intent(finished, blocked),
   };
@@ -164,7 +171,8 @@ function idle(
     nextStep: approved
       ? `odcinek "${input.episodeId}" na torze ${input.track} ma narrację i jest przyjęty`
       : `obejrzyj całość z narracją i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-    problems: audio,
+    notices: audio,
+    problems: [],
     ready: false,
     state: "skipped",
   };
@@ -409,7 +417,8 @@ async function lay(
     engine: muxed.data.engine,
     lines: data.placed,
     nextStep: `obejrzyj całość z narracją i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-    problems: [...data.audio, ...drift(data.placed)],
+    notices: [...data.audio, ...drift(data.placed)],
+    problems: [],
     ready: true,
     state: "published",
     track: input.track,

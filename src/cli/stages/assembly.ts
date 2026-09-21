@@ -68,6 +68,10 @@ function renderAssembly(
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of report.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   if (report.artifact.state === "published") {
     lines.push("  ! odcinek przeszedł walidację; to nie to samo co obejrzenie go przez człowieka");
   }
@@ -85,6 +89,10 @@ function renderAssemblyStatus(headline: string, status: AssemblyStatus): string 
 
   for (const problem of status.problems) {
     lines.push(`  ! ${problem}`);
+  }
+
+  for (const notice of status.notices) {
+    lines.push(`  · ${notice}`);
   }
 
   lines.push(`Dalej: ${status.nextStep}`);

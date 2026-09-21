@@ -427,6 +427,48 @@ describe("checkClips", () => {
     ]);
   });
 
+  /**
+   * A blocker refuses the **stage** only when the stage has nothing left to buy.
+   *
+   * The gate here is a chain, so a later clip is almost always waiting for an
+   * earlier one, and listing every link would call a track refused while
+   * `clip generate` would buy something on it this second. What is a refusal is
+   * a track with nothing buyable at all, which is what an untouched track is:
+   * no references and no opening frame, so not one of the five has an input.
+   * The ladder then reads "zablokowany" rather than "gotowy do generowania",
+   * and says what it waits for.
+   */
+  it("should report a track with nothing buyable as a refusal of the stage", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    const result = await checkClips({
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      track: "seedream",
+      workspace,
+    });
+
+    expect(result.ok ? result.data.problems.join("\n") : reason(result)).toContain(
+      "klatka otwarcia nie powstała na torze seedream"
+    );
+  });
+
+  /**
+   * The other half of the same rule, and the one that makes it worth having:
+   * an opening frame nobody has accepted blocks C01 and nothing else, because
+   * the entry frame of C02 needs no clip to exist first. A track one command
+   * away from spending money is not a refused track.
+   */
+  it("should not call a track refused while it still has something to buy", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image", false);
+
+    const result = await status();
+
+    expect(result.ok ? result.data.problems : reason(result)).toEqual([]);
+  });
+
   it("should write nothing", async () => {
     await upstream();
     await makeOpeningFrame("gpt-image");

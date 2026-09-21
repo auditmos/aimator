@@ -316,7 +316,8 @@ describe("generateAssembly", () => {
 
     expect(result.ok ? result.data.plannedSeconds : null).toBe(PLANNED_SECONDS);
     expect(result.ok ? result.data.actualSeconds : null).toBeCloseTo(DRIFTED_SECONDS, 2);
-    expect(result.ok ? result.data.problems.join("\n") : null).toContain("0.12");
+    expect(result.ok ? result.data.notices.join("\n") : null).toContain("0.12");
+    expect(result.ok ? result.data.problems : null).toEqual([]);
   });
 
   /**
@@ -392,7 +393,10 @@ describe("checkAssembly and approveAssembly", () => {
 
     const status = await inspect();
 
-    expect(status.ok ? status.data.problems.join("\n") : "").toContain("narration");
+    // A notice rather than a problem, which is the whole claim of this test:
+    // the cut is finished and accepted-able, and the silence is worth saying.
+    expect(status.ok ? status.data.notices.join("\n") : "").toContain("narration");
+    expect(status.ok ? status.data.problems : null).toEqual([]);
     expect(status.ok ? status.data.artifact.state : null).toBe("completed");
   });
 

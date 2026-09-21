@@ -618,7 +618,10 @@ describe("generateMix", () => {
 
     const result = await mix();
 
-    expect(result.ok ? result.data.problems.join(" ") : null).toContain("muzyki ani efektów");
+    // A notice, not a refusal: the mix happened, and what is missing from the
+    // declared sound mode belongs to the row below this one.
+    expect(result.ok ? result.data.notices.join(" ") : null).toContain("muzyki ani efektów");
+    expect(result.ok ? result.data.problems : null).toEqual([]);
   });
 });
 

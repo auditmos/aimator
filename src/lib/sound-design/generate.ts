@@ -70,6 +70,12 @@ export interface SoundDesignReport {
   readonly created: readonly string[];
   readonly cues: readonly CueOutcome[];
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   /** `--dry-run` only: the exact text the cue-sheet call would send. */
   readonly prompt: string | null;
@@ -272,7 +278,8 @@ function preview(
     nextStep: blocked
       ? "usuń powyższe przeszkody przed płatnym wywołaniem"
       : `aimator sound-design generate ${input.projectId} ${input.episodeId}`,
-    problems: [...problems, ...missingDialogue(stage10.settings), BILLING],
+    notices: [...missingDialogue(stage10.settings), BILLING],
+    problems,
     prompt: stage10.prompt,
     ready: !blocked,
     runId: null,
@@ -295,7 +302,8 @@ function waiting(
     created: [],
     cues,
     nextStep: `przeczytaj arkusz i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${CUES}`,
-    problems: missingDialogue(stage10.settings),
+    notices: missingDialogue(stage10.settings),
+    problems: [],
     prompt: null,
     ready: false,
     runId: null,
@@ -354,7 +362,8 @@ async function write(
       state: "blocked" as const,
     })),
     nextStep: `przeczytaj arkusz i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${CUES}`,
-    problems: [...missingDialogue(stage10.settings), BILLING],
+    notices: [...missingDialogue(stage10.settings), BILLING],
+    problems: [],
     prompt: null,
     ready: true,
     runId: attempt.data.runId,
@@ -544,7 +553,8 @@ async function buy(
     nextStep: pending
       ? `odsłuchaj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${done.map((cue) => cue.id).join(",")}`
       : `aimator sound-design mix ${input.projectId} ${input.episodeId} --track <tor>`,
-    problems: missingDialogue(stage10.settings),
+    notices: missingDialogue(stage10.settings),
+    problems: [],
     prompt: null,
     ready: true,
     runId,

@@ -17,6 +17,7 @@ import { readDirection } from "./delivery.js";
 import {
   missingSound,
   NARRATED,
+  readAcceptedLines,
   readStage9Inputs,
   readTrackTimeline,
   SCRIPT,
@@ -64,6 +65,12 @@ export interface NarrationStatus {
   readonly approved: boolean;
   readonly lines: readonly LineState[];
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly script: LineState;
   /** The whole bill of the script, whether or not it has been paid yet. */
@@ -74,6 +81,12 @@ export interface MixStatus {
   readonly approved: boolean;
   readonly artifact: LineState;
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly track: ImageTrack;
 }
@@ -152,7 +165,8 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
         approved: false,
         lines: [],
         nextStep: `aimator narration generate ${input.projectId} ${input.episodeId}`,
-        problems: [...stage9.data.gate, ...missingSound(stage9.data.settings)],
+        notices: missingSound(stage9.data.settings),
+        problems: stage9.data.gate,
         script: {
           ...ABSENT,
           id: SCRIPT,
@@ -206,6 +220,7 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
       approved,
       lines: lines.states,
       nextStep: nextStep(input, scriptApproved, lines.states),
+      notices: missingSound(stage9.data.settings),
       problems: [
         ...stage9.data.gate,
         ...blocking,
@@ -214,7 +229,6 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
             `${path}: zmienił się od czasu spisania skryptu, przeczytaj skrypt jeszcze raz i zatwierdź ponownie`
         ),
         ...lines.problems,
-        ...missingSound(stage9.data.settings),
       ],
       script: {
         approved: scriptApproved,
@@ -489,6 +503,18 @@ async function inspectMix(
     return timeline;
   }
 
+  // The mix has two gates, and a check that reported only one of them would
+  // call a track ready that the mix command refuses a second later: the cut
+  // has to be accepted, and so does every line that would be laid on it. It
+  // is read here rather than left to the command, because the ladder above
+  // this stage asks the same question and has to get the same answer.
+  const lines = await readAcceptedLines(input);
+
+  if (!lines.ok) {
+    return lines;
+  }
+
+  const gate = [...timeline.data.gate, ...lines.data.gate];
   const paths = episodeTrackPaths(stage9.data.paths.episode, input.track);
   const record = timeline.data.stage.artifacts[NARRATED];
 
@@ -502,7 +528,8 @@ async function inspectMix(
         approved: false,
         artifact: { ...ABSENT, id: NARRATED, note: "jeszcze nie zmiksowany", state: "absent" },
         nextStep: `aimator narration mix ${input.projectId} ${input.episodeId} --track ${input.track}`,
-        problems: [...timeline.data.gate, ...missingSound(stage9.data.settings)],
+        notices: missingSound(stage9.data.settings),
+        problems: gate,
         track: input.track,
       },
     });
@@ -563,14 +590,14 @@ async function inspectMix(
       nextStep: approved
         ? `odcinek "${input.episodeId}" na torze ${input.track} ma narrację i jest przyjęty`
         : `obejrzyj całość z narracją i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
+      notices: missingSound(stage9.data.settings),
       problems: [
-        ...timeline.data.gate,
+        ...gate,
         ...blocking,
         ...inputsChanged.map(
           (path) =>
             `${path}: zmienił się od czasu miksu, obejrzyj odcinek jeszcze raz i zatwierdź ponownie albo zmiksuj go od nowa: aimator narration mix ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate`
         ),
-        ...missingSound(stage9.data.settings),
       ],
       track: input.track,
     },

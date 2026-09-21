@@ -75,6 +75,12 @@ export interface MasterReport {
   /** How the mix sits, sent explicitly, so the archive answers for these bytes. */
   readonly levels: MixLevels;
   readonly nextStep: string;
+  /**
+   * What this stage says without refusing: a declaration nothing here can
+   * fulfil, a length that drifted, a price worth reading before spending.
+   * Reported, never enforced, which is exactly why it is not a problem.
+   */
+  readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly ready: boolean;
   /** Where each sound landed on this track, and where the plan put it. */
@@ -144,7 +150,8 @@ function preview(
   return {
     ...report,
     nextStep: nextStep(input, { approved, blocked, finished }),
-    problems: [...problems, ...notes],
+    notices: notes,
+    problems,
     ready: !(blocked || finished),
     state: intent(finished, blocked),
   };
@@ -214,7 +221,8 @@ function idle(
     nextStep: approved
       ? `odcinek "${input.episodeId}" na torze ${input.track} ma pełną ścieżkę i jest przyjęty`
       : `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-    problems: notes,
+    notices: notes,
+    problems: [],
     ready: false,
     state: "skipped",
   };
@@ -489,7 +497,8 @@ async function lay(
     engine: muxed.data.engine,
     levels: data.levels,
     nextStep: `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-    problems: data.notes,
+    notices: data.notes,
+    problems: [],
     ready: true,
     sounds: data.placed,
     state: "published",
