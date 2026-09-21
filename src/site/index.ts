@@ -52,6 +52,14 @@ import { type Release, releaseSchema } from "./schema.js";
 
 const SITE_URL = "https://aimator.auditmos.com";
 const REPOSITORY = "https://github.com/auditmos/aimator";
+/**
+ * A page of its own rather than a section of the front page: it explains the
+ * pipeline and carries the diagram, so it is about the tool rather than about
+ * any release, and putting it above the changelog buried the films it exists
+ * to explain. It is written whole, with absolute asset paths, so publishing it
+ * is a copy into a directory rather than a second substitution template.
+ */
+const PIPELINE_PAGE = "jak-to-powstaje";
 const TEXT_PREVIEW_LIMIT = 120_000;
 /** Both titles open with the product name, so one prefix covers both languages. */
 const TITLE_TAG = /<title([^>]*)>/;
@@ -351,8 +359,19 @@ export async function buildSite(root: string): Promise<Result<string>> {
       }
     }
 
+    let pipeline: string;
+    try {
+      pipeline = await readFile(join(source, `${PIPELINE_PAGE}.html`), "utf8");
+    } catch (error) {
+      // biome-ignore lint/style/useErrorCause: SiteBuildError carries its cause as the third argument
+      throw new SiteBuildError("*", `missing: ${PIPELINE_PAGE}.html`, { cause: error });
+    }
+    await mkdir(join(staging, PIPELINE_PAGE), { recursive: true });
+    await writeFile(join(staging, PIPELINE_PAGE, "index.html"), pipeline);
+
     const urls = [
       `<url><loc>${SITE_URL}/</loc></url>`,
+      `<url><loc>${SITE_URL}/${PIPELINE_PAGE}/</loc></url>`,
       ...pages.map((page) => `<url><loc>${SITE_URL}/releases/${page.version}/</loc></url>`),
     ].join("");
     await writeFile(

@@ -28,6 +28,14 @@ const TEMPLATE = `<!doctype html>
 </html>
 `;
 
+/** Published whole, into a directory of its own, without any substitution. */
+const PIPELINE_PAGE = `<!doctype html>
+<html lang="pl" data-lang="pl">
+  <head><title data-en="How it is made">Jak to powstaje</title></head>
+  <body><svg viewBox="0 0 10 10"></svg></body>
+</html>
+`;
+
 const VIDEO = Buffer.from("a finished film, in spirit");
 const STILL = Buffer.from("a reference image, in spirit");
 const DOCUMENT = "# Lista ujęć\n\nUjęcie 1.\n";
@@ -124,6 +132,7 @@ async function repository(overrides: Registry = {}) {
   await mkdir(join(root, "site", "assets"), { recursive: true });
   await mkdir(join(root, "site", "releases"), { recursive: true });
   await writeFile(join(root, "site", "index.html"), TEMPLATE);
+  await writeFile(join(root, "site", "jak-to-powstaje.html"), PIPELINE_PAGE);
   for (const file of [
     "styles.css",
     "theme.js",
@@ -195,6 +204,9 @@ describe("buildSite", () => {
     expect(files).toContain("sources/0.1.0/source.md");
     expect(files).toContain("documents/0.1.0/shot-list.md");
     expect(files).toContain("releases/0.1.0/index.html");
+    // A page of its own, not a section of the front page and not a release.
+    expect(files).toContain("jak-to-powstaje/index.html");
+    expect(files).not.toContain("jak-to-powstaje.html");
     // The registry describes the release; it is not itself a published file.
     expect(files).not.toContain("releases/0.1.0.json");
     expect(files).not.toContain("notes.txt");

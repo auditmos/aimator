@@ -293,6 +293,19 @@ h1 {
 .hero-link:hover::before {
   background: #fff;
 }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  align-items: center;
+  margin: 0;
+}
+.hero-alt {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.9375rem;
+}
 .hatch {
   height: 8px;
   background: repeating-linear-gradient(
@@ -304,6 +317,80 @@ h1 {
 .pipeline {
   padding-top: 3.5rem;
   padding-bottom: 1rem;
+}
+.diagram {
+  margin: 0;
+}
+/* The diagram is one drawing, not a layout that reflows, so on a narrow screen
+   it scrolls sideways rather than shrinking its labels below reading size. The
+   cards under it carry the same eleven stages in a single column. */
+.diagram-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+/* Shown only where the drawing is wider than the column it sits in. */
+.diagram-hint {
+  display: none;
+}
+.diagram-svg {
+  display: block;
+  width: 100%;
+  min-width: 52rem;
+  height: auto;
+}
+.d-band {
+  fill: color-mix(in srgb, var(--color-neutral-900) 65%, transparent);
+  stroke: var(--color-neutral-800);
+  stroke-width: 1;
+}
+.d-box {
+  fill: var(--color-neutral-950);
+  stroke: var(--color-neutral-800);
+  stroke-width: 1;
+}
+.d-capsule {
+  fill: none;
+  stroke: var(--color-brand-ink);
+  stroke-width: 1;
+}
+.d-capsule-text {
+  font: 400 15px var(--font-sans);
+  fill: var(--color-neutral-300);
+}
+.d-phase {
+  font: 400 13px var(--font-mono);
+  letter-spacing: 0.08em;
+  fill: var(--color-brand-ink);
+}
+.d-phase-note,
+.d-split {
+  font: 400 13px var(--font-sans);
+  fill: var(--color-neutral-400);
+}
+.d-num {
+  font: 400 12px var(--font-mono);
+  fill: var(--color-brand-ink);
+}
+.d-name {
+  font: 600 16px var(--font-display);
+  fill: var(--color-neutral-50);
+}
+.d-flow {
+  fill: none;
+  stroke: var(--color-neutral-400);
+  stroke-width: 1.5;
+}
+.d-tip {
+  fill: var(--color-neutral-400);
+}
+.diagram figcaption {
+  max-width: 46rem;
+  margin-top: 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--color-neutral-400);
+}
+.pipeline-back {
+  margin-top: 2.5rem;
 }
 .phases,
 .stages {
@@ -800,6 +887,14 @@ summary {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+  }
+}
+@media (max-width: 56rem) {
+  .diagram-hint {
+    display: block;
+    margin: 0 0 0.75rem;
+    font: 400 0.8125rem / 1.5 var(--font-mono);
+    color: var(--color-neutral-400);
   }
 }
 @media (max-width: 60rem) {

@@ -86,7 +86,7 @@ const LOCAL_LINK = /\[[^\]]+\]\(([^)]+)\)/g;
 /**
  * The stage list is written in three media: the README's table, the page that
  * explains the pipeline to somebody who knows video rather than code, and the
- * site's own markup. Three copies of one list is the drift this file exists to
+ * site’s own page. Three copies of one list is the drift this file exists to
  * catch, and `--help` cannot settle it: the CLI names commands, not stages.
  */
 const README_STAGE = /^\| \[(\d+)\. ([^\]]+)\]/gm;
@@ -186,7 +186,7 @@ describe("documentation", () => {
     const listed = stageList(readRepoFile("README.md"), README_STAGE);
     expect(listed).toHaveLength(11);
     expect(stageList(readRepoFile("docs/jak-to-powstaje.md"), PAGE_STAGE)).toEqual(listed);
-    expect(stageList(readRepoFile("site/index.html"), SITE_STAGE)).toEqual(listed);
+    expect(stageList(readRepoFile("site/jak-to-powstaje.html"), SITE_STAGE)).toEqual(listed);
   });
 
   it("should draw every stage the pipeline page describes", () => {

@@ -16,13 +16,19 @@ changelog z `site/releases/*.json` i kopiuje do `out/site` **tylko to, co jest n
 `STATIC_FILES`. HTML, filmy, obrazy, pobieranie i rozwijane sekcje działają bez
 JavaScriptu; JS zapamiętuje motyw i język oraz zatrzymuje pozostałe odtwarzacze.
 
-Sekcja „Jak to powstaje" stoi w `site/index.html` na stałe, bo opisuje narzędzie, a nie
-wydanie, więc wychodzi tak samo na stronie głównej i na każdej podstronie wersji. Jest to
-ten sam podział na jedenaście etapów w trzech fazach co
-[docs/jak-to-powstaje.md](jak-to-powstaje.md), tylko kartami zamiast diagramu, bo Mermaid
-wymagałby JavaScriptu z obcego CDN-u. Że obie listy mówią to samo, pilnuje
-`src/test/docs.test.ts`: nazwy etapów muszą się zgadzać w README, na tej stronie
-dokumentacji i w znacznikach `data-stage` szablonu.
+**„Jak to powstaje" jest osobną podstroną**, `site/jak-to-powstaje.html`, publikowaną pod
+`/jak-to-powstaje/`. Opisuje narzędzie, a nie wydanie, więc wstawiona nad changelogiem
+przykrywała filmy, po które ktoś przyszedł. Nie jest szablonem: build kopiuje ją w całości
+do katalogu, dlatego ścieżki do zasobów są w niej bezwzględne, a nie `./`.
+
+Diagram na tej stronie to **wklejony SVG**, nie obrazek i nie Mermaid. Wklejony, bo tylko
+wtedy `<text>` łapie tokeny motywu i mechanizm `.t` obu języków; Mermaid odpada, bo
+wymagałby JavaScriptu z obcego CDN-u. Rysunek nie przelewa się, więc na wąskim ekranie
+przewija się w bok, a karty pod nim niosą te same jedenaście etapów w jednej kolumnie.
+
+Że wszystkie trzy listy etapów mówią to samo, pilnuje `src/test/docs.test.ts`: nazwy muszą
+się zgadzać w tabeli README, w nagłówkach [docs/jak-to-powstaje.md](jak-to-powstaje.md)
+i w znacznikach `data-stage` tej podstrony.
 
 **Każda strona niesie obie wersje językowe naraz.** Tekst polski i angielski stoi obok
 siebie w `<span class="t" lang="…">`, a `styles.css` chowa nieaktywny. Wybór zapada przed
