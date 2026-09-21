@@ -96,14 +96,17 @@ src/
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form — the published page; not a pipeline domain
-│   ├── index.ts      # Public: buildSite and publishMedia — what is published, and what is not
+│   ├── index.ts      # Public: freezeRelease, buildSite, publishMedia
+│   ├── freeze.ts     # Process entry — one episode out of the workspace
 │   ├── build.ts      # Process entry — the page
 │   ├── publish.ts    # Process entry — the media
 │   ├── worker.ts     # Process entry — how one published file is served: the bucket
 │   ├── schema.ts     # Internal — the release registry, one file per release
+│   ├── episode.ts    # Internal — the crossing: the only reader of the workspace
 │   ├── render.ts     # Internal — the markup, and the English machine twin
 │   ├── media.ts      # Internal — where heavy files live, and how one gets there
 │   ├── index.test.ts # The build and the publisher, through the entry
+│   ├── episode.test.ts
 │   └── worker.test.ts
 └── lib/
     ├── env.ts        # Single-file form — loads .env files, validates with Zod
@@ -431,11 +434,30 @@ the same file again and nothing else.
 "publish this file"; how wrangler spells an upload stays inside, so a bucket rename or a
 move to the S3 API is one file's problem.
 
-It has **three process entries**, for the reason the package has `bin.ts`: `build.ts` owns
-the page, `publish.ts` owns the media, and `worker.ts` owns how one published file is
-served, which is a different question from what gets published. None is an internal of
-another, and `index.ts` stays two functions so both are tested by calling them — the
-publisher with a fake uploader rather than a real bucket.
+`episode.ts` is the **crossing**, and it is the one place here that reads
+`AIMATOR_WORKSPACE` — which is exactly why the other two never have to. It takes a finished
+episode out of the workspace, re-encodes its films for the web, scales its pictures,
+measures what it produced and writes the registry. It reads the workspace through
+`lib/workspace.ts` and every artifact through its own stage's public entry, so rule 3 holds
+and nothing reaches into a stage. It is **not** in `lib/muxer` because it re-encodes, and
+that module's whole promise is that it copies streams and never does; CRF and scale are
+facts about the web rather than about the film, so they live with the publisher.
+
+What it deliberately will not do is write the prose. Every text a reader sees comes out as
+the literal `TODO`, and `buildSite` refuses a registry that still says so, naming the
+fields. That is **rule 7 one level up**: a description nobody has written is undecided, and
+the gate blocks rather than publishing the word `TODO` to the internet. Both sides use one
+walk over the registry, so they cannot disagree about what counts as unwritten. The
+exception proves the rule — a reference's `subject` is *lifted* from the prompt package,
+because it is the English line the model received and retyping it would be a second version
+of the same truth.
+
+It has **four process entries**, for the reason the package has `bin.ts`: `freeze.ts` owns
+the crossing, `build.ts` the page, `publish.ts` the media, and `worker.ts` how one published
+file is served, which is a different question from what gets published. None is an internal
+of another, and `index.ts` stays three functions so all three are tested by calling them —
+the publisher with a fake uploader rather than a real bucket, and freezing with an injected
+`Encoder`, exactly as `lib/assembly` takes an injected `Muxer`.
 
 The worker got **simpler** by moving the media out. When films were deployed assets, Static
 Assets answered a Range request with 200 and the whole file, so the worker had to read the
@@ -576,6 +598,7 @@ function parsePort(raw: string): Result<number> {
 | `pnpm unused` | Detect unused code with Knip |
 | `ffmpeg` | Not a script — a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
+| `pnpm site:freeze` | `<project> <episode> <version>` — take one finished episode out of the workspace, re-encode it for the web and write a registry whose prose is still `TODO` |
 | `pnpm site:build` | Build the release page into `out/site` — needs no frozen export on disk |
 | `pnpm site:media` | Put every registered release's films and stills in R2, checksum-gated |
 | `pnpm site:preview` | Build it, then serve it on the real Workers runtime, reading the real bucket |

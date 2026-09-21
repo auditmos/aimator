@@ -130,6 +130,7 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 | `pnpm test:watch` | Testy w trybie watch |
 | `pnpm unused` | Nieużywany kod (Knip) |
 | `pnpm update` | Interaktywna aktualizacja zależności (Taze) |
+| `pnpm site:freeze` | Zamroź odcinek z workspace jako nowe wydanie strony |
 | `pnpm site:build` | Zbuduj stronę wydań do `out/site` |
 | `pnpm site:media` | Wyślij filmy i obrazy wydania do R2 |
 | `pnpm site:preview` | Zbuduj i podejrzyj stronę lokalnie |

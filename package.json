@@ -20,6 +20,7 @@
     "prepare": "simple-git-hooks",
     "site:build": "tsx src/site/build.ts",
     "site:deploy": "pnpm site:build && pnpm site:media && wrangler deploy --config wrangler.site.jsonc",
+    "site:freeze": "tsx src/site/freeze.ts",
     "site:media": "tsx src/site/publish.ts",
     "site:preview": "pnpm site:build && wrangler dev --config wrangler.site.jsonc --local",
     "test": "vitest run",

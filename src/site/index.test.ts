@@ -311,6 +311,18 @@ describe("buildSite", () => {
     expect(result.ok ? "" : result.error.message).toBe("missing: shot-list.md");
   });
 
+  it("should refuse a release whose prose nobody has written yet", async () => {
+    const root = await repository({ note: "TODO", title: "TODO" });
+
+    const result = await buildSite(root);
+
+    const message = result.ok ? "" : result.error.message;
+    expect(message).toContain("title");
+    expect(message).toContain("note");
+    // The word would otherwise have been published to the internet.
+    expect(message).toContain("nienapisane");
+  });
+
   it("should refuse a release that names another repository", async () => {
     const root = await repository({ repository: "https://github.com/someone/else" });
 

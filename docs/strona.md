@@ -103,30 +103,40 @@ rozbieżności, przed którą chroni reguła 7.
 1. Zachowaj poprzednie eksporty. Nie nadpisuj ich po opublikowaniu: cache mediów jest
    roczny i niezmienny, a build i tak odmówi. Nie aktualizuj sum starego wydania, żeby
    obejść kontrolę — zarejestruj zmienione pliki jako nową wersję.
-2. Skopiuj materiały z workspace do `out/releases/<wersja>/` i przekoduj je na postać
-   webową. Powodem jest **kodek, nie rozmiar** — R2 zniósł limit wielkości pliku, ale modele
-   wideo oddają HEVC, którego przeglądarki poza Safari nie odtworzą:
+
+2. **`pnpm site:freeze <projekt> <odcinek> <wersja>`** — jedno polecenie robi całą
+   mechaniczną część:
 
    ```bash
-   ffmpeg -i mixed.mp4 -c:v libx264 -preset slow -crf 23 -maxrate 2000k -bufsize 4000k \
-     -profile:v high -level 4.0 -pix_fmt yuv420p -c:a aac -b:a 128k -ac 2 \
-     -movflags +faststart <tor>-mixed.mp4
-   ffmpeg -i opening-frame.png -vf scale=1600:-2 -q:v 3 <tor>-opening-frame.jpg
+   pnpm site:freeze dzielna-ewa 02-latarnia 0.2.0
    ```
 
-   Napisz w polu `note`, co zostało przekodowane i jakie były oryginały. Podglądu nie
-   wolno wydawać za plik, który wyszedł z narzędzia.
-3. Dodaj miniaturę każdego toru do `site/assets/releases/<wersja>/<tor>.jpg`:
-   `ffmpeg -ss 3 -i <tor>-mixed.mp4 -frames:v 1 -vf scale=960:-2 -q:v 3 miniatura.jpg`.
-   Skala 960 px szerokości jest konwencją wszystkich miniatur.
-4. Dodaj zamrożony plik źródłowy do `site/sources/<wersja>/`, dokumenty etapów do
-   `site/documents/<wersja>/` i `site/releases/<wersja>.json` na wzór poprzedniego: data,
-   tytuł, faktyczne zmiany, dokładny commit GitHub, widoczność repozytorium, rozdzielczości
-   i sumy SHA-256 **mierzone z gotowych plików**, nie deklarowane.
-5. `pnpm site:build` i `pnpm site:preview`, sprawdź nowe materiały w obu motywach
+   Wyjmuje z workspace film każdego toru i przekodowuje go do H.264 (powodem jest
+   **kodek, nie rozmiar** — R2 zniósł limit wielkości pliku, ale modele wideo oddają HEVC,
+   którego przeglądarki poza Safari nie odtworzą), skaluje klatkę otwarcia, referencje
+   i karty postaci do podglądów JPEG 1600 px, wycina miniaturę każdego toru z **gotowego
+   pliku webowego**, kopiuje plik źródłowy i dokumenty etapów do repozytorium i wypisuje
+   `site/releases/<wersja>.json` z policzonymi sumami SHA-256, rozdzielczościami i długością
+   **zmierzonymi z plików, które właśnie zrobił**, nie zadeklarowanymi.
+
+   Czego nie robi: nie pisze prozy. Każdy tekst, który zobaczy czytelnik, wychodzi jako
+   `TODO`, a polecenie wypisuje listę pól do napisania. Identyfikatory i linijki `subject`
+   referencji **podnosi z pakietu promptów**, bo to angielski tekst, który dostał model —
+   przepisywanie go ręcznie byłoby drugą wersją tej samej prawdy.
+
+   Odmawia, gdy wersja już istnieje, gdy etap 0 nie jest zatwierdzony (albo zgoda wygasła
+   po ręcznej edycji), gdy któryś tor nie ma `mixed.mp4` i gdy brakuje karty postaci.
+
+3. Napisz prozę w `site/releases/<wersja>.json`. Dopóki zostaje tam choć jedno `TODO`,
+   `pnpm site:build` odmawia i wymienia pola po nazwach. W polu `note` napisz, co zostało
+   przekodowane i jakie były oryginały — podglądu nie wolno wydawać za plik, który wyszedł
+   z narzędzia.
+
+4. `pnpm site:build` i `pnpm site:preview`, sprawdź nowe materiały w obu motywach
    i obu językach. Podgląd czyta media z **prawdziwego** bucketu (`remote` w konfiguracji
    bindingu), więc nowe pliki zobaczysz dopiero po `pnpm site:media`.
-6. `pnpm site:deploy` robi trzy rzeczy po kolei: buduje stronę, wysyła media do R2
+
+5. `pnpm site:deploy` robi trzy rzeczy po kolei: buduje stronę, wysyła media do R2
    i publikuje **publicznie** wszystkie zarejestrowane wydania.
 
 ## Weryfikacja
@@ -142,10 +152,15 @@ Przed publikacją: `pnpm types`, `pnpm test`, `pnpm lint`, `pnpm unused`, `pnpm 
 
 `src/site/index.test.ts` sprawdza zawartość paczki, brak publikacji prywatnych plików i
 mediów, budowanie bez żadnych eksportów na dysku, escapowanie tekstu z rejestru, obie wersje
-językowe i powrót do polskiej, wykrywanie podmienionych i brakujących plików, zachowanie
-poprzedniego buildu oraz to, że publikacja mediów nie oddaje bucketowi pliku, którego bajty
-się zmieniły. `src/site/worker.test.ts` sprawdza zakresy bajtów, to że bucket dostaje
-dokładnie żądany offset, If-Range, HEAD, błędne zakresy i 404 na brakujący klucz.
+językowe i powrót do polskiej, bramkę na nienapisanej prozie, wykrywanie podmienionych
+i brakujących plików, zachowanie poprzedniego buildu oraz to, że publikacja mediów nie oddaje
+bucketowi pliku, którego bajty się zmieniły. `src/site/worker.test.ts` sprawdza zakresy
+bajtów, to że bucket dostaje dokładnie żądany offset, If-Range, HEAD, błędne zakresy i 404
+na brakujący klucz. `src/site/episode.test.ts` sprawdza zamrażanie na workspace zbudowanym
+przez wspólny fixture przez wejścia własnych etapów: co trafia do wydania, podnoszenie
+`subject` z pakietu, miniaturę wyciętą z pliku webowego, pomiar gotowego pliku i cztery
+odmowy. Silnik jest wstrzykiwany, więc te testy nie potrzebują ffmpeg — prawdziwy silnik
+sprawdza się tam, gdzie jest przedmiotem testu.
 
 Dwa wyjątki w `biome.jsonc` mają powód zapisany na miejscu: `site/index.html` jest
 szablonem, który build przepisuje podstawieniami tekstowymi, więc formatter go nie dotyka,

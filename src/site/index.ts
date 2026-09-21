@@ -13,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { err, ok, type Result } from "../lib/result.js";
+import { unwrittenFields } from "./episode.js";
 import { putMedia } from "./media.js";
 import {
   type ReleaseTexts,
@@ -147,6 +148,16 @@ async function readRegistry(source: string): Promise<Release[]> {
     } catch (error) {
       // biome-ignore lint/style/useErrorCause: SiteBuildError carries its cause as the third argument
       throw new SiteBuildError(name, "release registry is not valid JSON.", { cause: error });
+    }
+    // Before the schema, deliberately: a frozen release carries `TODO` where a
+    // commit hash or a date will go, and "must match /^[a-f0-9]{40}$/" is a
+    // worse answer to "you have not written this yet" than saying so.
+    const unwritten = unwrittenFields(raw);
+    if (unwritten.length > 0) {
+      throw new SiteBuildError(
+        name,
+        `pola jeszcze nienapisane: ${unwritten.join(", ")}. Wydanie zamrożone, ale nieopisane, nie jest wydaniem gotowym do publikacji.`
+      );
     }
     const parsed = releaseSchema.safeParse(raw);
     if (!parsed.success) {
@@ -412,3 +423,5 @@ export async function publishMedia(
     throw error;
   }
 }
+
+export { freezeRelease } from "./episode.js";
