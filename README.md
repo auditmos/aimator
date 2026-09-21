@@ -157,6 +157,11 @@ Praca nad kodem: testy leżą obok źródeł (`*.test.ts`), TDD (czerwony test �
 → refaktor), commity w formacie [Conventional Commits](https://www.conventionalcommits.org/),
 hook pre-commit uruchamia lint i testy, push na `main` odpala CI i semantic-release.
 
+Wersja opisuje narzędzie, a nie stronę: commity z zakresem `site`, tak samo jak `docs`,
+`chore`, `ci` i `test`, nie wydają nic. Odcinek na stronie ma własny numer w
+`site/releases/`, nadawany przez `pnpm site:freeze`, i te dwie numeracje mogą się
+rozjeżdżać.
+
 Gotowe odcinki pokazuje [aimator.auditmos.com](https://aimator.auditmos.com/): jeden film
 na tor obrazu, razem z klatką otwarcia, referencjami i dokumentami etapów. Jak dodać
 wydanie i co wolno na nim opublikować, opisuje [docs/strona.md](docs/strona.md).

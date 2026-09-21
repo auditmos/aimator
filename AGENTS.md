@@ -701,6 +701,20 @@ Types: feat, fix, refactor, test, docs, chore, ci, perf
 
 Pre-commit hook runs `pnpm lint && pnpm test` automatically.
 
+**The version is the tool's, not the site's.** `.releaserc.json` tells the commit
+analyzer that `docs`, `chore`, `ci`, `test` and **anything scoped `site`** release
+nothing, so only a change to the CLI moves the number. The first four are the ordinary
+reading of a version; the scope is the one that had to be decided, and it was decided
+after four releases in one day turned out to be four commits about the published page and
+none about the pipeline. A tag that grows when the shop window is rearranged says nothing
+about the thing on sale. A release of the *site* is a different artifact with its own
+number, `site/releases/<version>.json`, written by `pnpm site:freeze`; the two share a
+numbering scheme and nothing else, and they are free to disagree.
+
+So the scope is what decides whether a commit ships, which makes `feat(site)` and `feat`
+a real choice rather than a label. Scope a commit `site` when it changes what is published
+at `aimator.auditmos.com`, and leave the scope off when it changes what the CLI does.
+
 ## Environment Variables
 
 - Define schemas in `src/lib/env.ts` using `@t3-oss/env-core` + Zod
