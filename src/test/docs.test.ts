@@ -6,7 +6,7 @@ import { run } from "../cli.js";
 /**
  * The documentation is the one artifact in this repo that nothing else proves.
  * Tests prove the code, `pnpm types` proves the configs, and a broken link or a
- * flag that no longer exists is found only when a person reads the page — which
+ * flag that no longer exists is found only when a person reads the page, which
  * is exactly the moment the page was supposed to help them.
  *
  * So the usage text is the source of truth here, and the documents are checked
@@ -82,6 +82,25 @@ const INVOCATION = /(?:pnpm dev|aimator) (\S+)(?: (\S+))?/g;
 const FOREIGN_COMMAND = /\b(wrangler|ffmpeg|ffprobe)\b/;
 const ABSOLUTE_LINK = /^(https?:|mailto:)/;
 const LOCAL_LINK = /\[[^\]]+\]\(([^)]+)\)/g;
+
+/**
+ * The stage list is written in three media: the README's table, the page that
+ * explains the pipeline to somebody who knows video rather than code, and the
+ * site's own markup. Three copies of one list is the drift this file exists to
+ * catch, and `--help` cannot settle it: the CLI names commands, not stages.
+ */
+const README_STAGE = /^\| \[(\d+)\. ([^\]]+)\]/gm;
+const PAGE_STAGE = /^### (\d+)\. (.+)$/gm;
+const SITE_STAGE = /data-stage="(\d+)"[\s\S]*?lang="pl">([^<]+)</g;
+const DIAGRAM = /```mermaid\n([\s\S]*?)```/;
+
+const readRepoFile = (path: string): string => readFileSync(join(repoRoot, path), "utf8");
+
+function stageList(text: string, pattern: RegExp): string[] {
+  return [...text.matchAll(pattern)]
+    .map(([, number, name]) => `${number}. ${name?.trim().toLowerCase()}`)
+    .sort();
+}
 
 let usage = "";
 let commands = new Set<string>();
@@ -161,6 +180,23 @@ describe("documentation", () => {
       }
     }
     expect([...new Set(unknown)]).toEqual([]);
+  });
+
+  it("should name the same eleven stages in the README, the page and the site", () => {
+    const listed = stageList(readRepoFile("README.md"), README_STAGE);
+    expect(listed).toHaveLength(11);
+    expect(stageList(readRepoFile("docs/jak-to-powstaje.md"), PAGE_STAGE)).toEqual(listed);
+    expect(stageList(readRepoFile("site/index.html"), SITE_STAGE)).toEqual(listed);
+  });
+
+  it("should draw every stage the pipeline page describes", () => {
+    const page = readRepoFile("docs/jak-to-powstaje.md");
+    const [, diagram] = DIAGRAM.exec(page) ?? [];
+    expect(diagram).toBeDefined();
+    const undrawn = [...page.matchAll(PAGE_STAGE)]
+      .map(([, number, name]) => `${number}. ${name?.trim()}`)
+      .filter((stage) => !diagram?.includes(stage));
+    expect(undrawn).toEqual([]);
   });
 
   it("should give every implemented stage a page of its own", () => {

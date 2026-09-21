@@ -32,7 +32,7 @@ import { type Release, releaseSchema } from "./schema.js";
  * changes. Nothing reaches the public without being checked against the sha256
  * the registry recorded, so an export edited after publication fails instead of
  * replacing a file whose cache is a year long. That is the same bargain the
- * pipeline's stages make with `approve` — acceptance bound to bytes — read one
+ * pipeline's stages make with `approve`, acceptance bound to bytes, read one
  * level up, where the bytes leave the machine.
  *
  * A release's bytes live in two places, split by what they are. **Text is
@@ -42,7 +42,7 @@ import { type Release, releaseSchema } from "./schema.js";
  * stills are streamed, not read, and a bucket is the only copy of them that
  * survives the laptop that made them.
  *
- * So `buildSite` needs nothing from `out/` at all — a fresh clone can rebuild
+ * So `buildSite` needs nothing from `out/` at all: a fresh clone can rebuild
  * and redeploy the page while the films stay exactly where they were. Only
  * `publishMedia` reads the frozen exports, and only to put them in the bucket.
  *
@@ -78,7 +78,17 @@ const MARKDOWN_HEADER = [
   "",
   "A CLI that walks one person through producing a short animated episode.",
   "",
-  "Eleven stages, each consuming only files earlier stages produced — never conversation context. One project can carry a complete set of assets on two image tracks, which yields two independent animations from one screenplay. Polish narration by default.",
+  "Eleven stages, each consuming only files earlier stages produced, never conversation context. One project can carry a complete set of assets on two image tracks, which yields two independent animations from one screenplay. Polish narration by default.",
+  "",
+  "## How it is made",
+  "",
+  "Eleven stages in the three phases every production knows. Each stage gets only the files approved in the one before it: a check verifies and writes nothing, and only an explicit approval records that a person said yes, bound to the exact bytes, so editing a file outside the tool revokes it.",
+  "",
+  "Pre-production, shared by both versions of the film: 0 Preparation (the idea, the episode source file and character photos become the series rules, the cast and the episode's decisions), 1 Screenplay (scenes with timings, dialogue and sound), 2 Character (a character sheet, eight views and a reference portrait, once per image track), 3 Shot list (scenes broken into shots and clips), 4 Prompt package (a description of every future frame and clip).",
+  "",
+  "Shoot, once per image track: 5 References (places, props and faces seen more than once), 6 Opening frame (the film's first frame, the only one drawn from words alone), 7 Clips (a video shot with its entry and end frames, each starting where the last one ended).",
+  "",
+  "Post-production, once per image track: 8 Edit (the silent picture cut), 9 Narration (the voice over the picture, the one version with nothing under it), 10 Music and effects (the film with everything in it).",
   "",
   "## Changelog",
   "",
