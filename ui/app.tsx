@@ -1,7 +1,8 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
 import { Ladder } from "./ladder";
+import { ScreenplayPanel } from "./panel";
 import { ThemeSelect } from "./theme";
-import type { EpisodeStatus, Refusal, WorkspaceListing } from "./types";
+import type { EpisodeStatus, Refusal, RunDone, StatusCell, WorkspaceListing } from "./types";
 
 /**
  * One screen: what is in the workspace, and where one episode stands.
@@ -26,6 +27,17 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
   stale: "Brak połączenia z serwerem. Poniżej ostatni znany stan, nieaktualny.",
 };
 
+/**
+ * Which cells can be opened today.
+ *
+ * One stage, one slice: stage 1 has a panel, the other ten are driven from the
+ * terminal until theirs arrives. A row nobody can open says so by being a row,
+ * which is more honest than a panel apologising for being empty.
+ */
+function openable(cell: StatusCell): boolean {
+  return cell.stage === 1;
+}
+
 /** The first episode anybody could be looking at, when nothing is chosen yet. */
 function firstEpisode(listing: WorkspaceListing): { episode: string; project: string } | null {
   for (const project of listing.projects) {
@@ -46,6 +58,9 @@ export function App(): JSX.Element {
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
+  const [opened, setOpened] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [run, setRun] = useState<RunDone | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,13 +120,61 @@ export function App(): JSX.Element {
       setRefusal((JSON.parse(event.data) as Refusal).error.message);
       setConnection("live");
     });
+    // A command started here finishes here, whatever else the screen is doing
+    // meanwhile. An identifier this window did not start is somebody else's.
+    events.addEventListener("run", (event) => setRun(JSON.parse(event.data) as RunDone));
     events.addEventListener("error", () => setConnection("stale"));
 
     return () => events.close();
   }, [episodeId, projectId]);
 
+  /**
+   * One click, one command, and nothing waited for.
+   *
+   * The answer is an identifier; what the command said arrives on the stream,
+   * because a clip is bought by a call that polls for minutes and the screen
+   * has to stay usable while it does.
+   */
+  const start = useCallback((argv: readonly string[]) => {
+    setRun(null);
+    setPending(null);
+
+    fetch("/api/run", {
+      body: JSON.stringify({ argv }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    })
+      .then(async (response) => (await response.json()) as { runId?: string })
+      .then((body) => setPending(body.runId ?? null))
+      .catch(() =>
+        setRun({
+          error: { message: "Serwer nie przyjął komendy.", name: "NetworkError" },
+          ok: false,
+          runId: "",
+        })
+      );
+  }, []);
+
+  const openCell = useCallback((id: string) => {
+    setRun(null);
+    setOpened((current) => (current === id ? null : id));
+  }, []);
+
   const project = listing?.projects.find((one) => one.id === projectId) ?? null;
   const note = CONNECTION_NOTE[connection];
+  /**
+   * Still running, derived rather than remembered.
+   *
+   * A `check` finishes in milliseconds, so its result can reach the stream
+   * before the request that started it has answered with the identifier. A
+   * flag cleared by the event would then be set again afterwards and never
+   * cleared, leaving "w toku" under a result that is already on screen. The
+   * identifier the result carries is the proof, so the two are compared.
+   */
+  const running = pending !== null && run?.runId !== pending;
+  // The panel renders the cell the ladder is carrying right now, so a finished
+  // command refreshes what the panel says without the panel asking anything.
+  const panel = status?.cells.find((cell) => cell.id === opened && openable(cell)) ?? null;
 
   /** Choosing a project chooses its first episode: no empty in-between. */
   const chooseProject = useCallback(
@@ -209,7 +272,19 @@ export function App(): JSX.Element {
         {project !== null && project.episodes.length === 0 ? (
           <p className="empty">Projekt {project.id} nie ma jeszcze odcinka.</p>
         ) : null}
-        {status === null ? null : <Ladder status={status} />}
+        {status === null ? null : (
+          <Ladder onOpen={openCell} openable={openable} opened={opened} status={status} />
+        )}
+        {panel === null || projectId === null || episodeId === null ? null : (
+          <ScreenplayPanel
+            cell={panel}
+            episodeId={episodeId}
+            onRun={start}
+            projectId={projectId}
+            run={run}
+            running={running}
+          />
+        )}
       </main>
       <footer className="app-footer">
         <div className="wrap">

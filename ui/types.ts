@@ -10,6 +10,24 @@
 
 export type CellState = "approved" | "blocked" | "ready" | "review" | "running";
 
+/**
+ * Stage 1's own object, as `check --stage screenplay --json` prints it and as
+ * the ladder carries it inside its stage-1 cell. Declared, never derived: the
+ * panel renders these fields and computes no verdict of its own.
+ */
+export interface ScreenplayStatus {
+  readonly approved: boolean;
+  /** Stage-0 inputs whose bytes no longer match what this screenplay was written from. */
+  readonly inputsChanged: readonly string[];
+  readonly problems: readonly string[];
+  readonly status: "absent" | "completed" | "submitted";
+  readonly verdict: {
+    readonly durationSeconds: number;
+    readonly longestSceneSeconds: number;
+    readonly scenes: number;
+  } | null;
+}
+
 export interface StatusCell {
   /** Set only where a cell is per character, which is stage 2 alone. */
   readonly character: string | null;
@@ -24,6 +42,11 @@ export interface StatusCell {
   readonly title: string;
   readonly track: string | null;
 }
+
+/** What a started command said when it finished, under the id it was given. */
+export type RunDone =
+  | { readonly data: string; readonly ok: true; readonly runId: string }
+  | { readonly error: Refusal["error"]; readonly ok: false; readonly runId: string };
 
 export interface EpisodeStatus {
   readonly cells: readonly StatusCell[];

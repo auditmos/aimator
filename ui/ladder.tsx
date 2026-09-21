@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { type JSX, useCallback } from "react";
 import type { CellState, EpisodeStatus, StatusCell } from "./types.js";
 
 /**
@@ -31,19 +31,47 @@ function where(cell: StatusCell): string | null {
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
-function Cell(props: { readonly cell: StatusCell; readonly isNext: boolean }): JSX.Element {
-  const { cell, isNext } = props;
+interface CellProps {
+  readonly cell: StatusCell;
+  readonly isNext: boolean;
+  readonly isOpen: boolean;
+  /** Set only where a panel exists; the other stages arrive one slice at a time. */
+  readonly onOpen: ((id: string) => void) | null;
+}
+
+function Cell(props: CellProps): JSX.Element {
+  const { cell, isNext, isOpen, onOpen } = props;
+  const open = useCallback(() => onOpen?.(cell.id), [cell.id, onOpen]);
   const place = where(cell);
   const notices = cell.status?.notices ?? [];
-
-  return (
-    <li className={isNext ? "cell cell-next" : "cell"}>
+  const classes = ["cell", isNext ? "cell-next" : "", isOpen ? "cell-open" : ""]
+    .filter((name) => name !== "")
+    .join(" ");
+  const body = (
+    <>
       <span className="cell-stage">{cell.stage}</span>
       <span className="cell-title">
         {cell.title}
         {place === null ? null : <span className="cell-where">{place}</span>}
       </span>
       <span className={`state state-${cell.state}`}>{LABEL[cell.state]}</span>
+    </>
+  );
+
+  return (
+    <li className={classes}>
+      {onOpen === null ? (
+        <span className="cell-body">{body}</span>
+      ) : (
+        <button
+          aria-expanded={isOpen}
+          className="cell-body cell-button"
+          onClick={open}
+          type="button"
+        >
+          {body}
+        </button>
+      )}
       {cell.reason === null ? null : <p className="cell-reason">{cell.reason}</p>}
       {notices.map((notice) => (
         <p className="cell-notice" key={notice}>
@@ -54,8 +82,14 @@ function Cell(props: { readonly cell: StatusCell; readonly isNext: boolean }): J
   );
 }
 
-export function Ladder(props: { readonly status: EpisodeStatus }): JSX.Element {
-  const { status } = props;
+export function Ladder(props: {
+  readonly onOpen: (id: string) => void;
+  readonly opened: string | null;
+  /** Which cells have a panel today. A cell without one stays a row. */
+  readonly openable: (cell: StatusCell) => boolean;
+  readonly status: EpisodeStatus;
+}): JSX.Element {
+  const { onOpen, openable, opened, status } = props;
 
   return (
     <section aria-labelledby="ladder-title" className="ladder-section">
@@ -74,7 +108,13 @@ export function Ladder(props: { readonly status: EpisodeStatus }): JSX.Element {
       </div>
       <ol className="ladder">
         {status.cells.map((cell) => (
-          <Cell cell={cell} isNext={cell.id === status.next?.cell} key={cell.id} />
+          <Cell
+            cell={cell}
+            isNext={cell.id === status.next?.cell}
+            isOpen={cell.id === opened}
+            key={cell.id}
+            onOpen={openable(cell) ? onOpen : null}
+          />
         ))}
       </ol>
     </section>

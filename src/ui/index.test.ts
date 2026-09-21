@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -47,6 +47,11 @@ async function cli(...argv: readonly string[]): Promise<string> {
   return result.data;
 }
 
+interface Frame {
+  readonly data: string;
+  readonly event: string;
+}
+
 /** A frame of the event stream, read off the socket and put back together. */
 class Events {
   private readonly decoder = new TextDecoder();
@@ -57,7 +62,7 @@ class Events {
     this.reader = body.getReader();
   }
 
-  async next(): Promise<string> {
+  async next(): Promise<Frame> {
     while (!this.buffered.includes("\n\n")) {
       // biome-ignore lint/performance/noAwaitInLoops: a stream arrives in order
       const { done, value } = await this.reader.read();
@@ -71,12 +76,27 @@ class Events {
 
     const [frame = "", ...rest] = this.buffered.split("\n\n");
     this.buffered = rest.join("\n\n");
+    const lines = frame.split("\n");
 
-    return frame
-      .split("\n")
-      .filter((line) => line.startsWith("data: "))
-      .map((line) => line.slice("data: ".length))
-      .join("\n");
+    return {
+      data: lines
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => line.slice("data: ".length))
+        .join("\n"),
+      event: lines.find((line) => line.startsWith("event: "))?.slice("event: ".length) ?? "",
+    };
+  }
+
+  /** The next frame of one kind, skipping the ladder pushed on the way. */
+  async nextOf(event: string): Promise<Frame> {
+    for (;;) {
+      // biome-ignore lint/performance/noAwaitInLoops: a stream arrives in order
+      const frame = await this.next();
+
+      if (frame.event === event) {
+        return frame;
+      }
+    }
   }
 
   async close(): Promise<void> {
@@ -167,7 +187,9 @@ describe("the UI server", () => {
     const events = new Events(response.body as ReadableStream<Uint8Array>);
     const first = await events.next();
 
-    expect(JSON.parse(first)).toEqual(JSON.parse(await cli("status", PROJECT, EPISODE, "--json")));
+    expect(JSON.parse(first.data)).toEqual(
+      JSON.parse(await cli("status", PROJECT, EPISODE, "--json"))
+    );
     await events.close();
   });
 
@@ -198,7 +220,166 @@ describe("the UI server", () => {
       ),
     ]);
 
-    expect(JSON.parse(pushed)).toMatchObject({ command: "status", episodeId: EPISODE });
+    expect(JSON.parse(pushed.data)).toMatchObject({ command: "status", episodeId: EPISODE });
+    await events.close();
+  });
+});
+
+/**
+ * The one place in this module where an identifier becomes a path.
+ *
+ * The client addresses an artifact by what it is (project, episode, stage,
+ * artifact) and never by where it lives, because the layout is `workspace.ts`'s
+ * to know and a browser that learned it would be reading the tree twice. What
+ * this resolver owes is therefore narrow and absolute: a tuple that names
+ * something the layout knows becomes its bytes, and anything else is a 404
+ * rather than a path walked out of the workspace.
+ */
+describe("the artifact resolver", () => {
+  it("should serve the screenplay as the markdown it is", async () => {
+    const response = await createUi({ workspace }).request(
+      `/api/artifact/${PROJECT}/${EPISODE}/screenplay/screenplay`
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/markdown");
+    expect(await response.text()).toBe(
+      await readFile(join(episodeRoot(), "screenplay.md"), "utf8")
+    );
+  });
+
+  it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
+    const secret = join(scratch, "sekret.md");
+
+    await writeFile(secret, "TAJNE\n", "utf8");
+
+    const app = createUi({ workspace });
+    const answers = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/${EPISODE}/screenplay/${encodeURIComponent("../../../../../../etc/passwd")}`,
+        `/api/artifact/${encodeURIComponent("..")}/${EPISODE}/screenplay/screenplay`,
+        `/api/artifact/${PROJECT}/${encodeURIComponent("../..")}/screenplay/screenplay`,
+        `/api/artifact/${PROJECT}/${EPISODE}/screenplay/${encodeURIComponent(secret)}`,
+        `/api/artifact/${PROJECT}/${EPISODE}/montaz/episode`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return { body: await response.text(), status: response.status };
+      })
+    );
+
+    expect(answers.map((one) => one.status)).toEqual([404, 404, 404, 404, 404]);
+    expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
+  });
+});
+
+/**
+ * A command started here, and answered where the ladder is answered.
+ *
+ * The request returns an identifier and nothing else, because the clip stage
+ * polls a provider for minutes and a browser that waited for it would be a
+ * browser that cannot show anything else meanwhile. The result arrives on the
+ * stream the episode already has open: one connection, one order of events,
+ * and no window in which a result exists and has nowhere to go.
+ *
+ * The server does not read the argv it is handed. Which command is legal is
+ * the CLI's answer, given by refusing, and a second opinion here would be the
+ * private road `imports.test.ts` exists to prevent.
+ */
+describe("running a command", () => {
+  it("should answer with a run id at once and deliver the result as an event", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: ["check", PROJECT, EPISODE, "--stage", "screenplay", "--json"],
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+
+    expect(started.status).toBe(202);
+
+    const { runId } = (await started.json()) as { runId: string };
+
+    expect(runId).not.toBe("");
+
+    const finished = await events.nextOf("run");
+
+    expect(JSON.parse(finished.data)).toEqual({
+      data: await cli("check", PROJECT, EPISODE, "--stage", "screenplay", "--json"),
+      ok: true,
+      runId,
+    });
+    await events.close();
+  });
+
+  /**
+   * The loopback address is the security model, and it is not the whole one.
+   *
+   * Any page open in this browser can post to `127.0.0.1:4317`; CORS would
+   * stop it reading the answer and would not stop the command running, and
+   * from the next slice on a command spends money. Two checks close that:
+   * a foreign `Origin` is refused, and a body has to be JSON, which is what
+   * makes the browser ask permission before sending anything at all.
+   */
+  it("should refuse a command posted by a page that is not this one", async () => {
+    const response = await createUi({ workspace }).request("/api/run", {
+      body: JSON.stringify({ argv: ["list"] }),
+      headers: { "content-type": "application/json", origin: "https://zla-strona.example" },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { name: "ForbiddenError" } });
+  });
+
+  it("should refuse a body that needed no permission to send", async () => {
+    const response = await createUi({ workspace }).request("/api/run", {
+      body: JSON.stringify({ argv: ["list"] }),
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(415);
+  });
+
+  it("should carry a refusal in the words the terminal would print", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({ argv: ["approve", "nie-ma", EPISODE, "--stage", "screenplay"] }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+    const refused = await run([
+      "approve",
+      "nie-ma",
+      EPISODE,
+      "--stage",
+      "screenplay",
+      "--workspace",
+      root,
+    ]);
+
+    expect(JSON.parse(finished.data)).toEqual({
+      error: {
+        message: refused.ok ? "" : refused.error.message,
+        name: refused.ok ? "" : refused.error.name,
+      },
+      ok: false,
+      runId,
+    });
     await events.close();
   });
 });

@@ -273,10 +273,31 @@ h1 {
 }
 .cell {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
   gap: 0.25rem 0.75rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--color-neutral-800);
+}
+.cell-body {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  width: 100%;
+}
+
+/* A cell with a panel is a button; one without is a row. The difference is
+   visible on hover and in the focus ring, never in colour alone. */
+.cell-button {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+.cell-open {
+  background: var(--color-neutral-900);
 }
 .cell:first-child {
   border-top: 0;
@@ -292,6 +313,9 @@ h1 {
 .cell-title {
   min-width: 0;
   color: var(--color-neutral-50);
+}
+.cell-button:hover .cell-title {
+  text-decoration: underline;
 }
 .cell-where {
   margin-left: 0.5rem;
@@ -316,8 +340,7 @@ h1 {
 }
 .cell-reason,
 .cell-notice {
-  grid-column: 2 / -1;
-  margin: 0;
+  margin: 0 0 0 2.75rem;
   font-size: 0.875rem;
 }
 .cell-reason {
@@ -332,6 +355,136 @@ h1 {
 .cell-notice::before {
   content: "· ";
 }
+/* The panel: one stage, its verdict, its artifact and its one yes. Every
+   button carries the command it runs, so what is clickable is also pasteable. */
+.panel {
+  padding: 1.25rem;
+  margin-top: 2rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.panel h2,
+.panel h3 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-neutral-50);
+}
+.panel h3 {
+  margin-top: 2rem;
+  font-size: 1rem;
+}
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin: 0 0 1rem;
+}
+.verdict dt {
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.verdict dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-neutral-50);
+}
+.drift {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--color-warning-text);
+  border: 1px solid currentcolor;
+  border-radius: 0.25rem;
+}
+.drift-title,
+.drift ul {
+  margin: 0;
+}
+.drift ul {
+  padding-left: 1.25rem;
+}
+.problem {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-warning-text);
+}
+.problem::before {
+  content: "! ";
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+.action {
+  min-height: 44px;
+  padding: 0 1rem;
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--color-neutral-50);
+  cursor: pointer;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.action:disabled {
+  color: var(--color-neutral-500);
+  cursor: not-allowed;
+}
+.action-primary {
+  font-weight: 600;
+  color: var(--color-accent-contrast);
+  background: var(--color-brand-accent);
+  border-color: var(--color-brand-accent);
+}
+.action-primary:disabled {
+  color: var(--color-accent-contrast);
+  opacity: 0.5;
+}
+.command {
+  padding: 0.25rem 0.5rem;
+  color: var(--color-neutral-300);
+  overflow-wrap: anywhere;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.actions-note,
+.panel-empty,
+.run-pending {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-400);
+}
+.run-output,
+.artifact-text {
+  padding: 0.75rem 1rem;
+  margin: 1rem 0 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-neutral-300);
+  white-space: pre-wrap;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.run-refused {
+  color: light-dark(#991b1b, oklch(93.6% 0.032 17.717));
+  border-color: currentcolor;
+}
+.artifact-text {
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
 .app-footer {
   padding-block: 1.5rem;
   font-size: 0.75rem;
@@ -346,7 +499,7 @@ h1 {
   overflow-wrap: anywhere;
 }
 @media (width <= 40rem) {
-  .cell {
+  .cell-body {
     grid-template-columns: 2rem minmax(0, 1fr);
   }
   .state {
