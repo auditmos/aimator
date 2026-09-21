@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { run } from "./cli.js";
+import { run } from "./cli/index.js";
 
 // The only place that touches the process boundary: streams and exit code.
 const result = await run(process.argv.slice(2));

@@ -91,10 +91,30 @@ becomes a reviewed intermediate whose yes stage 10 gates on rather than reproduc
 src/
 ├── index.ts          # Package API: re-exports what consumers need
 ├── bin.ts            # Executable: shebang, streams, exit code
-├── cli.ts            # Single-file form: run(argv): Promise<Result<string>>
 ├── cli.test.ts
 ├── cli.usage.test.ts # The freeze: --help byte for byte, one snapshot per usage line
 ├── __snapshots__/    # What the freeze compares against
+├── cli/              # Folder form: index.ts is the only entry, one file per stage
+│   ├── index.ts      # Public: run(argv): Promise<Result<string>>, nothing else
+│   ├── usage.ts      # Internal: one --help text, assembled from the fragments
+│   ├── common.ts     # Internal: the grammar under every command
+│   ├── check.ts      # Internal: the cross-stage command that writes nothing
+│   ├── approve.ts    # Internal: the cross-stage command that records a yes
+│   ├── imports.test.ts # The shape: one export at the entry, no stage reaching
+│   │                   #            into another
+│   └── stages/       # Internal: usage fragment, flags, dispatch, renderers
+│       ├── project.ts        # Etap 0: the rules, and who narrates
+│       ├── episode.ts        # Etap 0: the five production settings
+│       ├── character.ts      # Etap 0's cast and etap 2's images: one command
+│       ├── screenplay.ts     # Etap 1
+│       ├── shot-list.ts      # Etap 3
+│       ├── prompt-package.ts # Etap 4, and the free preview of a send
+│       ├── references.ts     # Etap 5
+│       ├── opening-frame.ts  # Etap 6
+│       ├── clips.ts          # Etap 7
+│       ├── assembly.ts       # Etap 8
+│       ├── narration.ts      # Etap 9
+│       └── sound-design.ts   # Etap 10
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form: the published page; not a pipeline domain
@@ -542,10 +562,26 @@ Small interface, large implementation (Ousterhout). A module absorbs complexity 
 | Config | `src/config/index.ts` | Typed `config` object | Env wiring, defaults, coercion |
 | Env | `src/lib/env.ts` | `env` | Zod schemas, `.env` loading, `process.env` access |
 | Layout | `src/lib/workspace.ts` | Path builders + id rules | Every directory and file name in the workspace |
-| CLI | `src/cli.ts` | `run(argv): Promise<Result<string>>` | Argument parsing, usage text, command dispatch |
+| CLI | `src/cli/index.ts` | `run(argv): Promise<Result<string>>` | Argument parsing, usage text, command dispatch |
 | Executable | `src/bin.ts` | none, a process entry | `process.argv`, stdout/stderr, exit code |
 
 `bin.ts` stays a shim on purpose: keeping streams and exit codes out of `run()` is what lets the CLI be tested by calling a function instead of spawning a process. `run` is async because stages write files and later stages call HTTP, but it still never touches `process`, a stream or an exit code, which is the invariant that matters.
+
+`src/cli` took the growth path below at eleven stages and 3600 lines, and the split is by
+**command**, not by stage, because a command is what the parser dispatches on: `character`
+straddles stage 0's cast and stage 2's images, so it is one file contributing a fragment to
+two blocks of the usage text rather than two files sharing a dispatcher. A stage file brings
+its usage fragment, its flags, its dispatch and its renderers, and brings nothing else: what
+two of them would copy is promoted to `common.ts`, which is why the stage-0 report renderer
+lives there and each stage's model flag does not. **No stage file imports another**, checked
+by `cli/imports.test.ts` rather than remembered, because the one failure this split can have
+is a stage reaching into another's renderers, and that reads as an ordinary import.
+
+`check` and `approve` are the two commands that are nobody's stage, so they sit beside the
+entry and call into the stage files. That direction is the only one allowed: a dispatcher may
+know its stages, a stage may never know its siblings. The usage text is assembled the same
+way, from the fragments the stages own, so a stage that grows a flag writes it in its own
+file and `usage.ts` does not change.
 
 ### Growth path
 

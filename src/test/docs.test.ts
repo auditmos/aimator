@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { run } from "../cli.js";
+import { run } from "../cli/index.js";
 
 /**
  * The documentation is the one artifact in this repo that nothing else proves.
