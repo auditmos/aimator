@@ -66,24 +66,37 @@ dla wszystkich odcinków, a nie artefakt tego wydania.
 
 ## Gdzie leżą pliki
 
-Strona i media to jedna paczka **Cloudflare Workers Static Assets**. Build sprawdza
-[limit 25 MiB na plik](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/)
-i odrzuca każdy plik, którego SHA-256 nie zgadza się z rejestrem.
+Bajty wydania leżą w dwóch miejscach, podzielone według tego, czym są.
 
-Adres pliku: `https://aimator.auditmos.com/media/<wersja>/<nazwa>`. Cloudflare Static
-Assets zwraca na żądanie Range całość ze statusem 200, więc `src/site/worker.ts` obsługuje
-`/media/*`: pojedyncze zakresy bajtów, odczyt od podanej pozycji i od końca, If-Range,
-odpowiedzi 206/416. Czyta strumień i kończy odczyt po żądanym fragmencie, bez ładowania
-całego MP4 do pamięci. Wewnętrzny binding nie zawsze podaje `Content-Length`; generowany
-`media-index.json` zawiera rozmiary plików z tej samej paczki wdrożeniowej.
+**Tekst jest w repozytorium.** Plik źródłowy odcinka (`site/sources/<wersja>/`) i dokumenty
+etapów (`site/documents/<wersja>/`) są małe, warto je czytać w diffie, a strona je cytuje,
+nie tylko linkuje. Idą do paczki **Cloudflare Workers Static Assets** razem ze stroną —
+całość waży około 350 KB.
 
-Przy rosnącej bibliotece przejdź na **R2 z własną domeną**. To następny etap, nie obecna
-zależność. Zachowaj strukturę `<wersja>/<plik>`; zmień budowanie URL-i i politykę
-`media-src` / `img-src` w `site/_headers`.
+**Media są w R2**, w prywatnym buckecie `aimator-site-media` (WEUR). Filmy i obrazy się
+strumieniuje, nie czyta, a bucket jest jedyną kopią, która przeżyje laptopa, na którym
+powstały. Bucket **nie ma publicznej domeny ani adresu `r2.dev`**: jedynym czytelnikiem jest
+Worker, na własnym origin strony. To dlatego strona może zostać przy `default-src 'self'`
+i dlatego link „pobierz" nadal pobiera, zamiast otwierać obcą domenę.
 
-`out/` jest w `.gitignore`, więc **zamrożone pliki wydania żyją tylko lokalnie**. Build
-wymaga ich obecności i niczego nie regeneruje w razie braku. Publikacja nie zastępuje kopii
-zapasowej eksportów.
+Ten podział zdejmuje dwie rzeczy naraz. Nie obowiązuje już
+[limit 25 MiB na plik](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/),
+bo to limit Static Assets, a nie R2. I **`pnpm site:build` nie potrzebuje niczego z `out/`** —
+świeży klon repozytorium przebuduje i wdroży stronę, a filmy zostaną tam, gdzie były. Tylko
+`pnpm site:media` czyta zamrożone eksporty, wyłącznie po to, żeby je wysłać.
+
+Adres pliku: `https://aimator.auditmos.com/media/<wersja>/<nazwa>` — klucz w buckecie to
+`<wersja>/<nazwa>`. `src/site/worker.ts` obsługuje `/media/*` i nic więcej: zakresy bajtów,
+odczyt od podanej pozycji i od końca, If-Range, HEAD, odpowiedzi 200/206/404/416. R2
+przyjmuje offset, więc przewinięcie na 1:15 czyta wyłącznie bajty, o które poprosiła
+przeglądarka — wcześniej, gdy filmy były assetami, trzeba było przeczytać i wyrzucić
+pierwsze 75 sekund.
+
+`pnpm site:media` wysyła **bezwarunkowo**, po sprawdzeniu każdego pliku przeciw sumie
+SHA-256 z rejestru. To nie jest niedopatrzenie: skoro bajty się zgadzają, ponowne wysłanie
+może zapisać tylko ten sam plik, a pomijanie tego, co już jest, wymagałoby HEAD-a, którego
+Wrangler nie oferuje — albo drugiej listy „co już opublikowano", czyli dokładnie tej
+rozbieżności, przed którą chroni reguła 7.
 
 ## Kolejne wydanie
 
@@ -91,8 +104,8 @@ zapasowej eksportów.
    roczny i niezmienny, a build i tak odmówi. Nie aktualizuj sum starego wydania, żeby
    obejść kontrolę — zarejestruj zmienione pliki jako nową wersję.
 2. Skopiuj materiały z workspace do `out/releases/<wersja>/` i przekoduj je na postać
-   webową. Modele wideo oddają HEVC, którego przeglądarki poza Safari nie odtworzą, a
-   oryginały mają kilkadziesiąt megabajtów:
+   webową. Powodem jest **kodek, nie rozmiar** — R2 zniósł limit wielkości pliku, ale modele
+   wideo oddają HEVC, którego przeglądarki poza Safari nie odtworzą:
 
    ```bash
    ffmpeg -i mixed.mp4 -c:v libx264 -preset slow -crf 23 -maxrate 2000k -bufsize 4000k \
@@ -106,29 +119,33 @@ zapasowej eksportów.
 3. Dodaj miniaturę każdego toru do `site/assets/releases/<wersja>/<tor>.jpg`:
    `ffmpeg -ss 3 -i <tor>-mixed.mp4 -frames:v 1 -vf scale=960:-2 -q:v 3 miniatura.jpg`.
    Skala 960 px szerokości jest konwencją wszystkich miniatur.
-4. Dodaj zamrożony plik źródłowy do `site/sources/<wersja>/` i `site/releases/<wersja>.json`
-   na wzór poprzedniego: data, tytuł, faktyczne zmiany, dokładny commit GitHub, widoczność
-   repozytorium, rozdzielczości i sumy SHA-256 **mierzone z gotowych plików**, nie
-   deklarowane.
+4. Dodaj zamrożony plik źródłowy do `site/sources/<wersja>/`, dokumenty etapów do
+   `site/documents/<wersja>/` i `site/releases/<wersja>.json` na wzór poprzedniego: data,
+   tytuł, faktyczne zmiany, dokładny commit GitHub, widoczność repozytorium, rozdzielczości
+   i sumy SHA-256 **mierzone z gotowych plików**, nie deklarowane.
 5. `pnpm site:build` i `pnpm site:preview`, sprawdź nowe materiały w obu motywach
-   i obu językach.
-6. `pnpm site:deploy` publikuje **publicznie** wszystkie zarejestrowane wydania.
+   i obu językach. Podgląd czyta media z **prawdziwego** bucketu (`remote` w konfiguracji
+   bindingu), więc nowe pliki zobaczysz dopiero po `pnpm site:media`.
+6. `pnpm site:deploy` robi trzy rzeczy po kolei: buduje stronę, wysyła media do R2
+   i publikuje **publicznie** wszystkie zarejestrowane wydania.
 
 ## Weryfikacja
 
-`wrangler.site.jsonc` publikuje wyłącznie `out/site` pod `aimator.auditmos.com`. Jedyny
-binding to `ASSETS`; nie ma baz, API ani uploadu `.env` czy workspace. Worker serwuje
-fragmenty istniejących plików i nic nie generuje. Konfiguracja używa `404-page`, więc błędny
-adres pliku zwraca 404, a nie HTML strony.
+`wrangler.site.jsonc` publikuje wyłącznie `out/site` pod `aimator.auditmos.com`. Bindingi są
+dwa: `ASSETS` i `MEDIA` (bucket tylko do odczytu); nie ma baz, API ani uploadu `.env` czy
+workspace. Worker serwuje istniejące obiekty i nic nie generuje. `run_worker_first` obejmuje
+wyłącznie `/media/*` — reszta idzie prosto z assetów, z `_headers` i bez wywołania Workera,
+a `404-page` odpowiada na błędny adres.
 
-Przed publikacją: `pnpm types`, `pnpm test`, `pnpm lint`, `pnpm site:build`,
+Przed publikacją: `pnpm types`, `pnpm test`, `pnpm lint`, `pnpm unused`, `pnpm site:build`,
 `pnpm exec wrangler deploy --config wrangler.site.jsonc --dry-run`.
 
-`src/site/index.test.ts` sprawdza zawartość paczki, brak publikacji prywatnych plików,
-escapowanie tekstu z rejestru, obie wersje językowe i powrót do polskiej, wykrywanie
-podmienionych i brakujących mediów, limit 25 MiB, zachowanie poprzedniego buildu
-i `media-index.json`. `src/site/worker.test.ts` sprawdza zakresy bajtów, zakończenie
-odczytu po wysłaniu fragmentu, If-Range, błędne zakresy i rozmiar z indeksu.
+`src/site/index.test.ts` sprawdza zawartość paczki, brak publikacji prywatnych plików i
+mediów, budowanie bez żadnych eksportów na dysku, escapowanie tekstu z rejestru, obie wersje
+językowe i powrót do polskiej, wykrywanie podmienionych i brakujących plików, zachowanie
+poprzedniego buildu oraz to, że publikacja mediów nie oddaje bucketowi pliku, którego bajty
+się zmieniły. `src/site/worker.test.ts` sprawdza zakresy bajtów, to że bucket dostaje
+dokładnie żądany offset, If-Range, HEAD, błędne zakresy i 404 na brakujący klucz.
 
 Dwa wyjątki w `biome.jsonc` mają powód zapisany na miejscu: `site/index.html` jest
 szablonem, który build przepisuje podstawieniami tekstowymi, więc formatter go nie dotyka,

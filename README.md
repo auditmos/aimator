@@ -131,8 +131,9 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 | `pnpm unused` | Nieużywany kod (Knip) |
 | `pnpm update` | Interaktywna aktualizacja zależności (Taze) |
 | `pnpm site:build` | Zbuduj stronę wydań do `out/site` |
-| `pnpm site:preview` | Zbuduj i podejrzyj ją lokalnie |
-| `pnpm site:deploy` | Opublikuj ją na `aimator.auditmos.com` |
+| `pnpm site:media` | Wyślij filmy i obrazy wydania do R2 |
+| `pnpm site:preview` | Zbuduj i podejrzyj stronę lokalnie |
+| `pnpm site:deploy` | Zbuduj, wyślij media i opublikuj na `aimator.auditmos.com` |
 
 `pnpm dev` używa `tsx`, a nie natywnego strippingu typów w Node, bo rozdzielczość
 `Node16` w TypeScripcie zapisuje specyfikatory `.js`, których Node nie zmapuje z powrotem

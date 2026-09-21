@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, rm, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildSite } from "./index.js";
+import { buildSite, publishMedia } from "./index.js";
 
 /**
- * The site build, tested through its entry. What every case below is really
- * about is the one promise this module makes: a published release never
- * changes. The build is therefore expected to refuse far more often than it is
- * expected to succeed.
+ * The build and the media publisher, tested through their entry. What every
+ * case below is really about is the one promise this module makes: a published
+ * release never changes. Both are therefore expected to refuse far more often
+ * than they are expected to succeed.
  */
 
 const sha = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
@@ -99,19 +99,22 @@ function registry(version: string): Registry {
 
 const roots: string[] = [];
 
+/** The text a release publishes lives in the repository; its media do not. */
 async function addRelease(root: string, version: string, overrides: Registry = {}) {
   const exports = join(root, "out", "releases", version);
   await mkdir(exports, { recursive: true });
   await writeFile(join(exports, "gpt-image-mixed.mp4"), VIDEO);
   await writeFile(join(exports, "gpt-image-r01.jpg"), STILL);
-  await writeFile(join(exports, "shot-list.md"), DOCUMENT);
+  await mkdir(join(root, "site", "documents", version), { recursive: true });
+  await writeFile(join(root, "site", "documents", version, "shot-list.md"), DOCUMENT);
   await mkdir(join(root, "site", "sources", version), { recursive: true });
   await writeFile(join(root, "site", "sources", version, "source.md"), SOURCE);
   await mkdir(join(root, "site", "assets", "releases", version), { recursive: true });
   await writeFile(join(root, "site", "assets", "releases", version, "gpt-image.jpg"), STILL);
-  const entry = { ...registry(version), ...overrides };
-  await writeFile(join(root, "site", "releases", `${version}.json`), JSON.stringify(entry));
-  return entry;
+  await writeFile(
+    join(root, "site", "releases", `${version}.json`),
+    JSON.stringify({ ...registry(version), ...overrides })
+  );
 }
 
 /** A repository with one release, plus a private file the build must not copy. */
@@ -159,6 +162,18 @@ async function published(root: string): Promise<string[]> {
   return (await walk(out, "")).sort();
 }
 
+/** A bucket that records what it was handed instead of uploading it. */
+function uploader() {
+  const put: string[] = [];
+  return {
+    put,
+    upload: (version: string, file: string) => {
+      put.push(`${version}/${file}`);
+      return Promise.resolve();
+    },
+  };
+}
+
 const indexHtml = (root: string) => readFile(join(root, "out", "site", "index.html"), "utf8");
 
 afterEach(async () => {
@@ -169,7 +184,7 @@ afterEach(async () => {
 });
 
 describe("buildSite", () => {
-  it("should publish the allowlist, the media and nothing else", async () => {
+  it("should publish the allowlist and the release text, and nothing else", async () => {
     const root = await repository();
 
     const result = await buildSite(root);
@@ -177,13 +192,35 @@ describe("buildSite", () => {
     expect(result.ok).toBe(true);
     const files = await published(root);
     expect(files).toContain("styles.css");
-    expect(files).toContain("media/0.1.0/gpt-image-mixed.mp4");
     expect(files).toContain("sources/0.1.0/source.md");
+    expect(files).toContain("documents/0.1.0/shot-list.md");
     expect(files).toContain("releases/0.1.0/index.html");
     // The registry describes the release; it is not itself a published file.
     expect(files).not.toContain("releases/0.1.0.json");
     expect(files).not.toContain("notes.txt");
     expect(files.some((file) => file.includes(".env"))).toBe(false);
+  });
+
+  it("should leave the media out of the bundle entirely", async () => {
+    const root = await repository();
+
+    await buildSite(root);
+
+    const files = await published(root);
+    expect(files.some((file) => file.startsWith("media/"))).toBe(false);
+    expect(files.some((file) => file.endsWith(".mp4"))).toBe(false);
+    // The page still links them; the worker answers those paths from the bucket.
+    expect(await indexHtml(root)).toContain("/media/0.1.0/gpt-image-mixed.mp4");
+  });
+
+  it("should build with no frozen exports on disk at all", async () => {
+    const root = await repository();
+    await rm(join(root, "out", "releases"), { force: true, recursive: true });
+
+    const result = await buildSite(root);
+
+    expect(result.ok).toBe(true);
+    expect(await indexHtml(root)).toContain("Pierwszy odcinek przeszedł całą ścieżkę.");
   });
 
   it("should carry both languages, falling back to Polish where a release is untranslated", async () => {
@@ -244,55 +281,34 @@ describe("buildSite", () => {
     expect(older).toContain(">v0.1.0 · aimator: film · Auditmos</title>");
   });
 
-  it("should refuse an export whose bytes changed and keep the previous build", async () => {
+  it("should refuse a stage document whose bytes changed", async () => {
     const root = await repository();
-    await buildSite(root);
-    await writeFile(join(root, "out", "releases", "0.1.0", "gpt-image-mixed.mp4"), "a re-render");
+    await writeFile(join(root, "site", "documents", "0.1.0", "shot-list.md"), "# Inne ujęcia\n");
 
     const result = await buildSite(root);
 
     expect(result.ok).toBe(false);
-    expect(result.ok ? "" : result.error.message).toContain("gpt-image-mixed.mp4");
-    // The site that was already published is still the one on disk.
-    expect(await indexHtml(root)).toContain("Pierwszy odcinek przeszedł całą ścieżkę.");
+    expect(result.ok ? "" : result.error.message).toContain("changed: shot-list.md");
   });
 
-  it("should report a registered file that is not on disk", async () => {
+  it("should keep the previous build when a release stops validating", async () => {
     const root = await repository();
-    await rm(join(root, "out", "releases", "0.1.0", "gpt-image-r01.jpg"));
-
-    const result = await buildSite(root);
-
-    expect(result.ok ? "" : result.error.message).toBe("missing: gpt-image-r01.jpg");
-  });
-
-  it("should refuse a file above the 25 MiB Static Assets bound", async () => {
-    const root = await repository();
-    await truncate(
-      join(root, "out", "releases", "0.1.0", "gpt-image-mixed.mp4"),
-      25 * 1024 * 1024 + 1
-    );
-
-    const result = await buildSite(root);
-
-    expect(result.ok ? "" : result.error.message).toContain("25 MiB");
-  });
-
-  it("should refuse a source directory that is not a frozen export", async () => {
-    const root = await repository({ sourceDirectory: "site" });
-
-    const result = await buildSite(root);
-
-    expect(result.ok ? "" : result.error.message).toContain("inside out/");
-  });
-
-  it("should refuse a source document whose bytes changed", async () => {
-    const root = await repository();
+    await buildSite(root);
     await writeFile(join(root, "site", "sources", "0.1.0", "source.md"), "# Inna burza\n");
 
     const result = await buildSite(root);
 
-    expect(result.ok ? "" : result.error.message).toBe("source document changed.");
+    expect(result.ok ? "" : result.error.message).toContain("changed: source.md");
+    expect(await indexHtml(root)).toContain("Pierwszy odcinek przeszedł całą ścieżkę.");
+  });
+
+  it("should report a registered document that is not on disk", async () => {
+    const root = await repository();
+    await rm(join(root, "site", "documents", "0.1.0", "shot-list.md"));
+
+    const result = await buildSite(root);
+
+    expect(result.ok ? "" : result.error.message).toBe("missing: shot-list.md");
   });
 
   it("should refuse a release that names another repository", async () => {
@@ -301,18 +317,6 @@ describe("buildSite", () => {
     const result = await buildSite(root);
 
     expect(result.ok ? "" : result.error.message).toContain("repository");
-  });
-
-  it("should record every published file's size for the range worker", async () => {
-    const root = await repository();
-
-    await buildSite(root);
-
-    const index: Record<string, number> = JSON.parse(
-      await readFile(join(root, "out", "site", "media-index.json"), "utf8")
-    );
-    expect(index["/media/0.1.0/gpt-image-mixed.mp4"]).toBe(VIDEO.byteLength);
-    expect(index["/media/0.1.0/shot-list.md"]).toBe(Buffer.byteLength(DOCUMENT));
   });
 
   it("should write an English machine twin alongside the page", async () => {
@@ -324,5 +328,64 @@ describe("buildSite", () => {
     expect(markdown).toContain("# aimator by Auditmos");
     expect(markdown).toContain("Two image models drew it.");
     expect(markdown).toContain("[View this release](/releases/0.1.0/)");
+  });
+});
+
+describe("publishMedia", () => {
+  it("should hand the bucket every media file the registry declares", async () => {
+    const root = await repository();
+    const bucket = uploader();
+
+    const result = await publishMedia(root, bucket.upload);
+
+    expect(result.ok).toBe(true);
+    expect(bucket.put).toEqual(["0.1.0/gpt-image-mixed.mp4", "0.1.0/gpt-image-r01.jpg"]);
+  });
+
+  it("should never hand over a file whose bytes changed", async () => {
+    const root = await repository();
+    const bucket = uploader();
+    // Same length as the registered film, so only the hash can tell them apart.
+    const rerender = "A FINISHED FILM, IN SPIRIT";
+    expect(rerender.length).toBe(VIDEO.byteLength);
+    await writeFile(join(root, "out", "releases", "0.1.0", "gpt-image-mixed.mp4"), rerender);
+
+    const result = await publishMedia(root, bucket.upload);
+
+    expect(result.ok ? "" : result.error.message).toContain("changed: gpt-image-mixed.mp4");
+    expect(bucket.put).toEqual([]);
+  });
+
+  it("should refuse a film whose declared size is not its real one", async () => {
+    const tracks = registry("0.1.0").tracks as Record<string, unknown>[];
+    const root = await repository({ tracks: [{ ...tracks[0], bytes: 99 }] });
+    const bucket = uploader();
+
+    const result = await publishMedia(root, bucket.upload);
+
+    expect(result.ok ? "" : result.error.message).toContain("the registry says 99");
+    expect(bucket.put).toEqual([]);
+  });
+
+  it("should report a registered media file that is not on disk", async () => {
+    const root = await repository();
+    const bucket = uploader();
+    await rm(join(root, "out", "releases", "0.1.0", "gpt-image-r01.jpg"));
+
+    const result = await publishMedia(root, bucket.upload);
+
+    expect(result.ok ? "" : result.error.message).toBe("missing: gpt-image-r01.jpg");
+    // The film before it was already handed over; the refusal stops the rest.
+    expect(bucket.put).toEqual(["0.1.0/gpt-image-mixed.mp4"]);
+  });
+
+  it("should refuse a source directory that is not a frozen export", async () => {
+    const root = await repository({ sourceDirectory: "site" });
+    const bucket = uploader();
+
+    const result = await publishMedia(root, bucket.upload);
+
+    expect(result.ok ? "" : result.error.message).toContain("inside out/");
+    expect(bucket.put).toEqual([]);
   });
 });

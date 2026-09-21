@@ -4,8 +4,15 @@
   X-Frame-Options: DENY
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; media-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
 
-/media/*
+# A release's text is as immutable as its media: both are bound to a sha256.
+/documents/*
   Cache-Control: public, max-age=31536000, immutable
+
+/sources/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# /media/* never reaches this file — it is the bucket, and the worker sets its
+# own headers there, because a response generated in worker code carries them.
 
 https://auditmos-aimator.:account.workers.dev/*
   X-Robots-Tag: noindex

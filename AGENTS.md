@@ -96,12 +96,14 @@ src/
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form — the published page; not a pipeline domain
-│   ├── index.ts      # Public: buildSite(root) — what gets published, and what does not
-│   ├── build.ts      # Second entry — a process: streams and the exit code
-│   ├── worker.ts     # Second entry — how one published file is served: byte ranges
+│   ├── index.ts      # Public: buildSite and publishMedia — what is published, and what is not
+│   ├── build.ts      # Process entry — the page
+│   ├── publish.ts    # Process entry — the media
+│   ├── worker.ts     # Process entry — how one published file is served: the bucket
 │   ├── schema.ts     # Internal — the release registry, one file per release
 │   ├── render.ts     # Internal — the markup, and the English machine twin
-│   ├── index.test.ts # The build, through the entry
+│   ├── media.ts      # Internal — where heavy files live, and how one gets there
+│   ├── index.test.ts # The build and the publisher, through the entry
 │   └── worker.test.ts
 └── lib/
     ├── env.ts        # Single-file form — loads .env files, validates with Zod
@@ -414,10 +416,33 @@ checked against the sha256 the registry recorded, so an export edited after publ
 fails the build instead of quietly replacing an asset whose cache is a year long —
 acceptance bound to bytes, read at the point where the bytes leave the machine.
 
-It has **two entries**, for the reason the package has `index.ts` and `bin.ts`: `build.ts`
-owns the process — streams and the exit code — and `worker.ts` owns how one published file
-is served, which is a different question from what gets published. Neither is an internal of
-the other, and `index.ts` stays a function so the build is tested by calling it.
+A release's bytes live in **two places, split by what they are**, and the split is the
+interesting part. Text is committed — the episode's source file and each stage's document
+sit under `site/`, because they are small, they are worth reading in a diff, and the page
+quotes them rather than linking them. Media go to a private R2 bucket, because films are
+streamed rather than read and a bucket is the only copy of them that survives the laptop
+that made them. `buildSite` therefore needs **nothing** from `out/`: a fresh clone rebuilds
+and redeploys the page while the films stay exactly where they were, which is the property
+the whole arrangement exists for. Only `publishMedia` reads the frozen exports, and only to
+hand them over — after checking each one against the registry, so re-publishing can write
+the same file again and nothing else.
+
+`media.ts` is `lib/muxer` one row up: **operations, never a process.** A caller says
+"publish this file"; how wrangler spells an upload stays inside, so a bucket rename or a
+move to the S3 API is one file's problem.
+
+It has **three process entries**, for the reason the package has `bin.ts`: `build.ts` owns
+the page, `publish.ts` owns the media, and `worker.ts` owns how one published file is
+served, which is a different question from what gets published. None is an internal of
+another, and `index.ts` stays two functions so both are tested by calling them — the
+publisher with a fake uploader rather than a real bucket.
+
+The worker got **simpler** by moving the media out. When films were deployed assets, Static
+Assets answered a Range request with 200 and the whole file, so the worker had to read the
+stream and discard everything before the requested offset. R2 takes an offset, so the bytes
+a viewer asked for are the only ones read. The bucket stays private and the worker is its
+only reader, on the site's own origin — which is also what lets the page keep
+`default-src 'self'` and what keeps a download link a download.
 
 The page itself is the second half, in `site/`, and it is deliberately the same shell as
 [vaideo.auditmos.com](https://vaideo.auditmos.com/): both are the "portable website shell"
@@ -551,9 +576,10 @@ function parsePort(raw: string): Result<number> {
 | `pnpm unused` | Detect unused code with Knip |
 | `ffmpeg` | Not a script — a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
-| `pnpm site:build` | Build the release page into `out/site` — refuses when a published export changed |
-| `pnpm site:preview` | Build it, then serve it on the real Workers runtime, byte ranges included |
-| `pnpm site:deploy` | Build it and publish **every** registered release to `aimator.auditmos.com` |
+| `pnpm site:build` | Build the release page into `out/site` — needs no frozen export on disk |
+| `pnpm site:media` | Put every registered release's films and stills in R2, checksum-gated |
+| `pnpm site:preview` | Build it, then serve it on the real Workers runtime, reading the real bucket |
+| `pnpm site:deploy` | Build, publish the media, then publish **every** registered release to `aimator.auditmos.com` |
 
 ## Testing Conventions
 

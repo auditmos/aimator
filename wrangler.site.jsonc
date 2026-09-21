@@ -10,7 +10,18 @@
   "assets": {
     "directory": "./out/site",
     "binding": "ASSETS",
+    // `/media/*` is not in the bundle at all any more — it is the bucket — so
+    // the worker has to be asked before the asset router answers a miss with
+    // the 404 page. Every other path is served straight from the assets, with
+    // `_headers` applied and no worker invocation.
     "run_worker_first": ["/media/*"],
     "not_found_handling": "404-page"
-  }
+  },
+  // The films and stills of every published release. The bucket is private:
+  // nothing reads it but the worker, on the site's own origin. `remote` makes
+  // `wrangler dev` read the real bucket, which is safe because these objects
+  // are immutable and the worker only ever gets and heads them.
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "aimator-site-media", "remote": true }
+  ]
 }

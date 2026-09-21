@@ -59,7 +59,10 @@ export interface RenderedRelease {
   readonly version: string;
 }
 
+/** Streamed from the bucket by the worker. */
 const mediaUrl = (version: string, file: string): string => `/media/${version}/${file}`;
+/** Served straight from the deployed assets: a stage document is small text. */
+const documentUrl = (version: string, file: string): string => `/documents/${version}/${file}`;
 
 const sourceUrl = (release: Release): string =>
   `/sources/${release.version}/${release.source.filename}`;
@@ -102,7 +105,7 @@ function renderDocuments(release: Release, texts: ReleaseTexts): string {
   const translated = release.en?.documents ?? [];
   const entries = release.documents.map((document, index) => {
     const text = texts.documents.get(document.file) ?? "";
-    const url = mediaUrl(release.version, document.file);
+    const url = documentUrl(release.version, document.file);
     const description = translated[index]?.description ?? document.description;
     return `<article>
       <div class="document-heading"><h5>${escapeHtml(document.label)}</h5><span class="document-meta">${both(`etap ${document.stage}`, `stage ${document.stage}`)} · ${escapeHtml(document.file)} · ${(Buffer.byteLength(text) / 1000).toFixed(1)} KB</span></div>
@@ -170,7 +173,7 @@ export function renderRelease(release: Release, texts: ReleaseTexts): RenderedRe
     "",
     ...release.documents.map(
       (document, index) =>
-        `- Stage ${document.stage} — ${document.label}: [${document.file}](${mediaUrl(release.version, document.file)}). ${release.en?.documents?.[index]?.description ?? document.description}`
+        `- Stage ${document.stage} — ${document.label}: [${document.file}](${documentUrl(release.version, document.file)}). ${release.en?.documents?.[index]?.description ?? document.description}`
     ),
     "",
     `[View this release](/releases/${release.version}/)`,

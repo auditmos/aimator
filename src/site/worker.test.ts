@@ -1,62 +1,76 @@
 import { describe, expect, it } from "vitest";
-import worker, { type AssetEnv, parseRange, sliceStream } from "./worker.js";
+import worker, { type AssetEnv, parseRange } from "./worker.js";
 
 /**
  * The worker, tested through its entry. Two things are worth proving: the
  * arithmetic of a byte range, which is where an off-by-one hides, and that a
- * partial response stops reading the asset once the requested span is out —
- * the whole reason this worker exists rather than letting Static Assets answer.
+ * partial response asks the bucket for exactly that span — the whole reason
+ * the films moved out of the deployed assets.
  */
 
-const CHUNKS = ["0123456789", "abcdefghij", "ABCDEFGHIJ"];
-const SIZE = CHUNKS.join("").length;
+const BODY = "0123456789abcdefghijABCDEFGHIJ";
+const SIZE = BODY.length;
+const KEY = "0.1.0/gpt-image-mixed.mp4";
+const ETAG = '"a1b2c3"';
 
-interface Upstream {
-  readonly cancelled: () => boolean;
-  /** How many chunks the reader pulled before it was cancelled. */
-  readonly read: () => number;
-  readonly stream: ReadableStream<Uint8Array>;
+interface Bucket {
+  /** Every range the bucket was asked for, in order. */
+  readonly asked: { length: number; offset: number }[];
+  readonly env: AssetEnv;
 }
 
-function upstream(): Upstream {
-  const encoder = new TextEncoder();
-  let index = 0;
-  let cancelled = false;
-  const stream = new ReadableStream<Uint8Array>({
-    cancel() {
-      cancelled = true;
-    },
-    pull(controller) {
-      if (index >= CHUNKS.length) {
-        controller.close();
-        return;
-      }
-      controller.enqueue(encoder.encode(CHUNKS[index] ?? ""));
-      index += 1;
+function bucket(objects: Record<string, string> = { [KEY]: BODY }): Bucket {
+  const asked: { length: number; offset: number }[] = [];
+  const object = (key: string, text: string) => ({
+    body: new Response(text).body as ReadableStream,
+    httpEtag: ETAG,
+    size: objects[key]?.length ?? text.length,
+    writeHttpMetadata(headers: Headers) {
+      headers.set("Content-Type", "video/mp4");
     },
   });
-  return { cancelled: () => cancelled, read: () => index, stream };
-}
-
-function env(response: () => Response, index: Record<string, number> = {}): AssetEnv {
   return {
-    ASSETS: {
-      fetch(request: Request) {
-        if (new URL(request.url).pathname === "/media-index.json") {
-          return Promise.resolve(Response.json(index));
-        }
-        return Promise.resolve(response());
+    asked,
+    env: {
+      ASSETS: {
+        fetch: () => Promise.resolve(new Response("the page", { status: 200 })),
+      },
+      MEDIA: {
+        get(key, options) {
+          const text = objects[key];
+          if (text === undefined) {
+            return Promise.resolve(null);
+          }
+          if (!options) {
+            return Promise.resolve(object(key, text));
+          }
+          asked.push(options.range);
+          const { length, offset } = options.range;
+          return Promise.resolve(object(key, text.slice(offset, offset + length)));
+        },
+        head(key) {
+          const text = objects[key];
+          return Promise.resolve(
+            text === undefined
+              ? null
+              : {
+                  httpEtag: ETAG,
+                  size: text.length,
+                  writeHttpMetadata(headers: Headers) {
+                    headers.set("Content-Type", "video/mp4");
+                  },
+                }
+          );
+        },
       },
     },
   };
 }
 
-const asset = (headers: Record<string, string>) =>
-  new Response(upstream().stream, { headers: { "content-type": "video/mp4", ...headers } });
-
-const get = (range?: string) =>
-  new Request("https://aimator.auditmos.com/media/0.1.0/gpt-image-mixed.mp4", {
+const media = (range?: string, method = "GET") =>
+  new Request(`https://aimator.auditmos.com/media/${KEY}`, {
     headers: range ? { range } : {},
+    method,
   });
 
 describe("parseRange", () => {
@@ -92,118 +106,113 @@ describe("parseRange", () => {
   });
 });
 
-describe("sliceStream", () => {
-  it("should emit exactly the requested bytes", async () => {
-    const source = upstream();
-
-    const text = await new Response(sliceStream(source.stream, 8, 14)).text();
-
-    expect(text).toBe("89abcde");
-  });
-
-  it("should stop reading the asset once the span is out", async () => {
-    const source = upstream();
-
-    await new Response(sliceStream(source.stream, 0, 4)).text();
-
-    // A stream reads one chunk ahead, so the exact count is not the point:
-    // the last chunk was never pulled and the asset was let go.
-    expect(source.read()).toBeLessThan(CHUNKS.length);
-    expect(source.cancelled()).toBe(true);
-  });
-
-  it("should fail rather than truncate when the asset ends early", async () => {
-    const source = upstream();
-
-    await expect(new Response(sliceStream(source.stream, 0, 999)).text()).rejects.toThrow(
-      "Asset ended before the requested byte range."
-    );
-  });
-});
-
 describe("worker", () => {
-  it("should answer a range request with 206 and the span it sent", async () => {
-    const binding = env(() => asset({ "content-length": String(SIZE) }));
+  it("should answer a range request with 206 and only the bytes it asked for", async () => {
+    const { asked, env } = bucket();
 
-    const response = await worker.fetch(get("bytes=5-9"), binding);
+    const response = await worker.fetch(media("bytes=5-9"), env);
 
     expect(response.status).toBe(206);
     expect(response.headers.get("Content-Range")).toBe(`bytes 5-9/${SIZE}`);
     expect(response.headers.get("Content-Length")).toBe("5");
     expect(response.headers.get("Accept-Ranges")).toBe("bytes");
     expect(await response.text()).toBe("56789");
+    // The point of the bucket: nothing before byte 5 was ever read.
+    expect(asked).toEqual([{ length: 5, offset: 5 }]);
+  });
+
+  it("should ask the bucket for a suffix span by its real offset", async () => {
+    const { asked, env } = bucket();
+
+    await worker.fetch(media("bytes=-10"), env);
+
+    expect(asked).toEqual([{ length: 10, offset: SIZE - 10 }]);
   });
 
   it("should answer an unsatisfiable range with 416 and the file's size", async () => {
-    const binding = env(() => asset({ "content-length": String(SIZE) }));
+    const { asked, env } = bucket();
 
-    const response = await worker.fetch(get("bytes=999-"), binding);
+    const response = await worker.fetch(media("bytes=999-"), env);
 
     expect(response.status).toBe(416);
     expect(response.headers.get("Content-Range")).toBe(`bytes */${SIZE}`);
+    expect(asked).toEqual([]);
   });
 
   it("should send the whole file when nothing was asked for", async () => {
-    const binding = env(() => asset({ "content-length": String(SIZE) }));
+    const { asked, env } = bucket();
 
-    const response = await worker.fetch(get(), binding);
-
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe(CHUNKS.join(""));
-  });
-
-  it("should send the whole file when If-Range does not match the asset", async () => {
-    const binding = env(() => asset({ "content-length": String(SIZE), etag: '"v2"' }));
-    const request = get("bytes=5-9");
-    request.headers.set("if-range", '"v1"');
-
-    const response = await worker.fetch(request, binding);
+    const response = await worker.fetch(media(), env);
 
     expect(response.status).toBe(200);
+    expect(await response.text()).toBe(BODY);
+    expect(asked).toEqual([]);
   });
 
-  it("should send the range when If-Range matches the asset's etag", async () => {
-    const binding = env(() => asset({ "content-length": String(SIZE), etag: '"v2"' }));
-    const request = get("bytes=5-9");
-    request.headers.set("if-range", '"v2"');
+  it("should carry the object's own type and an immutable cache", async () => {
+    const { env } = bucket();
 
-    const response = await worker.fetch(request, binding);
+    const response = await worker.fetch(media(), env);
+
+    expect(response.headers.get("Content-Type")).toBe("video/mp4");
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=31536000, immutable");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("ETag")).toBe(ETAG);
+  });
+
+  it("should answer HEAD with the size and no body", async () => {
+    const { env } = bucket();
+
+    const response = await worker.fetch(media(undefined, "HEAD"), env);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Length")).toBe(String(SIZE));
+    expect(response.body).toBeNull();
+  });
+
+  it("should send the whole file when If-Range does not match the object", async () => {
+    const { asked, env } = bucket();
+    const request = media("bytes=5-9");
+    request.headers.set("if-range", '"stale"');
+
+    const response = await worker.fetch(request, env);
+
+    expect(response.status).toBe(200);
+    expect(asked).toEqual([]);
+  });
+
+  it("should send the range when If-Range matches the object", async () => {
+    const { env } = bucket();
+    const request = media("bytes=5-9");
+    request.headers.set("if-range", ETAG);
+
+    const response = await worker.fetch(request, env);
 
     expect(response.status).toBe(206);
-  });
-
-  it("should take the size from the generated index when the binding omits it", async () => {
-    const binding = env(() => asset({}), {
-      "/media/0.1.0/gpt-image-mixed.mp4": SIZE,
-    });
-
-    const response = await worker.fetch(get("bytes=5-9"), binding);
-
-    expect(response.status).toBe(206);
-    expect(response.headers.get("Content-Range")).toBe(`bytes 5-9/${SIZE}`);
-  });
-
-  it("should send the whole file when no size can be established", async () => {
-    const binding = env(() => asset({}));
-
-    const response = await worker.fetch(get("bytes=5-9"), binding);
-
-    expect(response.status).toBe(200);
   });
 
   it("should ignore a multi-range request rather than answering half of it", async () => {
-    const binding = env(() => asset({ "content-length": String(SIZE) }));
+    const { asked, env } = bucket();
 
-    const response = await worker.fetch(get("bytes=0-4,10-14"), binding);
+    const response = await worker.fetch(media("bytes=0-4,10-14"), env);
 
     expect(response.status).toBe(200);
+    expect(asked).toEqual([]);
   });
 
-  it("should pass a failed asset lookup through untouched", async () => {
-    const binding = env(() => new Response("not found", { status: 404 }));
+  it("should answer 404 for a key the bucket does not hold", async () => {
+    const { env } = bucket({});
 
-    const response = await worker.fetch(get("bytes=0-4"), binding);
+    expect((await worker.fetch(media(), env)).status).toBe(404);
+    expect((await worker.fetch(media("bytes=0-4"), env)).status).toBe(404);
+    expect((await worker.fetch(media(undefined, "HEAD"), env)).status).toBe(404);
+  });
 
-    expect(response.status).toBe(404);
+  it("should leave every other path to the deployed assets", async () => {
+    const { env } = bucket();
+
+    const response = await worker.fetch(new Request("https://aimator.auditmos.com/"), env);
+
+    expect(await response.text()).toBe("the page");
   });
 });
