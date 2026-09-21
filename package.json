@@ -25,7 +25,8 @@
     "site:preview": "pnpm site:build && wrangler dev --config wrangler.site.jsonc --local",
     "test": "vitest run",
     "test:watch": "vitest",
-    "types": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
+    "types": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && tsc --noEmit -p ui/tsconfig.json",
+    "ui": "tsx src/ui/serve.ts",
     "unused": "knip",
     "update": "taze --interactive"
   },
@@ -41,11 +42,18 @@
     "@biomejs/biome": "^2.5.13",
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
+    "@hono/node-server": "^2.1.1",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/github": "^12.0.9",
     "@semantic-release/release-notes-generator": "^14.1.1",
     "@types/node": "^25.9.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "hono": "^4.13.8",
     "knip": "^5.88.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "semantic-release": "^25.0.9",
     "simple-git-hooks": "^2.14.0",
     "taze": "^19.17.2",
@@ -53,6 +61,7 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "ultracite": "^7.12.0",
+    "vite": "^8.3.0",
     "vitest": "^4.1.11",
     "wrangler": "^4.135.0"
   },
@@ -61,8 +70,12 @@
     "node": ">=22"
   },
   "knip": {
+    "entry": [
+      "ui/main.tsx"
+    ],
     "project": [
-      "src/**/*.ts"
+      "src/**/*.ts",
+      "ui/**/*.{ts,tsx}"
     ],
     "ignoreDependencies": [
       "@semantic-release/commit-analyzer",

@@ -1,0 +1,28 @@
+<!doctype html>
+<html data-theme="system" lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>aimator: drabina etapów</title>
+    <meta content="light dark" name="color-scheme">
+    <link href="/auditmos-icon-transparent.svg" rel="icon" type="image/svg+xml">
+    <!-- Blocking by design: it decides what the first paint looks like, so
+         deferring it is the flash of the wrong theme it exists to prevent. -->
+    <script>
+    "use strict";
+    try {
+      const saved = localStorage.getItem("auditmos-theme");
+      if (["light", "dark", "system"].includes(saved)) {
+        document.documentElement.dataset.theme = saved;
+      }
+    } catch {
+      /* System theme still works when storage is unavailable. */
+    }
+    </script>
+    <link href="./styles.css" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="./main.tsx" type="module"></script>
+  </body>
+</html>

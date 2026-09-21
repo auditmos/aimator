@@ -134,6 +134,12 @@ src/
 │   ├── index.test.ts # The build and the publisher, through the entry
 │   ├── episode.test.ts
 │   └── worker.test.ts
+├── ui/               # Folder form: the local server over the CLI; not a domain
+│   ├── index.ts      # Public: createUi, the Hono app a test can call
+│   ├── serve.ts      # Process entry: one port, Vite for the page, Hono for /api
+│   ├── watch.ts      # Internal: something under the workspace changed; never what
+│   ├── index.test.ts # Every route, through the entry, without opening a port
+│   └── imports.test.ts # The one rule: the pipeline is reached only through run
 └── lib/
     ├── env.ts        # Single-file form: loads .env files, validates with Zod
     ├── env.test.ts   # Co-located test for env validation
@@ -501,6 +507,36 @@ because this repository's documentation and this film are Polish, while `index.m
 `llms.txt` stay English as the machine version. What a release may publish, and what it may
 not, is in [docs/strona.md](docs/strona.md).
 
+`src/ui` is the local server over the CLI, and it sits beside `src/site` for the reason
+that one sits beside `src/lib`: it is not a stage, it owns no artifact and it decides
+nothing. The two differ in which way they face. The site publishes a frozen export to the
+internet; this one shows the workspace as it is right now, to one person on one machine, on
+the loopback address with no authentication at all, which is the security model rather than
+a default somebody will widen later.
+
+The rule the whole module rests on: **the CLI is the only contract.** A route builds an
+`argv`, calls `run` and hands back what came out, so the browser can never answer a question
+the terminal cannot. That is not a courtesy to the terminal: this pipeline is driven by
+agents as well as by a person, and a screen with a private road into the stages would make
+parity a thing to remember instead of a thing that holds. `ui/imports.test.ts` checks it,
+because a stage import reads like every other import. It is also why `list` exists: the
+picker needed the projects in the workspace, and a client reading directories would have
+been exactly that private road, so the question became a command and the screen renders it.
+
+**The client lives in `ui/` at the repository root**, mirroring `site/` beside `src/site`:
+browser files where the browser files go. The practical half of that is that JSX and the DOM
+never enter `src`, whose `tsconfig` is what tsup reads, so the client gets its own project
+and the package's stays exactly as narrow as it was. One process serves both halves on one
+port: Vite in middleware mode owns the page and its reloads, Hono owns `/api`. Two processes
+would have bought a proxy, a second log and a second thing to kill, for an address that
+already existed.
+
+`watch.ts` is the module's one piece of cleverness and it is deliberately dull: it says
+that *something* under the workspace changed, never what. Progress here is exactly as
+detailed as the state a stage wrote to disk, so the answer to "what changed" is the same
+`status` call an agent would make. Anything finer would mean the server learning what a
+stage's files mean, which is the one thing it must never learn.
+
 ## Pipeline rules
 
 Nine rules that stop an agent from re-creating the mess this tool was built to replace.
@@ -658,10 +694,11 @@ function parsePort(raw: string): Result<number> {
 | `pnpm dev` | Run the CLI from source with tsx (no build step) |
 | `pnpm lint` | Check code with Biome |
 | `pnpm lint:fix` | Auto-fix lint/format issues |
-| `pnpm types` | Type-check with tsc --noEmit, **two projects, one command**. `tsconfig.json` holds `src` alone, because `rootDir: "src"` is what tsup reads when it rolls up the declarations and a wider root would move them. The configs in the repo root are therefore a second project, `tsconfig.tools.json`, which `include`s `*.config.ts` and which the root **references**, not for `tsc -b`, which nothing here runs, but because a referenced project is the only thing that makes the editor's language server put those files in it. Without the reference they land in an inferred project, type-checked against TypeScript's defaults instead of this repo's `strict`, and nothing in CI reads them at all. A new config in the root is covered the moment it is named `*.config.ts`, and silently uncovered if it is not. |
+| `pnpm types` | Type-check with tsc --noEmit, **three projects, one command**. `tsconfig.json` holds `src` alone, because `rootDir: "src"` is what tsup reads when it rolls up the declarations and a wider root would move them. The configs in the repo root are therefore a second project, `tsconfig.tools.json`, which `include`s `*.config.ts` and which the root **references**, not for `tsc -b`, which nothing here runs, but because a referenced project is the only thing that makes the editor's language server put those files in it. Without the reference they land in an inferred project, type-checked against TypeScript's defaults instead of this repo's `strict`, and nothing in CI reads them at all. A new config in the root is covered the moment it is named `*.config.ts`, and silently uncovered if it is not. The third is `ui/tsconfig.json`, the browser half of the UI, which needs the DOM and JSX that `src` must not have; it is **not** referenced from the root, because the editor already finds the nearest config to those files, and a reference would have forced `composite` on a project that emits nothing. |
 | `pnpm test` | Run tests with Vitest |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm unused` | Detect unused code with Knip |
+| `pnpm ui` | The local UI: one process on `127.0.0.1:4317`, Vite serving `ui/` and Hono serving `/api`. Reads `AIMATOR_WORKSPACE`, writes nothing and publishes nothing; [docs/ui.md](docs/ui.md) says what it shows and what it deliberately does not do |
 | `ffmpeg` | Not a script but a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
 | `pnpm site:freeze` | `<project> <episode> <version>`: take one finished episode out of the workspace, re-encode it for the web and write a registry whose prose is still `TODO` |
@@ -768,7 +805,7 @@ Types: feat, fix, refactor, test, docs, chore, ci, perf
 Pre-commit hook runs `pnpm lint && pnpm test` automatically.
 
 **The version is the tool's, not the site's.** `.releaserc.json` tells the commit
-analyzer that `docs`, `chore`, `ci`, `test` and **anything scoped `site`** release
+analyzer that `docs`, `chore`, `ci`, `test` and **anything scoped `site` or `ui`** release
 nothing, so only a change to the CLI moves the number. The first four are the ordinary
 reading of a version; the scope is the one that had to be decided, and it was decided
 after four releases in one day turned out to be four commits about the published page and
@@ -779,7 +816,10 @@ numbering scheme and nothing else, and they are free to disagree.
 
 So the scope is what decides whether a commit ships, which makes `feat(site)` and `feat`
 a real choice rather than a label. Scope a commit `site` when it changes what is published
-at `aimator.auditmos.com`, and leave the scope off when it changes what the CLI does.
+at `aimator.auditmos.com`, `ui` when it changes the local screen over the CLI, and leave
+the scope off when it changes what the CLI does. `ui` is the same reading as `site` one
+room over: a window onto the pipeline is not the pipeline, and a person who installs the
+tool gets nothing new from a commit that rearranges the view.
 
 **An open issue labelled `blocks-release` holds every release.** A PRD implemented over
 many commits is one version, not one per `feat`, and the number it earns is decided by all

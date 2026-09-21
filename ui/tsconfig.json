@@ -1,0 +1,24 @@
+{
+  // The browser half of the UI, type-checked as its own project for the reason
+  // the configs in the repository root are one: `tsconfig.json` holds `src`
+  // alone, because `rootDir: "src"` is what tsup reads when it rolls up the
+  // declarations. These files also need what `src` must not have: the DOM and
+  // JSX. A project of its own gives them both without widening the package's.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["."]
+}

@@ -130,10 +130,11 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 | `pnpm dev` | Uruchom CLI ze źródeł przez tsx, bez budowania |
 | `pnpm lint` | Sprawdź kod Biome |
 | `pnpm lint:fix` | Napraw lint i formatowanie |
-| `pnpm types` | Sprawdź typy: `src` i configi w roocie |
+| `pnpm types` | Sprawdź typy: `src`, configi w roocie i klient UI |
 | `pnpm test` | Testy Vitest |
 | `pnpm test:watch` | Testy w trybie watch |
 | `pnpm unused` | Nieużywany kod (Knip) |
+| `pnpm ui` | Lokalne UI nad CLI: drabina etapów w przeglądarce, tylko na localhost |
 | `pnpm update` | Interaktywna aktualizacja zależności (Taze) |
 | `pnpm site:freeze` | Zamroź odcinek z workspace jako nowe wydanie strony |
 | `pnpm site:build` | Zbuduj stronę wydań do `out/site` |
@@ -157,8 +158,13 @@ Praca nad kodem: testy leżą obok źródeł (`*.test.ts`), TDD (czerwony test �
 → refaktor), commity w formacie [Conventional Commits](https://www.conventionalcommits.org/),
 hook pre-commit uruchamia lint i testy, push na `main` odpala CI i semantic-release.
 
-Wersja opisuje narzędzie, a nie stronę: commity z zakresem `site`, tak samo jak `docs`,
-`chore`, `ci` i `test`, nie wydają nic. Odcinek na stronie ma własny numer w
+Stan odcinka można też oglądać w przeglądarce: `pnpm ui` podnosi lokalny serwer, który
+każdą odpowiedź bierze z tego samego `run(argv)`, co terminal, i odświeża drabinę, gdy coś
+w katalogu roboczym się zmieni. Co pokazuje i czego świadomie nie robi, opisuje
+[docs/ui.md](docs/ui.md).
+
+Wersja opisuje narzędzie, a nie stronę: commity z zakresem `site` i `ui`, tak samo jak
+`docs`, `chore`, `ci` i `test`, nie wydają nic. Odcinek na stronie ma własny numer w
 `site/releases/`, nadawany przez `pnpm site:freeze`, i te dwie numeracje mogą się
 rozjeżdżać.
 

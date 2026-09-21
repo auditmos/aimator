@@ -6,6 +6,7 @@
       {
         "releaseRules": [
           { "scope": "site", "release": false },
+          { "scope": "ui", "release": false },
           { "type": "docs", "release": false },
           { "type": "chore", "release": false },
           { "type": "ci", "release": false },
