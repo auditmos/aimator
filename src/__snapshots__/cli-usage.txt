@@ -1,0 +1,195 @@
+Usage: aimator <command>
+
+Etap 0. Przygotowanie projektu i odcinka:
+  project init <id> --title <tytuł> [--aspect-ratio <w:h>]
+  project voice <id> --voice-id <id głosu>
+    Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
+    odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
+    dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
+    etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
+  character new <id> <character-id> --name <nazwa>
+  character add <id> <character-id> --source <plik> [--source <plik>...]
+  character describe <id> <character-id>
+  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
+                   [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
+                   [--max-clip <s>]
+  episode set <id> <episode-id> [te same flagi decyzji]
+
+Etap 1. Scenariusz (płatny):
+  screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                                        [--dry-run] [--regenerate]
+
+Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
+  character generate <id> <character-id> --track <gpt-image|seedream>
+                     [--artifact card|hero|<widok>,...] [--model <id>]
+                     [--dry-run] [--regenerate]
+
+Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
+  shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                                       [--dry-run] [--regenerate]
+
+Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
+  prompt-package generate <id> <episode-id> [--model <id>]
+                          [--max-output-tokens <n>] [--dry-run] [--regenerate]
+                          [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
+  prompt-package show <id> <episode-id> --track <tor>
+                      [--artifact R02|opening-frame|C03|entry:C03,...]
+    Darmowe. Drukuje dokładnie to, co poleci do modelu obrazu albo wideo:
+    numerowany blok załączników w kolejności bajtów, treść pliku z prompts/,
+    blok o medium, kadr, dosłowne ujęcia z listy i project.md. Bez --artifact
+    wypisuje sam plan: co pakiet planuje, ile referencji i czy są zatwierdzone.
+
+Etap 5. Obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
+  reference generate <id> <episode-id> --track <gpt-image|seedream>
+                     [--artifact R01,R02] [--model <id>] [--dry-run] [--regenerate]
+    Bez --artifact rysuje wszystkie referencje, których zależności są już
+    zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.
+
+Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
+  opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
+                         [--model <id>] [--dry-run] [--regenerate]
+    Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
+    każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
+    --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.
+
+Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
+  clip generate <id> <episode-id> --track <gpt-image|seedream>
+               [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
+               [--dry-run] [--regenerate]
+               [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
+    Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
+    i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL, klucz
+    BYTEPLUS_MODELARK). Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną
+    klatkę otwarcia, klatka wejściowa C02 na zatwierdzoną końcówkę C01 (gdy
+    lista ujęć mówi previous-end-frame), a klip C02 na tę klatkę. Raport podaje
+    liczbę wywołań OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle.
+    Długość klipu bierze się z listy ujęć; klipu, którego model nie renderuje,
+    narzędzie nie zaokrągli, odmówi i wskaże poprawkę w etapie 3.
+
+Etap 8. Montaż (darmowy; per tor, jeden artefakt):
+  assembly generate <id> <episode-id> --track <gpt-image|seedream>
+                    [--dry-run] [--regenerate]
+    Skleja zatwierdzone klipy w <tor>/episode.mp4 bez przekodowania, w
+    kolejności z zatwierdzonej listy ujęć, planu montażowego nie ma jako pliku,
+    bo lista ujęć już go niesie. Nic nie kupuje i nie potrzebuje modelu ani
+    klucza; potrzebuje ffmpeg (PATH albo AIMATOR_FFMPEG), a gdy go nie ma,
+    odmawia zamiast przekodowywać. Klipy nie wracają co do sekundy, więc skleja
+    to, co wróciło, i melduje różnicę wobec planu, nigdy nie przycina.
+    Jeden artefakt na tor, więc --artifact niczego nie zawęża i nie jest
+    wymagane; --regenerate jest, bo gotowy montaż nosi zgodę człowieka.
+    episode.mp4 jest NIEMY: ścieżka dźwiękowa musi powstać wobec sklejonego
+    filmu, a nie wobec planu, więc należy do etapu poniżej montażu.
+
+Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
+  narration generate <id> <episode-id> [--model <id>] [--voice-model <id>]
+                     [--max-output-tokens <n>] [--artifact script|N01[,N02]]
+                     [--dry-run] [--regenerate]
+    Podnosi narrację z zatwierdzonej listy ujęć i kupuje ją głosem z project.json.
+    Narracji nie pisze: każde zdanie musi wystąpić dosłownie w polu Audio swojego
+    ujęcia, a walidator to sprawdza, jeśli film ma powiedzieć coś nowego,
+    poprawka należy do etapu 1. Skrypt i nagrania są WSPÓLNE dla obu torów, bo
+    głos czytający zdanie nie wie, nad którym filmem usiądzie.
+    ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
+  narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]
+                      [--similarity <0-1>] [--speaker-boost] [--dry-run]
+    Jak narrator serii CZYTA. Bez tej decyzji każde wywołanie szło na domyślnych
+    ustawieniach dostawcy, stability 0.5 i style 0, które sam dostawca opisuje
+    jako skłonne do monotonii; płaskie brzmienie nie było wadą głosu, tylko
+    brakiem miejsca na decyzję. Mieszka w narration.json OBOK project.json, a nie
+    w nim: plik etapu 0 jest zapisanym wejściem niemal wszystkiego, więc suwak,
+    który ma się kręcić, unieważniałby zgody na bajty, których nie dotknął. Tutaj
+    unieważnia dokładnie te nagrania, które powstały pod starym brzmieniem.
+    Głos to obsada (etap 0), sposób czytania to reżyseria (etap 9).
+  narration mix <id> <episode-id> --track <gpt-image|seedream>
+                [--dry-run] [--regenerate]
+    Kładzie przyjęte kwestie na zatwierdzonym episode.mp4 i zapisuje
+    <tor>/narrated.mp4. Obraz idzie kopią strumieniową, episode.mp4 nie jest
+    nadpisywany ani przekodowywany. Kotwice z planu przelicza na oś TEGO toru,
+    bo klipy wróciły z dryfem. Kwestia, która nachodziłaby na następną albo nie
+    mieści się w filmie, jest ODMOWĄ, nie przesunięciem.
+    Narracja to nie cała ścieżka: muzykę i efekty dokłada etap 10, więc ich brak
+    jest tu meldowany, dokładnie jak cisza w etapie 8.
+
+Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
+  sound-design generate <id> <episode-id> [--model <id>] [--music-model <id>]
+                        [--effects-model <id>] [--max-output-tokens <n>]
+                        [--artifact cues|M01[,E02]] [--dry-run] [--regenerate]
+    Pisze arkusz cue z zatwierdzonej listy ujęć, a potem kupuje to, co arkusz
+    autoryzuje: podkład z /v1/music i efekty z /v1/sound-generation (klucz
+    ELEVENLABS_API_KEY, ten sam co mowa, to czwarte i piąte miejsce wywołania
+    u dostawcy, którego potok już ma, nie czwarty dostawca).
+    Arkusz jest INSTRUKCJĄ, więc idzie po angielsku (reguła 9), a lista ujęć
+    jedzie obok niego dosłownie, po swojemu. Nie ma tu odpowiednika reguły
+    „podnoszone, nie pisane" z etapu 9 i nie da się go mieć: prompt muzyczny
+    trzeba napisać, a nie przepisać. Zamiast niego jest werdykt okablowania
+    etapu 4, każde ujęcie policzone, podkład kafelkujący film bez dziur,
+    każda długość taka, jaką dostawca zrenderuje, i człowiek, który to czyta.
+    ElevenLabs wycenia muzykę i efekty ZA MINUTĘ dźwięku i nalicza przy
+    GENERACJI, więc podgląd podaje wywołania I sekundy, a --regenerate to druga
+    pełna opłata.
+  sound-design levels <id> [--music-db <n>] [--effects-db <n>] [--duck-db <n>]
+                      [--duck-release <ms>] [--dry-run]
+    Jak głośno siedzi podkład i jak mocno ustępuje pod mową. Mieszka
+    w projects/<id>/mix.json, nie w project.json, bo suwak unieważniałby zgody
+    na bajty, których nie dotknął, i nie w narration.json, bo głośność muzyki
+    nie mówi nic o tym, jak narrator czytał, więc nie może unieważniać nagrań.
+    Wartości startowe są, bo tej decyzji nie da się podjąć, zanim się ją usłyszy;
+    jadą jawnie do silnika i lądują w archiwum.
+  sound-design mix <id> <episode-id> --track <gpt-image|seedream>
+                   [--dry-run] [--regenerate]
+    Składa <tor>/mixed.mp4 z episode.mp4 i stemów, NIE z narrated.mp4. Dzięki
+    temu mowa koduje się dokładnie raz, a muzyka w ogóle może ustąpić pod
+    głosem. narrated.mp4 nie jest nadpisywany ani unieważniany: zostaje
+    przyjętym produktem pośrednim i jedynym miejscem, gdzie słychać samo
+    umieszczenie narracji, i to od tej zgody ten etap bramkuje.
+    Efekt, który wychodzi poza koniec filmu, jest ODMOWĄ; podkład, który kończy
+    się przed nim, jest MELDUNKIEM, pierwsze to zderzenie, drugie to dryf.
+
+Wspólne:
+  check <id> [<episode-id>]
+  check <id> <character-id> --stage character --track <tor>
+  check <id> <episode-id> --stage references --track <tor>
+  check <id> <episode-id> --stage opening-frame --track <tor>
+  check <id> <episode-id> --stage clips --track <tor>
+  check <id> <episode-id> --stage assembly --track <tor>
+  check <id> <episode-id> --stage soundtrack [--track <tor>]
+  check <id> <episode-id> --stage sound-design [--track <tor>]
+  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
+               [--note <uzasadnienie>] [--reviewer <kto>]
+  approve <id> <character-id> --stage character --track <tor>
+               --artifact <klucz>[,<klucz>...]
+  approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
+  approve <id> <episode-id> --stage opening-frame --track <tor>
+  approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
+  approve <id> <episode-id> --stage assembly --track <tor>
+  approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]
+  approve <id> <episode-id> --stage soundtrack --track <tor>
+  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02]
+  approve <id> <episode-id> --stage sound-design --track <tor>
+
+  --audio      music-and-effects | dialogue | narration | dialogue-and-narration
+  --nature     law-or-idea | synopsis | screenplay
+  --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
+               wartości domyślnej, wymagana dopiero przez etap 3
+  --stage      zakres akceptacji; domyślnie prepare (etap 0)
+  --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
+  --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,
+               three-quarter-left, three-quarter-right, profile-left,
+               profile-right, rear
+
+Obsada jest jawną decyzją: wymień każdą powracającą postać przez "character new".
+Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę,
+zdjęcia ("character add") albo opis w project.md ("character describe").
+
+Globalne:
+  --workspace <ścieżka>  katalog artefaktów (domyślnie AIMATOR_WORKSPACE)
+  --dry-run              pokaż, co powstanie, nie zapisuj niczego
+  --help                 ten komunikat
+
+Etapy 1 i 2 odmawiają płatnego wywołania, dopóki etap 0 nie ma review.status =
+"approved". W etapie 2 osiem widoków czeka na zatwierdzoną kartę, a hero na
+zatwierdzone widoki. Etap 3 czeka na zatwierdzony scenariusz i nie zależy od
+etapu 2. Etap 4 czeka na zatwierdzoną listę ujęć i na zatwierdzony hero.png
+każdej postaci, którą lista ujęć stawia w kadrze, na obu torach naraz, bo
+pakiet jest jeden dla obu. Nic nie ponawia się samo; nową płatną próbę zaczyna
+wyłącznie --regenerate, zachowując poprzedni wynik.

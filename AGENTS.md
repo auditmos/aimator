@@ -93,6 +93,8 @@ src/
 ├── bin.ts            # Executable: shebang, streams, exit code
 ├── cli.ts            # Single-file form: run(argv): Promise<Result<string>>
 ├── cli.test.ts
+├── cli.usage.test.ts # The freeze: --help byte for byte, one snapshot per usage line
+├── __snapshots__/    # What the freeze compares against
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form: the published page; not a pipeline domain
