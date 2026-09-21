@@ -22,3 +22,6 @@ out/
 
 # Wrangler trzyma tu lokalny stan podglądu
 .wrangler/
+
+# Lokalne plany pracy (/carve); historia to git log i issues, reguła 5 w AGENTS.md
+plans/
