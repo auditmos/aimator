@@ -62,6 +62,15 @@ przy obcym nagłówku `Origin` i wymaga `application/json`, co wymusza zapytanie
 (preflight) zanim cokolwiek poleci. Żądanie bez `Origin`, czyli z terminala albo od agenta,
 przechodzi normalnie.
 
+Samo porównanie `Origin` z `Host` by nie wystarczyło i warto wiedzieć, dlaczego. Strona na
+`zla-strona.example`, której nazwa zostaje przestawiona na 127.0.0.1 (DNS rebinding),
+dociera tu **pod własną nazwą**: oba nagłówki się wtedy zgadzają, żądanie jest tego samego
+pochodzenia, o zgodę nikt nie pyta, a strona czyta odpowiedź. Jedynym nagłówkiem, którego
+obca strona nie podrobi na pętlę zwrotną, jest nazwa, pod którą serwer został osiągnięty,
+więc **każda** odpowiedź `/api` jest na niej bramkowana, nie tylko uruchomienie komendy:
+katalog roboczy to czyjś nieopublikowany film, a odczyt drabiny i scenariusza wyciekłby tak
+samo jak wywołanie.
+
 ## Odświeżanie i utrata połączenia
 
 Serwer obserwuje katalog roboczy i po zmianie przelicza `status --json`, a wynik wypycha

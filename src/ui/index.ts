@@ -52,10 +52,38 @@ type RunDone =
   | { readonly data: string; readonly ok: true; readonly runId: string }
   | { readonly error: Refusal["error"]; readonly ok: false; readonly runId: string };
 
-/** Whether a request came from the page this server itself is serving. */
-function sameOrigin(origin: string, host: string | undefined): boolean {
+/**
+ * The names this server answers to. Anything else is somebody else's DNS.
+ *
+ * This is the check that cannot be forged past. Comparing `Origin` with `Host`
+ * looks like the same test and is not: a page on `zla-strona.example` whose
+ * name is re-pointed at 127.0.0.1 reaches this process under **its own** name,
+ * so both headers agree, the request counts as same-origin, no preflight is
+ * asked for, and the page reads the answer. The loopback binding stops the
+ * network from routing a stranger here; this stops a stranger's *name* from
+ * doing it.
+ */
+const LOOPBACK = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
+
+function loopbackHost(host: string): boolean {
+  const name = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+
+  return name !== undefined && LOOPBACK.has(name);
+}
+
+/** The name and port a request arrived under, or nothing it could have. */
+function hostOf(url: string): string {
   try {
-    return new URL(origin).host === host;
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+}
+
+/** Whether a request came from the page this server itself is serving. */
+function sameOrigin(origin: string, url: string): boolean {
+  try {
+    return new URL(origin).host === hostOf(url);
   } catch {
     return false;
   }
@@ -78,6 +106,27 @@ export function createUi(options: UiOptions): Hono {
   /** What one question costs: an argv, a call, and the text that came back. */
   const ask = async (argv: readonly string[]): ReturnType<typeof run> =>
     await run([...argv, "--json", "--workspace", options.workspace.root]);
+
+  /**
+   * Every answer this server gives, gated on the name it was reached by.
+   *
+   * It guards reads as well as the one write, because a rebound page would
+   * otherwise read the ladder and the screenplay just as happily as it would
+   * run a command, and this workspace is somebody's unpublished film.
+   */
+  app.use("/api/*", async (c, next) => {
+    // Read off the request URL rather than the header: the Node adapter builds
+    // that URL from `Host`, so this is the same name with one spelling.
+    if (!loopbackHost(hostOf(c.req.url))) {
+      const refusal: Refusal = {
+        error: { message: "żądanie pod nazwą spoza pętli zwrotnej", name: "ForbiddenError" },
+      };
+
+      return Response.json(refusal, { status: 403 });
+    }
+
+    await next();
+  });
 
   /** Nothing here, said the way a refusal is said everywhere else. */
   const missing = (message: string): Response => {
@@ -228,7 +277,7 @@ export function createUi(options: UiOptions): Hono {
     // request and only hides the answer, which is no comfort when the request
     // is the thing that costs money. An absent `Origin` is a terminal or an
     // agent, which is the other caller this endpoint is for.
-    if (origin !== undefined && !sameOrigin(origin, c.req.header("host"))) {
+    if (origin !== undefined && !sameOrigin(origin, c.req.url)) {
       const refusal: Refusal = {
         error: { message: "żądanie spoza tego serwera", name: "ForbiddenError" },
       };

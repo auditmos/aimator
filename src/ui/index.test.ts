@@ -338,6 +338,36 @@ describe("running a command", () => {
     expect(await response.json()).toMatchObject({ error: { name: "ForbiddenError" } });
   });
 
+  /**
+   * Comparing `Origin` to `Host` is not enough, and the attack says why.
+   *
+   * A page on `zla-strona.example` whose DNS is re-pointed at 127.0.0.1 is
+   * served by this server under **its own** name: the browser then sends
+   * `Host: zla-strona.example` and `Origin: http://zla-strona.example`, the
+   * two agree, the request is same-origin so no preflight is asked for, and
+   * the page can read the answer. The only header an attacker cannot forge
+   * into the loopback address is the name this server is reached by, so that
+   * is what is checked.
+   */
+  it("should refuse a request reaching it under a name that is not the loopback", async () => {
+    const app = createUi({ workspace });
+    const [started, read] = await Promise.all([
+      app.request("http://zla-strona.example:4317/api/run", {
+        body: JSON.stringify({ argv: ["list"] }),
+        headers: {
+          "content-type": "application/json",
+          origin: "http://zla-strona.example:4317",
+        },
+        method: "POST",
+      }),
+      app.request(`http://zla-strona.example:4317/api/status/${PROJECT}/${EPISODE}`),
+    ]);
+
+    expect(started.status).toBe(403);
+    expect(read.status).toBe(403);
+    expect(await read.text()).not.toContain("command");
+  });
+
   it("should refuse a body that needed no permission to send", async () => {
     const response = await createUi({ workspace }).request("/api/run", {
       body: JSON.stringify({ argv: ["list"] }),
