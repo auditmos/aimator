@@ -19,10 +19,48 @@ równolegle.
 pnpm dev screenplay generate dzielna-ewa 01-burza --dry-run
 pnpm dev screenplay generate dzielna-ewa 01-burza
 pnpm dev check dzielna-ewa 01-burza
+pnpm dev check dzielna-ewa 01-burza --stage screenplay
 pnpm dev approve dzielna-ewa 01-burza --stage screenplay --note "rytm się zgadza"
 ```
 
 Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>`, `--regenerate`.
+
+## Sam etap 1, i odpowiedź jako obiekt
+
+`check <id> <episode-id>` czyta całą tekstową stronę odcinka (etapy 0, 1, 3 i 4) i skleja
+cztery werdykty w jeden tekst. To dobre pytanie dla człowieka przy terminalu i złe dla
+wszystkiego, co chce werdyktu samego etapu 1, bo sklejonego tekstu nie da się rozłożyć z
+powrotem. Dlatego etap daje się nazwać: `--stage screenplay` odpowiada wyłącznie za niego.
+
+`--json` na `check` i `approve` wypisuje **obiekt, który zwraca moduł etapu**, bez żadnego
+osobnego formatu, plus dwa pola mówiące, skąd się wziął:
+
+```bash
+pnpm dev check dzielna-ewa 01-burza --stage screenplay --json
+```
+
+```json
+{
+  "command": "check",
+  "stage": "screenplay",
+  "approved": false,
+  "inputsChanged": [],
+  "problems": [],
+  "status": "completed",
+  "verdict": {
+    "durationSeconds": 30,
+    "longestSceneSeconds": 10,
+    "maxSceneSeconds": 15,
+    "minimumScenes": 2,
+    "scenes": 3
+  }
+}
+```
+
+Flaga jest odmową, a nie cichym powrotem do tekstu: `--json` bez `--stage screenplay`
+kończy się błędem użycia, bo wołający, który poprosił o obiekt i dostał polskie zdania,
+został okłamany przez flagę. Kolejne etapy dostają `--json` po kolei, każdy razem ze swoim
+panelem w [lokalnym UI](../ui.md).
 
 ## Model i klucz
 

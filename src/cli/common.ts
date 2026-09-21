@@ -141,6 +141,56 @@ export function modeOf(parsed: Parsed): "apply" | "dry-run" {
   return parsed.values["dry-run"] === true ? "dry-run" : "apply";
 }
 
+/** Prose for a person, or the stage's own object for anything that parses. */
+export type Answer = "json" | "text";
+
+/**
+ * Which stages `check` and `approve` can answer as an object.
+ *
+ * It grows one stage at a time, with that stage's panel, which is the order
+ * the whole screen is being built in. The set is here rather than in either
+ * command because both commands take the flag and both owe the same answer to
+ * "which spellings work", and two lists would disagree the day one grew.
+ */
+const JSON_STAGES = ["screenplay"] as const;
+
+/**
+ * What to print, refusing the spellings that would print the wrong thing.
+ *
+ * `--json` on a stage that has no object yet cannot quietly fall back to
+ * prose: a caller that asked for JSON and got Polish sentences has been lied
+ * to by a flag the usage text promised. So the flag refuses, and names the
+ * spelling that works, exactly as an unknown `--stage` already does.
+ */
+export function answerOf(parsed: Parsed): Result<Answer> {
+  if (parsed.values.json !== true) {
+    return ok("text");
+  }
+
+  const { stage } = parsed.values;
+
+  return typeof stage === "string" && JSON_STAGES.some((name) => name === stage)
+    ? ok("json")
+    : err(
+        new UsageError(
+          `--json wypisuje obiekt na razie wyłącznie dla --stage ${JSON_STAGES.join(", ")}; kolejne etapy dostają go po kolei, razem ze swoim panelem`
+        )
+      );
+}
+
+/**
+ * A stage's object, printed as it is, with the fields that say where it is from.
+ *
+ * No format is designed here and none may be: what `--json` promises is the
+ * object the stage module already returns, so a caller reading the browser and
+ * a caller reading the terminal are reading one contract. `command` and
+ * `stage` are the two words a cross-stage command has to add, because `check`
+ * answers for eleven stages and the answer has to say which one it is.
+ */
+export function asJson(command: string, stage: string, data: object): string {
+  return JSON.stringify({ command, stage, ...data }, null, 2);
+}
+
 /** Who ran the command. An approval with no name attached is worth nothing. */
 export function reviewerOf(parsed: Parsed): string {
   const flag = parsed.values.reviewer;
@@ -229,6 +279,8 @@ export function imageModelOf(parsed: Parsed, track: ImageTrack): Result<string |
 
 /** Who is accepting what, and where. The stage decides the rest. */
 export interface Approval {
+  /** Prose or the stage's object; refused before this record is built. */
+  readonly answer: Answer;
   readonly mode: "apply" | "dry-run";
   readonly note: string | null;
   readonly projectId: string;

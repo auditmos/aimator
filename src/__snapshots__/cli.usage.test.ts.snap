@@ -254,6 +254,25 @@ Odcinek "01-burza", tor gpt-image, etap 5, zatwierdzony w całości
 Dalej: etap 5 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 6, klatka otwarcia"
 `;
 
+exports[`every command >   check <id> <episode-id> --stage screenplay [--json] 1`] = `
+"ok
+{
+  "command": "check",
+  "stage": "screenplay",
+  "approved": true,
+  "inputsChanged": [],
+  "problems": [],
+  "status": "completed",
+  "verdict": {
+    "durationSeconds": 30,
+    "longestSceneSeconds": 10,
+    "maxSceneSeconds": 15,
+    "minimumScenes": 2,
+    "scenes": 3
+  }
+}"
+`;
+
 exports[`every command >   check <id> <episode-id> --stage sound-design [--track <tor>] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 10, pełna ścieżka

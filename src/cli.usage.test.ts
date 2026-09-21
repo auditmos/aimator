@@ -300,6 +300,13 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--track",
     T,
   ],
+  "  check <id> <episode-id> --stage screenplay [--json]": [
+    "check",
+    ...ON,
+    "--stage",
+    "screenplay",
+    "--json",
+  ],
   "  check <id> <episode-id> --stage sound-design [--track <tor>]": [
     "check",
     ...ON,

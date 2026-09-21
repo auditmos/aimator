@@ -1,5 +1,5 @@
 import { ok, type Result } from "../lib/result.js";
-import { parse, requirePositional, workspaceOf } from "./common.js";
+import { answerOf, parse, requirePositional, workspaceOf } from "./common.js";
 import { checkAssemblyStage } from "./stages/assembly.js";
 import { checkCharacterStage } from "./stages/character.js";
 import { checkClipsStage } from "./stages/clips.js";
@@ -14,6 +14,7 @@ import { checkSoundDesignStage } from "./stages/sound-design.js";
 
 /** Every question `check` answers, in the words the usage text promises. */
 export const USAGE = `  check <id> [<episode-id>]
+  check <id> <episode-id> --stage screenplay [--json]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
   check <id> <episode-id> --stage opening-frame --track <tor>
@@ -31,7 +32,11 @@ export const USAGE = `  check <id> [<episode-id>]
  * first and then the three stages an episode carries.
  */
 export async function runCheck(argv: readonly string[]): Promise<Result<string>> {
-  const parsed = parse(argv, { stage: { type: "string" }, track: { type: "string" } });
+  const parsed = parse(argv, {
+    json: { type: "boolean" },
+    stage: { type: "string" },
+    track: { type: "string" },
+  });
 
   if (!parsed.ok) {
     return parsed;
@@ -39,12 +44,36 @@ export async function runCheck(argv: readonly string[]): Promise<Result<string>>
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
   const workspace = workspaceOf(parsed.data);
+  const answer = answerOf(parsed.data);
 
   if (!projectId.ok) {
     return projectId;
   }
   if (!workspace.ok) {
     return workspace;
+  }
+  if (!answer.ok) {
+    return answer;
+  }
+
+  // Naming stage 1 narrows the question to it. The wide check answers four
+  // stages in one string, which reads well and cannot be read back apart, so
+  // anything that wants stage 1's verdict alone has to be able to ask for it.
+  if (parsed.data.values.stage === "screenplay") {
+    const episodeId = requirePositional(parsed.data, 1, "episode-id");
+
+    if (!episodeId.ok) {
+      return episodeId;
+    }
+
+    return await checkScreenplayStage(
+      {
+        episodeId: episodeId.data,
+        projectId: projectId.data,
+        workspace: workspace.data,
+      },
+      answer.data
+    );
   }
 
   if (parsed.data.values.stage === "character") {
@@ -90,7 +119,7 @@ export async function runCheck(argv: readonly string[]): Promise<Result<string>>
   // Naming an episode widens the check to its text stages. Nothing is written,
   // a check reports drift, it never records it.
   const scope = { episodeId, projectId: projectId.data, workspace: workspace.data };
-  const stage1 = await checkScreenplayStage(scope);
+  const stage1 = await checkScreenplayStage(scope, "text");
 
   if (!stage1.ok) {
     return stage1;

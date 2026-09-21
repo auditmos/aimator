@@ -1,5 +1,13 @@
 import { err, type Result } from "../lib/result.js";
-import { modeOf, parse, requirePositional, reviewerOf, UsageError, workspaceOf } from "./common.js";
+import {
+  answerOf,
+  modeOf,
+  parse,
+  requirePositional,
+  reviewerOf,
+  UsageError,
+  workspaceOf,
+} from "./common.js";
 import { approveAssemblyStage } from "./stages/assembly.js";
 import { approveCharacterStage } from "./stages/character.js";
 import { approveClipsStage } from "./stages/clips.js";
@@ -14,7 +22,7 @@ import { approveSoundDesignStage } from "./stages/sound-design.js";
 
 /** Every acceptance this tool records, in the words the usage text promises. */
 export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
-               [--note <uzasadnienie>] [--reviewer <kto>]
+               [--note <uzasadnienie>] [--reviewer <kto>] [--json]
   approve <id> <character-id> --stage character --track <tor>
                --artifact <klucz>[,<klucz>...]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
@@ -40,6 +48,7 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
   // usage promises and the parser rejects.
   const parsed = parse(argv, {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     note: { type: "string" },
     reviewer: { type: "string" },
     stage: { type: "string" },
@@ -52,6 +61,7 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
   const workspace = workspaceOf(parsed.data);
+  const answer = answerOf(parsed.data);
 
   if (!projectId.ok) {
     return projectId;
@@ -59,9 +69,13 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
   if (!workspace.ok) {
     return workspace;
   }
+  if (!answer.ok) {
+    return answer;
+  }
 
   const { note, stage } = parsed.data.values;
   const approval = {
+    answer: answer.data,
     mode: modeOf(parsed.data),
     note: typeof note === "string" ? note : null,
     projectId: projectId.data,

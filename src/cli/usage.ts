@@ -20,6 +20,9 @@ const FLAGS = `  --audio      music-and-effects | dialogue | narration | dialogu
   --nature     law-or-idea | synopsis | screenplay
   --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
                wartości domyślnej, wymagana dopiero przez etap 3
+  --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
+               i approve na razie wyłącznie z --stage screenplay, kolejne etapy
+               dostają go po kolei razem ze swoim panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

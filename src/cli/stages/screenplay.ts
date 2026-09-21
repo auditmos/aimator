@@ -8,7 +8,9 @@ import {
   type ScreenplayStatus,
 } from "../../lib/screenplay/index.js";
 import {
+  type Answer,
   type Approval,
+  asJson,
   type EpisodeScope,
   MODEL_ID,
   maxOutputTokensOf,
@@ -164,24 +166,47 @@ function modelOf(parsed: Parsed): Result<string | null> {
   return ok(value);
 }
 
-/** The stage-1 half of `check <id> <episode-id>`. */
-export async function checkScreenplayStage(scope: EpisodeScope): Promise<Result<string>> {
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "screenplay";
+
+/**
+ * The stage-1 half of `check <id> <episode-id>`, in prose or as the object.
+ *
+ * The answer is chosen by the caller rather than defaulted, because both
+ * callers are in the same file one screen up: the wide check renders prose,
+ * `--stage screenplay` renders whichever the flag asked for, and a default
+ * would decide for the next caller silently.
+ */
+export async function checkScreenplayStage(
+  scope: EpisodeScope,
+  answer: Answer
+): Promise<Result<string>> {
   const result = await checkScreenplay(scope);
 
-  return result.ok
-    ? ok(
-        renderScreenplay(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderScreenplay(
           `Odcinek "${scope.episodeId}", etap 1: ${result.data.status}${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data,
           scope.projectId,
           scope.episodeId,
           "apply"
         )
-      )
-    : result;
+  );
 }
 
-/** `approve --stage screenplay`: the whole result, bound to its digest. */
+/**
+ * `approve --stage screenplay`: the whole result, bound to its digest.
+ *
+ * What to print travels in the approval, beside who accepted and in which
+ * mode, because `approve` settles it once for eleven stages: the spellings
+ * `--json` cannot answer are refused before any stage is reached.
+ */
 export async function approveScreenplayStage(
   parsed: Parsed,
   approval: Approval
@@ -194,15 +219,19 @@ export async function approveScreenplayStage(
 
   const result = await approveScreenplay({ ...approval, episodeId: episodeId.data });
 
-  return result.ok
-    ? ok(
-        renderScreenplay(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderScreenplay(
           `Scenariusz odcinka "${episodeId.data}" zatwierdzony`,
           result.data,
           approval.projectId,
           episodeId.data,
           approval.mode
         )
-      )
-    : result;
+  );
 }

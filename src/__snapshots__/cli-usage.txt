@@ -162,6 +162,7 @@ Wspólne:
     która komenda go wypisała, a każda komórka niesie obiekt swojego etapu bez
     zmian. Odmowa zostaje w Result, dokładnie jak bez flagi.
   check <id> [<episode-id>]
+  check <id> <episode-id> --stage screenplay [--json]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
   check <id> <episode-id> --stage opening-frame --track <tor>
@@ -170,7 +171,7 @@ Wspólne:
   check <id> <episode-id> --stage soundtrack [--track <tor>]
   check <id> <episode-id> --stage sound-design [--track <tor>]
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
-               [--note <uzasadnienie>] [--reviewer <kto>]
+               [--note <uzasadnienie>] [--reviewer <kto>] [--json]
   approve <id> <character-id> --stage character --track <tor>
                --artifact <klucz>[,<klucz>...]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
@@ -186,6 +187,9 @@ Wspólne:
   --nature     law-or-idea | synopsis | screenplay
   --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
                wartości domyślnej, wymagana dopiero przez etap 3
+  --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
+               i approve na razie wyłącznie z --stage screenplay, kolejne etapy
+               dostają go po kolei razem ze swoim panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,
