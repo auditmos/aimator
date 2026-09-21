@@ -715,6 +715,14 @@ So the scope is what decides whether a commit ships, which makes `feat(site)` an
 a real choice rather than a label. Scope a commit `site` when it changes what is published
 at `aimator.auditmos.com`, and leave the scope off when it changes what the CLI does.
 
+**An open issue labelled `blocks-release` holds every release.** A PRD implemented over
+many commits is one version, not one per `feat`, and the number it earns is decided by all
+of them together, so the CI release job checks for open issues with that label and skips
+`semantic-release` while any exists. Put the label on the PRD issue when the work starts;
+closing it after the last phase is what releases, with the notes of every commit since the
+previous tag. Nothing in the workflow needs editing per PRD. The cost is deliberate: an
+unrelated `fix` waits with the PRD, which is the right trade for a solo repository.
+
 ## Environment Variables
 
 - Define schemas in `src/lib/env.ts` using `@t3-oss/env-core` + Zod

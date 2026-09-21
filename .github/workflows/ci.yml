@@ -45,17 +45,37 @@ jobs:
         with:
           fetch-depth: 0
 
+      # An open issue labelled `blocks-release` holds every release until it is
+      # closed: a PRD implemented over fifteen commits is one version, not
+      # fifteen, and the number it earns is decided by all of them together.
+      # Closing the issue is what releases; nothing here needs editing.
+      - name: Check for issues that block a release
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          blocking=$(gh issue list --repo "$GITHUB_REPOSITORY" --label blocks-release --state open --json number --jq '[.[].number] | join(" ")')
+          if [ -n "$blocking" ]; then
+            echo "Release held by open issue(s): $blocking" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "blocking=$blocking" >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.blocking == ''
 
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.blocking == ''
         with:
           node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+        if: steps.gate.outputs.blocking == ''
 
       - run: pnpm build
+        if: steps.gate.outputs.blocking == ''
 
       - run: pnpm semantic-release
+        if: steps.gate.outputs.blocking == ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
