@@ -1,6 +1,6 @@
-# Etap 3 — lista ujęć
+# Etap 3: lista ujęć
 
-Rozbija scenariusz na sceny, ujęcia i klipy — czyli na plan, z którego powstanie film.
+Rozbija scenariusz na sceny, ujęcia i klipy, czyli na plan, z którego powstanie film.
 Pierwszy artefakt **wspólny dla obu torów**, więc nie ma w nim poziomu katalogu na tor.
 
 | | |
@@ -11,7 +11,7 @@ Pierwszy artefakt **wspólny dla obu torów**, więc nie ma w nim poziomu katalo
 | **Koszt** | jedno płatne wywołanie tekstowe |
 
 Nie zależy od [etapu 2](02-postac.md): nazywa postacie identyfikatorami z obsady, a nie
-ich obrazami — te są potrzebne dopiero w [etapie 4](04-pakiet-promptow.md).
+ich obrazami; te są potrzebne dopiero w [etapie 4](04-pakiet-promptow.md).
 
 ## Komendy
 
@@ -26,7 +26,7 @@ Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 24 000),
 `--regenerate`.
 
 Jeśli `--max-clip` nie zostało jeszcze podjęte w [etapie 0](00-przygotowanie.md), zrób to
-teraz — bez tej liczby promptu nie da się złożyć:
+teraz, bo bez tej liczby promptu nie da się złożyć:
 
 ```bash
 pnpm dev episode set dzielna-ewa 01-burza --max-clip 6
@@ -34,7 +34,7 @@ pnpm dev episode set dzielna-ewa 01-burza --max-clip 6
 
 ## Model
 
-`--model <id>`, a bez tej flagi `AIMATOR_SHOTLIST_MODEL` — osobna zmienna, nie ta od
+`--model <id>`, a bez tej flagi `AIMATOR_SHOTLIST_MODEL`, osobna zmienna, nie ta od
 scenariusza. Wspólna znaczyłaby, że wybór modelu do etapu 1 po cichu wybrał też model do
 etapu 3, a tego nikt nie zdecydował.
 
@@ -57,13 +57,13 @@ etapu 3, a tego nikt nie zdecydował.
 - każde ujęcie w **dokładnie jednej scenie i jednym klipie**, mieszczące się w granicach obu;
 - dziesięć pól ujęcia, każde dokładnie raz i niepuste: `Purpose`, `Frame`, `Action`,
   `Expression`, `Camera`, `Cast`, `Audio`, `Text`, `Start state`, `End state`;
-- tekst ekranowy **przeniesiony, nie wymyślony** — ujęcie nie może mieć napisu, którego
+- tekst ekranowy **przeniesiony, nie wymyślony**: ujęcie nie może mieć napisu, którego
   jego scena nie miała.
 
 ## `Cast` wiąże ujęcie z postacią
 
 Każde ujęcie wymienia widoczne postacie **identyfikatorami obsady** (`ewa`, `tata`) albo
-`none`. Proza pól opisowych używa imion i odmienia je naturalnie — i właśnie dlatego imię
+`none`. Proza pól opisowych używa imion i odmienia je naturalnie, i właśnie dlatego imię
 nie może być wiązaniem: „Ewy" i „Ewie" to ten sam człowiek, a dopasowywanie tego w tekście
 byłoby zgadywaniem. Identyfikator jest jedyną drogą, którą etap 4 dojdzie od ujęcia do
 zatwierdzonego `hero.png`.
@@ -73,11 +73,11 @@ się w [etapie 5](05-referencje.md).
 
 ## Nie ma `shot-list.json`
 
-`validateShotList` rozbiera dokument w trakcie walidacji i zwraca to, co rozebrał — ujęcia,
-klipy, sceny, czasy i obsadę — więc etap 4 czyta je jako dane. Drugi plik dałby odcinkowi
+`validateShotList` rozbiera dokument w trakcie walidacji i zwraca to, co rozebrał: ujęcia,
+klipy, sceny, czasy i obsadę, więc etap 4 czyta je jako dane. Drugi plik dałby odcinkowi
 dwie wersje tej samej prawdy, a po pierwszej ręcznej poprawce rozjechałyby się.
 
 ---
 
 [← etap 2](02-postac.md) · [README](../../README.md) ·
-[etap 4 — pakiet promptów →](04-pakiet-promptow.md) · [pełny kontrakt](../pipeline.md)
+[etap 4: pakiet promptów →](04-pakiet-promptow.md) · [pełny kontrakt](../pipeline.md)

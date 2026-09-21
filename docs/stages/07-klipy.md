@@ -1,4 +1,4 @@
-# Etap 7 — klipy
+# Etap 7: klipy
 
 Pierwszy etap, który kupuje **dwa rodzaje mediów**: klatki wejściowe (obraz) i klipy
 (wideo). Pierwszy, w którym bramka jest łańcuchem.
@@ -7,7 +7,7 @@ Pierwszy etap, który kupuje **dwa rodzaje mediów**: klatki wejściowe (obraz) 
 |---|---|
 | **Wejście** | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna |
 | **Wyjście** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg`, `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` |
-| **Bramka** | łańcuch zgód — patrz niżej; potem ocena klipu i klatek z osobna |
+| **Bramka** | łańcuch zgód, patrz niżej; potem ocena klipu i klatek z osobna |
 | **Koszt** | płatny w **dwóch walutach**: wywołania obrazowe i wideo, liczone osobno |
 
 ## Komendy
@@ -26,7 +26,7 @@ Dodatkowe flagi: `--artifact C01,entry:C02`, `--image-model <id>`, `--video-mode
 
 ## Bramka jest łańcuchem
 
-Klip C01 czeka na zatwierdzoną klatkę otwarcia. Klatka wejściowa C02 — na zatwierdzoną
+Klip C01 czeka na zatwierdzoną klatkę otwarcia. Klatka wejściowa C02 czeka na zatwierdzoną
 **końcówkę** C01, jeśli lista ujęć mówi `previous-end-frame`; jeśli mówi
 `new-scene-frame`, czeka tylko na swoje referencje. Klip C02 czeka na swoją klatkę
 wejściową. **Każde ogniwo to zgoda człowieka, nie sama walidacja.**
@@ -41,17 +41,17 @@ Format wybiera dostawca: ModelArk oddaje JPEG, więc plik nazywa się `frames/Cn
 Nazwa idzie za bajtami, bo przekodowanie oznaczałoby przyjęcie jednego obrazu i dołączenie
 innego.
 
-## `--republish` — jedyny etap, który tego potrzebuje
+## `--republish`, jedyny etap, który tego potrzebuje
 
 `--republish --artifact C01` publikuje klip jeszcze raz z archiwum, nie wysyłając niczego
-i nie wymagając modelu ani klucza. Obok klipu rozstrzyga się jeszcze, czym jest końcówka —
+i nie wymagając modelu ani klucza. Obok klipu rozstrzyga się jeszcze, czym jest końcówka,
 a pomyłka w rozstrzygnięciu wychodzi na jaw po publikacji i nie może kosztować drugiego
 wideo.
 
 ## Jeden obraz na wywołanie
 
 **Płatne wywołanie klipu niesie dokładnie jeden obraz: swoją pierwszą klatkę.** To reguła
-API, nie wybór — przypięcie pierwszej klatki wyklucza się z dołączaniem referencji.
+API, nie wybór: przypięcie pierwszej klatki wyklucza się z dołączaniem referencji.
 Referencje, które manifest przypisał klipowi, są tym, z czego narysowano tę klatkę.
 
 ## Długość klipu bierze się z listy ujęć
@@ -60,7 +60,7 @@ Klipu o długości, której model nie renderuje, narzędzie nie zaokrągli: odm�
 wysyłką i wskaże poprawkę w `maxClipSeconds` i [etapie 3](03-lista-ujec.md). Raport podaje
 liczbę płatnych wywołań **osobno dla obrazów i dla wideo**, zanim cokolwiek wyśle.
 
-Dźwięku nie generujemy — ścieżka dźwiękowa jest ciągła przez cięcia, więc należy do etapu
+Dźwięku nie generujemy, bo ścieżka dźwiękowa jest ciągła przez cięcia, więc należy do etapu
 **poniżej montażu**, a klipy są proszone o ciszę jawnie.
 
 ## Modele
@@ -78,4 +78,4 @@ więc przerwaną próbę kończy się pytaniem, a nie drugą opłatą.
 ---
 
 [← etap 6](06-klatka-otwarcia.md) · [README](../../README.md) ·
-[etap 8 — montaż →](08-montaz.md) · [pełny kontrakt](../pipeline.md)
+[etap 8: montaż →](08-montaz.md) · [pełny kontrakt](../pipeline.md)

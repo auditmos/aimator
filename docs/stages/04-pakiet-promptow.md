@@ -1,4 +1,4 @@
-# Etap 4 — pakiet promptów
+# Etap 4: pakiet promptów
 
 Pierwszy etap, który łączy tor tekstowy z obrazowym: wynikiem jest tekst, ale bramka pyta
 o obraz. Pisze **jeden plik promptu na każde przyszłe płatne wywołanie** obrazowe i wideo.
@@ -10,7 +10,7 @@ o obraz. Pisze **jeden plik promptu na każde przyszłe płatne wywołanie** obr
 | **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) **i** zatwierdzone hero na obu torach |
 | **Koszt** | jedno płatne wywołanie tekstowe |
 
-Pakiet jest wspólny dla obu torów, więc nie ma w nim poziomu katalogu na tor — i nic
+Pakiet jest wspólny dla obu torów, więc nie ma w nim poziomu katalogu na tor, i nic
 w nim nie nazywa toru.
 
 ## Komendy
@@ -37,7 +37,7 @@ pnpm dev prompt-package show dzielna-ewa 01-burza --track gpt-image --artifact R
 pliku z `prompts/`, blok o medium, kadr, przy kadrach filmu dosłowne ujęcia z listy,
 i `project.md`.
 
-Istnieje, bo etap 4 publikuje **połowę** promptu — resztę dokleja etap wysyłający, więc
+Istnieje, bo etap 4 publikuje **połowę** promptu; resztę dokleja etap wysyłający, więc
 inaczej zatwierdzałbyś tekst, którego nie widzisz w formie, w jakiej poleci. Bez
 `--artifact` wypisuje sam plan: co pakiet planuje, ile referencji i czy są zatwierdzone.
 
@@ -54,11 +54,11 @@ zatwierdzonego `hero.png` na torze `gpt-image` **i** na torze `seedream`.
 Bramka pyta o postacie **w kadrze**, nie o całą obsadę: hero postaci, której pakiet nigdy
 nie wymieni, nie jest jego wejściem.
 
-Obrazy postaci są zapisanym wejściem, choć **nie są wysyłane** — do modelu idzie to, z
+Obrazy postaci są zapisanym wejściem, choć **nie są wysyłane**: do modelu idzie to, z
 czego powstały, czyli `project.md`. Dołączenie hero jednego toru uczyniłoby plan drugiego
 toru pochodną tamtego rysunku.
 
 ---
 
 [← etap 3](03-lista-ujec.md) · [README](../../README.md) ·
-[etap 5 — obrazy referencyjne →](05-referencje.md) · [pełny kontrakt](../pipeline.md)
+[etap 5: obrazy referencyjne →](05-referencje.md) · [pełny kontrakt](../pipeline.md)

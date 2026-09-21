@@ -1,4 +1,4 @@
-# Etap 6 — klatka otwarcia
+# Etap 6: klatka otwarcia
 
 Pierwsza klatka filmu. Jedno polecenie, jedno płatne wywołanie, jeden obraz do oceny.
 
@@ -24,8 +24,8 @@ Dodatkowe flagi: `--model <id>`, `--regenerate`.
 
 ## Bramka przekracza granicę etapu, nie granicę toru
 
-Czeka na to, co pakiet wpisał w `opening.referenceIds` — `hero:<id>` każdej postaci
-w kadrze i wskazane `Rnn` — **zatwierdzone na tym torze**. Zgoda wydana na `gpt-image` nie
+Czeka na to, co pakiet wpisał w `opening.referenceIds`: `hero:<id>` każdej postaci
+w kadrze i wskazane `Rnn`, **zatwierdzone na tym torze**. Zgoda wydana na `gpt-image` nie
 otwiera niczego na `seedream`.
 
 ## `--artifact` nie jest tu wymagane nigdzie
@@ -38,10 +38,10 @@ nie ciche zignorowanie.
 ## Czym różni się od referencji
 
 Klatka otwarcia **niesie dosłowne ujęcia** pierwszego klipu, bo jest kadrem filmu, a nie
-referencją — więc `shot-list.md` jest jej zapisanym wejściem. Kadr jest ten sam co
+referencją, więc `shot-list.md` jest jej zapisanym wejściem. Kadr jest ten sam co
 w [etapie 5](05-referencje.md).
 
 ---
 
 [← etap 5](05-referencje.md) · [README](../../README.md) ·
-[etap 7 — klipy →](07-klipy.md) · [pełny kontrakt](../pipeline.md)
+[etap 7: klipy →](07-klipy.md) · [pełny kontrakt](../pipeline.md)

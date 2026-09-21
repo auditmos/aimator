@@ -1,13 +1,13 @@
-# Etap 9 — narracja
+# Etap 9: narracja
 
 Pierwszy etap, który kupuje od **dwóch dostawców**, i pierwszy, którego artefakty leżą na
 **dwóch poziomach drzewa**: słowa są wspólne dla obu torów, miks jest per tor.
 
 | | |
 |---|---|
-| **Wejście** | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu — zatwierdzony `<tor>/episode.mp4` |
+| **Wejście** | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` |
 | **Wyjście** | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` |
-| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i obsadzony głos; miks — zatwierdzony [etap 8](08-montaz.md) |
+| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i obsadzony głos; miks czeka na zatwierdzony [etap 8](08-montaz.md) |
 | **Koszt** | płatny; rachunek liczy się w **znakach**, nie w wywołaniach |
 
 ## Komendy
@@ -27,11 +27,11 @@ pnpm dev approve dzielna-ewa 01-burza --stage soundtrack --track gpt-image
 Dodatkowe flagi: `--model <id>`, `--voice-model <id>`, `--max-output-tokens <n>`,
 `--artifact script|N01[,N02]`, `--regenerate`.
 
-## Narracja jest podnoszona, nie pisana — i walidator to sprawdza
+## Narracja jest podnoszona, nie pisana, i walidator to sprawdza
 
 Słowa narratora powstały już w [etapie 1](01-scenariusz.md), a [etap 3](03-lista-ujec.md)
 przeniósł je do pola `Audio` każdego ujęcia, gdzie siedzą w zdaniu opisującym też muzykę
-i deszcz. Wyciąganie ich parserem byłoby parserem nad prozą, więc robi to model — a
+i deszcz. Wyciąganie ich parserem byłoby parserem nad prozą, więc robi to model, a
 walidator dowodzi, że podniesienie było podniesieniem: **tekst każdej kwestii musi wystąpić
 co do słowa w ujęciu, które ta kwestia nazywa.**
 
@@ -40,7 +40,7 @@ film ma powiedzieć coś nowego, poprawka należy do etapu 1.
 
 ## Głos to obsada, sposób czytania to reżyseria
 
-`narratorVoiceId` mieszka w `project.json` obok postaci, bo lektor wraca między odcinkami —
+`narratorVoiceId` mieszka w `project.json` obok postaci, bo lektor wraca między odcinkami;
 obsadza go [etap 0](00-przygotowanie.md). To, *jak* on gra, mieszka w osobnym
 `projects/<id>/narration.json`:
 
@@ -54,8 +54,8 @@ To nie jest kaprys układu. `project.json` jest zapisanym wejściem niemal wszys
 suwak, który ma się kręcić, unieważniałby zgody na bajty, których nie dotknął o ani jeden
 bit. Tutaj unieważnia dokładnie te nagrania, które powstały pod starym brzmieniem.
 
-Bez tej decyzji każde wywołanie szło na domyślnych ustawieniach dostawcy — `stability 0.5`
-i `style 0` — które sam dostawca opisuje jako skłonne do monotonii. Płaskie brzmienie nie
+Bez tej decyzji każde wywołanie szło na domyślnych ustawieniach dostawcy, czyli `stability 0.5`
+i `style 0`, które sam dostawca opisuje jako skłonne do monotonii. Płaskie brzmienie nie
 było wadą głosu, tylko brakiem miejsca na decyzję.
 
 ## Rachunek nie jest w wywołaniach
@@ -67,7 +67,7 @@ cudzymi pieniędzmi.
 
 ## Bajtami rządzi etap 8, umieszczeniem etap 7
 
-Publikuje się to, co wróciło — żadnego rozciągania czasu ani skracania pauzy. Ale kotwica
+Publikuje się to, co wróciło, bez rozciągania czasu i skracania pauzy. Ale kotwica
 pochodzi z planu, który zatwierdził człowiek, więc kwestia nachodząca na następną albo
 wychodząca poza koniec filmu jest **odmową**, nie zaokrągleniem.
 
@@ -79,10 +79,10 @@ strumieniową zatwierdzonego cięcia, klatka w klatkę.
 
 ## Gdzie kończy się ten etap
 
-Narracja to nie cała ścieżka — muzykę i efekty dokłada [etap 10](10-muzyka-i-efekty.md),
+Narracja to nie cała ścieżka; muzykę i efekty dokłada [etap 10](10-muzyka-i-efekty.md),
 więc ich brak jest tu meldowany, dokładnie jak cisza w etapie 8.
 
 ---
 
 [← etap 8](08-montaz.md) · [README](../../README.md) ·
-[etap 10 — muzyka i efekty →](10-muzyka-i-efekty.md) · [pełny kontrakt](../pipeline.md)
+[etap 10: muzyka i efekty →](10-muzyka-i-efekty.md) · [pełny kontrakt](../pipeline.md)

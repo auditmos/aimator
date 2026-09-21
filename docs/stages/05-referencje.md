@@ -1,8 +1,8 @@
-# Etap 5 — obrazy referencyjne
+# Etap 5: obrazy referencyjne
 
 Pierwszy etap, w którym tory **naprawdę się rozchodzą**: jeden pakiet promptów, dwa
 niezależne zestawy obrazów, dwie osobne oceny. Rysuje miejsca, przedmioty i twarze
-widziane raz — wszystko, co nie należy do obsady.
+widziane raz, czyli wszystko, co nie należy do obsady.
 
 | | |
 |---|---|
@@ -27,7 +27,7 @@ Dodatkowe flagi: `--artifact R01,R02`, `--model <id>`, `--regenerate`.
 ## Bez flag rysuje wszystko, co gotowe
 
 **Polecenie rysuje wszystkie referencje, których zależności są już zatwierdzone na tym
-torze** — i mówi, ile płatnych wywołań wykona, zanim je wykona. To pierwszy etap, w którym
+torze**, i mówi, ile płatnych wywołań wykona, zanim je wykona. To pierwszy etap, w którym
 jedno polecenie może kupić kilka obrazów: graf `dependsOn` ma zwykle kilka niezależnych
 korzeni.
 
@@ -36,11 +36,11 @@ a narysowanie R03 niczego nie otwiera.
 
 ## Kadr
 
-Wynika z `aspectRatio` projektu i jest ten sam na obu torach — dla `16:9` to 2816×1584,
+Wynika z `aspectRatio` projektu i jest ten sam na obu torach: dla `16:9` to 2816×1584,
 czyli największa ramka o dokładnie tej proporcji, którą przyjmują oba tory. Obraz w innym
 rozmiarze nie jest publikowany ani skalowany.
 
 ---
 
 [← etap 4](04-pakiet-promptow.md) · [README](../../README.md) ·
-[etap 6 — klatka otwarcia →](06-klatka-otwarcia.md) · [pełny kontrakt](../pipeline.md)
+[etap 6: klatka otwarcia →](06-klatka-otwarcia.md) · [pełny kontrakt](../pipeline.md)
