@@ -315,6 +315,14 @@ Próba na sucho: nic nie zapisano. Ustawienia odcinka "01-burza"
 Dalej: aimator check ewa"
 `;
 
+exports[`every command >   list [--json] 1`] = `
+"ok
+Katalog roboczy: <workspace>
+  ewa
+    01-burza
+Dalej: aimator status ewa 01-burza"
+`;
+
 exports[`every command >   narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Narrator projektu "ewa"

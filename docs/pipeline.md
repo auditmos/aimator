@@ -261,6 +261,29 @@ Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od et
 postacie identyfikatorami z **obsady etapu 0**, a nie ich obrazami; te są potrzebne dopiero
 w etapie 4.
 
+## Co jest w katalogu: `list`
+
+`aimator list [--json]` odpowiada na pytanie **przed** wszystkimi pozostałymi: jakie
+projekty i jakie odcinki w ogóle są w katalogu roboczym. Każda inna komenda dostaje
+identyfikator, więc do tej pory jedyną drogą do tych identyfikatorów był menedżer plików,
+a narzędzie, które odpowiada na coś, czego terminal nie umie, jest tą drugą drogą, której
+ten projekt nie buduje.
+
+Odpowiedź to **same identyfikatory**, w kolejności alfabetycznej: katalog pod `projects/`,
+którego nazwa jest legalnym identyfikatorem projektu, i katalog pod jego `episodes/`.
+Tytuły, ustawienia i werdykty należą do etapów, które je zapisały, a `status` jest jedno
+wywołanie dalej. Katalog o nazwie, która nie może być identyfikatorem, jest pomijany:
+regułę zna moduł układu, więc komenda pyta jego, zamiast powtarzać ją u siebie.
+
+Katalog roboczy bez `projects/` to **stan, nie awaria**: to workspace, którego nikt jeszcze
+nie ruszył, i `list` mówi to słowami. Cokolwiek innego odmówi system plików, leci dalej
+wyjątkiem, bo „pusto" byłoby nieprawdą o katalogu, który istnieje i nie dał się otworzyć.
+Nieustawiony katalog roboczy zostaje odmową w `Result`, z flagą `--json` i bez niej.
+
+`--json` wypisuje ten sam obiekt, który renderuje tekst, w kształcie opisanym niżej:
+`command` równe `"list"`, `workspace` z bezwzględną ścieżką odczytanego drzewa i `projects`,
+gdzie każdy wpis to `id` oraz `episodes`.
+
 ## Stan odcinka: `status`
 
 `aimator status <id> <episode-id> [--json]` odpowiada na jedno pytanie, którego żaden etap

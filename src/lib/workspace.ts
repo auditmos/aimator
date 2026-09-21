@@ -511,6 +511,19 @@ export function workspacePath(workspace: Workspace, recorded: string): string {
   return join(workspace.root, ...recorded.split("/"));
 }
 
+/**
+ * Where the projects are, for the one question asked without an id.
+ *
+ * Every other builder here is handed the name of the thing it is asked about,
+ * because every other question is about a project, an episode or an artifact
+ * somebody already named. "What is in this workspace" is the question before
+ * that one, and answering it means reading a directory rather than naming a
+ * file, so the caller reads and this module still says where.
+ */
+export function projectsRoot(workspace: Workspace): string {
+  return join(workspace.root, "projects");
+}
+
 export function projectPaths(workspace: Workspace, projectId: string): Result<ProjectPaths> {
   if (!PROJECT_ID.test(projectId)) {
     return err(

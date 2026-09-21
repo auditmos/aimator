@@ -2,6 +2,7 @@ import { err, ok, type Result } from "../lib/result.js";
 import { runApprove } from "./approve.js";
 import { runCheck } from "./check.js";
 import { UsageError } from "./common.js";
+import { runList } from "./list.js";
 import { runAssembly } from "./stages/assembly.js";
 import { runCharacter } from "./stages/character.js";
 import { runClip } from "./stages/clips.js";
@@ -75,6 +76,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "sound-design") {
     return await runSoundDesign(rest);
+  }
+
+  if (command === "list") {
+    return await runList(rest);
   }
 
   if (command === "status") {

@@ -146,6 +146,13 @@ Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
     się przed nim, jest MELDUNKIEM, pierwsze to zderzenie, drugie to dryf.
 
 Wspólne:
+  list [--json]
+    Co w ogóle jest w katalogu roboczym: identyfikator każdego projektu i
+    każdego odcinka pod nim, w kolejności alfabetycznej. Nic poza tym: tytuły,
+    ustawienia i werdykty należą do etapów, które je zapisały, a status jest
+    jedno wywołanie dalej. Niczego nie zapisuje i niczego nie wydaje.
+    --json wypisuje ten sam obiekt, który renderuje tekst; odmowa zostaje
+    w Result, dokładnie jak bez flagi.
   status <id> <episode-id> [--json]
     Jedno pytanie zamiast kilkunastu: stan każdego etapu odcinka, osobno na
     każdym torze i na każdej postaci, w jednym z pięciu stanów, z powodem

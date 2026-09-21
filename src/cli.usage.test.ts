@@ -348,6 +348,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "30",
     "--dry-run",
   ],
+  "  list [--json]": ["list"],
   "  narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]": [
     "narration",
     "direction",

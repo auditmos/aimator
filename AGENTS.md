@@ -101,6 +101,8 @@ src/
 │   ├── check.ts      # Internal: the cross-stage command that writes nothing
 │   ├── approve.ts    # Internal: the cross-stage command that records a yes
 │   ├── status.ts     # Internal: the ladder of one episode, and the one "Dalej:"
+│   ├── list.ts       # Internal: what is in the workspace, before any id is known
+│   ├── list.test.ts
 │   ├── status.test.ts
 │   ├── imports.test.ts # The shape: one export at the entry, no stage reaching
 │   │                   #            into another
@@ -579,11 +581,20 @@ lives there and each stage's model flag does not. **No stage file imports anothe
 by `cli/imports.test.ts` rather than remembered, because the one failure this split can have
 is a stage reaching into another's renderers, and that reads as an ordinary import.
 
-`check`, `approve` and `status` are the three commands that are nobody's stage, so they sit
-beside the entry and call into the stage files. That direction is the only one allowed: a
-dispatcher may know its stages, a stage may never know its siblings. The usage text is
-assembled the same way, from the fragments the stages own, so a stage that grows a flag
-writes it in its own file and `usage.ts` does not change.
+`check`, `approve`, `status` and `list` are the four commands that are nobody's stage, so
+they sit beside the entry and call into the stage files. That direction is the only one
+allowed: a dispatcher may know its stages, a stage may never know its siblings. The usage
+text is assembled the same way, from the fragments the stages own, so a stage that grows a
+flag writes it in its own file and `usage.ts` does not change.
+
+`list` is the only one of the four that calls into **no** stage at all, and the only one
+that takes no identifier, because it answers the question before every other one: what is
+in this workspace. It reads two directory levels through `workspace.ts` and prints their
+names, which is why it needed one new path builder there, `projectsRoot`: every other
+builder is handed the name of the thing it is asked about, and this question has no name to
+be handed. It exists because the local UI needs a project picker, and a picker that read
+the directories itself would be a screen answering something the terminal cannot, which is
+the second road this tool refuses to build.
 
 `status` is the odd one of the three, and the odd thing about it is deliberate: it calls the
 stages' `check` functions in `src/lib` rather than the CLI's stage files, because what it
