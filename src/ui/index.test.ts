@@ -4,7 +4,15 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "../cli/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
-import { EPISODE, makeCut, makeNarration, makeUpstream, PROJECT, VOICE } from "../test/fixture.js";
+import {
+  EPISODE,
+  makeCut,
+  makeNarration,
+  makeSoundDesign,
+  makeUpstream,
+  PROJECT,
+  VOICE,
+} from "../test/fixture.js";
 import { INTENTS } from "./commands.js";
 import { createUi } from "./index.js";
 
@@ -187,6 +195,10 @@ beforeAll(async () => {
   // resolver has a script to read, recordings to play and a narrated cut to
   // watch, which are three different media under one stage.
   await makeNarration({ root, tracks: [TRACK], workspace });
+  // Stage 10 on top of it, which is what makes the ladder end the way a
+  // finished episode ends: a cue sheet, two stems and the film with every
+  // sound it has.
+  await makeSoundDesign({ tracks: [TRACK], workspace });
 }, 180_000);
 
 afterAll(async () => {
@@ -510,6 +522,48 @@ describe("the artifact resolver", () => {
     expect(narrated?.bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "narrated.mp4")));
   });
 
+  /**
+   * Stage 10, the same two levels one row down, and the one row that serves
+   * **MP3**.
+   *
+   * The container is the provider's choice rather than this pipeline's:
+   * neither the music endpoint nor the sound-effect one offers WAV at all. So
+   * a stem is `audio/mpeg`, for the reason a recording is `audio/wav` and a
+   * reference is `image/png`: a bed judged by its file name is a bed nobody
+   * judged, and this is the row where a person finds out whether the music
+   * fights the narrator.
+   *
+   * The cue sheet is shared and the full mix is not, exactly as the script and
+   * `narrated.mp4` are, and for the same reason: only the mix is timed against
+   * a particular cut.
+   */
+  it("should serve stage 10's three media, each at the level it lives at", async () => {
+    const app = createUi({ workspace });
+    const [cues, stem, mixed] = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/sound-design/cues?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/sound-design/M01?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/sound-design/mixed?episode=${EPISODE}&track=${TRACK}`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return {
+          bytes: Buffer.from(await response.arrayBuffer()),
+          status: response.status,
+          type: response.headers.get("content-type") ?? "",
+        };
+      })
+    );
+
+    expect([cues?.status, stem?.status, mixed?.status]).toEqual([200, 200, 200]);
+    expect(cues?.type).toContain("text/markdown");
+    expect(stem?.type).toBe("audio/mpeg");
+    expect(mixed?.type).toBe("video/mp4");
+    expect(cues?.bytes).toEqual(await readFile(join(episodeRoot(), "sound-design.md")));
+    expect(stem?.bytes).toEqual(await readFile(join(episodeRoot(), "sound", "M01.mp3")));
+    expect(mixed?.bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "mixed.mp4")));
+  });
+
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
     const secret = join(scratch, "sekret.md");
 
@@ -551,6 +605,11 @@ describe("the artifact resolver", () => {
         // copy of a recording per track is a recording nobody bought.
         `/api/artifact/${PROJECT}/soundtrack/narrated?episode=${EPISODE}`,
         `/api/artifact/${PROJECT}/soundtrack/${encodeURIComponent("../../N01")}?episode=${EPISODE}`,
+        // Stage 10 the same way one row down: the full mix needs a track, a
+        // stem id is a stem id, and neither answer is guessed at.
+        `/api/artifact/${PROJECT}/sound-design/mixed?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/sound-design/${encodeURIComponent("../../M01")}?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/sound-design/N01?episode=${EPISODE}`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -558,7 +617,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 19 }, () => 404));
+    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 22 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 });
@@ -866,6 +925,56 @@ describe("running a command", () => {
           speed: "",
           stability: "0.35",
           style: "0.4",
+        }),
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+
+    expect(JSON.parse(finished.data)).toMatchObject({ ok: true, runId });
+    expect(await ladder()).toEqual(before);
+    await events.close();
+  });
+
+  /**
+   * The same decision one level finer, and the proof that the line held.
+   *
+   * How loud the bed sits under a narrator says nothing about how that
+   * narrator read, so the levels live in `mix.json` rather than inside
+   * `narration.json`, and a fader somebody moves must not lapse a recording
+   * that was bought, heard and accepted. Stage 9 owns delivery; stage 10 owns
+   * levels; neither is in `project.json`, which is a recorded input of nearly
+   * everything. What a panel owes here is therefore the ladder with **stage 9
+   * in it**: the same cells, in the same states, before and after the form is
+   * saved.
+   */
+  it("should not lapse an accepted recording when the levels are saved", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const ladder = async (): Promise<readonly (readonly [string, string])[]> => {
+      const response = await app.request(`/api/status/${PROJECT}/${EPISODE}`);
+      const body = (await response.json()) as {
+        cells: readonly { id: string; stage: number; state: string }[];
+      };
+
+      return body.cells.filter((cell) => cell.stage < 10).map((cell) => [cell.id, cell.state]);
+    };
+    const before = await ladder();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: INTENTS.setLevels({
+          duckDb: "-14",
+          duckRelease: "",
+          effectsDb: "",
+          musicDb: "-22",
+          projectId: PROJECT,
         }),
       }),
       headers: { "content-type": "application/json" },

@@ -49,13 +49,19 @@ const scope = {
   audio: "narration",
   characterId: "ewa",
   dryRun: false,
+  duckDb: "-12",
+  duckRelease: "400",
   duration: "30",
+  effectsDb: "-10",
+  effectsModel: "eleven-sfx",
   episodeId: "01-burza",
   imageModel: "gpt-image-2.5-sunburst",
   language: "pl",
   maxClip: "15",
   maxOutputTokens: "12000",
   model: "gpt-6-astra",
+  musicDb: "-18",
+  musicModel: "eleven-music",
   name: "Ewa",
   nature: "law-or-idea",
   projectId: "dzielna-ewa",
@@ -706,5 +712,98 @@ describe("the stage-9 commands", () => {
         style: "",
       })
     ).toEqual(["narration", "direction", "dzielna-ewa", "--stability", "0.35"]);
+  });
+});
+
+/**
+ * Stage 10, the same two levels one row down, and three models instead of two.
+ *
+ * The sheet and the stems are shared by both tracks and the full mix is not,
+ * so `--track` is the choice of question here exactly as it is one row up, and
+ * accepting the sheet is what authorises buying the stems, which makes it a
+ * different yes about different bytes from accepting what came back.
+ *
+ * The three model flags are the stage rather than a naming habit: one text
+ * model writes the cue sheet, one composes a bed and one renders an effect, so
+ * a bare `--model` would not say which, and a screen offering one would be
+ * offering a refusal.
+ */
+describe("the stage-10 commands", () => {
+  it("should accept the cue sheet and the stems with two different commands", () => {
+    const cues = INTENTS.approveCueSheet(scope);
+    const stems = INTENTS.approveStems({ ...scope, artifacts: ["M01", "E01"] });
+
+    expect(cues).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "sound-design",
+      "--artifact",
+      "cues",
+    ]);
+    expect(stems).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "sound-design",
+      "--artifact",
+      "M01,E01",
+    ]);
+    expect(cues).not.toEqual(stems);
+  });
+
+  it("should ask about the stems and about one track's master with two commands", () => {
+    expect(INTENTS.checkSoundDesign(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "sound-design",
+    ]);
+    expect(INTENTS.checkMaster(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "sound-design",
+      "--track",
+      "gpt-image",
+    ]);
+  });
+
+  it("should name all three models the stage buys from", () => {
+    expect(INTENTS.previewSoundDesign(scope)).toEqual([
+      "sound-design",
+      "generate",
+      "dzielna-ewa",
+      "01-burza",
+      "--artifact",
+      "card,front",
+      "--model",
+      "gpt-6-astra",
+      "--music-model",
+      "eleven-music",
+      "--effects-model",
+      "eleven-sfx",
+      "--max-output-tokens",
+      "12000",
+      "--dry-run",
+      "--json",
+    ]);
+  });
+
+  /** Rule 7 once more: a fader the form was not given is not zero decibels. */
+  it("should leave out a level nobody set", () => {
+    expect(
+      INTENTS.setLevels({
+        duckDb: "",
+        duckRelease: "",
+        effectsDb: "",
+        musicDb: "-22",
+        projectId: "dzielna-ewa",
+      })
+    ).toEqual(["sound-design", "levels", "dzielna-ewa", "--music-db", "-22"]);
   });
 });

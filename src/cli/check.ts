@@ -33,7 +33,7 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage clips --track <tor> [--json]
   check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]
-  check <id> <episode-id> --stage sound-design [--track <tor>]`;
+  check <id> <episode-id> --stage sound-design [--track <tor>] [--json]`;
 
 /**
  * The text stages, whose whole question is an episode and how to print it.

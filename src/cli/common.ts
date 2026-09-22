@@ -147,10 +147,15 @@ export type Answer = "json" | "text";
 /**
  * Which stages `check` and `approve` can answer as an object.
  *
- * It grows one stage at a time, with that stage's panel, which is the order
- * the whole screen is being built in. The set is here rather than in either
- * command because both commands take the flag and both owe the same answer to
- * "which spellings work", and two lists would disagree the day one grew.
+ * It grew one stage at a time, with that stage's panel, which is the order the
+ * whole screen was built in, and stage 10 is the last of them: every
+ * implemented stage is now here. The set stays, because the list is still what
+ * the flag needs. `check` without `--stage` glues four stages into one string
+ * for a person at a terminal, and there is no object for that, which is what
+ * the refusal below is about now that no stage is waiting its turn. The set is
+ * here rather than in either command because both take the flag and both owe
+ * the same answer to "which spellings work", and two lists would disagree the
+ * day one grew.
  */
 const JSON_STAGES = [
   "prepare",
@@ -163,15 +168,18 @@ const JSON_STAGES = [
   "clips",
   "assembly",
   "soundtrack",
+  "sound-design",
 ] as const;
 
 /**
  * What to print, refusing the spellings that would print the wrong thing.
  *
- * `--json` on a stage that has no object yet cannot quietly fall back to
- * prose: a caller that asked for JSON and got Polish sentences has been lied
- * to by a flag the usage text promised. So the flag refuses, and names the
- * spelling that works, exactly as an unknown `--stage` already does.
+ * `--json` over a question no stage owns cannot quietly fall back to prose: a
+ * caller that asked for JSON and got Polish sentences has been lied to by a
+ * flag the usage text promised. The question without `--stage` is exactly
+ * that: four stages glued into one string, which reads well at a terminal and
+ * cannot be read back apart. So the flag refuses, and names the spellings that
+ * work, exactly as an unknown `--stage` already does.
  */
 export function answerOf(parsed: Parsed): Result<Answer> {
   if (parsed.values.json !== true) {
@@ -184,7 +192,7 @@ export function answerOf(parsed: Parsed): Result<Answer> {
     ? ok("json")
     : err(
         new UsageError(
-          `--json wypisuje obiekt na razie wyłącznie dla: ${JSON_STAGES.map((name) => `--stage ${name}`).join(", ")}; kolejne etapy dostają go po kolei, razem ze swoim panelem`
+          `--json wypisuje obiekt jednego etapu, więc wymaga jednego z: ${JSON_STAGES.map((name) => `--stage ${name}`).join(", ")}`
         )
       );
 }

@@ -104,6 +104,21 @@ interface Delivery extends ProjectRef {
 }
 
 /**
+ * How loud this series sits, and how far the bed gives way under a voice.
+ *
+ * Strings for `Delivery`'s reason, read one level finer. An empty box means
+ * the flag is not spelled and whatever was decided last stands; coercing `""`
+ * to `0` would be this client putting the music at full level, which is the
+ * one value nobody would ever dial in on purpose.
+ */
+interface Levels extends ProjectRef {
+  readonly duckDb: string;
+  readonly duckRelease: string;
+  readonly effectsDb: string;
+  readonly musicDb: string;
+}
+
+/**
  * One character as one track draws it, and which of the ten pictures.
  *
  * `artifacts` is a list because the CLI takes one: six references or two views
@@ -157,14 +172,18 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Delivery, Send, Settings, TrackRef {
+interface Everything extends Delivery, Levels, Send, Settings, TrackRef {
   readonly artifact: string;
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
   readonly characterId: string;
   /** Stage 8 alone: the free `generate` that shows the cut without writing it. */
   readonly dryRun: boolean;
+  /** Stage 10's third model: the one that renders one effect. */
+  readonly effectsModel: string;
   readonly imageModel: string;
+  /** Stage 10's second model: the one that composes a bed. */
+  readonly musicModel: string;
   readonly name: string;
   readonly source: string;
   readonly sources: readonly string[];
@@ -283,6 +302,40 @@ export const INTENTS = {
     ...artifacts(one.artifacts),
   ],
   /**
+   * Stage 10, accepted: the cue sheet, which is the gate the stems wait on.
+   *
+   * Its own command rather than a consequence of accepting what came back,
+   * for stage 9's reason one row down: this yes is what authorises spending,
+   * and the yes about the bought bytes is a different decision entirely. It
+   * is also the last yes in this pipeline that a person gives before any
+   * money moves.
+   */
+  approveCueSheet: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "approve",
+    projectId,
+    episodeId,
+    "--stage",
+    "sound-design",
+    "--artifact",
+    "cues",
+  ],
+  /**
+   * Stage 10, accepted: this track's full mix, and nothing to narrow.
+   *
+   * `--track` is the choice of question rather than a narrowing, exactly as
+   * it is at stage 9: without it the same command accepts the sheet or the
+   * stems, which were bought once and belong to both films.
+   */
+  approveMaster: (one: TrackRef): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "sound-design",
+    "--track",
+    one.track,
+  ],
+  /**
    * Stage 9, accepted: this track's narrated cut, and nothing to narrow.
    *
    * `--track` here is not a narrowing but the **choice of question**: without
@@ -397,6 +450,24 @@ export const INTENTS = {
     "shot-list",
   ],
   /**
+   * Stage 10, accepted: stems, listened to, several at a time.
+   *
+   * A bed is accepted by **hearing** it under the picture it was written for,
+   * the same act an image asks for one sense over, so several in a sitting is
+   * one decision and one command. The ids are the CLI's own, `M01` for a bed
+   * and `E01` for an effect.
+   */
+  approveStems: (
+    one: EpisodeRef & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "sound-design",
+    ...artifacts(one.artifacts),
+  ],
+  /**
    * Stage 8: the cut, and the only `generate` on this screen that is not a send.
    *
    * It has no model flag, no key and no bill, because it reaches no provider:
@@ -459,6 +530,16 @@ export const INTENTS = {
     one.episodeId,
     "--stage",
     "clips",
+    "--track",
+    one.track,
+  ],
+  /** Stage 10, verified: this track's full mix, where every sound landed. */
+  checkMaster: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "sound-design",
     "--track",
     one.track,
   ],
@@ -537,6 +618,14 @@ export const INTENTS = {
     "--stage",
     "shot-list",
   ],
+  /** Stage 10, verified: the sheet and the stems, shared, with no track. */
+  checkSoundDesign: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "check",
+    projectId,
+    episodeId,
+    "--stage",
+    "sound-design",
+  ],
   /** Stage 0: this character is drawn from `project.md`, not from photographs. */
   describeCharacter: (one: CastRef): readonly string[] => [
     "character",
@@ -589,6 +678,25 @@ export const INTENTS = {
    */
   mixNarration: (one: TrackRef & { readonly regenerate: boolean }): readonly string[] => [
     "narration",
+    "mix",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--json",
+  ],
+  /**
+   * Stage 10's per-track half: it buys nothing, so it has no preview.
+   *
+   * Like stage 9's it needs a program on this machine rather than a provider,
+   * and it rebuilds from `episode.mp4` and the lossless stems rather than
+   * laying music over `narrated.mp4`, which is the only arrangement that
+   * encodes the speech once and the only one in which the bed can step back
+   * under a voice.
+   */
+  mixSoundDesign: (one: TrackRef & { readonly regenerate: boolean }): readonly string[] => [
+    "sound-design",
     "mix",
     one.projectId,
     one.episodeId,
@@ -751,6 +859,38 @@ export const INTENTS = {
     "--json",
   ],
   /**
+   * Stage 10, previewed: the sheet's one text call, or the stems' bill.
+   *
+   * One command covers both halves and the report says which it is doing,
+   * exactly as at stage 9: until the cue sheet exists and a human has accepted
+   * it, this buys the sheet; afterwards it buys the stems that yes authorised.
+   *
+   * Three model flags, because the stage buys from three call sites. What the
+   * preview is for differs again: this provider rates **per minute of
+   * generated audio** and charges at generation, so the count of calls says
+   * nothing about the money and a regeneration is a second full charge.
+   */
+  previewSoundDesign: (
+    one: Send & {
+      readonly artifacts: readonly string[];
+      readonly effectsModel: string;
+      readonly musicModel: string;
+    }
+  ): readonly string[] => [
+    "sound-design",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    ...artifacts(one.artifacts),
+    ...flag("--model", one.model),
+    ...flag("--music-model", one.musicModel),
+    ...flag("--effects-model", one.effectsModel),
+    ...flag("--max-output-tokens", one.maxOutputTokens),
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
+  /**
    * Stage 7, republished: the clip again, out of its own archive.
    *
    * The one command on this screen that writes without paying, and the one
@@ -779,6 +919,29 @@ export const INTENTS = {
     one.projectId,
     one.episodeId,
     ...settings(one),
+  ],
+  /**
+   * Stage 10: how loud this series sits, which is neither casting nor reading.
+   *
+   * `narration/delivery` one level finer, and in its own file for the reason
+   * that one is not in `project.json`: how loud the bed sits under a narrator
+   * says nothing about how that narrator read, so changing the mix must not
+   * lapse a recording. Two knobs, two scopes, two files.
+   *
+   * It has starting values where nothing else in this pipeline does, and the
+   * justification is its own: **this decision cannot be made before it is
+   * heard**, so refusing the first mix would demand an answer nobody is yet in
+   * a position to form, and a mix costs nothing to redo. An empty field is
+   * still undecided, so the flag is not spelled at all.
+   */
+  setLevels: (one: Levels): readonly string[] => [
+    "sound-design",
+    "levels",
+    one.projectId,
+    ...flag("--music-db", one.musicDb),
+    ...flag("--effects-db", one.effectsDb),
+    ...flag("--duck-db", one.duckDb),
+    ...flag("--duck-release", one.duckRelease),
   ],
   /**
    * Stage 4, free: exactly what a later paid call would send, on one track.

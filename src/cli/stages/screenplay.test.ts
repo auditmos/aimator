@@ -133,7 +133,16 @@ describe("approve --stage screenplay", () => {
   });
 });
 
-describe("--json on a stage that has no object yet", () => {
+/**
+ * The flag refuses where there is no one stage to answer for.
+ *
+ * It used to refuse for stages whose panel had not arrived yet, and that list
+ * is empty now: stage 10 was the last one waiting. What is left is the case
+ * that never goes away. `check` without `--stage` glues four stages into one
+ * string, which reads well for a person at a terminal and cannot be read back
+ * apart, and a `--stage` this CLI does not have is not a stage at all.
+ */
+describe("--json where no single stage answers", () => {
   it("should refuse rather than print prose nobody asked for", async () => {
     const refused = await run(["check", PROJECT, EPISODE, "--json", "--workspace", root]);
 
@@ -152,11 +161,10 @@ describe("--json on a stage that has no object yet", () => {
       "approve",
       PROJECT,
       EPISODE,
-      // A stage whose object does not exist yet. The list shrinks as panels
-      // arrive, which is exactly what this test is watching: the flag refuses
-      // for what is left rather than quietly printing prose.
+      // A stage this CLI does not have. The flag names the spellings that do
+      // work rather than falling back to prose a caller did not ask for.
       "--stage",
-      "sound-design",
+      "montaz",
       "--json",
       "--dry-run",
       "--workspace",

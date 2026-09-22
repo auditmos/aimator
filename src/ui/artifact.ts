@@ -13,6 +13,7 @@ import {
   type ProjectPaths,
   projectPaths,
   referenceImage,
+  soundStem,
   type Workspace,
 } from "../lib/workspace.js";
 
@@ -67,6 +68,13 @@ const MP4 = "video/mp4";
  * bought line be measured on a machine with no media tools.
  */
 const WAV = "audio/wav";
+/**
+ * Stage 10 buys MP3 because neither of its two endpoints offers anything else;
+ * the container is the provider's answer rather than this pipeline's taste,
+ * which is why the verdict on a stem walks frame headers instead of reading a
+ * RIFF chunk. A bed is still judged by hearing it.
+ */
+const MP3 = "audio/mpeg";
 
 /** The one artifact of stage 7 whose id is not simply the clip's. */
 const ENTRY = "entry:";
@@ -77,6 +85,10 @@ const EPISODE_CUT = "episode";
 /** Stage 9's two words that are not a line's id: the script, and the mix. */
 const SCRIPT = "script";
 const NARRATED = "narrated";
+
+/** Stage 10's two, read the same way one row down: the sheet, and the mix. */
+const CUES = "cues";
+const MIXED = "mixed";
 
 /** What each episode stage publishes, in the stage's own word for it. */
 const UNDER_EPISODE: Readonly<
@@ -242,6 +254,43 @@ function underSoundtrack(project: ProjectPaths, request: ArtifactRequest): Locat
 }
 
 /**
+ * Stage 10: the same two levels one row down, and the one row serving MP3.
+ *
+ * It is a function of its own rather than a line in `underSoundtrack`,
+ * although the shape is identical, because what the two stages call their
+ * artifacts is the only thing this table may know about them: `cues` and
+ * `mixed` are the words `--artifact` and the stage file already use, and a
+ * shared function taking four names as parameters would be a table pretending
+ * to be one. The level is read off the id for stage 9's reason: the sheet and
+ * the stems are bought once and shared, so a track on them would be a second
+ * copy of a bed nobody paid for, and the full mix is timed against one cut, so
+ * no track at all would be one film's music over the other's picture.
+ */
+function underSoundDesign(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const episode = episodePaths(project, request.episodeId);
+
+  if (!episode.ok) {
+    return null;
+  }
+
+  if (request.artifact === MIXED) {
+    const track = trackOf(request);
+
+    return track === null
+      ? null
+      : { contentType: MP4, path: episodeTrackPaths(episode.data, track).mixedVideo };
+  }
+
+  if (request.artifact === CUES) {
+    return { contentType: MARKDOWN, path: episode.data.soundDesign };
+  }
+
+  const stem = soundStem(episode.data, request.artifact);
+
+  return stem.ok ? { contentType: MP3, path: stem.data } : null;
+}
+
+/**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
  * It is a function rather than a row in the table above because its artifacts
@@ -302,6 +351,10 @@ export function locateArtifact(
 
   if (request.stage === "soundtrack") {
     return underSoundtrack(project.data, request);
+  }
+
+  if (request.stage === "sound-design") {
+    return underSoundDesign(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

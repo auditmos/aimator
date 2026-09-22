@@ -10,6 +10,7 @@ import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ScreenplayPanel } from "./screenplay";
 import { ShotListPanel } from "./shot-list";
+import { MasterPanel, SoundDesignPanel } from "./sound-design";
 import { ThemeSelect } from "./theme";
 import type {
   EpisodeStatus,
@@ -50,7 +51,7 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  * arrives. A row nobody can open says so by being a row, which is more honest
  * than a panel apologising for being empty.
  */
-const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 function openable(cell: StatusCell): boolean {
   return PANELLED.has(cell.stage);
@@ -122,6 +123,13 @@ function StagePanel(props: PanelProps): JSX.Element | null {
   // cell's own track is what says which of the two questions this row is.
   if (props.cell.stage === 9) {
     return props.cell.track === null ? <NarrationPanel {...props} /> : <MixPanel {...props} />;
+  }
+
+  // Stage 10 splits the same way and for the same reason: the cue sheet and
+  // the stems are bought once for both films, and only the full mix is timed
+  // against a particular cut.
+  if (props.cell.stage === 10) {
+    return props.cell.track === null ? <SoundDesignPanel {...props} /> : <MasterPanel {...props} />;
   }
 
   return null;

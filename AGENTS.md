@@ -760,6 +760,15 @@ made itself. `NARRATION` and the `narration` option are the same line drawn agai
 shots carry what a narrator says only where a test asks for it, because a longer `Audio`
 field would quietly change the prose stages 5 to 8 attach verbatim.
 
+`makeNarration` and `makeSoundDesign` are the same promotion two rows further down, and the
+threshold is the one the rest of this file uses: the CLI's tests for those stages and the UI
+server's both need a **finished** narration and a finished sound design rather than one they
+are testing, and neither is asking how many calls it took. Each leaves its stage's artifacts
+on disk, accepted, and its per-track mix on every track it was handed. Neither replaces the
+instrumented transport its own stage brings to its own tests, for `makeTrack`'s reason: a
+stage billed per character or per second asserts on the request, and these two only have to
+leave the files.
+
 `makeTrack` was promoted for the same reason and at the same threshold as the rest of it:
 stage 8 would have been the fourth copy of the stage 5-to-6 build-up and the second of stage
 7's. It deliberately does **not** replace the instrumented transports stages 5, 6 and 7

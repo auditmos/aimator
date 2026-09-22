@@ -25,6 +25,12 @@ import { approveReferences, generateReferences } from "../lib/references/index.j
 import { ok } from "../lib/result.js";
 import { approveScreenplay, generateScreenplay } from "../lib/screenplay/index.js";
 import { approveShotList, generateShotList } from "../lib/shot-list/index.js";
+import {
+  approveMaster,
+  approveSoundDesign,
+  generateMaster,
+  generateSoundDesign,
+} from "../lib/sound-design/index.js";
 import { type ImageTrack, imageTracks, type Workspace } from "../lib/workspace.js";
 
 /**
@@ -1299,6 +1305,162 @@ export async function makeNarration(options: {
     });
 
     await approveMix({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "fixture",
+      track,
+      workspace,
+    });
+  }
+}
+
+/**
+ * Stage 10's cue sheet, in the English rule 9 requires of an instruction.
+ *
+ * The bed tiles the whole plan and the effect sits inside the shot it names,
+ * because those are the two things the wiring verdict refuses over, and a
+ * fixture whose sheet did not validate would leave every test one stage
+ * shorter than it claims to be. The prose is the model's to write here: stage
+ * 10 is where "lifted, not invented" runs out, so there is nothing to copy
+ * out of the shot list and nothing to compare this against.
+ */
+function cueSheet(): string {
+  return [
+    "## Plan",
+    "",
+    "A quiet evening turning into a storm, scored warmly and never loudly.",
+    "",
+    "## Music",
+    "",
+    "### M01 | U01,U02,U03,U04 | 0-30s",
+    "",
+    "A warm, unhurried acoustic theme for a quiet evening room.",
+    "",
+    "## Effects",
+    "",
+    "### E01 | U03 | 16s | 3s",
+    "",
+    "Soft low thunder rolling in the distance.",
+    "",
+    "## Review",
+    "",
+    "Listen for the bed stepping back under the narrator.",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Stage 10's three call sites behind one transport: a sheet, then the stems.
+ *
+ * Each stem comes back exactly as long as it was asked for, which is what the
+ * provider promises and what the placement arithmetic assumes. The length is
+ * read out of the request rather than fixed, because the two endpoints spell
+ * it differently, `music_length_ms` for a bed and `duration_seconds` for an
+ * effect, and a fixture that answered one length for both would hide the
+ * difference the bill is counted in.
+ */
+function soundProvider(): typeof fetch {
+  return ((url: string | URL, init?: RequestInit) => {
+    if (!String(url).includes("elevenlabs")) {
+      return Promise.resolve(
+        Response.json({
+          id: "resp_fixture",
+          output: [
+            {
+              content: [{ text: cueSheet(), type: "output_text" }],
+              role: "assistant",
+              type: "message",
+            },
+          ],
+          status: "completed",
+        })
+      );
+    }
+
+    const sent = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    const seconds =
+      typeof sent.music_length_ms === "number"
+        ? sent.music_length_ms / 1000
+        : Number(sent.duration_seconds ?? 0);
+
+    return Promise.resolve(
+      new Response(mp3({ seconds }), {
+        headers: { "content-type": "audio/mpeg" },
+        status: 200,
+      })
+    );
+  }) as unknown as typeof fetch;
+}
+
+/**
+ * Stage 10's stems, bought and accepted, and optionally laid on a track.
+ *
+ * `makeNarration` one row down, and promoted at the same threshold and for the
+ * same reason: the CLI's stage-10 tests and the UI server's both need a sheet,
+ * two stems and a full mix that are *finished* rather than under test, and
+ * neither is asking how many calls it took. What it leaves on disk is
+ * `sound-design.md`, `sound/M01.mp3`, `sound/E01.mp3`, all accepted, and
+ * `mixed.mp4` on every track it was handed.
+ *
+ * The episode has to have been through `makeNarration` on each of those
+ * tracks: the full mix gates on a yes given to `narrated.mp4`, because that is
+ * the only proof the narration sits where somebody meant it to.
+ */
+export async function makeSoundDesign(options: {
+  readonly tracks?: readonly ImageTrack[];
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { tracks = [], workspace } = options;
+  const paid = {
+    artifacts: [],
+    audioKey: API_KEY,
+    effectsModel: "eleven_text_to_sound_v2",
+    episodeId: EPISODE,
+    fetch: soundProvider(),
+    maxOutputTokens: 8000,
+    mode: "apply",
+    model: "gpt-6-astra",
+    musicModel: "music_v2",
+    openAiKey: API_KEY,
+    projectId: PROJECT,
+    regenerate: false,
+    workspace,
+  } as const;
+  const accept = (artifacts: readonly string[]) =>
+    approveSoundDesign({
+      artifacts,
+      episodeId: EPISODE,
+      mode: "apply" as const,
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "fixture",
+      workspace,
+    });
+
+  // The sheet first and on its own: accepting it is what authorises the
+  // buying, which is the same two passes a person makes by hand.
+  await generateSoundDesign(paid);
+  await accept(["cues"]);
+  await generateSoundDesign(paid);
+  await accept(["M01", "E01"]);
+
+  for (const track of tracks) {
+    // biome-ignore lint/performance/noAwaitInLoops: one track's mix at a time
+    await generateMaster({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      mux: muxer(),
+      projectId: PROJECT,
+      regenerate: false,
+      track,
+      workspace,
+    });
+
+    await approveMaster({
       artifacts: [],
       episodeId: EPISODE,
       mode: "apply",

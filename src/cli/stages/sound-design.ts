@@ -17,7 +17,10 @@ import {
 } from "../../lib/sound-design/index.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  answerFlag,
+  asJson,
   maxOutputTokensOf,
   modeOf,
   numberFlag,
@@ -30,11 +33,24 @@ import {
   workspaceOf,
 } from "../common.js";
 
+/**
+ * Which stage this file answers for, in the word `--stage` takes.
+ *
+ * One stage written by three commands, which is why `command` carries the
+ * subcommand rather than the stage: `generate` writes the sheet and buys the
+ * stems it authorises, `mix` lays them on one track, and `levels` decides how
+ * loud the result sits. A field that said the same word for all three would
+ * answer "which command wrote this" with a guess, the reason stage 0's is two
+ * words and stage 9's is a subcommand.
+ */
+const STAGE = "sound-design";
+
 /** Stage 10: music and effects, and the film with everything in it. */
 export const USAGE = `Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
   sound-design generate <id> <episode-id> [--model <id>] [--music-model <id>]
                         [--effects-model <id>] [--max-output-tokens <n>]
-                        [--artifact cues|M01[,E02]] [--dry-run] [--regenerate]
+                        [--artifact cues|M01[,E02]] [--dry-run] [--json]
+                        [--regenerate]
     Pisze arkusz cue z zatwierdzonej listy ujęć, a potem kupuje to, co arkusz
     autoryzuje: podkład z /v1/music i efekty z /v1/sound-generation (klucz
     ELEVENLABS_API_KEY, ten sam co mowa, to czwarte i piąte miejsce wywołania
@@ -49,7 +65,7 @@ export const USAGE = `Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks pe
     GENERACJI, więc podgląd podaje wywołania I sekundy, a --regenerate to druga
     pełna opłata.
   sound-design levels <id> [--music-db <n>] [--effects-db <n>] [--duck-db <n>]
-                      [--duck-release <ms>] [--dry-run]
+                      [--duck-release <ms>] [--dry-run] [--json]
     Jak głośno siedzi podkład i jak mocno ustępuje pod mową. Mieszka
     w projects/<id>/mix.json, nie w project.json, bo suwak unieważniałby zgody
     na bajty, których nie dotknął, i nie w narration.json, bo głośność muzyki
@@ -57,7 +73,7 @@ export const USAGE = `Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks pe
     Wartości startowe są, bo tej decyzji nie da się podjąć, zanim się ją usłyszy;
     jadą jawnie do silnika i lądują w archiwum.
   sound-design mix <id> <episode-id> --track <gpt-image|seedream>
-                   [--dry-run] [--regenerate]
+                   [--dry-run] [--json] [--regenerate]
     Składa <tor>/mixed.mp4 z episode.mp4 i stemów, NIE z narrated.mp4. Dzięki
     temu mowa koduje się dokładnie raz, a muzyka w ogóle może ustąpić pod
     głosem. narrated.mp4 nie jest nadpisywany ani unieważniany: zostaje
@@ -78,6 +94,7 @@ async function runSoundDesignGenerate(argv: readonly string[]): Promise<Result<s
   const parsed = parse(argv, {
     artifact: { type: "string" },
     "effects-model": { type: "string" },
+    json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     "music-model": { type: "string" },
@@ -124,15 +141,22 @@ async function runSoundDesignGenerate(argv: readonly string[]): Promise<Result<s
     workspace: workspace.data,
   });
 
-  return result.ok
-    ? ok(renderSoundDesign(result.data, projectId.data, episodeId.data, mode))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("generate", STAGE, result.data)
+      : renderSoundDesign(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /** Stage 10's per-track half: no model, no key, one program on this machine. */
 async function runSoundDesignMix(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
   });
@@ -171,7 +195,15 @@ async function runSoundDesignMix(argv: readonly string[]): Promise<Result<string
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderMaster(result.data, projectId.data, episodeId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("mix", STAGE, result.data)
+      : renderMaster(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /**
@@ -186,6 +218,7 @@ async function runSoundDesignLevels(argv: readonly string[]): Promise<Result<str
     "duck-db": { type: "string" },
     "duck-release": { type: "string" },
     "effects-db": { type: "string" },
+    json: { type: "boolean" },
     "music-db": { type: "string" },
   });
 
@@ -223,7 +256,15 @@ async function runSoundDesignLevels(argv: readonly string[]): Promise<Result<str
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderLevels(result.data, projectId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("levels", STAGE, result.data)
+      : renderLevels(result.data, projectId.data, mode)
+  );
 }
 
 /** Four numbers, each said in the words that make it actionable. */
@@ -402,7 +443,8 @@ function renderMasterStatus(headline: string, status: MasterStatus): string {
 export async function checkSoundDesignStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
 
@@ -415,14 +457,18 @@ export async function checkSoundDesignStage(
   if (parsed.values.track === undefined) {
     const result = await checkSoundDesign(scope);
 
-    return result.ok
-      ? ok(
-          renderSoundDesignStatus(
+    if (!result.ok) {
+      return result;
+    }
+
+    return ok(
+      answer === "json"
+        ? asJson("check", STAGE, result.data)
+        : renderSoundDesignStatus(
             `Odcinek "${episodeId.data}", etap 10, muzyka i efekty${result.data.approved ? ", zatwierdzone" : ""}`,
             result.data
           )
-        )
-      : result;
+    );
   }
 
   const track = trackOf(parsed);
@@ -433,14 +479,18 @@ export async function checkSoundDesignStage(
 
   const result = await checkMaster({ ...scope, track: track.data });
 
-  return result.ok
-    ? ok(
-        renderMasterStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderMasterStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, etap 10, pełna ścieżka${result.data.approved ? ", zatwierdzona" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 /** `approve --stage sound-design`: the sheet and the stems, or one track's mix. */
@@ -461,14 +511,18 @@ export async function approveSoundDesignStage(
       episodeId: episodeId.data,
     });
 
-    return result.ok
-      ? ok(
-          renderSoundDesignStatus(
+    if (!result.ok) {
+      return result;
+    }
+
+    return ok(
+      approval.answer === "json"
+        ? asJson("approve", STAGE, result.data)
+        : renderSoundDesignStatus(
             `Odcinek "${episodeId.data}", zatwierdzono muzykę i efekty etapu 10`,
             result.data
           )
-        )
-      : result;
+    );
   }
 
   const track = trackOf(parsed);
@@ -484,12 +538,16 @@ export async function approveSoundDesignStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderMasterStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderMasterStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono pełną ścieżkę`,
           result.data
         )
-      )
-    : result;
+  );
 }

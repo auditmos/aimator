@@ -36,12 +36,12 @@ Odcinek "01-burza", tor gpt-image, zatwierdzono: R01
 Dalej: etap 5 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 6, klatka otwarcia"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json] 1`] = `
 "SoundDesignStateError
 nie ma czego zatwierdzić: cues"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage sound-design --track <tor> 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage sound-design --track <tor> [--json] 1`] = `
 "SoundDesignStateError
 nie ma czego zatwierdzić: pełnej ścieżki nie złożono na torze gpt-image
   - nie ma narracji położonej na obrazie na torze gpt-image, etap 9 nie ukończył miksu
@@ -447,7 +447,7 @@ exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`
 }"
 `;
 
-exports[`every command >   check <id> <episode-id> --stage sound-design [--track <tor>] 1`] = `
+exports[`every command >   check <id> <episode-id> --stage sound-design [--track <tor>] [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 10, pełna ścieżka
   mixed: absent, jeszcze nie zmiksowany

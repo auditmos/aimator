@@ -170,7 +170,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02]": [
+  "  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]": [
     "approve",
     ...ON,
     "--stage",
@@ -181,7 +181,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage sound-design --track <tor>": [
+  "  approve <id> <episode-id> --stage sound-design --track <tor> [--json]": [
     "approve",
     ...ON,
     "--stage",
@@ -322,7 +322,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "shot-list",
     "--json",
   ],
-  "  check <id> <episode-id> --stage sound-design [--track <tor>]": [
+  "  check <id> <episode-id> --stage sound-design [--track <tor>] [--json]": [
     "check",
     ...ON,
     "--stage",

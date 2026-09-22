@@ -25,7 +25,26 @@ pnpm dev approve dzielna-ewa 01-burza --stage sound-design --track gpt-image
 ```
 
 Dodatkowe flagi: `--model <id>`, `--music-model <id>`, `--effects-model <id>`,
-`--max-output-tokens <n>`, `--artifact cues|M01[,E02]`, `--regenerate`.
+`--max-output-tokens <n>`, `--artifact cues|M01[,E02]`, `--regenerate`, `--json`.
+
+## `--json`, czyli obiekt na dwóch poziomach
+
+`sound-design generate`, `sound-design mix`, `sound-design levels`,
+`check --stage sound-design` i `approve --stage sound-design` przyjmują `--json` i
+wypisują obiekt etapu zamiast zdań: ten sam, który zwraca moduł, plus `command` i `stage`.
+`command` niesie **podpolecenie** (`generate`, `mix`, `levels`), bo jeden etap piszą tutaj
+trzy gramatyki, tak samo jak w [etapie 9](09-narracja.md).
+
+Poziom rozstrzyga `--track`, i to nie jest zawężenie, tylko **wybór pytania**: bez flagi
+`check` i `approve` odpowiadają o arkuszu i stemach, wspólnych dla obu torów, z flagą —
+o pełnej ścieżce tego toru.
+
+Rachunek w obiekcie stoi w dwóch polach, `calls` i `seconds`, i nigdy się ich nie sumuje:
+dostawca wycenia **za minutę wygenerowanego dźwięku**, więc jedno wywołanie na
+trzydziestosekundowy podkład i jedno na trzysekundowy grzmot to ta sama liczba wywołań
+i nic podobnego do tej samej kwoty.
+
+Tym etapem lista się domyka: `--json` mają już wszystkie komendy wszystkich etapów.
 
 ## Poziomy
 
@@ -33,7 +52,7 @@ Dodatkowe flagi: `--model <id>`, `--music-model <id>`, `--effects-model <id>`,
 pnpm dev sound-design levels dzielna-ewa --music-db -22 --duck-db -12
 ```
 
-Pozostałe flagi: `--effects-db <n>`, `--duck-release <ms>`, `--dry-run`.
+Pozostałe flagi: `--effects-db <n>`, `--duck-release <ms>`, `--dry-run`, `--json`.
 
 Mieszkają w `projects/<id>/mix.json`, a nie w `project.json`, bo suwak unieważniałby zgody
 na bajty, których nie dotknął, i nie w `narration.json`, bo głośność podkładu nie mówi nic

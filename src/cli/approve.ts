@@ -33,8 +33,8 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
   approve <id> <episode-id> --stage assembly --track <tor> [--json]
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] [--json]
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
-  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02]
-  approve <id> <episode-id> --stage sound-design --track <tor>`;
+  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
+  approve <id> <episode-id> --stage sound-design --track <tor> [--json]`;
 
 /**
  * Acceptance, and only over artifacts that already validate.

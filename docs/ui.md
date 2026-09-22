@@ -54,12 +54,20 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   niego, nie w nim. Reżyseria narratora to formularz pięciu pokręteł mapowany na komendę
   `narration direction`; jego zapis nie unieważnia zgód wcześniejszych etapów, bo nie
   dotyka `project.json`.
+- **Panele etapu 10**, na wzorcu etapu 9 i na tych samych dwóch poziomach: arkusz cue
+  i stemy są wspólne dla obu torów (stem jako audio do odsłuchania, `audio/mpeg`, bo
+  tylko taki kontener dają te dwa endpointy), a pełna ścieżka jest per tor i jest wideo.
+  Rachunek stoi w **sekundach i wywołaniach**, a obok niego zdanie, którego nie ma nigdzie
+  indziej: dostawca nalicza przy **generacji**, więc nowa próba to druga pełna opłata.
+  Poziomy to formularz czterech suwaków mapowany na `sound-design levels`; jego zapis nie
+  unieważnia zatwierdzonych nagrań etapu 9, bo mieszka w `mix.json`, a nie w
+  `narration.json` ani w `project.json`.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
 
-Komórki pozostałych etapów są na razie wierszami bez panelu: każdy etap dostaje swój
-w osobnym wycinku, a wiersz, którego nie da się kliknąć, mówi to uczciwiej niż pusty panel.
+Tym etapem drabina domyka się w panelach: każdy zaimplementowany etap, od 0 do 10, ma swój
+ekran, a dwa ostatnie mają po dwa, bo ich artefakty leżą na dwóch poziomach drzewa.
 
 ## Etap 0 i ścieżka w polu tekstowym
 
@@ -145,9 +153,11 @@ się przy pierwszej poprawce ręcznej.
 W jakich jednostkach, rozstrzyga **etap**, nie ekran: to on wie, za co dostawca liczy.
 Etapy tekstowe liczą wywołania, obrazowe obrazy, etap 7 **dwie liczby naraz**, klatki
 wejściowe i klipy, których nigdy się nie sumuje, bo obraz i wideo kosztują o rząd wielkości
-inaczej i suma byłaby liczbą, której nikt nie płaci, a etap 9 **znaki**, bo dostawca mowy
-rozlicza tekst, który dostał, a nie wywołania. Dlatego `ui/panel.tsx` trzyma samo ułożenie
-rachunku, a to, które pola raportu są rachunkiem, przynosi panel etapu.
+inaczej i suma byłaby liczbą, której nikt nie płaci, etap 9 **znaki**, bo dostawca mowy
+rozlicza tekst, który dostał, a nie wywołania, a etap 10 **sekundy**, bo jego dostawca
+wycenia za minutę wygenerowanego dźwięku i jedno wywołanie na trzydziestosekundowy podkład
+to ta sama liczba, co jedno na trzysekundowy grzmot. Dlatego `ui/panel.tsx` trzyma samo
+ułożenie rachunku, a to, które pola raportu są rachunkiem, przynosi panel etapu.
 
 Etap 9 pokazuje też, czym rachunek **nie** jest. Jedno polecenie robi tam dwa różne zakupy
 i raport mówi który: dopóki skryptu nie ma, kupuje się jedno wywołanie tekstowe; po jego
@@ -156,6 +166,12 @@ tego samego obiektu, bo wypisanie rachunku za mowę w pierwszej fazie pokazałob
 `0` obok przycisku, który zaraz wyda pieniądze. Znaki kontekstu (`previous_text`/`next_text`)
 stoją **obok** rachunku i nigdy w nim: dostawca dokumentuje te parametry i nie mówi, czy je
 rozlicza, a narzędzie nie zgaduje cudzymi pieniędzmi.
+
+Etap 10 powtarza ten podział na dwa zakupy (arkusz, potem stemy, które jego zatwierdzenie
+otworzyło) i dokłada zdanie, którego nie ma nigdzie indziej na tym ekranie: ten dostawca
+nalicza przy **generacji**, a nie przy pobraniu, więc `--regenerate` tego samego cue to
+druga pełna opłata, nie dopłata. Stoi obok rachunku, bo to nie jest liczba, tylko rzecz do
+przeczytania, zanim ktoś kliknie drugi raz.
 
 ## Uruchamianie komendy i artefakty
 
@@ -181,7 +197,10 @@ Etap 9 jest też pierwszym, którego artefakty leżą na **dwóch poziomach**, i
 rozróżnia po identyfikatorze, a nie po tym, co wołający wpisał w zapytaniu: skrypt i kwestie
 są wspólne i nie przyjmują toru, `narrated` przyjmuje tylko z torem. Odwrotnie byłaby to
 druga kopia nagrania, którego nikt nie kupił, albo narracja jednego filmu nad obrazem
-drugiego.
+drugiego. Etap 10 czyta się tak samo: `cues` i stemy (`M01`, `E01`) bez toru, `mixed` tylko
+z torem. Stemy wracają jako `audio/mpeg`, bo tylko taki kontener dają oba endpointy tego
+dostawcy — wybór jest jego, nie tego potoku, i dlatego werdykt na stemie chodzi po nagłówkach
+ramek, a nie po nagłówku RIFF.
 
 Od etapu 7 dochodzi film, a film się **przewija**, więc artefakt odpowiada na nagłówek
 `Range`: bez niego 200 i całość, z czytelnym zakresem 206 i dokładnie te bajty (200 kazałoby

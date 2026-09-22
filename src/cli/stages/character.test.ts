@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { checkCharacter } from "../../lib/character/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
-import { EPISODE, makeUpstream, PROJECT } from "../../test/fixture.js";
+import { makeUpstream, PROJECT } from "../../test/fixture.js";
 import { run } from "../index.js";
 
 /**
@@ -242,27 +242,5 @@ describe("character generate --json", () => {
     );
 
     expect(prose).toContain("płatnych wywołań do wykonania: 1");
-  });
-});
-
-describe("--json on a stage that still has no object", () => {
-  it("should refuse rather than print prose nobody asked for", async () => {
-    const refused = await run([
-      "check",
-      PROJECT,
-      EPISODE,
-      // A stage whose object does not exist yet; the list shrinks as panels
-      // arrive, and the flag has to refuse for what is left.
-      "--stage",
-      "sound-design",
-      "--track",
-      TRACK,
-      "--json",
-      "--workspace",
-      root,
-    ]);
-
-    expect(refused.ok).toBe(false);
-    expect(refused.ok ? "" : refused.error.name).toBe("UsageError");
   });
 });

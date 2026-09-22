@@ -118,7 +118,8 @@ Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
 Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
   sound-design generate <id> <episode-id> [--model <id>] [--music-model <id>]
                         [--effects-model <id>] [--max-output-tokens <n>]
-                        [--artifact cues|M01[,E02]] [--dry-run] [--regenerate]
+                        [--artifact cues|M01[,E02]] [--dry-run] [--json]
+                        [--regenerate]
     Pisze arkusz cue z zatwierdzonej listy ujęć, a potem kupuje to, co arkusz
     autoryzuje: podkład z /v1/music i efekty z /v1/sound-generation (klucz
     ELEVENLABS_API_KEY, ten sam co mowa, to czwarte i piąte miejsce wywołania
@@ -133,7 +134,7 @@ Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
     GENERACJI, więc podgląd podaje wywołania I sekundy, a --regenerate to druga
     pełna opłata.
   sound-design levels <id> [--music-db <n>] [--effects-db <n>] [--duck-db <n>]
-                      [--duck-release <ms>] [--dry-run]
+                      [--duck-release <ms>] [--dry-run] [--json]
     Jak głośno siedzi podkład i jak mocno ustępuje pod mową. Mieszka
     w projects/<id>/mix.json, nie w project.json, bo suwak unieważniałby zgody
     na bajty, których nie dotknął, i nie w narration.json, bo głośność muzyki
@@ -141,7 +142,7 @@ Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
     Wartości startowe są, bo tej decyzji nie da się podjąć, zanim się ją usłyszy;
     jadą jawnie do silnika i lądują w archiwum.
   sound-design mix <id> <episode-id> --track <gpt-image|seedream>
-                   [--dry-run] [--regenerate]
+                   [--dry-run] [--json] [--regenerate]
     Składa <tor>/mixed.mp4 z episode.mp4 i stemów, NIE z narrated.mp4. Dzięki
     temu mowa koduje się dokładnie raz, a muzyka w ogóle może ustąpić pod
     głosem. narrated.mp4 nie jest nadpisywany ani unieważniany: zostaje
@@ -177,7 +178,7 @@ Wspólne:
   check <id> <episode-id> --stage clips --track <tor> [--json]
   check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]
-  check <id> <episode-id> --stage sound-design [--track <tor>]
+  check <id> <episode-id> --stage sound-design [--track <tor>] [--json]
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>] [--json]
   approve <id> <character-id> --stage character --track <tor> [--json]
@@ -190,19 +191,17 @@ Wspólne:
   approve <id> <episode-id> --stage assembly --track <tor> [--json]
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] [--json]
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
-  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02]
-  approve <id> <episode-id> --stage sound-design --track <tor>
+  approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
+  approve <id> <episode-id> --stage sound-design --track <tor> [--json]
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay
   --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
-               i approve na razie wyłącznie z --stage prepare, screenplay,
-               shot-list, prompt-package, character, references, opening-frame,
-               clips, assembly albo soundtrack, a z komend etapu na razie
-               wyłącznie na etapach 0–9; kolejne etapy dostają go po kolei
-               razem ze swoim panelem w UI
+               i approve z każdym --stage, na komendach etapu na wszystkich
+               etapach 0–10. Pole command niesie podpolecenie tam, gdzie jeden
+               etap piszą dwie gramatyki albo więcej
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

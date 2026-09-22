@@ -319,6 +319,101 @@ export interface MixReport {
 }
 
 /**
+ * One thing stage 10 reviewed: the cue sheet, one stem, or one track's mix.
+ *
+ * `LineState` one row down, with `seconds` where that one carries
+ * `characters`, and the difference is the bill rather than a shortening: the
+ * speech provider charges for the text it is handed, and this one rates per
+ * minute of the audio it produces, so what a cue carries is what it is rated
+ * on. A shared shape with both fields would have put a number nobody is
+ * billed on every artifact of both stages.
+ */
+export interface CueState {
+  readonly approved: boolean;
+  readonly id: string;
+  /** Recorded inputs whose bytes on disk no longer match what this cue used. */
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  readonly seconds: number | null;
+  readonly state: "absent" | "completed" | "submitted";
+}
+
+/** Stage 10's shared half: the sheet and every stem, with no track anywhere. */
+export interface SoundDesignStatus {
+  readonly approved: boolean;
+  readonly cues: readonly CueState[];
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly sheet: CueState;
+  /** The whole bill, in the unit the provider rates: seconds of audio. */
+  readonly totalSeconds: number;
+}
+
+/** Stage 10's per-track half: one full mix, and nothing to narrow it with. */
+export interface MasterStatus {
+  readonly approved: boolean;
+  readonly artifact: CueState;
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/**
+ * Stage 10's report, whose bill is **seconds** rather than calls.
+ *
+ * Both numbers travel for stage 9's reason read one provider over: this one
+ * rates per minute of generated audio, so one call for a thirty-second bed
+ * and one for a three-second thunderclap are the same count and nothing like
+ * the same money. It also charges at generation rather than at download,
+ * which is what makes a second attempt a second full charge and worth saying
+ * beside the button.
+ */
+export interface SoundDesignReport {
+  readonly calls: number;
+  readonly cues: readonly {
+    readonly id: string;
+    readonly kind: string;
+    readonly note: string;
+    readonly seconds: number;
+    readonly state: string;
+  }[];
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  /** `--dry-run` only: the exact text the cue-sheet call would send. */
+  readonly prompt: string | null;
+  readonly seconds: number;
+  /** What would happen to the sheet itself, which decides what the bill is. */
+  readonly sheet: { readonly note: string; readonly state: string };
+}
+
+/** How loud this series sits, as the mix recorded it for these bytes. */
+export interface MixLevels {
+  readonly duckDb: number;
+  readonly duckReleaseMs: number;
+  readonly effectsDb: number;
+  readonly musicDb: number;
+}
+
+/** Stage 10's per-track report: where every sound landed on this film. */
+export interface MasterReport {
+  readonly actualSeconds: number;
+  /** The local engine, once it has answered. `null` when it could not be asked. */
+  readonly engine: string | null;
+  readonly levels: MixLevels;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly sounds: readonly {
+    readonly atSeconds: number;
+    readonly id: string;
+    readonly kind: "effect" | "music" | "speech";
+    readonly plannedSeconds: number;
+    readonly seconds: number;
+  }[];
+}
+
+/**
  * What every paid stage's report says that a panel has to show.
  *
  * The bill is deliberately **not** here, and that is the interesting part.
