@@ -149,8 +149,10 @@ na pliki `.ts`.
 Kod trzyma się **głębokich modułów** (Ousterhout): wąski interfejs nad dużą implementacją.
 Domena zaczyna jako jeden plik `src/lib/{domena}.ts`, a gdy urośnie o wewnętrzne części,
 staje się katalogiem z `index.ts` jako jedynym wejściem. `src/bin.ts` jest celowo cienką
-nakładką, bo całe zachowanie siedzi w `src/cli.ts` jako `run(argv): Promise<Result<string>>`,
-dzięki czemu CLI testuje się wywołaniem funkcji, a nie uruchamianiem procesu.
+nakładką, bo całe zachowanie siedzi w `src/cli/` jako `run(argv): Promise<Result<string>>`,
+dzięki czemu CLI testuje się wywołaniem funkcji, a nie uruchamianiem procesu. Samo CLI
+przeszło tę ścieżkę wzrostu: było jednym plikiem, aż urosło do jedenastu etapów, i ma dziś
+plik na komendę za `index.ts`, który eksportuje wyłącznie `run`.
 
 Pełne zasady, czyli granice, ścieżka wzrostu i egzekwowanie, są w [AGENTS.md](AGENTS.md).
 

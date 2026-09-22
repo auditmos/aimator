@@ -69,6 +69,47 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 Tym etapem drabina domyka się w panelach: każdy zaimplementowany etap, od 0 do 10, ma swój
 ekran, a dwa ostatnie mają po dwa, bo ich artefakty leżą na dwóch poziomach drzewa.
 
+## Czego ten ekran nie robi
+
+Lista jest krótka i każda pozycja jest decyzją, a nie brakiem czasu.
+
+**Nie umie nic, czego nie umie terminal.** Pod każdym przyciskiem stoi `run(argv)`, więc
+ekran nie ma ani jednej własnej odpowiedzi. Gdy czegoś brakuje, brakuje tego w CLI i tam
+trzeba to dopisać; dołożenie tego po stronie klienta byłoby drugą drogą, o której agent
+prowadzący ten sam potok nie wie.
+
+**Nie rozstrzyga niczego.** Czy komórka jest zablokowana, ile kosztuje wywołanie i co jest
+następnym krokiem, liczy `status` i raport etapu. Serwer nie importuje modułu etapu, nie
+czyta pliku stanu i nie skleja ścieżek poza `workspace.ts`.
+
+**Nie przyjmuje plików.** Plik podaje się ścieżką, bo upload zapisałby w `episode.json`
+katalog tymczasowy zamiast miejsca, z którego plik naprawdę pochodzi.
+
+**Nie pisze `project.md` i nie prowadzi wywiadu.** Zasady wspólne pisze człowiek
+w edytorze, a rozwinięcie pomysłu i etap 0 prowadzą skille `develop-series`
+i `prepare-project` w terminalu.
+
+**Nie pokazuje pieniędzy.** Rachunek stoi w jednostkach, które liczy etap — wywołaniach,
+obrazach, znakach, sekundach — i nigdy w dolarach. Cennika, salda ani progu „tanie kupuj
+jednym kliknięciem" tu nie ma, bo próg to decyzja, którą ktoś musiałby ustalać
+i utrzymywać.
+
+**Nie wie o postępie więcej niż dysk.** Etapy nie wysyłają zdarzeń i nie dostaną takiej
+sygnatury; blokada etapu daje „w toku" i na tym kończy się wiedza serwera o trwającej
+pracy.
+
+**Nie kolejkuje i nie ponawia.** Przed dwoma uruchomieniami naraz, z ekranu i z terminala,
+chronią blokady etapów — te same, które chronią przed dwoma terminalami. Drugiej ochrony
+nie ma i nie jest potrzebna.
+
+**Nie zapisuje niczego od siebie i niczego nie publikuje.** Wszystko, co powstaje, zapisuje
+etap w katalogu roboczym; gotowy odcinek wychodzi do internetu osobnym narzędziem
+([strona wydań](strona.md)), a historia zmian to `git log`, nie widok w przeglądarce.
+
+**Nie wychodzi poza tę maszynę.** Bez uwierzytelniania, bez konta, bez zdalnego dostępu
+i bez instalatora. Nasłuch na pętli zwrotnej jest tu całym modelem bezpieczeństwa;
+co z tego nie wynika, opisuje osobna sekcja niżej.
+
 ## Etap 0 i ścieżka w polu tekstowym
 
 Etap 0 jest wyjątkiem od zdania „panel otwiera się z komórki drabiny", i to nie jest

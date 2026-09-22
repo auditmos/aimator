@@ -37,6 +37,60 @@ const USAGE_LINE = /^ {2}[a-z][a-z-]*(?: [a-z][a-z-]*)? /;
 const SHA256 = /\b[0-9a-f]{64}\b/g;
 const TIMESTAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
 
+/** The two words a usage line opens with, before any argument or flag. */
+const COMMAND = /^ {2}(\S+)(?: (\S+))?/;
+const WORD = /^[a-z][a-z-]*$/;
+/** A signature too long for one line wraps under its arguments; prose does not. */
+const WRAPPED = /^ {5,}\S/;
+
+/**
+ * Which command a usage line opens, or none when the line opens no command.
+ *
+ * A second word belongs to the name only when it is a word: `project init` is
+ * a command and `check <id>` is `check` with an argument. That is the rule
+ * `docs.test.ts` reads an invocation by, and it is the same rule for the same
+ * reason — what the parser dispatches on is one or two words, never a shape.
+ */
+function commandOf(line: string): string | null {
+  const [, first, second] = COMMAND.exec(line) ?? [];
+
+  if (first === undefined || !WORD.test(first)) {
+    return null;
+  }
+
+  return second !== undefined && WORD.test(second) ? `${first} ${second}` : first;
+}
+
+/**
+ * Every command the usage text defines, each with its whole signature.
+ *
+ * A signature is the usage line plus the lines it wraps onto, and nothing
+ * else. The sentences under a command are indented four spaces and several of
+ * them talk *about* `--json`, so folding them in would let a paragraph stand
+ * in for a flag, which is the one mistake the check below has to not make.
+ */
+function signatures(text: string): Map<string, string> {
+  const found = new Map<string, string>();
+  let open: string | null = null;
+
+  for (const line of text.split("\n")) {
+    // Annotated, because the loop carries `open` forward from it and inferring
+    // one from the other is a circle TypeScript refuses to walk.
+    const command: string | null =
+      commandOf(line) ?? (open !== null && WRAPPED.test(line) ? open : null);
+
+    if (command === null) {
+      open = null;
+      continue;
+    }
+
+    found.set(command, `${found.get(command) ?? ""}\n${line}`);
+    open = command;
+  }
+
+  return found;
+}
+
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
@@ -545,6 +599,40 @@ describe("the table", () => {
 
     expect(new Set(lines).size).toBe(lines.length);
     expect(Object.keys(TABLE).sort()).toEqual([...lines].sort());
+  });
+});
+
+/**
+ * The parity promise, kept where it can be read: in the usage text itself.
+ *
+ * A screen over this CLI can only ask what the terminal answers, and the other
+ * caller is an agent, which reads an object rather than Polish sentences. A
+ * command with no `--json` is therefore a question one of the two callers
+ * cannot ask, and the hole would open silently: nothing about a stage that
+ * forgot the flag looks wrong until somebody tries to click it.
+ *
+ * It is read per **command** rather than per usage line, because a command is
+ * what the parser dispatches on. `check <id> <episode-id>` glues four stages
+ * into one string for a person at a terminal and `common.ts` refuses `--json`
+ * over it by name, while `check --stage screenplay` answers as an object: one
+ * command, two grammars, one flag.
+ */
+describe("--json", () => {
+  it("should be declared by every command the usage text defines", () => {
+    const declared = signatures(usage);
+    const silent = [...declared]
+      .filter(([, signature]) => !signature.includes("--json"))
+      .map(([command]) => command);
+
+    expect(silent).toEqual([]);
+
+    // Second, because it is the weaker claim and has to fail second: a parse
+    // that matched nothing would have found nothing silent either and would
+    // have passed. The commands are read back against the frozen table, whose
+    // keys the test above pins to the usage lines one by one.
+    const covered = new Set(Object.keys(TABLE).flatMap((line) => commandOf(line) ?? []));
+
+    expect([...declared.keys()].sort()).toEqual([...covered].sort());
   });
 });
 

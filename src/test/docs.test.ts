@@ -203,24 +203,35 @@ describe("documentation", () => {
   });
 
   /**
-   * `--json` arrives one stage at a time, and the page has to arrive with it.
+   * `--json` has reached every stage, and every page has to say so.
    *
    * The flag is what an agent reads instead of Polish sentences, so a stage
-   * that takes it and never says so is a contract nobody can find. Which
-   * stages take it is not listed here, for the reason nothing else in this file
-   * is: it is read off `--help`, block by block, so the day a stage's usage
-   * fragment grows the flag, its page is what fails until somebody writes it.
+   * that takes it and never says so is a contract nobody can find. This used
+   * to ask only about the stages whose usage block already carried the flag,
+   * because it arrived one stage at a time. `cli.usage.test.ts` now holds that
+   * end — every command the usage text defines declares it — so the condition
+   * here could no longer be false, and a condition with no false is a comment
+   * pretending to be code.
+   *
+   * What replaces it is the count. Which stages exist is still not listed here,
+   * for the reason nothing else in this file is: the blocks are read off
+   * `--help`. But a walk that found no block would have found nothing missing
+   * either, so the walk says how far it got and the page list says how many
+   * stages there are.
    */
-  it("should document --json on the page of every stage whose commands take it", () => {
+  it("should document --json on every stage's page", () => {
     const pages = markdownUnder(join(repoRoot, "docs", "stages"));
     const undocumented: string[] = [];
+    const walked: string[] = [];
 
     for (const block of usage.split("\n\n")) {
       const [, number] = STAGE_HEADING.exec(block) ?? [];
 
-      if (number === undefined || !block.includes("--json")) {
+      if (number === undefined) {
         continue;
       }
+
+      walked.push(number);
 
       const prefix = `/${number.padStart(2, "0")}-`;
       const page = pages.find((one) => relative(repoRoot, one).includes(prefix));
@@ -231,6 +242,7 @@ describe("documentation", () => {
     }
 
     expect(undocumented).toEqual([]);
+    expect(walked).toHaveLength(pages.length);
   });
 
   it("should give every implemented stage a page of its own", () => {
