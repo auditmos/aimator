@@ -251,8 +251,10 @@ describe("--json on a stage that still has no object", () => {
       "check",
       PROJECT,
       EPISODE,
+      // A stage whose object does not exist yet; the list shrinks as panels
+      // arrive, and the flag has to refuse for what is left.
       "--stage",
-      "references",
+      "clips",
       "--track",
       TRACK,
       "--json",

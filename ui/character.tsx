@@ -5,12 +5,13 @@ import {
   artifactUrl,
   Drift,
   Field,
+  Gallery,
   PaidCall,
   Problems,
   RunOutput,
   type Unit,
 } from "./panel";
-import type { ArtifactStatus, CharacterStatus, RunDone, StatusCell } from "./types";
+import type { CharacterStatus, RunDone, StatusCell } from "./types";
 
 /**
  * Stage 2: the first panel where a person approves by **looking**.
@@ -41,64 +42,7 @@ interface PanelProps {
 }
 
 /** An image stage's bill counts pictures, because pictures are the decision. */
-const IMAGES: Unit = ["obraz", "obrazy", "obrazów"];
-
-/** What the state of one picture means, in the word a person reads. */
-const STATE: Record<ArtifactStatus["state"], string> = {
-  absent: "jeszcze nie narysowany",
-  completed: "narysowany, czeka na ocenę",
-  submitted: "próba przerwana",
-};
-
-/** One of the ten: the picture, its state, and the box that chooses it. */
-function Picture(props: {
-  readonly characterId: string;
-  readonly entry: ArtifactStatus;
-  readonly onToggle: (artifact: string, chosen: boolean) => void;
-  readonly projectId: string;
-  readonly revision: string;
-  readonly selected: boolean;
-  readonly track: string;
-}): JSX.Element {
-  const { characterId, entry, onToggle, projectId, revision, selected, track } = props;
-  const toggle = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => onToggle(entry.artifact, event.target.checked),
-    [entry.artifact, onToggle]
-  );
-  const source = `${artifactUrl({
-    artifact: entry.artifact,
-    characterId,
-    projectId,
-    stage: "character",
-    track,
-  })}&v=${encodeURIComponent(revision)}`;
-
-  return (
-    <li className="picture">
-      <label className="field-check" htmlFor={`pick-${entry.artifact}`}>
-        <input checked={selected} id={`pick-${entry.artifact}`} onChange={toggle} type="checkbox" />
-        <code>{entry.artifact}</code>
-      </label>
-      {entry.verdict === null ? (
-        <p className="picture-empty">{STATE[entry.state]}</p>
-      ) : (
-        // The dimensions come from what the stage measured in the bytes, so
-        // the box is the right shape before the picture arrives. A number
-        // typed here would be a second copy of the frame `lib/character` owns.
-        <img
-          alt={`${entry.artifact}, ${characterId}, ${track}`}
-          height={entry.verdict.height}
-          loading="lazy"
-          src={source}
-          width={entry.verdict.width}
-        />
-      )}
-      <p className="picture-state">
-        {entry.approved ? "zatwierdzony" : STATE[entry.state]} · {entry.note}
-      </p>
-    </li>
-  );
-}
+export const IMAGES: Unit = ["obraz", "obrazy", "obrazów"];
 
 export function CharacterPanel(props: PanelProps): JSX.Element {
   const { cell, onRun, projectId, run, running } = props;
@@ -138,6 +82,16 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
     (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
     []
   );
+  /** The stage's word for a picture is `artifact`; the gallery's is `id`. */
+  const drawn = useMemo(
+    () => (status?.artifacts ?? []).map((one) => ({ ...one, id: one.artifact })),
+    [status]
+  );
+  const urlOf = useCallback(
+    (artifact: string) =>
+      `${artifactUrl({ artifact, characterId, projectId, stage: "character", track })}&v=${encodeURIComponent(cell.state)}`,
+    [cell.state, characterId, projectId, track]
+  );
 
   // Another character's choice says nothing about this one, and the argv names
   // the character it was built for, so neither survives the switch.
@@ -154,7 +108,7 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
    * exists and nobody has accepted yet. An approval the terminal would refuse
    * is a click that teaches a person the screen lies.
    */
-  const picked = (status?.artifacts ?? []).filter((one) => chosen.includes(one.artifact));
+  const picked = drawn.filter((one) => chosen.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
 
@@ -193,23 +147,16 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
 
           <h3>Obrazy</h3>
           <p className="actions-note">
-            Zaznacz te, których dotyczy akcja. Jedno kliknięcie to jedna komenda z listą
+            Zaznacz te, których dotyczy akcja. Jedno kliknięcie to jedna komenda z listą{" "}
             <code>--artifact</code>, bo zatwierdzenie dwóch widoków to jedna decyzja, a nie dwie.
           </p>
-          <ul className="pictures">
-            {status.artifacts.map((entry) => (
-              <Picture
-                characterId={characterId}
-                entry={entry}
-                key={entry.artifact}
-                onToggle={toggle}
-                projectId={projectId}
-                revision={cell.state}
-                selected={chosen.includes(entry.artifact)}
-                track={track}
-              />
-            ))}
-          </ul>
+          <Gallery
+            chosen={chosen}
+            idPrefix="character"
+            items={drawn}
+            onToggle={toggle}
+            urlOf={urlOf}
+          />
         </>
       )}
 

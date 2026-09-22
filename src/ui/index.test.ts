@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "../cli/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
-import { EPISODE, makeUpstream, PROJECT } from "../test/fixture.js";
+import { EPISODE, makeTrack, makeUpstream, PROJECT } from "../test/fixture.js";
 import { INTENTS } from "./commands.js";
 import { createUi } from "./index.js";
 
@@ -36,6 +36,9 @@ vi.mock("../lib/env.js", () => ({ env: { AIMATOR_FFMPEG: "/nonexistent/aimator-f
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
+
+/** The one track this fixture draws to the end. */
+const TRACK = "gpt-image";
 
 /** What the terminal would print for the same question. */
 async function cli(...argv: readonly string[]): Promise<string> {
@@ -163,7 +166,10 @@ beforeAll(async () => {
 
   workspace = resolved.data;
   await makeUpstream({ answer: answer(), approvePackage: true, root, scratch, workspace });
-}, 60_000);
+  // One track drawn to the end, so the resolver has real pictures to serve and
+  // the ladder has more than one kind of cell in it.
+  await makeTrack({ root, track: TRACK, workspace });
+}, 120_000);
 
 afterAll(async () => {
   await rm(root, { force: true, recursive: true });
@@ -315,6 +321,40 @@ describe("the artifact resolver", () => {
     );
   });
 
+  /**
+   * Stages 5 and 6, which are the same two axes as stage 2 rearranged.
+   *
+   * A reference and the opening frame are under an episode **and** a track,
+   * where a character's card is under a character and a track. That is the
+   * whole reason the axes travel separately: each stage reads the ones it has,
+   * and no caller fills in a segment that means nothing for the artifact it is
+   * asking about.
+   */
+  it("should serve a track's own pictures as the png they are", async () => {
+    const app = createUi({ workspace });
+    const [reference, opening] = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/references/R01?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/opening-frame/opening-frame?episode=${EPISODE}&track=${TRACK}`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return {
+          bytes: Buffer.from(await response.arrayBuffer()),
+          status: response.status,
+          type: response.headers.get("content-type") ?? "",
+        };
+      })
+    );
+
+    expect([reference?.status, opening?.status]).toEqual([200, 200]);
+    expect([reference?.type, opening?.type]).toEqual(["image/png", "image/png"]);
+    expect(reference?.bytes).toEqual(
+      await readFile(join(episodeRoot(), TRACK, "references", "R01.png"))
+    );
+    expect(opening?.bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "opening-frame.png")));
+  });
+
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
     const secret = join(scratch, "sekret.md");
 
@@ -334,6 +374,10 @@ describe("the artifact resolver", () => {
         `/api/artifact/${PROJECT}/character/hero?character=ewa&track=${encodeURIComponent("../..")}`,
         `/api/artifact/${PROJECT}/character/hero?character=${encodeURIComponent("..")}&track=gpt-image`,
         `/api/artifact/${PROJECT}/character/${encodeURIComponent("../../../hero")}?character=ewa&track=gpt-image`,
+        // A reference whose id is not a reference id, and a frame asked for
+        // under a name stage 6 does not have: neither becomes a path.
+        `/api/artifact/${PROJECT}/references/${encodeURIComponent("../../opening-frame")}?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/opening-frame/R01?episode=${EPISODE}&track=${TRACK}`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -341,7 +385,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual([404, 404, 404, 404, 404, 404, 404, 404, 404]);
+    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 11 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 });

@@ -146,7 +146,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage opening-frame --track <tor>": [
+  "  approve <id> <episode-id> --stage opening-frame --track <tor> [--json]": [
     "approve",
     ...ON,
     "--stage",
@@ -285,7 +285,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--track",
     T,
   ],
-  "  check <id> <episode-id> --stage opening-frame --track <tor>": [
+  "  check <id> <episode-id> --stage opening-frame --track <tor> [--json]": [
     "check",
     ...ON,
     "--stage",
@@ -300,7 +300,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "prompt-package",
     "--json",
   ],
-  "  check <id> <episode-id> --stage references --track <tor>": [
+  "  check <id> <episode-id> --stage references --track <tor> [--json]": [
     "check",
     ...ON,
     "--stage",

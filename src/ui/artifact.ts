@@ -4,9 +4,12 @@ import {
   characterViewImage,
   type EpisodePaths,
   episodePaths,
+  episodeTrackPaths,
+  type ImageTrack,
   imageTracks,
   type ProjectPaths,
   projectPaths,
+  referenceImage,
   type Workspace,
 } from "../lib/workspace.js";
 
@@ -84,6 +87,41 @@ const UNDER_EPISODE: Readonly<
 
 const TRACKS = new Set<string>(imageTracks);
 
+/** The track a request names, or nothing, which is never a path. */
+function trackOf(request: ArtifactRequest): ImageTrack | null {
+  return TRACKS.has(request.track) ? (request.track as ImageTrack) : null;
+}
+
+/**
+ * Stages 5 and 6: the pictures an episode is drawn from, once per track.
+ *
+ * Two stages in one function because they answer the same question with the
+ * same two axes, and differ only in how many artifacts they have. Stage 5 has
+ * a set, so the id is checked by the layout module as it becomes a file name;
+ * stage 6 has exactly one, which is why its own word is the only name it
+ * accepts and why nothing here narrows it further.
+ */
+function underTrack(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const track = trackOf(request);
+  const episode = episodePaths(project, request.episodeId);
+
+  if (track === null || !episode.ok) {
+    return null;
+  }
+
+  const paths = episodeTrackPaths(episode.data, track);
+
+  if (request.stage === "opening-frame") {
+    return request.artifact === "opening-frame"
+      ? { contentType: PNG, path: paths.openingFrameImage }
+      : null;
+  }
+
+  const image = referenceImage(paths, request.artifact);
+
+  return image.ok ? { contentType: PNG, path: image.data } : null;
+}
+
 /**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
@@ -94,17 +132,14 @@ const TRACKS = new Set<string>(imageTracks);
  * in this file would be exactly the drift rule 3 exists to prevent.
  */
 function underCharacter(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
-  if (!TRACKS.has(request.track)) {
-    return null;
-  }
-
+  const track = trackOf(request);
   const character = characterPaths(project, request.characterId);
 
-  if (!character.ok) {
+  if (track === null || !character.ok) {
     return null;
   }
 
-  const paths = characterTrackPaths(character.data, request.track as "gpt-image" | "seedream");
+  const paths = characterTrackPaths(character.data, track);
 
   if (request.artifact === "card") {
     return { contentType: PNG, path: paths.card };
@@ -132,6 +167,10 @@ export function locateArtifact(
 
   if (request.stage === "character") {
     return underCharacter(project.data, request);
+  }
+
+  if (request.stage === "references" || request.stage === "opening-frame") {
+    return underTrack(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

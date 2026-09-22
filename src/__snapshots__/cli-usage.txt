@@ -42,13 +42,14 @@ Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
 
 Etap 5. Obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
   reference generate <id> <episode-id> --track <gpt-image|seedream>
-                     [--artifact R01,R02] [--model <id>] [--dry-run] [--regenerate]
+                     [--artifact R01,R02] [--model <id>] [--dry-run] [--json]
+                     [--regenerate]
     Bez --artifact rysuje wszystkie referencje, których zależności są już
     zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.
 
 Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
   opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
-                         [--model <id>] [--dry-run] [--regenerate]
+                         [--model <id>] [--dry-run] [--json] [--regenerate]
     Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
     każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
     --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.
@@ -168,8 +169,8 @@ Wspólne:
   check <id> <episode-id> --stage shot-list [--json]
   check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor> [--json]
-  check <id> <episode-id> --stage references --track <tor>
-  check <id> <episode-id> --stage opening-frame --track <tor>
+  check <id> <episode-id> --stage references --track <tor> [--json]
+  check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor>
   check <id> <episode-id> --stage assembly --track <tor>
   check <id> <episode-id> --stage soundtrack [--track <tor>]
@@ -179,7 +180,8 @@ Wspólne:
   approve <id> <character-id> --stage character --track <tor> [--json]
                --artifact <klucz>[,<klucz>...]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
-  approve <id> <episode-id> --stage opening-frame --track <tor>
+               [--json]
+  approve <id> <episode-id> --stage opening-frame --track <tor> [--json]
   approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
   approve <id> <episode-id> --stage assembly --track <tor>
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]
@@ -193,9 +195,10 @@ Wspólne:
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve na razie wyłącznie z --stage prepare, screenplay,
-               shot-list, prompt-package albo character, a z komend etapu na
-               razie wyłącznie na etapach 0, 1, 2, 3 i 4; kolejne etapy dostają
-               go po kolei razem ze swoim panelem w UI
+               shot-list, prompt-package, character, references albo
+               opening-frame, a z komend etapu na razie wyłącznie na etapach
+               0–6; kolejne etapy dostają go po kolei razem ze swoim panelem w
+               UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

@@ -384,6 +384,66 @@ describe("the stage-2 panel", () => {
 });
 
 /**
+ * Stages 5 and 6, where the same rule produces two different commands.
+ *
+ * Stage 5 accepts a **list**, because six references reviewed in one sitting
+ * is one decision and six clicks would make it six commands. Stage 6 accepts
+ * **nothing**, because it has one artifact: a flag with one legal value is
+ * ceremony standing where a decision used to be, so the panel has none either.
+ */
+describe("the stage-5 and stage-6 panels", () => {
+  it("should accept several references in one command, and the frame in none", () => {
+    expect(INTENTS.approveReferences({ ...scope, artifacts: ["R01", "R02"] })).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "references",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "R01,R02",
+    ]);
+    expect(INTENTS.approveOpeningFrame(scope)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "opening-frame",
+      "--track",
+      "gpt-image",
+    ]);
+    expect(INTENTS.approveOpeningFrame(scope)).not.toContain("--artifact");
+    expect(INTENTS.previewOpeningFrame(scope)).not.toContain("--artifact");
+  });
+
+  it("should draw whatever the graph allows when no reference is named", () => {
+    expect(INTENTS.previewReferences({ ...scope, artifacts: [] })).toEqual([
+      "reference",
+      "generate",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run",
+      "--json",
+    ]);
+  });
+
+  it("should ask each of them about one track, because the two cost separately", () => {
+    expect(INTENTS.checkReferences(scope)).toContain("references");
+    expect(INTENTS.checkOpeningFrame(scope)).toContain("opening-frame");
+
+    for (const argv of [INTENTS.checkReferences(scope), INTENTS.checkOpeningFrame(scope)]) {
+      expect(argv).toContain("--track");
+      expect(argv).toContain("gpt-image");
+    }
+  });
+});
+
+/**
  * Two steps before every purchase, made structural rather than promised.
  *
  * The screen has one dangerous button and the rule around it is the PRD's:

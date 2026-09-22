@@ -8,7 +8,9 @@ import {
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  asJson,
   imageModelOf,
   keyFor,
   modeOf,
@@ -24,10 +26,13 @@ import {
 /** Stage 6: the first frame of the film, one artifact per track. */
 export const USAGE = `Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
   opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
-                         [--model <id>] [--dry-run] [--regenerate]
+                         [--model <id>] [--dry-run] [--json] [--regenerate]
     Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
     każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
     --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.`;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "opening-frame";
 
 /**
  * Stage 6 prints one artifact instead of a set, and still prints the count.
@@ -100,6 +105,7 @@ export async function runOpeningFrame(argv: readonly string[]): Promise<Result<s
 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
@@ -148,9 +154,15 @@ export async function runOpeningFrame(argv: readonly string[]): Promise<Result<s
     workspace: workspace.data,
   });
 
-  return result.ok
-    ? ok(renderOpeningFrame(result.data, projectId.data, episodeId.data, mode))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderOpeningFrame(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /**
@@ -160,7 +172,8 @@ export async function runOpeningFrame(argv: readonly string[]): Promise<Result<s
 export async function checkOpeningFrameStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
   const track = trackOf(parsed);
@@ -179,14 +192,18 @@ export async function checkOpeningFrameStage(
     workspace,
   });
 
-  return result.ok
-    ? ok(
-        renderOpeningFrameStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderOpeningFrameStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, etap 6${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 /**
@@ -218,12 +235,16 @@ export async function approveOpeningFrameStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderOpeningFrameStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderOpeningFrameStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono klatkę otwarcia`,
           result.data
         )
-      )
-    : result;
+  );
 }

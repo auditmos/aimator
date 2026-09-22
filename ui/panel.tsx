@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { buy, commandLine, type Preview } from "../src/ui/commands.js";
-import type { PaidReport, RunDone, TextStatus } from "./types";
+import type { Drawn, PaidReport, RunDone, TextStatus } from "./types";
 
 /**
  * What every stage panel repeats, in one place, so eleven of them cannot drift.
@@ -426,6 +426,92 @@ export function artifactUrl(one: ArtifactRef): string {
   const query = axes.toString();
 
   return `/api/artifact/${one.projectId}/${one.stage}/${one.artifact}${query === "" ? "" : `?${query}`}`;
+}
+
+/** What the state of one picture means, in the word a person reads. */
+const DRAWN_STATE: Record<Drawn["state"], string> = {
+  absent: "jeszcze nie narysowany",
+  completed: "narysowany, czeka na ocenę",
+  submitted: "próba przerwana",
+};
+
+/**
+ * The pictures of one stage on one track, each beside the box that picks it.
+ *
+ * It is here rather than in a stage's panel because three stages draw and the
+ * arrangement is the same for all of them: the image, its state in the stage's
+ * own words, and, where the CLI accepts a list, a checkbox. Stage 6 passes no
+ * `onToggle`, which is how "one artifact, so nothing to narrow" is said on
+ * screen: no boxes appear, because there is no choice to make.
+ */
+export function Gallery(props: {
+  readonly chosen: readonly string[];
+  /** Keeps the checkbox ids unique when two galleries share a page. */
+  readonly idPrefix: string;
+  readonly items: readonly Drawn[];
+  readonly onToggle: ((id: string, wanted: boolean) => void) | null;
+  readonly urlOf: (id: string) => string;
+}): JSX.Element {
+  const { chosen, idPrefix, items, onToggle, urlOf } = props;
+
+  return (
+    <ul className="pictures">
+      {items.map((item) => (
+        <Shown
+          chosen={chosen.includes(item.id)}
+          idPrefix={idPrefix}
+          item={item}
+          key={item.id}
+          onToggle={onToggle}
+          url={urlOf(item.id)}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function Shown(props: {
+  readonly chosen: boolean;
+  readonly idPrefix: string;
+  readonly item: Drawn;
+  readonly onToggle: ((id: string, wanted: boolean) => void) | null;
+  readonly url: string;
+}): JSX.Element {
+  const { chosen, idPrefix, item, onToggle, url } = props;
+  const boxId = `${idPrefix}-${item.id}`;
+  const toggle = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onToggle?.(item.id, event.target.checked),
+    [item.id, onToggle]
+  );
+
+  return (
+    <li className="picture">
+      {onToggle === null ? (
+        <p className="picture-name">
+          <code>{item.id}</code>
+        </p>
+      ) : (
+        <label className="field-check" htmlFor={boxId}>
+          <input checked={chosen} id={boxId} onChange={toggle} type="checkbox" />
+          <code>{item.id}</code>
+        </label>
+      )}
+      {item.verdict === null ? (
+        <p className="picture-empty">{DRAWN_STATE[item.state]}</p>
+      ) : (
+        <img
+          alt={item.id}
+          height={item.verdict.height}
+          loading="lazy"
+          src={url}
+          width={item.verdict.width}
+        />
+      )}
+      <p className="picture-state">
+        {item.approved ? "zatwierdzony" : DRAWN_STATE[item.state]} · {item.note}
+      </p>
+    </li>
+  );
 }
 
 /**

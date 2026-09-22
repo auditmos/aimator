@@ -8,7 +8,9 @@ import {
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  asJson,
   imageModelOf,
   keyFor,
   modeOf,
@@ -24,9 +26,13 @@ import {
 /** Stage 5: the reference images, per track, several to a command. */
 export const USAGE = `Etap 5. Obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
   reference generate <id> <episode-id> --track <gpt-image|seedream>
-                     [--artifact R01,R02] [--model <id>] [--dry-run] [--regenerate]
+                     [--artifact R01,R02] [--model <id>] [--dry-run] [--json]
+                     [--regenerate]
     Bez --artifact rysuje wszystkie referencje, których zależności są już
     zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.`;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "references";
 
 /**
  * `--dry-run` prints every prompt in full and the number of paid calls.
@@ -104,6 +110,7 @@ export async function runReference(argv: readonly string[]): Promise<Result<stri
 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
@@ -152,9 +159,15 @@ export async function runReference(argv: readonly string[]): Promise<Result<stri
     workspace: workspace.data,
   });
 
-  return result.ok
-    ? ok(renderReferences(result.data, projectId.data, episodeId.data, mode))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderReferences(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /**
@@ -164,7 +177,8 @@ export async function runReference(argv: readonly string[]): Promise<Result<stri
 export async function checkReferencesStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
   const track = trackOf(parsed);
@@ -183,14 +197,18 @@ export async function checkReferencesStage(
     workspace,
   });
 
-  return result.ok
-    ? ok(
-        renderReferencesStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderReferencesStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, etap 5${result.data.approved ? ", zatwierdzony w całości" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 /**
@@ -222,12 +240,16 @@ export async function approveReferencesStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderReferencesStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderReferencesStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono: ${artifacts.join(", ")}`,
           result.data
         )
-      )
-    : result;
+  );
 }

@@ -550,6 +550,12 @@ h1 {
   background: var(--color-neutral-950);
   border-radius: 0.25rem;
 }
+/* Stage 6 has one artifact, so its name stands where a checkbox would. */
+.picture-name {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-300);
+}
 .picture-state,
 .picture-empty {
   margin: 0.5rem 0 0;

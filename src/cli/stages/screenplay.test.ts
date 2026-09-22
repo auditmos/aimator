@@ -152,8 +152,11 @@ describe("--json on a stage that has no object yet", () => {
       "approve",
       PROJECT,
       EPISODE,
+      // A stage whose object does not exist yet. The list shrinks as panels
+      // arrive, which is exactly what this test is watching: the flag refuses
+      // for what is left rather than quietly printing prose.
       "--stage",
-      "references",
+      "clips",
       "--json",
       "--dry-run",
       "--workspace",

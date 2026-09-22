@@ -20,7 +20,23 @@ pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track seedream \
   --note "pozycja alpaki bez ucisku ucha"
 ```
 
-Dodatkowe flagi: `--model <id>`, `--regenerate`.
+Dodatkowe flagi: `--model <id>`, `--json`, `--regenerate`.
+
+## Etap 6 jako obiekt
+
+`--json` wypisuje **obiekt, który zwraca moduł etapu**, plus pola `command` i `stage`:
+
+```bash
+pnpm dev check dzielna-ewa 01-burza --stage opening-frame --track gpt-image --json
+pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track gpt-image --json
+pnpm dev opening-frame generate dzielna-ewa 01-burza --track gpt-image --dry-run --json
+```
+
+Rachunek (`paidCalls`) jest zerem albo jedynką, i właśnie dlatego wart wypisania: pytanie
+przed kliknięciem brzmi „czy to zaraz kupi klatkę, czy powie, że nie może". Gdy jest zerem,
+`artifact.note` mówi, której zgody brakuje. W żadnej z tych komend nie ma `--artifact`,
+i [panel etapu 6](../ui.md) też go nie pokazuje: pole wyboru z jedną możliwością jest
+ceremonią stojącą tam, gdzie kiedyś była decyzja.
 
 ## Bramka przekracza granicę etapu, nie granicę toru
 

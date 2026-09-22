@@ -205,6 +205,23 @@ export const INTENTS = {
     one.track,
     ...artifacts(one.artifacts),
   ],
+  /**
+   * Stage 6, accepted: the one frame, and no `--artifact` anywhere near it.
+   *
+   * Stage 5 demands the flag because it has several candidates and accepting
+   * the wrong one buys an image. Here the command already says which stage and
+   * which track, and there is nothing else it could mean, so a flag with one
+   * legal value would be ceremony standing where a decision used to be.
+   */
+  approveOpeningFrame: (one: TrackRef): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "opening-frame",
+    "--track",
+    one.track,
+  ],
   /** Stage 0, accepted: the rules, the cast and the episode's decisions. */
   approvePrepare: (one: ProjectRef): readonly string[] => [
     "approve",
@@ -219,6 +236,26 @@ export const INTENTS = {
     episodeId,
     "--stage",
     "prompt-package",
+  ],
+  /**
+   * Stage 5, accepted: named references on one track, several at a time.
+   *
+   * Six references reviewed in one sitting is one decision, so it is one
+   * command with a list rather than six commands, six approvals and six lines
+   * in an archive. Accepting R03 is what lets R04 be bought, which is why the
+   * list is something somebody named rather than "everything".
+   */
+  approveReferences: (
+    one: TrackRef & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "references",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
   ],
   /** Stage 1, accepted: a human saying yes, bound to the digests it has now. */
   approveScreenplay: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
@@ -259,6 +296,16 @@ export const INTENTS = {
     "--track",
     one.track,
   ],
+  /** Stage 6, verified: one frame on one track, and nothing to narrow. */
+  checkOpeningFrame: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "opening-frame",
+    "--track",
+    one.track,
+  ],
   /**
    * Stage 0, verified: named, so the answer is stage 0 and nothing else.
    *
@@ -279,6 +326,16 @@ export const INTENTS = {
     episodeId,
     "--stage",
     "prompt-package",
+  ],
+  /** Stage 5, verified: every reference of this track, and what each waits for. */
+  checkReferences: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "references",
+    "--track",
+    one.track,
   ],
   /** Stage 1, verified: reads, reports drift, writes nothing. */
   checkScreenplay: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
@@ -337,6 +394,21 @@ export const INTENTS = {
     "--dry-run",
     "--json",
   ],
+  /** Stage 6, previewed: one image or the reason there is none. */
+  previewOpeningFrame: (
+    one: TrackRef & { readonly model: string; readonly regenerate: boolean }
+  ): readonly string[] => [
+    "opening-frame",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...flag("--model", one.model),
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
   /** Stage 4, previewed: the whole send, priced, with nothing sent. */
   previewPromptPackage: (send: Send): readonly string[] => [
     "prompt-package",
@@ -346,6 +418,32 @@ export const INTENTS = {
     ...flag("--model", send.model),
     ...flag("--max-output-tokens", send.maxOutputTokens),
     ...(send.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
+  /**
+   * Stage 5, previewed: every prompt, and how many images the graph allows.
+   *
+   * Without a named artifact this draws whatever is already unblocked, which
+   * is the ordinary call, and the count says how many that is. Naming one is
+   * how a person asks the other question: why not that one yet.
+   */
+  previewReferences: (
+    one: TrackRef & {
+      readonly artifacts: readonly string[];
+      readonly model: string;
+      readonly regenerate: boolean;
+    }
+  ): readonly string[] => [
+    "reference",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    ...flag("--model", one.model),
+    ...(one.regenerate ? ["--regenerate"] : []),
     "--dry-run",
     "--json",
   ],

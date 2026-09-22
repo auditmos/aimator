@@ -22,7 +22,7 @@ Odcinek "01-burza", tor gpt-image, zatwierdzono
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage opening-frame --track <tor> 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage opening-frame --track <tor> [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, zatwierdzono klatkę otwarcia
   opening-frame: zatwierdzona, 2816x1584
@@ -241,7 +241,7 @@ Odcinek "01-burza", tor gpt-image, etap 7, zatwierdzony w całości
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
 `;
 
-exports[`every command >   check <id> <episode-id> --stage opening-frame --track <tor> 1`] = `
+exports[`every command >   check <id> <episode-id> --stage opening-frame --track <tor> [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 6, zatwierdzony
   opening-frame: zatwierdzona, 2816x1584
@@ -301,7 +301,7 @@ exports[`every command >   check <id> <episode-id> --stage prompt-package [--jso
 }"
 `;
 
-exports[`every command >   check <id> <episode-id> --stage references --track <tor> 1`] = `
+exports[`every command >   check <id> <episode-id> --stage references --track <tor> [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 5, zatwierdzony w całości
   R01: zatwierdzona, 2816x1584

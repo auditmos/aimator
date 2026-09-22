@@ -28,8 +28,8 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage shot-list [--json]
   check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor> [--json]
-  check <id> <episode-id> --stage references --track <tor>
-  check <id> <episode-id> --stage opening-frame --track <tor>
+  check <id> <episode-id> --stage references --track <tor> [--json]
+  check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor>
   check <id> <episode-id> --stage assembly --track <tor>
   check <id> <episode-id> --stage soundtrack [--track <tor>]

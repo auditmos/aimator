@@ -34,6 +34,9 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Panele etapów 3 i 4**, na tym samym wzorcu: werdykt, dryf wejść, treść
   `shot-list.md` albo manifestu pakietu, „Sprawdź", „Zatwierdź" i płatne wywołanie
   w dwóch krokach z rachunkiem w wywołaniach.
+- **Panele etapów 5 i 6** na tym samym wzorcu obrazowym: referencje z wyborem kilku naraz
+  i z powodem blokady w słowach etapu, nazywającym referencję, na którą zależna czeka;
+  klatka otwarcia bez żadnego wyboru, bo ma jeden artefakt.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".

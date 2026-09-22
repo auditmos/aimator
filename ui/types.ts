@@ -83,19 +83,31 @@ export interface PromptPackageStatus extends TextStatus {
 }
 
 /**
- * One of the ten pictures of a character, as `check --stage character` reports it.
+ * One drawn artifact, in the fields every image stage reports about one.
  *
- * The verdict is what the stage measured in the bytes, so the panel takes the
- * picture's real dimensions from it rather than holding a copy of the frame a
- * character sheet is drawn in. That frame is `lib/character`'s fact, and a
- * second copy of it in a browser would be wrong the day it changed.
+ * The verdict is what the stage measured in the bytes, so a panel takes the
+ * picture's real dimensions from it rather than holding a copy of the frame it
+ * is drawn in. That frame is the stage's fact, and a second copy of it in a
+ * browser would be wrong the day it changed.
  */
-export interface ArtifactStatus {
+export interface Drawn {
   readonly approved: boolean;
-  readonly artifact: string;
+  readonly id: string;
   readonly note: string;
   readonly state: "absent" | "completed" | "submitted";
   readonly verdict: { readonly height: number; readonly width: number } | null;
+}
+
+/**
+ * One of the ten pictures of a character, as `check --stage character` reports it.
+ *
+ * The same five fields as anything else that gets drawn, under one different
+ * name: stage 2 calls it `artifact` because its ids are words rather than
+ * numbers. The panel renames it on the way to the gallery, which is a mapping
+ * of one field and cheaper than two galleries.
+ */
+export interface ArtifactStatus extends Omit<Drawn, "id"> {
+  readonly artifact: string;
 }
 
 /**
@@ -111,6 +123,31 @@ export interface CharacterStatus {
   readonly artifacts: readonly ArtifactStatus[];
   readonly inputsChanged: readonly string[];
   readonly name: string;
+  readonly nextStep: string;
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/**
+ * Stage 5's own object: every reference of one track, and what each waits for.
+ *
+ * A dependent reference carries the reason in its own `note`, naming the
+ * sibling it is composed from. That is the stage's sentence, quoted rather
+ * than summarised: a cell that only said "blocked" would leave a person with
+ * no next move.
+ */
+export interface ReferencesStatus {
+  readonly approved: boolean;
+  readonly artifacts: readonly Drawn[];
+  readonly nextStep: string;
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/** Stage 6's own object: one frame, per track, and nothing to narrow it with. */
+export interface OpeningFrameStatus {
+  readonly approved: boolean;
+  readonly artifact: Drawn;
   readonly nextStep: string;
   readonly problems: readonly string[];
   readonly track: string;

@@ -22,7 +22,29 @@ pnpm dev approve dzielna-ewa 01-burza --stage references --track gpt-image \
   --artifact R01 --note "wieczorny komplet się zgadza"
 ```
 
-Dodatkowe flagi: `--artifact R01,R02`, `--model <id>`, `--regenerate`.
+Dodatkowe flagi: `--artifact R01,R02`, `--model <id>`, `--json`, `--regenerate`.
+
+## Etap 5 jako obiekt
+
+`--json` wypisuje **obiekt, który zwraca moduł etapu**, bez osobnego formatu, plus pola
+`command` i `stage`:
+
+```bash
+pnpm dev check dzielna-ewa 01-burza --stage references --track gpt-image --json
+pnpm dev approve dzielna-ewa 01-burza --stage references --track gpt-image \
+  --artifact R01,R02 --json
+pnpm dev reference generate dzielna-ewa 01-burza --track gpt-image --dry-run --json
+```
+
+Raport `generate` niesie `paidCalls`, czyli **ile obrazów to wywołanie kupi**. Bez
+`--artifact` liczy to, na co pozwala graf: referencja zależna nie wchodzi do rachunku,
+dopóki ta, z której powstaje, nie jest zatwierdzona **na tym torze**.
+
+Powód blokady jest w obiekcie, a nie tylko w tekście, i to jest ważne: pole `note`
+zablokowanej referencji **nazywa referencję, na którą czeka**, zarówno w raporcie
+`generate` (gdy zapytasz o nią po nazwie), jak i w obiekcie `check`, z którego korzysta
+[panel etapu 5](../ui.md). Komórka, która mówiłaby tylko „zablokowana", zostawiałaby
+człowieka bez następnego ruchu.
 
 ## Bez flag rysuje wszystko, co gotowe
 
