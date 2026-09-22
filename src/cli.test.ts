@@ -1,8 +1,25 @@
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { run } from "./cli/index.js";
+
+/**
+ * What the CLI does, on a machine that has nothing configured.
+ *
+ * The empty environment is the point rather than tidiness. `lib/env.ts` reads
+ * `.env`, so a test that leaves a model unnamed is answered by whichever model
+ * the person running it happens to have in their own file: green on the author's
+ * laptop, red on a runner that has no `.env` at all, and the failure blames the
+ * assertion instead of the missing flag. That is not a hypothetical, it is what
+ * this file did for four commits, reporting a bill of 0 where it asserted 1.
+ *
+ * So the environment is mocked empty, exactly as it is in `cli.usage.test.ts`
+ * and in every stage's own test, and every paid command below **names its
+ * model**. Between them, what these tests assert is a property of the CLI
+ * rather than of the machine it ran on.
+ */
+vi.mock("./lib/env.js", () => ({ env: {} }));
 
 let root = "";
 let scratch = "";
@@ -288,7 +305,15 @@ describe("screenplay generate", () => {
    */
   it("should say how many paid calls it is about to make", async () => {
     await approvedProject();
-    const result = await cli("screenplay", "generate", "demo", "01-burza", "--dry-run");
+    const result = await cli(
+      "screenplay",
+      "generate",
+      "demo",
+      "01-burza",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run"
+    );
 
     expect(result.text).toContain("płatnych wywołań do wykonania: 1");
   });
@@ -306,7 +331,16 @@ describe("screenplay generate", () => {
    */
   it("should print the stage's own object for --json", async () => {
     await approvedProject();
-    const result = await cli("screenplay", "generate", "demo", "01-burza", "--dry-run", "--json");
+    const result = await cli(
+      "screenplay",
+      "generate",
+      "demo",
+      "01-burza",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run",
+      "--json"
+    );
     const report = JSON.parse(result.text) as {
       command: string;
       paidCalls: number;
