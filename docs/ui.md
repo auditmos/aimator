@@ -26,6 +26,8 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
+- **Płatne wywołanie etapu 1**: pola modelu, limitu tokenów i nowej próby, przycisk
+  „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
 
 Komórki pozostałych etapów są na razie wierszami bez panelu: każdy etap dostaje swój
 w osobnym wycinku, a wiersz, którego nie da się kliknąć, mówi to uczciwiej niż pusty panel.
@@ -40,6 +42,28 @@ sprawdza każde zbudowane `argv` względem `--help` tą samą metodą, co test d
 „Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów**, a
 scenariusz czeka na przyjęcie. Przycisk, któremu CLI i tak by odmówiło, uczy człowieka,
 że ekran kłamie.
+
+## Zakup w dwóch krokach
+
+Każde płatne wywołanie ma **dwa kroki i nie ma progu**. „Generuj" uruchamia tę samą
+komendę z `--dry-run --json`, która z kontraktu nie czyta klucza i niczego nie wysyła, i
+pokazuje całą wysyłkę: prompt do przeczytania i rachunek w **wywołaniach**, nie w
+dolarach. Dopiero wtedy istnieje „Kup", a to, co uruchamia, jest **tym samym `argv` bez
+próby na sucho**.
+
+To wyprowadzenie, a nie zbieżność, i na tym stoi cała reguła. Zamiar „kup" przyjmuje
+ukończoną próbę na sucho jako jedyne wejście, więc **nie da się go zbudować** bez niej ani
+zbudować go dla innej wysyłki niż ta przeczytana: odcinek, model, limit tokenów i nowa
+próba jadą z podglądu, nie z pól formularza w chwili drugiego kliknięcia. Pilnuje tego
+typ i test (`src/ui/commands.test.ts`), a nie pamięć autora panelu. Próg „jeden klik dla
+tanich, dwa dla drogich" został odrzucony w PRD, bo próg to decyzja, którą ktoś musiałby
+ustalać i utrzymywać.
+
+Podgląd jest jedyną odpowiedzią, którą panel **układa** z pól obiektu, bo rachunek ma stać
+jako liczba obok przycisku, który płaci, a szukanie jej w polskim zdaniu byłoby uczeniem
+klienta formatu tekstowego CLI. Wynik zakupu, jak wynik „Sprawdź" i „Zatwierdź", pokazuje
+się w całości, w słowach terminala. Gdy podgląd mówi `0 płatnych wywołań`, „Kup" nie
+pojawia się wcale, a pod spodem stoją przeszkody w słowach etapu.
 
 ## Uruchamianie komendy i artefakty
 
@@ -113,5 +137,6 @@ otwierania portu: żądanie stanu zwraca to samo, co `status --json`, żądanie 
 `list --json`, odmowa zostaje odmową z tym samym komunikatem, strumień zdarzeń wypycha
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
 jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem. Słownik
-komend jest sprawdzany względem `--help`. Klient jest sprawdzany w przeglądarce, w obu
-motywach.
+komend jest sprawdzany względem `--help`, a zakup osobno: że jest tą samą wysyłką bez próby
+na sucho i że bez ukończonej próby nie daje się zbudować. Klient jest sprawdzany w
+przeglądarce, w obu motywach.

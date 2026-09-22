@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "../cli/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
 import { EPISODE, makeUpstream, PROJECT } from "../test/fixture.js";
+import { INTENTS } from "./commands.js";
 import { createUi } from "./index.js";
 
 /**
@@ -315,6 +316,55 @@ describe("running a command", () => {
       ok: true,
       runId,
     });
+    await events.close();
+  });
+
+  /**
+   * The first of the two steps of a purchase, as far as a test can take it.
+   *
+   * What a browser has to confirm is the clicking. What this confirms is the
+   * seam between the two halves that a click would otherwise be the first to
+   * exercise: the argv the dictionary builds for "Generuj" is a command this
+   * server runs, and what comes back under its identifier is the object the
+   * panel arranges, the bill and the whole prompt included. The second step is
+   * not run here, for the obvious reason, and `--dry-run` is why the first one
+   * can be: by contract it reads no secret and sends nothing.
+   */
+  it("should answer the first step of a purchase with the stage's own object", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: INTENTS.previewScreenplay({
+          episodeId: EPISODE,
+          maxOutputTokens: "",
+          model: "gpt-6-astra",
+          projectId: PROJECT,
+          regenerate: true,
+        }),
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+    const done = JSON.parse(finished.data) as { data: string; ok: boolean; runId: string };
+    const report = JSON.parse(done.data) as {
+      command: string;
+      paidCalls: number;
+      prompt: string;
+      stage: string;
+    };
+
+    expect(done).toMatchObject({ ok: true, runId });
+    expect(report.command).toBe("generate");
+    expect(report.stage).toBe("screenplay");
+    expect(report.paidCalls).toBe(1);
+    expect(report.prompt).toContain("# Task: write a screenplay");
     await events.close();
   });
 

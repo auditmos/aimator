@@ -28,6 +28,27 @@ export interface ScreenplayStatus {
   } | null;
 }
 
+/**
+ * Stage 1's paid command, as `screenplay generate --json` prints it.
+ *
+ * A dry run fills `prompt` and leaves `runId` empty; a purchase does the
+ * opposite and names what it wrote. `paidCalls` is the bill, in the unit this
+ * stage is billed in, and it is the one number that has to stand beside the
+ * button that spends it rather than inside a sentence.
+ */
+export interface GenerateReport {
+  readonly command: "generate";
+  readonly created: readonly string[];
+  readonly minimumScenes: number;
+  readonly nextStep: string;
+  readonly paidCalls: number;
+  readonly problems: readonly string[];
+  readonly prompt: string | null;
+  readonly ready: boolean;
+  readonly runId: string | null;
+  readonly stage: "screenplay";
+}
+
 export interface StatusCell {
   /** Set only where a cell is per character, which is stage 2 alone. */
   readonly character: string | null;
