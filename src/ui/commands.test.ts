@@ -42,6 +42,7 @@ const FLAG = /--[a-z][a-z-]+/g;
  */
 const scope = {
   artifact: "opening-frame",
+  artifacts: ["card", "front"],
   aspectRatio: "16:9",
   audio: "narration",
   characterId: "ewa",
@@ -303,6 +304,82 @@ describe("the stage-3 and stage-4 panels", () => {
       expect(bought).toContain("gpt-6-astra");
       expect(bought.slice(0, 2)).toEqual(preview.slice(0, 2));
     }
+  });
+});
+
+/**
+ * Stage 2, the first panel where one click is about several pictures.
+ *
+ * The CLI takes a list, so the screen has to build one: accepting six
+ * references or two views is one decision somebody made, and six clicks would
+ * turn it into six commands, six approvals and six lines in an archive. That
+ * is the whole of user story 13, and it is a property of the argv rather than
+ * of the buttons, which is why it is checked here.
+ */
+describe("the stage-2 panel", () => {
+  it("should put several chosen artifacts in one command", () => {
+    expect(INTENTS.approveCharacter(scope)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "ewa",
+      "--stage",
+      "character",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "card,front",
+    ]);
+    expect(INTENTS.previewCharacter(scope)).toEqual([
+      "character",
+      "generate",
+      "dzielna-ewa",
+      "ewa",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "card,front",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run",
+      "--json",
+    ]);
+  });
+
+  /** No choice is not an empty choice: the flag is then not spelled at all. */
+  it("should leave --artifact out when nothing is chosen", () => {
+    expect(INTENTS.previewCharacter({ ...scope, artifacts: [] })).toEqual([
+      "character",
+      "generate",
+      "dzielna-ewa",
+      "ewa",
+      "--track",
+      "gpt-image",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run",
+      "--json",
+    ]);
+  });
+
+  it("should ask about one character on one track, because the two cost separately", () => {
+    expect(INTENTS.checkCharacter(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "ewa",
+      "--stage",
+      "character",
+      "--track",
+      "gpt-image",
+    ]);
+  });
+
+  it("should buy exactly the pictures it previewed", () => {
+    const preview = INTENTS.previewCharacter({ ...scope, regenerate: true });
+    const bought = buy({ argv: preview, runId: "9f1c" });
+
+    expect(bought).toContain("--regenerate");
+    expect(bought).toContain("card,front");
+    expect(bought).not.toContain("--dry-run");
   });
 });
 

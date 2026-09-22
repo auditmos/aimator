@@ -24,10 +24,34 @@ pnpm dev character generate dzielna-ewa ewa --track gpt-image   # osiem widoków
 pnpm dev check dzielna-ewa ewa --stage character --track gpt-image
 ```
 
-Dodatkowe flagi: `--artifact card|hero|<widok>,...`, `--model <id>`, `--regenerate`.
+Dodatkowe flagi: `--artifact card|hero|<widok>,...`, `--model <id>`, `--json`,
+`--regenerate`.
 
 Nazwy widoków: `front`, `slight-left`, `slight-right`, `three-quarter-left`,
 `three-quarter-right`, `profile-left`, `profile-right`, `rear`.
+
+## Etap 2 jako obiekt
+
+`--json` wypisuje **obiekt, który zwraca moduł etapu**, bez osobnego formatu, plus pola
+`command` i `stage`:
+
+```bash
+pnpm dev check dzielna-ewa ewa --stage character --track gpt-image --json
+pnpm dev approve dzielna-ewa ewa --stage character --track gpt-image --artifact card --json
+pnpm dev character generate dzielna-ewa ewa --track gpt-image --dry-run --json
+```
+
+Raport `generate` niesie `paidCalls`, i to **pierwszy rachunek w tym potoku, który jest
+zbiorem, a nie rzutem monetą**: jedno polecenie rysuje jeden obraz albo osiem. Liczy to,
+co naprawdę zostanie kupione, a nie to, o co ktoś poprosił: widoki czekają na zatwierdzoną
+kartę, więc `--artifact card,front` to dwa artefakty i **jeden** zakup. Tekst drukuje tę
+samą liczbę (`płatnych wywołań do wykonania`), bo na etapie obrazowym jedno wywołanie to
+jeden obraz; [panel etapu 2](../ui.md) mówi wprost „obrazy", bo to o obrazach decyduje
+człowiek.
+
+Obrazy są też **serwowane** przez lokalne UI jako PNG, adresowane krotką (projekt, etap,
+artefakt) z torem i postacią obok niej. Zatwierdzanie obrazu w terminalu jest
+zatwierdzaniem nazwy pliku, i to jest luka, którą panel zamyka.
 
 ## Kolejność jest bramką
 

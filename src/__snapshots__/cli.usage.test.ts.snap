@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`every command >   approve <id> <character-id> --stage character --track <tor> 1`] = `
+exports[`every command >   approve <id> <character-id> --stage character --track <tor> [--json] 1`] = `
 "CharacterStateError
 wskaż, co zatwierdzasz: --artifact card|front|slight-left|slight-right|three-quarter-left|three-quarter-right|profile-left|profile-right|rear|hero"
 `;
@@ -100,6 +100,7 @@ Dalej: opis wyglądu "Ewa" w project.md jest jedynym wejściem etapu postaci, mu
 exports[`every command >   character generate <id> <character-id> --track <gpt-image|seedream> 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Postać "Ewa" (ewa), tor gpt-image
+  płatnych wywołań do wykonania: 1
   card: planned, gotowe do płatnego wywołania
   ! OPENAI_API_KEY nie był czytany, próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga
 Dalej: aimator character generate ewa ewa --track gpt-image
@@ -207,7 +208,7 @@ Próba na sucho: nic nie zapisano. Postać "Babcia" dopisana do obsady
 Dalej: zdecyduj, skąd bierze się wygląd: aimator character add ewa babcia --source <plik> albo aimator character describe ewa babcia"
 `;
 
-exports[`every command >   check <id> <character-id> --stage character --track <tor> 1`] = `
+exports[`every command >   check <id> <character-id> --stage character --track <tor> [--json] 1`] = `
 "ok
 Postać "Ewa" (ewa), tor gpt-image, etap 2
   card: absent, jeszcze nie powstał

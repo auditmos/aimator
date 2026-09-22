@@ -139,7 +139,10 @@ function plural(count: number, forms: readonly [string, string, string]): string
   return `${count} ${few ? forms[1] : forms[2]}`;
 }
 
-const CALLS = ["płatne wywołanie", "płatne wywołania", "płatnych wywołań"] as const;
+/** The unit a stage is billed in, in the three forms Polish counts in. */
+export type Unit = readonly [string, string, string];
+
+const CALLS: Unit = ["płatne wywołanie", "płatne wywołania", "płatnych wywołań"];
 
 /** What a text stage's paid command is told, beyond which episode it is about. */
 export interface SendFlags {
@@ -239,8 +242,17 @@ export function PaidCall(props: {
   readonly running: boolean;
   /** The argv of the last command the panel started, whatever it was. */
   readonly sent: readonly string[] | null;
+  /**
+   * What this stage's bill counts, when calls is the wrong word for it.
+   *
+   * On an image stage one call is one picture, and pictures are what a person
+   * is deciding about, so the number says images. The PRD's rule is that the
+   * bill stands in a unit the CLI already counts, not that every stage counts
+   * the same thing.
+   */
+  readonly unit?: Unit;
 }): JSX.Element {
-  const { children, note, onRun, preview, projectRun, running, sent } = props;
+  const { children, note, onRun, preview, projectRun, running, sent, unit = CALLS } = props;
   const [previewed, setPreviewed] = useState<Previewed | null>(null);
 
   useEffect(() => {
@@ -280,7 +292,7 @@ export function PaidCall(props: {
           nic nie wychodzi do modelu.
         </p>
       ) : (
-        <Bought onBuy={runBuy} previewed={previewed} running={running} />
+        <Bought onBuy={runBuy} previewed={previewed} running={running} unit={unit} />
       )}
     </>
   );
@@ -291,12 +303,13 @@ function Bought(props: {
   readonly onBuy: () => void;
   readonly previewed: Previewed;
   readonly running: boolean;
+  readonly unit: Unit;
 }): JSX.Element {
   const { report, send } = props.previewed;
 
   return (
     <>
-      <p className="bill">Do kupienia: {plural(report.paidCalls, CALLS)}</p>
+      <p className="bill">Do kupienia: {plural(report.paidCalls, props.unit)}</p>
 
       <Problems problems={report.problems} />
 
@@ -381,16 +394,38 @@ export function Review(props: {
   );
 }
 
-/** What the resolver is asked for: what an artifact is, never where it lives. */
+/**
+ * What the resolver is asked for: what an artifact is, never where it lives.
+ *
+ * The three optional fields are the axes a stage may or may not have. They
+ * travel beside the path rather than in it, because a character's card is
+ * under no episode and a screenplay is under no track.
+ */
 interface ArtifactRef {
   readonly artifact: string;
-  readonly episodeId: string;
+  readonly characterId?: string;
+  readonly episodeId?: string;
   readonly projectId: string;
   readonly stage: string;
+  readonly track?: string;
 }
 
-function artifactUrl(one: ArtifactRef): string {
-  return `/api/artifact/${one.projectId}/${one.episodeId}/${one.stage}/${one.artifact}`;
+export function artifactUrl(one: ArtifactRef): string {
+  const axes = new URLSearchParams();
+
+  for (const [name, value] of [
+    ["character", one.characterId],
+    ["episode", one.episodeId],
+    ["track", one.track],
+  ] as const) {
+    if (value !== undefined && value !== "") {
+      axes.set(name, value);
+    }
+  }
+
+  const query = axes.toString();
+
+  return `/api/artifact/${one.projectId}/${one.stage}/${one.artifact}${query === "" ? "" : `?${query}`}`;
 }
 
 /**

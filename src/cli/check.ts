@@ -27,7 +27,7 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage screenplay [--json]
   check <id> <episode-id> --stage shot-list [--json]
   check <id> <episode-id> --stage prompt-package [--json]
-  check <id> <character-id> --stage character --track <tor>
+  check <id> <character-id> --stage character --track <tor> [--json]
   check <id> <episode-id> --stage references --track <tor>
   check <id> <episode-id> --stage opening-frame --track <tor>
   check <id> <episode-id> --stage clips --track <tor>
@@ -60,7 +60,12 @@ const NARROW: Readonly<
 const WIDE: Readonly<
   Record<
     string,
-    (parsed: Parsed, projectId: string, workspace: Workspace) => Promise<Result<string>>
+    (
+      parsed: Parsed,
+      projectId: string,
+      workspace: Workspace,
+      answer: Answer
+    ) => Promise<Result<string>>
   >
 > = {
   assembly: checkAssemblyStage,
@@ -159,7 +164,7 @@ export async function runCheck(argv: readonly string[]): Promise<Result<string>>
   const wide = WIDE[named];
 
   if (wide !== undefined) {
-    return await wide(parsed.data, projectId.data, workspace.data);
+    return await wide(parsed.data, projectId.data, workspace.data, answer.data);
   }
 
   const stage0 = await checkPrepareStage(projectId.data, workspace.data, "text");

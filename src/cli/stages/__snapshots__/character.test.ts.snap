@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`approve --stage character > should print the stage's own object under --json 1`] = `
+{
+  "approved": false,
+  "artifacts": [
+    {
+      "approved": false,
+      "artifact": "card",
+      "note": "jeszcze nie powstał",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "front",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "slight-left",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "slight-right",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "three-quarter-left",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "three-quarter-right",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "profile-left",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "profile-right",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": false,
+      "artifact": "rear",
+      "note": "widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją",
+      "state": "absent",
+      "verdict": null,
+    },
+    {
+      "approved": true,
+      "artifact": "hero",
+      "note": "1536x2304",
+      "state": "completed",
+      "verdict": {
+        "alpha": false,
+        "bytes": 102,
+        "height": 2304,
+        "width": 1536,
+      },
+    },
+  ],
+  "command": "approve",
+  "inputsChanged": [],
+  "name": "Ewa",
+  "nextStep": "aimator character generate ewa ewa --track gpt-image",
+  "problems": [],
+  "stage": "character",
+  "track": "gpt-image",
+}
+`;

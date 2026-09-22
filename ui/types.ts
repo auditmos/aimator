@@ -83,6 +83,40 @@ export interface PromptPackageStatus extends TextStatus {
 }
 
 /**
+ * One of the ten pictures of a character, as `check --stage character` reports it.
+ *
+ * The verdict is what the stage measured in the bytes, so the panel takes the
+ * picture's real dimensions from it rather than holding a copy of the frame a
+ * character sheet is drawn in. That frame is `lib/character`'s fact, and a
+ * second copy of it in a browser would be wrong the day it changed.
+ */
+export interface ArtifactStatus {
+  readonly approved: boolean;
+  readonly artifact: string;
+  readonly note: string;
+  readonly state: "absent" | "completed" | "submitted";
+  readonly verdict: { readonly height: number; readonly width: number } | null;
+}
+
+/**
+ * Stage 2's own object: one character as one track draws it.
+ *
+ * The ten artifacts arrive in the order the stage draws them, card first and
+ * hero last, so the panel lists them rather than holding a second copy of
+ * their names. A list the screen owned would drift from the stage's the day
+ * somebody added a view.
+ */
+export interface CharacterStatus {
+  readonly approved: boolean;
+  readonly artifacts: readonly ArtifactStatus[];
+  readonly inputsChanged: readonly string[];
+  readonly name: string;
+  readonly nextStep: string;
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/**
  * What every paid stage's report says that a panel has to show.
  *
  * The bill first, because it is the one number that must stand beside the

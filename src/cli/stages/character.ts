@@ -13,9 +13,11 @@ import { addCharacter, addCharacterSources, setCharacterBasis } from "../../lib/
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
   answerFlag,
   answerStage0,
+  asJson,
   imageModelOf,
   keyFor,
   modeOf,
@@ -45,7 +47,10 @@ export const CAST_USAGE = `  character new <id> <character-id> --name <nazwa> [-
 export const USAGE = `Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
   character generate <id> <character-id> --track <gpt-image|seedream>
                      [--artifact card|hero|<widok>,...] [--model <id>]
-                     [--dry-run] [--regenerate]`;
+                     [--dry-run] [--json] [--regenerate]`;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "character";
 
 /** Project id, character id and the workspace, what every cast command needs. */
 function castScope(
@@ -154,6 +159,7 @@ const CHARACTER_OPTIONS = {
   describe: { json: { type: "boolean" } },
   generate: {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
@@ -244,7 +250,15 @@ async function runCharacterGenerate(parsed: Parsed): Promise<Result<string>> {
     workspace: scope.data.workspace,
   });
 
-  return result.ok ? ok(renderCharacter(result.data, scope.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderCharacter(result.data, scope.data, mode)
+  );
 }
 
 /**
@@ -262,6 +276,12 @@ function renderCharacter(
     mode === "dry-run"
       ? `Próba na sucho: nic nie zapisano, nic nie wysłano. ${headline}`
       : headline,
+    // One call is one image here, so this is the count of pictures too, and
+    // it stands before the outcomes rather than after them: it is the number
+    // somebody reads to decide whether to run the command at all.
+    mode === "dry-run"
+      ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
+      : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
   ];
 
   for (const outcome of report.artifacts) {
@@ -323,7 +343,8 @@ function renderCharacterStatus(headline: string, status: CharacterStatus): strin
 export async function checkCharacterStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const characterId = requirePositional(parsed, 1, "character-id");
   const track = trackOf(parsed);
@@ -342,14 +363,18 @@ export async function checkCharacterStage(
     workspace,
   });
 
-  return result.ok
-    ? ok(
-        renderCharacterStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderCharacterStatus(
           `Postać "${result.data.name}" (${characterId.data}), tor ${track.data}, etap 2${result.data.approved ? ", zatwierdzony w całości" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 export async function approveCharacterStage(
@@ -377,12 +402,16 @@ export async function approveCharacterStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderCharacterStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderCharacterStatus(
           `Postać "${characterId.data}" na torze ${track.data}, zatwierdzono: ${artifacts.data.join(", ")}`,
           result.data
         )
-      )
-    : result;
+  );
 }

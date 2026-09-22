@@ -86,6 +86,26 @@ interface TrackRef extends EpisodeRef {
   readonly track: string;
 }
 
+/**
+ * One character as one track draws it, and which of the ten pictures.
+ *
+ * `artifacts` is a list because the CLI takes one: six references or two views
+ * accepted in a single command is one decision a person made, and six clicks
+ * would be six commands over one decision. An empty list means the flag is not
+ * spelled at all, which for `generate` is "whatever the gates allow next".
+ */
+interface CharacterTrackRef extends CastRef {
+  readonly artifacts: readonly string[];
+  readonly track: string;
+}
+
+/** `--artifact R01,R02`: several names, one command, the way the CLI spells it. */
+function artifacts(names: readonly string[]): readonly string[] {
+  const listed = names.filter((name) => name !== "");
+
+  return listed.length === 0 ? [] : ["--artifact", listed.join(",")];
+}
+
 /** A purchase the two-step rule would not allow. Never a refusal to show. */
 class NotPreviewedError extends Error {
   constructor(message: string) {
@@ -122,6 +142,7 @@ function settings(one: Settings): readonly string[] {
  */
 interface Everything extends Send, Settings, TrackRef {
   readonly artifact: string;
+  readonly artifacts: readonly string[];
   readonly aspectRatio: string;
   readonly characterId: string;
   readonly name: string;
@@ -166,6 +187,24 @@ export const INTENTS = {
     one.source,
     ...settings(one),
   ],
+  /**
+   * Stage 2, accepted: named pictures of one character on one track.
+   *
+   * `--artifact` is required by the CLI here and the list is what makes one
+   * click one decision: accepting the card is what lets the eight views be
+   * bought, so it has to be something somebody named rather than a side
+   * effect of accepting something else.
+   */
+  approveCharacter: (one: CharacterTrackRef): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.characterId,
+    "--stage",
+    "character",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+  ],
   /** Stage 0, accepted: the rules, the cast and the episode's decisions. */
   approvePrepare: (one: ProjectRef): readonly string[] => [
     "approve",
@@ -209,6 +248,16 @@ export const INTENTS = {
     one.projectId,
     "--voice-id",
     one.voiceId,
+  ],
+  /** Stage 2, verified: one character on one track, ten artifacts at a time. */
+  checkCharacter: (one: CastRef & { readonly track: string }): readonly string[] => [
+    "check",
+    one.projectId,
+    one.characterId,
+    "--stage",
+    "character",
+    "--track",
+    one.track,
   ],
   /**
    * Stage 0, verified: named, so the answer is stage 0 and nothing else.
@@ -264,6 +313,29 @@ export const INTENTS = {
     "--title",
     one.title,
     ...flag("--aspect-ratio", one.aspectRatio),
+  ],
+  /**
+   * Stage 2, previewed: every prompt, and the count of pictures it would buy.
+   *
+   * The first preview on this screen whose bill is a set rather than a coin
+   * flip, which is why the count comes back as a number in an object: one
+   * command draws one image or eight, and that is the thing to read before
+   * clicking rather than after.
+   */
+  previewCharacter: (
+    one: CharacterTrackRef & { readonly model: string; readonly regenerate: boolean }
+  ): readonly string[] => [
+    "character",
+    "generate",
+    one.projectId,
+    one.characterId,
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    ...flag("--model", one.model),
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
   ],
   /** Stage 4, previewed: the whole send, priced, with nothing sent. */
   previewPromptPackage: (send: Send): readonly string[] => [

@@ -1,16 +1,33 @@
-import { type EpisodePaths, episodePaths, projectPaths, type Workspace } from "../lib/workspace.js";
+import {
+  characterPaths,
+  characterTrackPaths,
+  characterViewImage,
+  type EpisodePaths,
+  episodePaths,
+  imageTracks,
+  type ProjectPaths,
+  projectPaths,
+  type Workspace,
+} from "../lib/workspace.js";
 
 /**
  * Where an identifier becomes a path, and the only place that is allowed to.
  *
- * The client names an artifact by what it is: the project, the episode, the
- * stage that wrote it and the stage's own word for it. It never names a file,
- * a directory or a track directory, for the reason rule 3 exists at all: the
+ * The client names an artifact by what it is: the project, the stage that
+ * wrote it, the stage's own word for it, and whichever of the three axes that
+ * stage has, an episode, a track, a character. It never names a file, a
+ * directory or a track directory, for the reason rule 3 exists at all: the
  * layout is one module's knowledge, and a browser that learned a second copy
  * of it would drift from the tree the moment a stage moved a file.
  *
- * The refusal is the interesting half. A tuple this table does not know is a
- * 404 **before any path is built**, so an identifier carrying `..`, an absolute
+ * The axes are the interesting half of the shape. A screenplay is under an
+ * episode; a character's card is under a character **and** a track and under
+ * no episode at all. So the identifier carries all three and each stage reads
+ * the ones it has, which is why the path holds what every artifact has and the
+ * rest arrives beside it rather than as a segment nobody fills in.
+ *
+ * The refusal is the other half. A tuple this table does not know is a 404
+ * **before any path is built**, so an identifier carrying `..`, an absolute
  * path or somebody else's project cannot walk out of the workspace: the layout
  * module rejects the id, this table rejects the name, and neither asks the
  * filesystem what it thinks. A resolver that read first and validated after
@@ -22,8 +39,24 @@ interface LocatedArtifact {
   readonly path: string;
 }
 
-/** What each stage publishes, in the stage's own word for it. */
-const ARTIFACTS: Readonly<
+/** What an artifact is, in the six words the PRD gives the identifier. */
+interface ArtifactRequest {
+  readonly artifact: string;
+  /** Set only where a stage's artifacts live under a character: stage 2. */
+  readonly characterId: string;
+  /** Set for every stage whose artifacts live under an episode. */
+  readonly episodeId: string;
+  readonly projectId: string;
+  readonly stage: string;
+  /** Set only where a stage draws the same artifact once per track. */
+  readonly track: string;
+}
+
+const MARKDOWN = "text/markdown; charset=utf-8";
+const PNG = "image/png";
+
+/** What each episode stage publishes, in the stage's own word for it. */
+const UNDER_EPISODE: Readonly<
   Record<string, Readonly<Record<string, (episode: EpisodePaths) => LocatedArtifact>>>
 > = {
   /**
@@ -42,24 +75,48 @@ const ARTIFACTS: Readonly<
     }),
   },
   screenplay: {
-    screenplay: (episode) => ({
-      contentType: "text/markdown; charset=utf-8",
-      path: episode.screenplay,
-    }),
+    screenplay: (episode) => ({ contentType: MARKDOWN, path: episode.screenplay }),
   },
   "shot-list": {
-    "shot-list": (episode) => ({
-      contentType: "text/markdown; charset=utf-8",
-      path: episode.shotList,
-    }),
+    "shot-list": (episode) => ({ contentType: MARKDOWN, path: episode.shotList }),
   },
 };
 
-interface ArtifactRequest {
-  readonly artifact: string;
-  readonly episodeId: string;
-  readonly projectId: string;
-  readonly stage: string;
+const TRACKS = new Set<string>(imageTracks);
+
+/**
+ * Stage 2's images: one character, one track, one of the ten pictures.
+ *
+ * It is a function rather than a row in the table above because its artifacts
+ * are not a fixed list of names: two of them are, and the other eight are view
+ * names that the layout module validates as it turns them into files. That
+ * check belongs there rather than here, and a second copy of the eight names
+ * in this file would be exactly the drift rule 3 exists to prevent.
+ */
+function underCharacter(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  if (!TRACKS.has(request.track)) {
+    return null;
+  }
+
+  const character = characterPaths(project, request.characterId);
+
+  if (!character.ok) {
+    return null;
+  }
+
+  const paths = characterTrackPaths(character.data, request.track as "gpt-image" | "seedream");
+
+  if (request.artifact === "card") {
+    return { contentType: PNG, path: paths.card };
+  }
+
+  if (request.artifact === "hero") {
+    return { contentType: PNG, path: paths.hero };
+  }
+
+  const view = characterViewImage(paths, request.artifact);
+
+  return view.ok ? { contentType: PNG, path: view.data } : null;
 }
 
 /** The file a tuple names, or nothing at all. There is no third answer. */
@@ -67,15 +124,19 @@ export function locateArtifact(
   workspace: Workspace,
   request: ArtifactRequest
 ): LocatedArtifact | null {
-  const locate = ARTIFACTS[request.stage]?.[request.artifact];
-
-  if (locate === undefined) {
-    return null;
-  }
-
   const project = projectPaths(workspace, request.projectId);
 
   if (!project.ok) {
+    return null;
+  }
+
+  if (request.stage === "character") {
+    return underCharacter(project.data, request);
+  }
+
+  const locate = UNDER_EPISODE[request.stage]?.[request.artifact];
+
+  if (locate === undefined) {
     return null;
   }
 

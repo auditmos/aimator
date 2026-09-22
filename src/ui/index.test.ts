@@ -249,17 +249,23 @@ describe("the UI server", () => {
 /**
  * The one place in this module where an identifier becomes a path.
  *
- * The client addresses an artifact by what it is (project, episode, stage,
- * artifact) and never by where it lives, because the layout is `workspace.ts`'s
- * to know and a browser that learned it would be reading the tree twice. What
- * this resolver owes is therefore narrow and absolute: a tuple that names
- * something the layout knows becomes its bytes, and anything else is a 404
- * rather than a path walked out of the workspace.
+ * The client addresses an artifact by what it is, the project, the stage, the
+ * stage's own word for it and whichever axes that stage has, and never by
+ * where it lives, because the layout is `workspace.ts`'s to know and a browser
+ * that learned it would be reading the tree twice. What this resolver owes is
+ * therefore narrow and absolute: a tuple that names something the layout knows
+ * becomes its bytes, and anything else is a 404 rather than a path walked out
+ * of the workspace.
+ *
+ * The axes are why an episode travels beside the path rather than in it. A
+ * screenplay lives under an episode and a character's card lives under a
+ * character and a track and under no episode at all, so a segment every caller
+ * had to fill in with something meaningless would be an identifier that lies.
  */
 describe("the artifact resolver", () => {
   it("should serve the screenplay as the markdown it is", async () => {
     const response = await createUi({ workspace }).request(
-      `/api/artifact/${PROJECT}/${EPISODE}/screenplay/screenplay`
+      `/api/artifact/${PROJECT}/screenplay/screenplay?episode=${EPISODE}`
     );
 
     expect(response.status).toBe(200);
@@ -273,8 +279,8 @@ describe("the artifact resolver", () => {
     const app = createUi({ workspace });
     const [shotList, manifest] = await Promise.all(
       [
-        `/api/artifact/${PROJECT}/${EPISODE}/shot-list/shot-list`,
-        `/api/artifact/${PROJECT}/${EPISODE}/prompt-package/manifest`,
+        `/api/artifact/${PROJECT}/shot-list/shot-list?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/prompt-package/manifest?episode=${EPISODE}`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -288,6 +294,27 @@ describe("the artifact resolver", () => {
     expect(JSON.parse(manifest?.body ?? "")).toMatchObject({ clips: expect.anything() });
   });
 
+  /**
+   * The first artifact a person has to **look** at rather than read.
+   *
+   * Approving an image in a terminal is approving a filename, which is the
+   * gap this whole module exists to close, so the bytes come back as the PNG
+   * they are and the browser draws them.
+   */
+  it("should serve a character's image as the png it is, per character and per track", async () => {
+    const app = createUi({ workspace });
+    const response = await app.request(
+      `/api/artifact/${PROJECT}/character/hero?character=ewa&track=gpt-image`
+    );
+    const bytes = Buffer.from(await response.arrayBuffer());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(bytes).toEqual(
+      await readFile(join(root, "projects", PROJECT, "characters", "ewa", "gpt-image", "hero.png"))
+    );
+  });
+
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
     const secret = join(scratch, "sekret.md");
 
@@ -296,11 +323,17 @@ describe("the artifact resolver", () => {
     const app = createUi({ workspace });
     const answers = await Promise.all(
       [
-        `/api/artifact/${PROJECT}/${EPISODE}/screenplay/${encodeURIComponent("../../../../../../etc/passwd")}`,
-        `/api/artifact/${encodeURIComponent("..")}/${EPISODE}/screenplay/screenplay`,
-        `/api/artifact/${PROJECT}/${encodeURIComponent("../..")}/screenplay/screenplay`,
-        `/api/artifact/${PROJECT}/${EPISODE}/screenplay/${encodeURIComponent(secret)}`,
-        `/api/artifact/${PROJECT}/${EPISODE}/montaz/episode`,
+        `/api/artifact/${PROJECT}/screenplay/${encodeURIComponent("../../../../../../etc/passwd")}?episode=${EPISODE}`,
+        `/api/artifact/${encodeURIComponent("..")}/screenplay/screenplay?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/screenplay/screenplay?episode=${encodeURIComponent("../..")}`,
+        `/api/artifact/${PROJECT}/screenplay/${encodeURIComponent(secret)}?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/montaz/episode?episode=${EPISODE}`,
+        // A character's image with no track named, and one with a track that
+        // is not a track: neither becomes a path, both become a refusal.
+        `/api/artifact/${PROJECT}/character/hero?character=ewa`,
+        `/api/artifact/${PROJECT}/character/hero?character=ewa&track=${encodeURIComponent("../..")}`,
+        `/api/artifact/${PROJECT}/character/hero?character=${encodeURIComponent("..")}&track=gpt-image`,
+        `/api/artifact/${PROJECT}/character/${encodeURIComponent("../../../hero")}?character=ewa&track=gpt-image`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -308,7 +341,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual([404, 404, 404, 404, 404]);
+    expect(answers.map((one) => one.status)).toEqual([404, 404, 404, 404, 404, 404, 404, 404, 404]);
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 });

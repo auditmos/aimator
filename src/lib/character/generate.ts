@@ -72,6 +72,16 @@ export interface CharacterReport {
   readonly created: readonly string[];
   readonly name: string;
   readonly nextStep: string;
+  /**
+   * How many billed image calls this invocation is about. A preview states
+   * what it would spend; a real run states what it spent.
+   *
+   * It is the first bill in this pipeline that is a set rather than a coin
+   * flip: one command draws one image or eight, so the count is what a person
+   * needs before clicking, and it has to be said before anything is sent
+   * rather than discovered from an invoice.
+   */
+  readonly paidCalls: number;
   readonly problems: readonly string[];
   readonly ready: boolean;
   readonly track: ImageTrack;
@@ -224,6 +234,7 @@ function idle(input: GenerateCharacterInput, scope: Scope): CharacterReport {
       waiting.length > 0
         ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.characterId} --stage character --track ${input.track} --artifact ${waiting.join(",")}`
         : `etap 2 dla "${input.characterId}" na torze ${input.track} jest kompletny`,
+    paidCalls: 0,
     problems: waiting.length > 0 ? [`czekają na ocenę człowieka: ${waiting.join(", ")}`] : [],
     ready: waiting.length === 0,
     track: input.track,
@@ -266,6 +277,7 @@ async function preview(
       problems.length === 0 && gated.length === 0
         ? `aimator character generate ${input.projectId} ${input.characterId} --track ${input.track}`
         : "usuń powyższe przeszkody przed płatnym wywołaniem",
+    paidCalls: outcomes.filter((outcome) => outcome.state === "planned").length,
     problems: [
       ...problems,
       `${KEY_NAME[input.track]} nie był czytany, próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga`,
@@ -361,6 +373,7 @@ async function runAll(
       drawn.length > 0
         ? `oceń wyniki, a potem: aimator approve ${input.projectId} ${input.characterId} --stage character --track ${input.track} --artifact ${drawn.map((o) => o.artifact).join(",")}`
         : `usuń przeszkody i powtórz: aimator character generate ${input.projectId} ${input.characterId} --track ${input.track}`,
+    paidCalls: outcomes.filter((outcome) => outcome.state === "published").length,
     problems: outcomes.filter((o) => o.state === "blocked").map((o) => `${o.artifact}: ${o.note}`),
     ready: drawn.length > 0,
     track: input.track,

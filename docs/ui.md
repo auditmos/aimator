@@ -29,6 +29,8 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
+- **Panel etapu 2**, pierwszy, w którym zatwierdza się **patrząc**: dziesięć obrazów
+  postaci na tym torze, każdy ze swoim stanem i polem wyboru, rachunek w obrazach.
 - **Panele etapów 3 i 4**, na tym samym wzorcu: werdykt, dryf wejść, treść
   `shot-list.md` albo manifestu pakietu, „Sprawdź", „Zatwierdź" i płatne wywołanie
   w dwóch krokach z rachunkiem w wywołaniach.
@@ -118,10 +120,16 @@ później zdarzeniem `run` na tym samym strumieniu, na którym przychodzi drabin
 odpytuje dostawcę minutami, a ekran ma przez ten czas pozostać używalny. Serwer **nie
 czyta przekazanego `argv`**: co jest legalną komendą, rozstrzyga CLI, odmawiając.
 
-Artefakty są serwowane tylko do odczytu i adresowane krotką (projekt, odcinek, etap,
-artefakt). Na ścieżkę tłumaczy je jedno miejsce, przez `workspace.ts`; krotka, której
-układ nie zna, dostaje 404, **zanim powstanie jakakolwiek ścieżka**, więc `..` ani ścieżka
-bezwzględna nie wyprowadzą odczytu poza katalog roboczy.
+Artefakty są serwowane tylko do odczytu i adresowane **tym, czym są**: projektem, etapem,
+własnym słowem etapu, oraz tą z trzech osi, którą ten etap ma — odcinkiem, torem, postacią.
+Osie jadą obok ścieżki, a nie w niej, bo karta postaci nie leży pod żadnym odcinkiem,
+a scenariusz pod żadnym torem: segment, który każdy wołający musiałby wypełnić czymkolwiek,
+byłby identyfikatorem, który kłamie.
+
+Na ścieżkę tłumaczy je jedno miejsce, przez `workspace.ts`; krotka, której układ nie zna,
+dostaje 404, **zanim powstanie jakakolwiek ścieżka**, więc `..` ani ścieżka bezwzględna nie
+wyprowadzą odczytu poza katalog roboczy. Obrazy wracają jako `image/png`, bo od etapu 2
+zatwierdza się patrząc, a zatwierdzanie obrazu w terminalu to zatwierdzanie nazwy pliku.
 
 ## Czego pętla zwrotna nie załatwia
 

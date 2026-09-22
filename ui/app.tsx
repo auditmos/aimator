@@ -1,4 +1,5 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
+import { CharacterPanel } from "./character";
 import { Ladder } from "./ladder";
 import { PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
@@ -44,7 +45,7 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  * arrives. A row nobody can open says so by being a row, which is more honest
  * than a panel apologising for being empty.
  */
-const PANELLED = new Set([0, 1, 3, 4]);
+const PANELLED = new Set([0, 1, 2, 3, 4]);
 
 function openable(cell: StatusCell): boolean {
   return PANELLED.has(cell.stage);
@@ -70,6 +71,21 @@ interface PanelProps {
 function StagePanel(props: PanelProps): JSX.Element | null {
   if (props.cell.stage === 1) {
     return <ScreenplayPanel {...props} />;
+  }
+
+  // Stage 2 is the one cell that is not about an episode: a character recurs
+  // between them, so its panel is handed the character and the track its cell
+  // carries and nothing else.
+  if (props.cell.stage === 2) {
+    return (
+      <CharacterPanel
+        cell={props.cell}
+        onRun={props.onRun}
+        projectId={props.projectId}
+        run={props.run}
+        running={props.running}
+      />
+    );
   }
 
   if (props.cell.stage === 3) {

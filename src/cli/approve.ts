@@ -23,7 +23,7 @@ import { approveSoundDesignStage } from "./stages/sound-design.js";
 /** Every acceptance this tool records, in the words the usage text promises. */
 export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>] [--json]
-  approve <id> <character-id> --stage character --track <tor>
+  approve <id> <character-id> --stage character --track <tor> [--json]
                --artifact <klucz>[,<klucz>...]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
   approve <id> <episode-id> --stage opening-frame --track <tor>

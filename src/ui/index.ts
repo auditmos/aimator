@@ -161,16 +161,23 @@ export function createUi(options: UiOptions): Hono {
    * An artifact, read-only, addressed by what it is rather than where it is.
    *
    * Reviewing is looking: a screenplay nobody can read in the panel is a yes
-   * given to a filename. So the bytes are served, from the one path builder
-   * that knows the layout, and nothing else about them is decided here. A
-   * tuple the layout does not know is a 404, never a guess at a file.
+   * given to a filename, and a character card nobody can see is worse. So the
+   * bytes are served, from the one path builder that knows the layout, and
+   * nothing else about them is decided here. A tuple the layout does not know
+   * is a 404, never a guess at a file.
    */
-  app.get("/api/artifact/:projectId/:episodeId/:stage/:artifact", async (c) => {
+  app.get("/api/artifact/:projectId/:stage/:artifact", async (c) => {
     const located = locateArtifact(options.workspace, {
       artifact: c.req.param("artifact"),
-      episodeId: c.req.param("episodeId"),
+      // The three axes a stage may or may not have. They travel beside the
+      // path rather than in it, because a character's card is under no episode
+      // and a screenplay is under no track: a segment every caller had to fill
+      // in with something meaningless would be an identifier that lies.
+      characterId: c.req.query("character") ?? "",
+      episodeId: c.req.query("episode") ?? "",
       projectId: c.req.param("projectId"),
       stage: c.req.param("stage"),
+      track: c.req.query("track") ?? "",
     });
 
     if (located === null) {

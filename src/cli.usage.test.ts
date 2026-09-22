@@ -110,7 +110,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <character-id> --stage character --track <tor>": [
+  "  approve <id> <character-id> --stage character --track <tor> [--json]": [
     "approve",
     PROJECT,
     "ewa",
@@ -260,7 +260,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
   ],
   "  check <id> --stage prepare [--json]": ["check", PROJECT, "--stage", "prepare", "--json"],
   "  check <id> [<episode-id>]": ["check", ...ON],
-  "  check <id> <character-id> --stage character --track <tor>": [
+  "  check <id> <character-id> --stage character --track <tor> [--json]": [
     "check",
     PROJECT,
     "ewa",
