@@ -7,7 +7,15 @@ import {
   useState,
 } from "react";
 import { buy, commandLine, type Preview } from "../src/ui/commands.js";
-import type { CallsReport, Drawn, DrawnReport, PaidReport, RunDone, TextStatus } from "./types";
+import type {
+  CallsReport,
+  Drawn,
+  DrawnPrompt,
+  DrawnReport,
+  PaidReport,
+  RunDone,
+  TextStatus,
+} from "./types";
 
 /**
  * What every stage panel repeats, in one place, so eleven of them cannot drift.
@@ -207,21 +215,37 @@ export function asCalls(report: CallsReport): Priced {
   };
 }
 
-/** An image stage's: the bill counts pictures, and each picture has its own text. */
+/**
+ * An image stage's: the bill counts pictures, and each picture has its own text.
+ *
+ * It reads all three image stages, which is why it reads both the set and the
+ * single artifact: stage 6 draws one frame and says so in the singular, for
+ * the same reason it takes no `--artifact` anywhere. A reader that knew only
+ * the plural did not print stage 6's prompt, it threw, and the two-step buy is
+ * built to treat an unreadable preview as no preview, so the whole stage lost
+ * its "Kup" without a word on the screen.
+ */
 export function asImages(report: DrawnReport): Priced {
+  const drawn = report.artifacts ?? (report.artifact === undefined ? [] : [report.artifact]);
+
   return {
     billed: [{ count: report.paidCalls, unit: IMAGES }],
-    prompts: promptsOf(report.artifacts),
+    prompts: promptsOf(drawn),
   };
 }
 
-/** Every artifact this call would send a text to, under the id it belongs to. */
+/** Every artifact this call would send a text to, under the name it belongs to. */
 export function promptsOf(
-  artifacts: readonly { readonly id: string; readonly prompt: string | null }[]
+  artifacts: readonly DrawnPrompt[]
 ): readonly { readonly label: string; readonly text: string }[] {
   return artifacts.flatMap((one) =>
-    one.prompt === null ? [] : [{ label: `Prompt ${one.id}`, text: one.prompt }]
+    one.prompt === null ? [] : [{ label: `Prompt ${namedBy(one)}`, text: one.prompt }]
   );
+}
+
+/** Whichever of the two words the stage that drew this one uses for it. */
+function namedBy(one: DrawnPrompt): string {
+  return "artifact" in one ? one.artifact : one.id;
 }
 
 /** What a text stage's paid command is told, beyond which episode it is about. */

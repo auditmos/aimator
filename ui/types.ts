@@ -435,14 +435,37 @@ export interface CallsReport extends PaidReport {
 }
 
 /**
+ * One picture a paid call would draw, under the word its own stage uses.
+ *
+ * Three image stages spell this field two ways and both spellings are right,
+ * because each is that stage's vocabulary: stage 2 draws the named views of
+ * one character, so its word is `artifact`, while stages 5, 6 and 7 draw
+ * things the prompt package gave ids to. The CLI is the contract here, so the
+ * reader learns both; asking a stage to rename a field so one client could
+ * share one function would be the browser writing the terminal's dictionary.
+ */
+export type DrawnPrompt =
+  | { readonly artifact: string; readonly prompt: string | null }
+  | { readonly id: string; readonly prompt: string | null };
+
+/**
  * An image stage's: one call is one picture, and each picture has its own text.
  *
  * The prompt sits under the artifact rather than at the top of the report,
  * because one command draws one picture or eight and each of them is sent a
  * different instruction.
+ *
+ * Which of the two fields carries them is the stage's own answer to how many
+ * it can draw. Stage 6 draws the one frame the film opens on and has no plural
+ * at all, which is the same fact that keeps `--artifact` out of every one of
+ * its commands, so its report names a single `artifact` where stages 2 and 5
+ * name a set.
  */
 export interface DrawnReport extends PaidReport {
-  readonly artifacts: readonly { readonly id: string; readonly prompt: string | null }[];
+  /** Stage 6's one frame. */
+  readonly artifact?: DrawnPrompt;
+  /** Stage 2's views and stage 5's references, however many the gates allowed. */
+  readonly artifacts?: readonly DrawnPrompt[];
   readonly paidCalls: number;
 }
 

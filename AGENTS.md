@@ -715,6 +715,16 @@ function parsePort(raw: string): Result<number> {
 - If a test needs to import an internal file, the module boundary is wrong; test through its `index.ts`
 - Run tests: `pnpm test`
 
+The client under `ui/` is tested the same way and in one place only: the **readers**, the
+pure functions that turn one stage's report into a bill and the prompts a paid call would
+send. Everything else there is verified in a browser, which is why `vitest.config.ts` keeps
+the `node` environment while including `ui/**/*.test.ts`. The line is not squeamishness
+about components, it is where a client bug can hide in silence: three image stages spell
+their artifacts two ways, a reader that knew one of them printed `Prompt undefined` on one
+stage and threw on another, and the throw was swallowed by the try that treats an
+unreadable preview as no preview, so the whole stage lost its "Kup" with nothing on screen
+to say why.
+
 ### The one test with no source file beside it
 
 `src/test/docs.test.ts` is the exception to co-location, and it earns it by having no
