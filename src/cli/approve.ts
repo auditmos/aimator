@@ -63,7 +63,10 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
   const workspace = workspaceOf(parsed.data);
-  const answer = answerOf(parsed.data);
+  // Stage 0 is what `approve` with no `--stage` accepts, so it is also what the
+  // flag prints: the usage text puts the flag in brackets, and brackets are a
+  // promise about the command rather than about how it answers.
+  const answer = answerOf(parsed.data, "prepare");
 
   if (!projectId.ok) {
     return projectId;

@@ -227,3 +227,22 @@ describe("the path a person types", () => {
     expect(episode).toMatchObject({ source: { originPath: source } });
   });
 });
+
+/**
+ * The flag the usage text puts in brackets, and what brackets promise.
+ *
+ * `approve <id>` with no `--stage` is stage 0's approval: the usage spells the
+ * flag optional and says so in words. `--json` is a question about how an
+ * answer is printed, so it cannot also decide what a command *means*; a
+ * spelling that works at a terminal and refuses in a panel is two grammars for
+ * one command, which is the parity this whole flag exists to keep.
+ */
+describe("approve with no --stage", () => {
+  it("should answer for stage 0 under --json, as it does without it", async () => {
+    const plain = await cli("approve", PROJECT, "--reviewer", "fixture");
+    const tagged = await object("approve", PROJECT, "--reviewer", "fixture", "--json");
+
+    expect(plain).toContain("etap 0");
+    expect(tagged).toMatchObject({ command: "approve", stage: "prepare" });
+  });
+});

@@ -181,14 +181,19 @@ const JSON_STAGES = [
  * cannot be read back apart. So the flag refuses, and names the spellings that
  * work, exactly as an unknown `--stage` already does.
  */
-export function answerOf(parsed: Parsed): Result<Answer> {
+export function answerOf(parsed: Parsed, fallback: string | null = null): Result<Answer> {
   if (parsed.values.json !== true) {
     return ok("text");
   }
 
   const { stage } = parsed.values;
+  // Which stage an absent `--stage` means, when it means one. `approve` has an
+  // answer and says so in brackets in the usage text; `check` has none. The
+  // flag decides how an answer is printed and must not also decide what the
+  // command means, or one spelling works at a terminal and refuses in a panel.
+  const named = typeof stage === "string" ? stage : fallback;
 
-  return typeof stage === "string" && JSON_STAGES.some((name) => name === stage)
+  return named !== null && JSON_STAGES.some((name) => name === named)
     ? ok("json")
     : err(
         new UsageError(
