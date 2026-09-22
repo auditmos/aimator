@@ -29,16 +29,25 @@ export interface Stage0Report {
 }
 
 /**
+ * What every reviewed text stage answers, whatever else it also answers.
+ *
+ * Stages 1, 3 and 4 share it to the field, which is why the one condition that
+ * decides whether "Zatwierdź" exists is written once rather than three times.
+ */
+export interface TextStatus {
+  readonly approved: boolean;
+  /** Inputs whose bytes no longer match what this stage was written from. */
+  readonly inputsChanged: readonly string[];
+  readonly problems: readonly string[];
+  readonly status: "absent" | "completed" | "submitted";
+}
+
+/**
  * Stage 1's own object, as `check --stage screenplay --json` prints it and as
  * the ladder carries it inside its stage-1 cell. Declared, never derived: the
  * panel renders these fields and computes no verdict of its own.
  */
-export interface ScreenplayStatus {
-  readonly approved: boolean;
-  /** Stage-0 inputs whose bytes no longer match what this screenplay was written from. */
-  readonly inputsChanged: readonly string[];
-  readonly problems: readonly string[];
-  readonly status: "absent" | "completed" | "submitted";
+export interface ScreenplayStatus extends TextStatus {
   readonly verdict: {
     readonly durationSeconds: number;
     readonly longestSceneSeconds: number;
@@ -46,27 +55,82 @@ export interface ScreenplayStatus {
   } | null;
 }
 
+/** Stage 3's own object: the plan, counted in the three units it never mixes. */
+export interface ShotListStatus extends TextStatus {
+  readonly verdict: {
+    readonly castSeen: readonly string[];
+    readonly clips: readonly unknown[];
+    readonly durationSeconds: number;
+    readonly longestClipSeconds: number;
+    readonly maxClipSeconds: number;
+    readonly scenes: readonly unknown[];
+    readonly shots: readonly unknown[];
+  } | null;
+}
+
+/** Stage 4's own object: the graph, and what it says depends on what. */
+export interface PromptPackageStatus extends TextStatus {
+  readonly verdict: {
+    readonly clips: readonly { readonly id: string }[];
+    readonly heroes: readonly string[];
+    readonly references: readonly {
+      readonly dependsOn: readonly string[];
+      readonly id: string;
+      readonly kind: string;
+      readonly subject: string;
+    }[];
+  } | null;
+}
+
 /**
- * Stage 1's paid command, as `screenplay generate --json` prints it.
+ * What every paid stage's report says that a panel has to show.
  *
- * A dry run fills `prompt` and leaves `runId` empty; a purchase does the
- * opposite and names what it wrote. `paidCalls` is the bill, in the unit this
- * stage is billed in, and it is the one number that has to stand beside the
- * button that spends it rather than inside a sentence.
+ * The bill first, because it is the one number that must stand beside the
+ * button that spends it rather than inside a sentence somebody has to parse.
  */
-export interface GenerateReport {
-  readonly command: "generate";
-  readonly created: readonly string[];
-  readonly minimumScenes: number;
-  readonly nextStep: string;
+export interface PaidReport {
   readonly paidCalls: number;
   readonly problems: readonly string[];
   readonly prompt: string | null;
-  readonly ready: boolean;
-  readonly runId: string | null;
-  readonly stage: "screenplay";
 }
 
+/**
+ * One future paid call, as stage 4 plans it for one track.
+ *
+ * The attachments are the point: rule 8 says a prompt is text **plus ordered
+ * attachments addressed by position**, and this is the only place that order
+ * is visible before anything is sent. `bytes` is deliberately absent, because
+ * a JSON document has none and the digest identifies the file.
+ */
+export interface PlannedArtifact {
+  readonly attachments: readonly {
+    readonly id: string;
+    readonly path: string;
+    readonly role: string;
+    readonly sha256: string | null;
+    readonly state: "absent" | "approved" | "changed" | "pending";
+  }[];
+  readonly blockers: readonly string[];
+  readonly kind: string;
+  readonly name: string;
+  readonly seconds: number | null;
+  readonly text: string | null;
+}
+
+/** What `prompt-package show --json` prints: one track's whole send plan. */
+export interface SendPlan {
+  readonly artifacts: readonly PlannedArtifact[];
+  readonly aspectRatio: string;
+  readonly command: "show";
+  readonly limit: number;
+  readonly problems: readonly string[];
+  readonly promptVersion: number;
+  readonly size: string;
+  readonly stage: "prompt-package";
+  readonly track: string;
+}
+
+/** One cell of the ladder, exactly as `status --json` writes it. */
 export interface StatusCell {
   /** Set only where a cell is per character, which is stage 2 alone. */
   readonly character: string | null;

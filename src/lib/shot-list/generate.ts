@@ -38,6 +38,14 @@ export interface ShotListReport {
   readonly approved: boolean;
   readonly created: readonly string[];
   readonly nextStep: string;
+  /**
+   * The bill, in the unit this stage is billed in: text calls.
+   *
+   * Only ever one or zero, which is exactly why it is worth reporting rather
+   * than assuming: the question a person asks before clicking is whether this
+   * command is about to buy a shot list or tell them it cannot.
+   */
+  readonly paidCalls: number;
   readonly problems: readonly string[];
   /** `--dry-run` only: the exact text a paid call would send. */
   readonly prompt: string | null;
@@ -110,6 +118,7 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
         problems.length === 0
           ? `aimator shot-list generate ${input.projectId} ${input.episodeId}`
           : "usuń powyższe przeszkody przed płatnym wywołaniem",
+      paidCalls: problems.length === 0 ? 1 : 0,
       problems,
       prompt: stage3.data.prompt,
       ready: problems.length === 0,
@@ -154,6 +163,9 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
     approved: false,
     created: attempt.data.created,
     nextStep: `oceń listę ujęć, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage shot-list`,
+    // One, including a resumed attempt: its answer was already on disk and
+    // already paid for, so a count of nothing would make a bill disappear.
+    paidCalls: 1,
     problems: [],
     prompt: null,
     ready: true,

@@ -122,12 +122,32 @@ function episodeRoot(): string {
   return episode.data.root;
 }
 
+/**
+ * A manifest stage 4 can actually publish, which the earlier one could not.
+ *
+ * Two things the stage refuses over were missing: a package with no reference
+ * at all, and clips naming one of the two faces the shots put on screen. Both
+ * left the stage `submitted`, which is a fixture quietly one stage shorter
+ * than it claims to be, and unnoticeable until something asked for the file.
+ */
 function answer(): string {
   return JSON.stringify({
-    clips: [{ id: "C01", prompt: "Akcja klipu C01.", referenceIds: ["hero:ewa"] }],
-    entryFrames: [],
-    opening: { prompt: "Ewa centralnie, burza za oknem.", referenceIds: ["hero:ewa"] },
-    references: [],
+    clips: ["C01", "C02"].map((id) => ({
+      id,
+      prompt: `Akcja klipu ${id}.`,
+      referenceIds: ["hero:ewa", "hero:tata", "R01"],
+    })),
+    entryFrames: [{ clipId: "C02", prompt: "Pierwsza chwila klipu C02." }],
+    opening: { prompt: "Ewa centralnie, burza za oknem.", referenceIds: ["hero:ewa", "R01"] },
+    references: [
+      {
+        dependsOn: ["hero:ewa"],
+        id: "R01",
+        kind: "location",
+        prompt: "Salon z niską kanapą.",
+        subject: "Living room, evening",
+      },
+    ],
     review: "Do rozstrzygnięcia: skala alpaki.",
   });
 }
@@ -247,6 +267,25 @@ describe("the artifact resolver", () => {
     expect(await response.text()).toBe(
       await readFile(join(episodeRoot(), "screenplay.md"), "utf8")
     );
+  });
+
+  it("should serve each text stage's artifact with the type it actually is", async () => {
+    const app = createUi({ workspace });
+    const [shotList, manifest] = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/${EPISODE}/shot-list/shot-list`,
+        `/api/artifact/${PROJECT}/${EPISODE}/prompt-package/manifest`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return { body: await response.text(), type: response.headers.get("content-type") ?? "" };
+      })
+    );
+
+    expect(shotList?.type).toContain("text/markdown");
+    expect(shotList?.body).toBe(await readFile(join(episodeRoot(), "shot-list.md"), "utf8"));
+    expect(manifest?.type).toContain("application/json");
+    expect(JSON.parse(manifest?.body ?? "")).toMatchObject({ clips: expect.anything() });
   });
 
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {

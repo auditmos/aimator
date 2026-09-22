@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { run } from "../cli/index.js";
-import { buyScreenplay, commandLine, INTENTS } from "./commands.js";
+import { buy, commandLine, INTENTS } from "./commands.js";
 
 /**
  * The client's one piece of knowledge about the CLI, checked against the CLI.
@@ -41,6 +41,7 @@ const FLAG = /--[a-z][a-z-]+/g;
  * assembles it.
  */
 const scope = {
+  artifact: "opening-frame",
   aspectRatio: "16:9",
   audio: "narration",
   characterId: "ewa",
@@ -58,6 +59,7 @@ const scope = {
   sources: ["/Users/ktos/Zdjecia/ewa-1.png"],
   subtitles: "none",
   title: "Dzielna Ewa",
+  track: "gpt-image",
   voiceId: "voice-1",
 };
 
@@ -74,7 +76,7 @@ function everyIntent(): readonly (readonly [string, readonly string[]])[] {
 
   return [
     ...Object.entries(INTENTS).map(([name, build]) => [name, build(scope)] as const),
-    ["buyScreenplay", buyScreenplay({ argv: preview, runId: "9f1c" })] as const,
+    ["buy", buy({ argv: preview, runId: "9f1c" })] as const,
   ];
 }
 
@@ -227,6 +229,84 @@ describe("the stage-0 forms", () => {
 });
 
 /**
+ * Stages 3 and 4, where one screen first asks about a track.
+ *
+ * The shot list and the package are shared by both productions and neither
+ * names one, which is exactly why the **send plan** has to: `hero:ewa` and
+ * `R01` become a file only at the sender, per track, and that resolution is
+ * what answers the gate. So `show` is the one stage-4 command that carries
+ * `--track`, and it asks for the object because the panel numbers the
+ * attachments itself, `Image N = <id> — <rola>`, in the order the bytes go.
+ */
+describe("the stage-3 and stage-4 panels", () => {
+  it("should name each stage when it asks about it, so the answer is that stage alone", () => {
+    expect(INTENTS.checkShotList(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "shot-list",
+    ]);
+    expect(INTENTS.checkPromptPackage(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "prompt-package",
+    ]);
+    expect(INTENTS.approveShotList(scope)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "shot-list",
+    ]);
+    expect(INTENTS.approvePromptPackage(scope)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "prompt-package",
+    ]);
+  });
+
+  it("should read the send plan of one track, and of one artifact when asked", () => {
+    expect(INTENTS.showSendPlan({ ...scope, artifact: "" })).toEqual([
+      "prompt-package",
+      "show",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--json",
+    ]);
+    expect(INTENTS.showSendPlan(scope)).toEqual([
+      "prompt-package",
+      "show",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "opening-frame",
+      "--json",
+    ]);
+  });
+
+  /** The same derivation, three stages over: what was previewed is what is bought. */
+  it("should buy exactly the send each of them previewed", () => {
+    for (const preview of [INTENTS.previewShotList(scope), INTENTS.previewPromptPackage(scope)]) {
+      const bought = buy({ argv: preview, runId: "9f1c" });
+
+      expect(bought).not.toContain("--dry-run");
+      expect(bought).not.toContain("--json");
+      expect(bought).toContain("gpt-6-astra");
+      expect(bought.slice(0, 2)).toEqual(preview.slice(0, 2));
+    }
+  });
+});
+
+/**
  * Two steps before every purchase, made structural rather than promised.
  *
  * The screen has one dangerous button and the rule around it is the PRD's:
@@ -275,7 +355,7 @@ describe("the two steps of a paid call", () => {
    * argument that decides what the money buys.
    */
   it("should buy exactly the send that was previewed", () => {
-    expect(buyScreenplay({ argv: INTENTS.previewScreenplay(scope), runId: "9f1c" })).toEqual([
+    expect(buy({ argv: INTENTS.previewScreenplay(scope), runId: "9f1c" })).toEqual([
       "screenplay",
       "generate",
       "dzielna-ewa",
@@ -291,15 +371,11 @@ describe("the two steps of a paid call", () => {
     const preview = INTENTS.previewScreenplay({ ...scope, regenerate: true });
 
     expect(preview).toContain("--regenerate");
-    expect(buyScreenplay({ argv: preview, runId: "9f1c" })).toContain("--regenerate");
+    expect(buy({ argv: preview, runId: "9f1c" })).toContain("--regenerate");
   });
 
   it("should refuse to build a purchase with no finished dry run behind it", () => {
-    expect(() => buyScreenplay({ argv: INTENTS.checkScreenplay(scope), runId: "9f1c" })).toThrow(
-      NO_DRY_RUN
-    );
-    expect(() => buyScreenplay({ argv: INTENTS.previewScreenplay(scope), runId: "" })).toThrow(
-      NO_RUN_ID
-    );
+    expect(() => buy({ argv: INTENTS.checkScreenplay(scope), runId: "9f1c" })).toThrow(NO_DRY_RUN);
+    expect(() => buy({ argv: INTENTS.previewScreenplay(scope), runId: "" })).toThrow(NO_RUN_ID);
   });
 });

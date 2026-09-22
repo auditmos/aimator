@@ -50,6 +50,14 @@ export interface PromptPackageReport {
   readonly approved: boolean;
   readonly created: readonly string[];
   readonly nextStep: string;
+  /**
+   * The bill, in the unit this stage is billed in: text calls.
+   *
+   * One or zero, and zero is what a blocked gate answers. A republication
+   * counts one for the reason a resumed attempt does: the answer it publishes
+   * was bought, and a count of nothing would make that purchase disappear.
+   */
+  readonly paidCalls: number;
   readonly problems: readonly string[];
   /** `--dry-run` only: the exact text a paid call would send. */
   readonly prompt: string | null;
@@ -130,6 +138,7 @@ export async function generatePromptPackage(
         problems.length === 0
           ? `aimator prompt-package generate ${input.projectId} ${input.episodeId}`
           : "usuń powyższe przeszkody przed płatnym wywołaniem",
+      paidCalls: problems.length === 0 ? 1 : 0,
       problems,
       prompt: stage4.data.prompt,
       ready: problems.length === 0,
@@ -176,6 +185,7 @@ export async function generatePromptPackage(
     approved: false,
     created: attempt.data.created,
     nextStep: `oceń pakiet, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`,
+    paidCalls: 1,
     problems: [],
     prompt: null,
     ready: true,

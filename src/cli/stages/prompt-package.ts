@@ -9,7 +9,9 @@ import {
 } from "../../lib/prompt-package/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import {
+  type Answer,
   type Approval,
+  asJson,
   type EpisodeScope,
   MODEL_ID,
   maxOutputTokensOf,
@@ -25,9 +27,10 @@ import {
 /** Stage 4: the package both tracks read, and the free preview of a send. */
 export const USAGE = `Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
   prompt-package generate <id> <episode-id> [--model <id>]
-                          [--max-output-tokens <n>] [--dry-run] [--regenerate]
+                          [--max-output-tokens <n>] [--dry-run] [--json]
+                          [--regenerate]
                           [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
-  prompt-package show <id> <episode-id> --track <tor>
+  prompt-package show <id> <episode-id> --track <tor> [--json]
                       [--artifact R02|opening-frame|C03|entry:C03,...]
     Darmowe. Drukuje dokładnie to, co poleci do modelu obrazu albo wideo:
     numerowany blok załączników w kolejności bajtów, treść pliku z prompts/,
@@ -40,6 +43,9 @@ export const USAGE = `Etap 4. Pakiet promptów (płatny; wspólny dla obu torów
  * decision, which is why it has a default where the model does not.
  */
 const DEFAULT_PROMPT_PACKAGE_MAX_OUTPUT_TOKENS = 32_000;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "prompt-package";
 
 /**
  * `--dry-run` prints the prompt itself, not a byte count, the same promise
@@ -56,10 +62,14 @@ function renderPackageGenerate(
     mode === "dry-run"
       ? [
           `Próba na sucho: nic nie zapisano, nic nie wysłano. Pakiet promptów ${projectId}/${episodeId}`,
+          `  płatnych wywołań do wykonania: ${report.paidCalls}`,
           "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
           "  obrazy postaci nie są wysyłane: pakiet jest wspólny dla obu torów, więc niesie same identyfikatory hero:<id>",
         ]
-      : [`Pakiet promptów ${projectId}/${episodeId}, próba ${report.runId ?? ""}`];
+      : [
+          `Pakiet promptów ${projectId}/${episodeId}, próba ${report.runId ?? ""}`,
+          `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+        ];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -174,7 +184,34 @@ async function runPromptPackageShow(parsed: Parsed): Promise<Result<string>> {
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderSendPlan(result.data, projectId.data, episodeId.data)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.values.json === true
+      ? asJson("show", STAGE, printable(result.data))
+      : renderSendPlan(result.data, projectId.data, episodeId.data)
+  );
+}
+
+/**
+ * The send plan as a document, which is the plan without the files in it.
+ *
+ * `bytes` exists so the stage that pays can POST the attachment, and a JSON
+ * document has no bytes: serialising a Buffer would put a megabyte of decimal
+ * numbers into a plan somebody asked to read. Dropping it is the only field
+ * this command decides anything about, and the file is not lost by it, the
+ * digest identifies it exactly as it does everywhere else here.
+ */
+function printable(plan: SendPlan): object {
+  return {
+    ...plan,
+    artifacts: plan.artifacts.map((one) => ({
+      ...one,
+      attachments: one.attachments.map(({ bytes: _bytes, ...rest }) => rest),
+    })),
+  };
 }
 
 /** The state of one attachment, in the word a person reads. */
@@ -225,6 +262,7 @@ export async function runPromptPackage(argv: readonly string[]): Promise<Result<
   if (argv[0] === "show") {
     const parsed = parse(argv.slice(1), {
       artifact: { type: "string" },
+      json: { type: "boolean" },
       track: { type: "string" },
     });
 
@@ -236,6 +274,7 @@ export async function runPromptPackage(argv: readonly string[]): Promise<Result<
   }
 
   const parsed = parse(argv.slice(1), {
+    json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -293,26 +332,39 @@ export async function runPromptPackage(argv: readonly string[]): Promise<Result<
     workspace: workspace.data,
   });
 
-  return result.ok
-    ? ok(renderPackageGenerate(result.data, projectId.data, episodeId.data, mode))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderPackageGenerate(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
-/** The stage-4 half of `check <id> <episode-id>`. */
-export async function checkPromptPackageStage(scope: EpisodeScope): Promise<Result<string>> {
+/** The stage-4 half of `check <id> <episode-id>`, in prose or as the object. */
+export async function checkPromptPackageStage(
+  scope: EpisodeScope,
+  answer: Answer
+): Promise<Result<string>> {
   const result = await checkPromptPackage(scope);
 
-  return result.ok
-    ? ok(
-        renderPackageStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderPackageStatus(
           `Odcinek "${scope.episodeId}", etap 4: ${result.data.status}${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data,
           scope.projectId,
           scope.episodeId,
           "apply"
         )
-      )
-    : result;
+  );
 }
 
 /** `approve --stage prompt-package`: the manifest and every prompt file. */
@@ -328,15 +380,19 @@ export async function approvePromptPackageStage(
 
   const result = await approvePromptPackage({ ...approval, episodeId: episodeId.data });
 
-  return result.ok
-    ? ok(
-        renderPackageStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderPackageStatus(
           `Pakiet promptów odcinka "${episodeId.data}" zatwierdzony`,
           result.data,
           approval.projectId,
           episodeId.data,
           approval.mode
         )
-      )
-    : result;
+  );
 }

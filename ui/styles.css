@@ -527,6 +527,50 @@ h1 {
   overflow-y: auto;
 }
 
+/* Stage 4: the graph the package describes, and the send plan of one track. */
+.references,
+.plan {
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+}
+.references li {
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-300);
+}
+.planned {
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.planned-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-neutral-50);
+}
+/* Rule 8 on screen: the attachments of one call, addressed by position. */
+.attachments {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-300);
+}
+.attachments li {
+  padding: 0.125rem 0;
+}
+.attachment-state {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+
 .app-footer {
   padding-block: 1.5rem;
   font-size: 0.75rem;

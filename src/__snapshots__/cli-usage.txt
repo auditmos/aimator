@@ -26,13 +26,14 @@ Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
 
 Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
-                                       [--dry-run] [--regenerate]
+                                       [--dry-run] [--json] [--regenerate]
 
 Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
   prompt-package generate <id> <episode-id> [--model <id>]
-                          [--max-output-tokens <n>] [--dry-run] [--regenerate]
+                          [--max-output-tokens <n>] [--dry-run] [--json]
+                          [--regenerate]
                           [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
-  prompt-package show <id> <episode-id> --track <tor>
+  prompt-package show <id> <episode-id> --track <tor> [--json]
                       [--artifact R02|opening-frame|C03|entry:C03,...]
     Darmowe. Drukuje dokładnie to, co poleci do modelu obrazu albo wideo:
     numerowany blok załączników w kolejności bajtów, treść pliku z prompts/,
@@ -164,6 +165,8 @@ Wspólne:
   check <id> [<episode-id>]
   check <id> --stage prepare [--json]
   check <id> <episode-id> --stage screenplay [--json]
+  check <id> <episode-id> --stage shot-list [--json]
+  check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
   check <id> <episode-id> --stage opening-frame --track <tor>
@@ -189,10 +192,10 @@ Wspólne:
   --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
-               i approve na razie wyłącznie z --stage prepare albo screenplay,
-               a z komend etapu na razie wyłącznie na etapie 0 i na screenplay
-               generate; kolejne etapy dostają go po kolei razem ze swoim
-               panelem w UI
+               i approve na razie wyłącznie z --stage prepare, screenplay,
+               shot-list albo prompt-package, a z komend etapu na razie
+               wyłącznie na etapach 0, 1, 3 i 4; kolejne etapy dostają go po
+               kolei razem ze swoim panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

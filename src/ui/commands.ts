@@ -81,6 +81,11 @@ export interface Preview {
   readonly runId: string;
 }
 
+/** Which of the two productions a command is about. Never guessed. */
+interface TrackRef extends EpisodeRef {
+  readonly track: string;
+}
+
 /** A purchase the two-step rule would not allow. Never a refusal to show. */
 class NotPreviewedError extends Error {
   constructor(message: string) {
@@ -115,7 +120,8 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Send, Settings {
+interface Everything extends Send, Settings, TrackRef {
+  readonly artifact: string;
   readonly aspectRatio: string;
   readonly characterId: string;
   readonly name: string;
@@ -167,6 +173,14 @@ export const INTENTS = {
     "--stage",
     "prepare",
   ],
+  /** Stage 4, accepted: the manifest and every prompt file under it. */
+  approvePromptPackage: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "approve",
+    projectId,
+    episodeId,
+    "--stage",
+    "prompt-package",
+  ],
   /** Stage 1, accepted: a human saying yes, bound to the digests it has now. */
   approveScreenplay: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
     "approve",
@@ -174,6 +188,14 @@ export const INTENTS = {
     episodeId,
     "--stage",
     "screenplay",
+  ],
+  /** Stage 3, accepted: the plan every image and every clip is drawn from. */
+  approveShotList: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "approve",
+    projectId,
+    episodeId,
+    "--stage",
+    "shot-list",
   ],
   /**
    * Stage 0: the narrator of the series, cast rather than configured.
@@ -201,6 +223,14 @@ export const INTENTS = {
     "--stage",
     "prepare",
   ],
+  /** Stage 4, verified: the wiring verdict, which never reads a prompt. */
+  checkPromptPackage: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "check",
+    projectId,
+    episodeId,
+    "--stage",
+    "prompt-package",
+  ],
   /** Stage 1, verified: reads, reports drift, writes nothing. */
   checkScreenplay: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
     "check",
@@ -208,6 +238,14 @@ export const INTENTS = {
     episodeId,
     "--stage",
     "screenplay",
+  ],
+  /** Stage 3, verified: coverage and the sums of time, nothing written. */
+  checkShotList: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "check",
+    projectId,
+    episodeId,
+    "--stage",
+    "shot-list",
   ],
   /** Stage 0: this character is drawn from `project.md`, not from photographs. */
   describeCharacter: (one: CastRef): readonly string[] => [
@@ -227,9 +265,33 @@ export const INTENTS = {
     one.title,
     ...flag("--aspect-ratio", one.aspectRatio),
   ],
+  /** Stage 4, previewed: the whole send, priced, with nothing sent. */
+  previewPromptPackage: (send: Send): readonly string[] => [
+    "prompt-package",
+    "generate",
+    send.projectId,
+    send.episodeId,
+    ...flag("--model", send.model),
+    ...flag("--max-output-tokens", send.maxOutputTokens),
+    ...(send.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
   /** Stage 1, previewed: the whole send, priced, with nothing sent. */
   previewScreenplay: (send: Send): readonly string[] => [
     "screenplay",
+    "generate",
+    send.projectId,
+    send.episodeId,
+    ...flag("--model", send.model),
+    ...flag("--max-output-tokens", send.maxOutputTokens),
+    ...(send.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
+  /** Stage 3, previewed: the whole send, priced, with nothing sent. */
+  previewShotList: (send: Send): readonly string[] => [
+    "shot-list",
     "generate",
     send.projectId,
     send.episodeId,
@@ -246,6 +308,26 @@ export const INTENTS = {
     one.projectId,
     one.episodeId,
     ...settings(one),
+  ],
+  /**
+   * Stage 4, free: exactly what a later paid call would send, on one track.
+   *
+   * It is the one place rule 8 is visible before anything is sent, so it asks
+   * for the object: the attachments of one future call, in the order their
+   * bytes will travel, which the panel numbers as `Image N = <id> — <rola>`.
+   * Finding that list inside a Polish sentence would be this client learning
+   * the CLI's text format. Without `--artifact` it is the plan alone; with one,
+   * that artifact's whole composed text comes with it.
+   */
+  showSendPlan: (one: TrackRef & { readonly artifact: string }): readonly string[] => [
+    "prompt-package",
+    "show",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...flag("--artifact", one.artifact),
+    "--json",
   ],
 } as const satisfies Record<string, (one: Everything) => readonly string[]>;
 
@@ -267,7 +349,7 @@ export const INTENTS = {
  * words the terminal would have printed, and the command under the button is
  * the one a person would have typed.
  */
-export function buyScreenplay(preview: Preview): readonly string[] {
+export function buy(preview: Preview): readonly string[] {
   if (!preview.argv.includes("--dry-run")) {
     throw new NotPreviewedError("kupić można wyłącznie to, co pokazała próba --dry-run");
   }

@@ -29,7 +29,11 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
-- **Płatne wywołanie etapu 1**: pola modelu, limitu tokenów i nowej próby, przycisk
+- **Panele etapów 3 i 4**, na tym samym wzorcu: werdykt, dryf wejść, treść
+  `shot-list.md` albo manifestu pakietu, „Sprawdź", „Zatwierdź" i płatne wywołanie
+  w dwóch krokach z rachunkiem w wywołaniach.
+- **Plan wysyłki etapu 4** per tor: patrz niżej.
+- **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
 
 Komórki pozostałych etapów są na razie wierszami bez panelu: każdy etap dostaje swój
@@ -55,6 +59,24 @@ Jedyne pole, którego ten panel nie zastępuje, to `project.md`: zasady wspólne
 człowiek w edytorze, bo to jedyny artefakt tego narzędzia pisany ręcznie. Wywiadu też tu
 nie ma — prowadzą go skille `prepare-project` i `develop-series` w terminalu.
 
+## Plan wysyłki, czyli reguła 8 na ekranie
+
+Panel etapu 4 ma jedną rzecz, której nie ma żaden panel tekstowy: **plan wysyłki per tor**.
+Bierze się z `prompt-package show --track <tor> --json`, jest darmowy i niczego nie wysyła.
+
+Jest tam, bo to pierwsze miejsce, w którym widać regułę 8: prompt do modelu obrazu albo
+wideo to tekst **plus uporządkowane załączniki adresowane po pozycji**. Pakiet nie nazywa
+toru, niesie `hero:ewa` i `R01`, a w jaki plik one się zamieniają, rozstrzyga dopiero etap
+wysyłający, per tor. Panel numeruje więc listę sam, `Image N = <id> — <rola>`, i dlatego
+pyta o obiekt zamiast czytać zdanie: liczba i kolejność to dokładnie to, co trzeba
+zobaczyć, zanim cokolwiek poleci.
+
+Bez wskazania artefaktu to sam plan: co pakiet planuje na tym torze, ile referencji niesie
+każde przyszłe wywołanie, w jakim są stanie i co je blokuje. Ze wskazanym artefaktem
+dochodzi **cały złożony tekst**, czyli plik z `prompts/` razem z tym, co dokleja do niego
+etap wysyłający. Dlatego resolver artefaktów nie serwuje `prompts/**`: stamtąd
+dostałbyś połowę promptu, a `show` daje całość.
+
 ## Przyciski, czyli komendy
 
 Pod każdym przyciskiem stoi komenda, którą on uruchamia, w tej samej postaci, którą
@@ -62,9 +84,10 @@ przyjmuje terminal. To nie ozdoba: pipeline prowadzą też agenci, więc to, co 
 musi dać się wkleić. Całą gramatykę CLI zna jeden plik (`src/ui/commands.ts`), a test
 sprawdza każde zbudowane `argv` względem `--help` tą samą metodą, co test dokumentacji.
 
-„Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów**, a
-scenariusz czeka na przyjęcie. Przycisk, któremu CLI i tak by odmówiło, uczy człowieka,
-że ekran kłamie.
+„Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów**, a artefakt
+czeka na przyjęcie. Przycisk, któremu CLI i tak by odmówiło, uczy człowieka, że ekran
+kłamie. Ten warunek jest napisany **raz**, w `ui/panel.tsx`, a nie w każdym panelu: trzy
+etapy tekstowe stosują go co do pola, więc trzy kopie zrobiłyby z reguły przypadek.
 
 ## Zakup w dwóch krokach
 

@@ -22,8 +22,33 @@ pnpm dev check dzielna-ewa 01-burza
 pnpm dev approve dzielna-ewa 01-burza --stage prompt-package --note "graf się zgadza"
 ```
 
-Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 32 000),
+Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 32 000), `--json`,
 `--regenerate`, `--republish` (publikuje zapisaną odpowiedź, nic nie wysyła).
+
+## Etap 4 jako obiekt
+
+`--json` wypisuje **obiekt, który zwraca moduł etapu**, plus pola `command` i `stage`:
+
+```bash
+pnpm dev check dzielna-ewa 01-burza --stage prompt-package --json
+pnpm dev approve dzielna-ewa 01-burza --stage prompt-package --json
+pnpm dev prompt-package generate dzielna-ewa 01-burza --dry-run --json
+pnpm dev prompt-package show dzielna-ewa 01-burza --track gpt-image --json
+```
+
+`--stage prompt-package` zawęża `check` do tego etapu, tak samo jak `--stage shot-list`
+zawęża go do [etapu 3](03-lista-ujec.md). Raport `generate` niesie `paidCalls`, rachunek
+w wywołaniach, zawsze jeden albo zero.
+
+`show --json` wypisuje **plan wysyłki**: to jedyne miejsce, w którym regułę 8 widać, zanim
+cokolwiek poleci. Każdy przyszły płatny kadr ma tu swoje załączniki w kolejności, w jakiej
+żądanie poniesie bajty, więc panel etapu 4 układa z tego listę `Image N = <id> — <rola>`
+per tor, a nie szuka jej w tekście.
+
+Jedno pole planu **nie wchodzi** do JSON-a: `bytes`. Załącznik niesie bajty dla etapu,
+który je wyśle, a dokument JSON bajtów nie ma; serializacja bufora wstawiłaby megabajt
+liczb dziesiętnych do planu, który ktoś chciał przeczytać. Plik identyfikuje tu `sha256`,
+dokładnie tak jak wszędzie indziej w tym potoku.
 
 ## Podgląd tego, co poleci do modelu obrazu
 

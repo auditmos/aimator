@@ -153,7 +153,7 @@ describe("--json on a stage that has no object yet", () => {
       PROJECT,
       EPISODE,
       "--stage",
-      "shot-list",
+      "references",
       "--json",
       "--dry-run",
       "--workspace",

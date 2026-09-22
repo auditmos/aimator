@@ -1,7 +1,9 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
 import { Ladder } from "./ladder";
 import { PreparePanel } from "./prepare";
+import { PromptPackagePanel } from "./prompt-package";
 import { ScreenplayPanel } from "./screenplay";
+import { ShotListPanel } from "./shot-list";
 import { ThemeSelect } from "./theme";
 import type {
   EpisodeStatus,
@@ -42,8 +44,39 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  * arrives. A row nobody can open says so by being a row, which is more honest
  * than a panel apologising for being empty.
  */
+const PANELLED = new Set([0, 1, 3, 4]);
+
 function openable(cell: StatusCell): boolean {
-  return cell.stage === 0 || cell.stage === 1;
+  return PANELLED.has(cell.stage);
+}
+
+interface PanelProps {
+  readonly cell: StatusCell;
+  readonly episodeId: string;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}
+
+/**
+ * Which stage's panel the open cell gets, and nothing else.
+ *
+ * One `if` per stage rather than a lookup table, because a panel is a
+ * component with its own props and a table of them would be a type that means
+ * nothing. Stage 0 is not here: it is the one panel that has to exist before
+ * there is a cell to open.
+ */
+function StagePanel(props: PanelProps): JSX.Element | null {
+  if (props.cell.stage === 1) {
+    return <ScreenplayPanel {...props} />;
+  }
+
+  if (props.cell.stage === 3) {
+    return <ShotListPanel {...props} />;
+  }
+
+  return props.cell.stage === 4 ? <PromptPackagePanel {...props} /> : null;
 }
 
 /**
@@ -347,8 +380,8 @@ export function App(): JSX.Element {
             running={running}
           />
         ) : null}
-        {panel === null || panel.stage !== 1 || projectId === null || episodeId === null ? null : (
-          <ScreenplayPanel
+        {panel === null || projectId === null || episodeId === null ? null : (
+          <StagePanel
             cell={panel}
             episodeId={episodeId}
             onRun={start}

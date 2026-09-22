@@ -26,10 +26,31 @@ interface LocatedArtifact {
 const ARTIFACTS: Readonly<
   Record<string, Readonly<Record<string, (episode: EpisodePaths) => LocatedArtifact>>>
 > = {
+  /**
+   * Stage 4's manifest, and only the manifest.
+   *
+   * The tree under `prompts/` is deliberately not here, and not because it
+   * would be hard: what stage 4 publishes is **half** a prompt, and the other
+   * half is composed by the stage that sends it. `prompt-package show` is the
+   * whole one, free, per track, so a panel that served the raw file would be
+   * showing a person less than the command already gives them.
+   */
+  "prompt-package": {
+    manifest: (episode) => ({
+      contentType: "application/json; charset=utf-8",
+      path: episode.promptPackage,
+    }),
+  },
   screenplay: {
     screenplay: (episode) => ({
       contentType: "text/markdown; charset=utf-8",
       path: episode.screenplay,
+    }),
+  },
+  "shot-list": {
+    "shot-list": (episode) => ({
+      contentType: "text/markdown; charset=utf-8",
+      path: episode.shotList,
     }),
   },
 };

@@ -293,6 +293,13 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--track",
     T,
   ],
+  "  check <id> <episode-id> --stage prompt-package [--json]": [
+    "check",
+    ...ON,
+    "--stage",
+    "prompt-package",
+    "--json",
+  ],
   "  check <id> <episode-id> --stage references --track <tor>": [
     "check",
     ...ON,
@@ -306,6 +313,13 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     ...ON,
     "--stage",
     "screenplay",
+    "--json",
+  ],
+  "  check <id> <episode-id> --stage shot-list [--json]": [
+    "check",
+    ...ON,
+    "--stage",
+    "shot-list",
     "--json",
   ],
   "  check <id> <episode-id> --stage sound-design [--track <tor>]": [
@@ -423,7 +437,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "gpt-6-astra",
     "--dry-run",
   ],
-  "  prompt-package show <id> <episode-id> --track <tor>": [
+  "  prompt-package show <id> <episode-id> --track <tor> [--json]": [
     "prompt-package",
     "show",
     ...ON,

@@ -22,8 +22,29 @@ pnpm dev check dzielna-ewa 01-burza
 pnpm dev approve dzielna-ewa 01-burza --stage shot-list --note "plan trzyma się kupy"
 ```
 
-Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 24 000),
+Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 24 000), `--json`,
 `--regenerate`.
+
+## Etap 3 jako obiekt
+
+`--json` wypisuje **obiekt, który zwraca moduł etapu**, bez osobnego formatu, plus pola
+`command` i `stage`:
+
+```bash
+pnpm dev check dzielna-ewa 01-burza --stage shot-list --json
+pnpm dev approve dzielna-ewa 01-burza --stage shot-list --json
+pnpm dev shot-list generate dzielna-ewa 01-burza --dry-run --json
+```
+
+`--stage shot-list` zawęża `check` do tego etapu. Bez tej flagi `check <id> <episode-id>`
+skleja werdykty etapów 0, 1, 3 i 4 w jeden tekst, którego nie da się rozłożyć z powrotem:
+dobre pytanie dla człowieka przy terminalu, nieczytelne dla panelu.
+
+Raport `generate` niesie `paidCalls`, czyli **rachunek w wywołaniach**. Zawsze jeden albo
+zero, i właśnie dlatego wart wypisania: pytanie przed kliknięciem brzmi „czy to zaraz kupi
+listę ujęć, czy powie, że nie może". Tekst drukuje tę samą liczbę
+(`płatnych wywołań do wykonania`), a [panel etapu 3](../ui.md) stawia ją obok przycisku,
+który płaci, zamiast szukać jej w polskim zdaniu.
 
 Jeśli `--max-clip` nie zostało jeszcze podjęte w [etapie 0](00-przygotowanie.md), zrób to
 teraz, bo bez tej liczby promptu nie da się złożyć:

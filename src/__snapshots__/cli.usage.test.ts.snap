@@ -247,6 +247,59 @@ Odcinek "01-burza", tor gpt-image, etap 6, zatwierdzony
 Dalej: etap 6 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 7, klipy"
 `;
 
+exports[`every command >   check <id> <episode-id> --stage prompt-package [--json] 1`] = `
+"ok
+{
+  "command": "check",
+  "stage": "prompt-package",
+  "approved": true,
+  "inputsChanged": [],
+  "problems": [],
+  "status": "completed",
+  "verdict": {
+    "clips": [
+      {
+        "id": "C01",
+        "referenceIds": [
+          "hero:ewa",
+          "hero:tata",
+          "R01"
+        ]
+      },
+      {
+        "id": "C02",
+        "referenceIds": [
+          "hero:ewa",
+          "hero:tata",
+          "R01"
+        ]
+      }
+    ],
+    "opening": {
+      "referenceIds": [
+        "hero:ewa",
+        "R01"
+      ]
+    },
+    "references": [
+      {
+        "dependsOn": [
+          "hero:ewa"
+        ],
+        "id": "R01",
+        "kind": "location",
+        "subject": "Living room, evening"
+      }
+    ],
+    "review": "Do rozstrzygnięcia: skala alpaki.",
+    "heroes": [
+      "ewa",
+      "tata"
+    ]
+  }
+}"
+`;
+
 exports[`every command >   check <id> <episode-id> --stage references --track <tor> 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 5, zatwierdzony w całości
@@ -269,6 +322,126 @@ exports[`every command >   check <id> <episode-id> --stage screenplay [--json] 1
     "maxSceneSeconds": 15,
     "minimumScenes": 2,
     "scenes": 3
+  }
+}"
+`;
+
+exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`] = `
+"ok
+{
+  "command": "check",
+  "stage": "shot-list",
+  "approved": true,
+  "inputsChanged": [],
+  "problems": [],
+  "status": "completed",
+  "verdict": {
+    "castSeen": [
+      "ewa",
+      "tata"
+    ],
+    "clips": [
+      {
+        "end": 15,
+        "id": "C01",
+        "reference": "opening-frame",
+        "shots": [
+          "U01",
+          "U02"
+        ],
+        "start": 0,
+        "text": "### C01 | 0-15s\\n\\n- Shots: U01,U02\\n- Reference: opening-frame\\n- Continuity: Ewa przy stole."
+      },
+      {
+        "end": 30,
+        "id": "C02",
+        "reference": "previous-end-frame",
+        "shots": [
+          "U03",
+          "U04"
+        ],
+        "start": 15,
+        "text": "### C02 | 15-30s\\n\\n- Shots: U03,U04\\n- Reference: previous-end-frame\\n- Continuity: Ewa siedzi, tata obok."
+      }
+    ],
+    "durationSeconds": 30,
+    "longestClipSeconds": 15,
+    "maxClipSeconds": 15,
+    "scenes": [
+      {
+        "end": 10,
+        "hasText": false,
+        "id": "S01",
+        "seconds": 10,
+        "start": 0
+      },
+      {
+        "end": 20,
+        "hasText": false,
+        "id": "S02",
+        "seconds": 10,
+        "start": 10
+      },
+      {
+        "end": 30,
+        "hasText": false,
+        "id": "S03",
+        "seconds": 10,
+        "start": 20
+      }
+    ],
+    "shots": [
+      {
+        "cast": [
+          "ewa"
+        ],
+        "clip": "C01",
+        "end": 10,
+        "hasText": false,
+        "id": "U01",
+        "scene": "S01",
+        "start": 0,
+        "text": "### U01 | S01 | C01 | 0-10s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: ewa\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
+      },
+      {
+        "cast": [
+          "ewa",
+          "tata"
+        ],
+        "clip": "C01",
+        "end": 15,
+        "hasText": false,
+        "id": "U02",
+        "scene": "S02",
+        "start": 10,
+        "text": "### U02 | S02 | C01 | 10-15s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: ewa,tata\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
+      },
+      {
+        "cast": [
+          "tata"
+        ],
+        "clip": "C02",
+        "end": 20,
+        "hasText": false,
+        "id": "U03",
+        "scene": "S02",
+        "start": 15,
+        "text": "### U03 | S02 | C02 | 15-20s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: tata\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
+      },
+      {
+        "cast": [
+          "ewa",
+          "tata"
+        ],
+        "clip": "C02",
+        "end": 30,
+        "hasText": false,
+        "id": "U04",
+        "scene": "S03",
+        "start": 20,
+        "text": "### U04 | S03 | C02 | 20-30s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: ewa,tata\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
+      }
+    ]
   }
 }"
 `;
@@ -678,6 +851,7 @@ Dalej: aimator check ewa"
 exports[`every command >   prompt-package generate <id> <episode-id> [--model <id>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Pakiet promptów ewa/01-burza
+  płatnych wywołań do wykonania: 1
   OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga
   obrazy postaci nie są wysyłane: pakiet jest wspólny dla obu torów, więc niesie same identyfikatory hero:<id>
 Dalej: aimator prompt-package generate ewa 01-burza
@@ -943,7 +1117,7 @@ Sprawdzono sumy czasów. Plan wymaga oceny.
 "
 `;
 
-exports[`every command >   prompt-package show <id> <episode-id> --track <tor> 1`] = `
+exports[`every command >   prompt-package show <id> <episode-id> --track <tor> [--json] 1`] = `
 "ok
 Pakiet promptów ewa/01-burza, tor gpt-image, nic nie wysłano, nic nie zapisano
   kadr 2816x1584 (16:9); tor przyjmuje najwyżej 16 referencji; składacz w wersji 1
@@ -1188,6 +1362,7 @@ Ewa boi się burzy.
 exports[`every command >   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Lista ujęć ewa/01-burza
+  płatnych wywołań do wykonania: 1
   OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga
 Dalej: aimator shot-list generate ewa 01-burza
 

@@ -8,7 +8,9 @@ import {
   type ShotListStatus,
 } from "../../lib/shot-list/index.js";
 import {
+  type Answer,
   type Approval,
+  asJson,
   type EpisodeScope,
   MODEL_ID,
   maxOutputTokensOf,
@@ -23,7 +25,10 @@ import {
 /** Stage 3: the shot list, shared by both tracks and named by neither. */
 export const USAGE = `Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
-                                       [--dry-run] [--regenerate]`;
+                                       [--dry-run] [--json] [--regenerate]`;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "shot-list";
 
 /**
  * The shot list is two to three times the length of the screenplay it plans:
@@ -47,9 +52,13 @@ function renderShotListGenerate(
     mode === "dry-run"
       ? [
           `Próba na sucho: nic nie zapisano, nic nie wysłano. Lista ujęć ${projectId}/${episodeId}`,
+          `  płatnych wywołań do wykonania: ${report.paidCalls}`,
           "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
         ]
-      : [`Lista ujęć ${projectId}/${episodeId}, próba ${report.runId ?? ""}`];
+      : [
+          `Lista ujęć ${projectId}/${episodeId}, próba ${report.runId ?? ""}`,
+          `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+        ];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -125,6 +134,7 @@ export async function runShotList(argv: readonly string[]): Promise<Result<strin
   }
 
   const parsed = parse(argv.slice(1), {
+    json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -172,26 +182,47 @@ export async function runShotList(argv: readonly string[]): Promise<Result<strin
     workspace: workspace.data,
   });
 
-  return result.ok
-    ? ok(renderShotListGenerate(result.data, projectId.data, episodeId.data, mode))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  // The stage is named by this command's own first word, so there is no
+  // spelling of `--json` here that could hand a caller Polish sentences.
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderShotListGenerate(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
-/** The stage-3 half of `check <id> <episode-id>`. */
-export async function checkShotListStage(scope: EpisodeScope): Promise<Result<string>> {
+/**
+ * The stage-3 half of `check <id> <episode-id>`, in prose or as the object.
+ *
+ * What to print travels in rather than being defaulted, for stage 1's reason:
+ * both callers sit in `check.ts`, the wide question renders prose and the
+ * narrow one renders whichever the flag asked for.
+ */
+export async function checkShotListStage(
+  scope: EpisodeScope,
+  answer: Answer
+): Promise<Result<string>> {
   const result = await checkShotList(scope);
 
-  return result.ok
-    ? ok(
-        renderShotList(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderShotList(
           `Odcinek "${scope.episodeId}", etap 3: ${result.data.status}${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data,
           scope.projectId,
           scope.episodeId,
           "apply"
         )
-      )
-    : result;
+  );
 }
 
 /** `approve --stage shot-list`: the whole plan, bound to its digest. */
@@ -207,15 +238,19 @@ export async function approveShotListStage(
 
   const result = await approveShotList({ ...approval, episodeId: episodeId.data });
 
-  return result.ok
-    ? ok(
-        renderShotList(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderShotList(
           `Lista ujęć odcinka "${episodeId.data}" zatwierdzona`,
           result.data,
           approval.projectId,
           episodeId.data,
           approval.mode
         )
-      )
-    : result;
+  );
 }

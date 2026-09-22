@@ -1,0 +1,172 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`approve --stage shot-list > should print the stage's own object under --json 1`] = `
+{
+  "approved": true,
+  "command": "approve",
+  "inputsChanged": [],
+  "problems": [],
+  "stage": "shot-list",
+  "status": "completed",
+  "verdict": {
+    "castSeen": [
+      "ewa",
+      "tata",
+    ],
+    "clips": [
+      {
+        "end": 15,
+        "id": "C01",
+        "reference": "opening-frame",
+        "shots": [
+          "U01",
+          "U02",
+        ],
+        "start": 0,
+        "text": "### C01 | 0-15s
+
+- Shots: U01,U02
+- Reference: opening-frame
+- Continuity: Ewa przy stole.",
+      },
+      {
+        "end": 30,
+        "id": "C02",
+        "reference": "previous-end-frame",
+        "shots": [
+          "U03",
+          "U04",
+        ],
+        "start": 15,
+        "text": "### C02 | 15-30s
+
+- Shots: U03,U04
+- Reference: previous-end-frame
+- Continuity: Ewa siedzi, tata obok.",
+      },
+    ],
+    "durationSeconds": 30,
+    "longestClipSeconds": 15,
+    "maxClipSeconds": 15,
+    "scenes": [
+      {
+        "end": 10,
+        "hasText": false,
+        "id": "S01",
+        "seconds": 10,
+        "start": 0,
+      },
+      {
+        "end": 20,
+        "hasText": false,
+        "id": "S02",
+        "seconds": 10,
+        "start": 10,
+      },
+      {
+        "end": 30,
+        "hasText": false,
+        "id": "S03",
+        "seconds": 10,
+        "start": 20,
+      },
+    ],
+    "shots": [
+      {
+        "cast": [
+          "ewa",
+        ],
+        "clip": "C01",
+        "end": 10,
+        "hasText": false,
+        "id": "U01",
+        "scene": "S01",
+        "start": 0,
+        "text": "### U01 | S01 | C01 | 0-10s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: ewa
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.",
+      },
+      {
+        "cast": [
+          "ewa",
+          "tata",
+        ],
+        "clip": "C01",
+        "end": 15,
+        "hasText": false,
+        "id": "U02",
+        "scene": "S02",
+        "start": 10,
+        "text": "### U02 | S02 | C01 | 10-15s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: ewa,tata
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.",
+      },
+      {
+        "cast": [
+          "tata",
+        ],
+        "clip": "C02",
+        "end": 20,
+        "hasText": false,
+        "id": "U03",
+        "scene": "S02",
+        "start": 15,
+        "text": "### U03 | S02 | C02 | 15-20s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: tata
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.",
+      },
+      {
+        "cast": [
+          "ewa",
+          "tata",
+        ],
+        "clip": "C02",
+        "end": 30,
+        "hasText": false,
+        "id": "U04",
+        "scene": "S03",
+        "start": 20,
+        "text": "### U04 | S03 | C02 | 20-30s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: ewa,tata
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.",
+      },
+    ],
+  },
+}
+`;

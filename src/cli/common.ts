@@ -152,7 +152,7 @@ export type Answer = "json" | "text";
  * command because both commands take the flag and both owe the same answer to
  * "which spellings work", and two lists would disagree the day one grew.
  */
-const JSON_STAGES = ["prepare", "screenplay"] as const;
+const JSON_STAGES = ["prepare", "screenplay", "shot-list", "prompt-package"] as const;
 
 /**
  * What to print, refusing the spellings that would print the wrong thing.
