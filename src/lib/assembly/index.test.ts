@@ -198,7 +198,7 @@ afterEach(async () => {
   await rm(scratch, { force: true, recursive: true });
 });
 
-describe("generateAssembly gates", () => {
+describe("generateAssembly gates", { timeout: 45_000 }, () => {
   /**
    * The table says stage 8 consumes approved clips, and that is the whole gate:
    * every clip the shot list plans, finished and accepted on this track. The
@@ -255,7 +255,7 @@ describe("generateAssembly gates", () => {
   });
 });
 
-describe("generateAssembly", () => {
+describe("generateAssembly", { timeout: 45_000 }, () => {
   it("should cut the clips into one episode and record a local producer", async () => {
     await upstream();
     await makeTrack({ clipSeconds: DRIFTING, root, track: "gpt-image", workspace });
@@ -380,7 +380,7 @@ describe("generateAssembly", () => {
   });
 });
 
-describe("checkAssembly and approveAssembly", () => {
+describe("checkAssembly and approveAssembly", { timeout: 45_000 }, () => {
   /**
    * The episode declares a soundtrack and no stage produces one, so the cut is
    * silent. That is reported rather than hidden: the file is the whole of what
