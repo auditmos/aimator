@@ -958,6 +958,7 @@ Dalej: usuń powyższe przeszkody przed płatnym wywołaniem"
 exports[`every command >   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Scenariusz ewa/01-burza
+  płatnych wywołań do wykonania: 1
   wymagane co najmniej 2 scen, każda 1–15 s, suma dokładnie równa durationSeconds
   OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga
 Dalej: aimator screenplay generate ewa 01-burza

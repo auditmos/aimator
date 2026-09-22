@@ -213,6 +213,48 @@ describe("the ladder", () => {
     await rm(source, { force: true, recursive: true });
   }, 240_000);
 
+  /**
+   * The one thing on this screen that a terminal can change under it.
+   *
+   * A stage writing right now and a stage that has written nothing yet are
+   * identical in every artifact they own, so the lock is the only evidence
+   * there is, which is also why it has to be read **both ways**: a cell that
+   * went to "w toku" and stayed there after the work finished would be worse
+   * than one that never said it, because a person would stop believing the
+   * column. Stage 1 is where it matters first: its lock is held for as long as
+   * a paid call takes to answer.
+   */
+  it("should follow stage 1's lock into work in progress and back out of it", async () => {
+    const project = projectPaths(workspace, PROJECT);
+
+    if (!project.ok) {
+      throw project.error;
+    }
+
+    const episode = episodePaths(project.data, EPISODE);
+
+    if (!episode.ok) {
+      throw episode.error;
+    }
+
+    const held = episode.data.screenplayLock;
+    const before = await json("status", PROJECT, EPISODE);
+
+    await writeFile(held, "", "utf8");
+
+    const during = await json("status", PROJECT, EPISODE);
+
+    await rm(held, { force: true });
+
+    const after = await json("status", PROJECT, EPISODE);
+    const stage1 = (reported: Episode): string | undefined =>
+      reported.cells.find((one) => one.id === "1")?.state;
+
+    expect(stage1(during)).toBe("running");
+    expect(stage1(after)).toBe(stage1(before));
+    expect(stage1(after)).not.toBe("running");
+  });
+
   it("should read a stage's lock file as work in progress, on that track alone", async () => {
     const project = projectPaths(workspace, PROJECT);
 

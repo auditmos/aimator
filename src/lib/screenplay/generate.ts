@@ -46,6 +46,14 @@ export interface ScreenplayReport {
   readonly created: readonly string[];
   readonly minimumScenes: number;
   readonly nextStep: string;
+  /**
+   * What this command costs, in the unit stage 1 is billed in: calls.
+   *
+   * Always zero or one, which is exactly why it is worth returning. The
+   * question a dry run answers is whether the command is about to buy a
+   * screenplay or to say it cannot, and the two answers are 1 and 0.
+   */
+  readonly paidCalls: number;
   readonly problems: readonly string[];
   /** `--dry-run` only: the exact text a paid call would send. */
   readonly prompt: string | null;
@@ -148,6 +156,7 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
         problems.length === 0
           ? `aimator screenplay generate ${input.projectId} ${input.episodeId}`
           : "usuń powyższe przeszkody przed płatnym wywołaniem",
+      paidCalls: problems.length === 0 ? 1 : 0,
       problems,
       prompt,
       ready: problems.length === 0,
@@ -186,6 +195,9 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
     created: attempt.data.created,
     minimumScenes: required,
     nextStep: `oceń scenariusz, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`,
+    // One screenplay costs one call, whether this invocation made it or
+    // finished an attempt whose answer was already on disk and already paid.
+    paidCalls: 1,
     problems: [],
     prompt: null,
     ready: true,

@@ -279,6 +279,47 @@ describe("screenplay generate", () => {
     expect(result.text).toContain("Ewa boi się burzy.");
   });
 
+  /**
+   * A preview that does not say what it would cost is only half a preview.
+   *
+   * Stage 1 buys one call and stages 5 and 6 buy several, so the number and
+   * the words around it are the same everywhere: what a person reads before
+   * spending should not change shape from row to row.
+   */
+  it("should say how many paid calls it is about to make", async () => {
+    await approvedProject();
+    const result = await cli("screenplay", "generate", "demo", "01-burza", "--dry-run");
+
+    expect(result.text).toContain("płatnych wywołań do wykonania: 1");
+  });
+
+  /**
+   * The preview as an object, because a screen has to arrange it rather than
+   * read it.
+   *
+   * The prose above is written for a person at a terminal and cannot be taken
+   * back apart: a panel that showed the bill beside the button that spends it
+   * would have to find the number inside a Polish sentence, which is the
+   * client learning this tool's text format. So `--json` prints what
+   * `generateScreenplay` already returns, plus the two words that say which
+   * command wrote it, exactly as `check` and `approve` do.
+   */
+  it("should print the stage's own object for --json", async () => {
+    await approvedProject();
+    const result = await cli("screenplay", "generate", "demo", "01-burza", "--dry-run", "--json");
+    const report = JSON.parse(result.text) as {
+      command: string;
+      paidCalls: number;
+      prompt: string;
+      stage: string;
+    };
+
+    expect(report.command).toBe("generate");
+    expect(report.stage).toBe("screenplay");
+    expect(report.paidCalls).toBe(1);
+    expect(report.prompt).toContain("# Task: write a screenplay");
+  });
+
   it("should write nothing during a dry run", async () => {
     await approvedProject();
     await cli("screenplay", "generate", "demo", "01-burza", "--dry-run");

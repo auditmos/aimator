@@ -25,7 +25,7 @@ import {
 /** Stage 1: the screenplay, the first command that spends money. */
 export const USAGE = `Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
-                                        [--dry-run] [--regenerate]`;
+                                        [--dry-run] [--json] [--regenerate]`;
 
 /**
  * `--dry-run` prints the prompt itself, not a byte count. The whole point of
@@ -41,10 +41,14 @@ function renderGenerate(
     mode === "dry-run"
       ? [
           `Próba na sucho: nic nie zapisano, nic nie wysłano. Scenariusz ${projectId}/${episodeId}`,
+          `  płatnych wywołań do wykonania: ${report.paidCalls}`,
           `  wymagane co najmniej ${report.minimumScenes} scen, każda 1–15 s, suma dokładnie równa durationSeconds`,
           "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
         ]
-      : [`Scenariusz ${projectId}/${episodeId}, próba ${report.runId ?? ""}`];
+      : [
+          `Scenariusz ${projectId}/${episodeId}, próba ${report.runId ?? ""}`,
+          `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+        ];
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);
@@ -104,6 +108,7 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
   }
 
   const parsed = parse(argv.slice(1), {
+    json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -151,7 +156,20 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderGenerate(result.data, projectId.data, episodeId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  // `answerOf` is deliberately not asked here, and the difference is the whole
+  // reason it exists: `check` and `approve` answer for eleven stages, so they
+  // have to refuse the spellings whose stage has no object yet. This command
+  // names its stage in its own first word, so there is no `--json` here that
+  // could hand a caller Polish sentences after it asked for an object.
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderGenerate(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /** `--model` wins over the environment; neither has a default. */

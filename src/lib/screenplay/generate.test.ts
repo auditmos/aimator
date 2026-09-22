@@ -208,6 +208,21 @@ describe("generateScreenplay --dry-run", () => {
     expect(prompt).toContain("Zasady.");
   });
 
+  /**
+   * The bill, in the unit this stage is billed in.
+   *
+   * Stage 1 buys exactly one call, which is precisely why the count is worth
+   * returning: what a person asks a dry run is whether this command is about
+   * to buy a screenplay or to tell them it cannot, and zero and one are two
+   * different answers to that question. The stages that already draw several
+   * images print the same number under the same name.
+   */
+  it("should count the one paid call it would make", async () => {
+    const result = await generate({ mode: "dry-run" });
+
+    expect(result.ok ? result.data.paidCalls : null).toBe(1);
+  });
+
   it("should touch neither the network nor the workspace", async () => {
     await generate({ mode: "dry-run" });
 
@@ -225,7 +240,7 @@ describe("generateScreenplay --dry-run", () => {
     expect(result.ok ? result.data.prompt : null).toContain("# Task:");
   });
 
-  it("should report a missing stage-0 approval while still showing the prompt", async () => {
+  it("should report a missing stage-0 approval, bill nothing, and still show the prompt", async () => {
     await rm(root, { force: true, recursive: true });
     root = await mkdtemp(join(tmpdir(), "aimator-ws-"));
     const resolved = resolveWorkspace(root);
@@ -237,6 +252,7 @@ describe("generateScreenplay --dry-run", () => {
     expect(result.ok ? result.data.problems.join("\n") : "").toContain("approved");
     expect(result.ok ? result.data.prompt : null).toContain("# Task:");
     expect(result.ok ? result.data.ready : true).toBe(false);
+    expect(result.ok ? result.data.paidCalls : null).toBe(0);
   });
 });
 

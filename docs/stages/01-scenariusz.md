@@ -17,13 +17,26 @@ równolegle.
 
 ```bash
 pnpm dev screenplay generate dzielna-ewa 01-burza --dry-run
+pnpm dev screenplay generate dzielna-ewa 01-burza --dry-run --json
 pnpm dev screenplay generate dzielna-ewa 01-burza
 pnpm dev check dzielna-ewa 01-burza
 pnpm dev check dzielna-ewa 01-burza --stage screenplay
 pnpm dev approve dzielna-ewa 01-burza --stage screenplay --note "rytm się zgadza"
 ```
 
-Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>`, `--regenerate`.
+Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>`, `--json`, `--regenerate`.
+
+## Dwa kroki i rachunek
+
+Etap kupuje dokładnie jedno wywołanie tekstowe i mówi to, zanim cokolwiek wyśle:
+`--dry-run` wypisuje `płatnych wywołań do wykonania: 1`, a przy przeszkodzie `0`, bo zero
+i jeden to dwie różne odpowiedzi na pytanie, czy ta komenda zaraz kupi scenariusz. Po
+zakupie ten sam wiersz brzmi `płatnych wywołań wykonanych`.
+
+Rachunek jest w **jednostkach, nie w dolarach**, i to jest decyzja, nie niedoróbka:
+dostawcy nie wystawiają cennika przez API, więc lokalna tabela cen byłaby utrzymaniem bez
+właściciela i liczbą, której nikt nie weryfikuje. Wywołania są tym, co ten CLI naprawdę
+liczy.
 
 ## Sam etap 1, i odpowiedź jako obiekt
 
@@ -61,6 +74,14 @@ Flaga jest odmową, a nie cichym powrotem do tekstu: `--json` bez `--stage scree
 kończy się błędem użycia, bo wołający, który poprosił o obiekt i dostał polskie zdania,
 został okłamany przez flagę. Kolejne etapy dostają `--json` po kolei, każdy razem ze swoim
 panelem w [lokalnym UI](../ui.md).
+
+`screenplay generate --json` wypisuje raport tej komendy tym samym sposobem, z polami
+`command: "generate"` i `stage: "screenplay"`. Odmowy tu nie ma i nie może być: `check`
+i `approve` odpowiadają za jedenaście etapów, więc muszą odrzucić pisownię, której etap
+nie umie jeszcze odpowiedzieć obiektem, a ta komenda nazywa swój etap własnym pierwszym
+słowem. Przy `--dry-run` raport niesie `prompt` i `paidCalls`, przy zakupie `runId` i
+listę zapisanych plików. Panel etapu 1 czyta właśnie ten obiekt, żeby postawić rachunek
+obok przycisku, który płaci, zamiast szukać liczby w polskim zdaniu.
 
 ## Model i klucz
 
