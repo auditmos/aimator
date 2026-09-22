@@ -48,13 +48,13 @@ nie ma czego zatwierdzić: pełnej ścieżki nie złożono na torze gpt-image
   - nie ma arkusza cue, uruchom najpierw: sound-design generate"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] [--json] 1`] = `
 "NarrationStateError
 nie ma czego zatwierdzić: script
   - nikt nie obsadził narratora, wskaż głos przez: aimator project voice ewa --voice-id <id>"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage soundtrack --track <tor> 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage soundtrack --track <tor> [--json] 1`] = `
 "NarrationStateError
 nie ma czego zatwierdzić: narracji nie położono na torze gpt-image
   - nie ma skryptu narracji, uruchom najpierw: narration generate"
@@ -456,7 +456,7 @@ Odcinek "01-burza", tor gpt-image, etap 10, pełna ścieżka
 Dalej: aimator sound-design mix ewa 01-burza --track gpt-image"
 `;
 
-exports[`every command >   check <id> <episode-id> --stage soundtrack [--track <tor>] 1`] = `
+exports[`every command >   check <id> <episode-id> --stage soundtrack [--track <tor>] [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 9, miks
   narrated: absent, jeszcze nie zmiksowany

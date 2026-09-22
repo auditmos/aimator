@@ -88,7 +88,7 @@ Etap 8. Montaż (darmowy; per tor, jeden artefakt):
 Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
   narration generate <id> <episode-id> [--model <id>] [--voice-model <id>]
                      [--max-output-tokens <n>] [--artifact script|N01[,N02]]
-                     [--dry-run] [--regenerate]
+                     [--dry-run] [--json] [--regenerate]
     Podnosi narrację z zatwierdzonej listy ujęć i kupuje ją głosem z project.json.
     Narracji nie pisze: każde zdanie musi wystąpić dosłownie w polu Audio swojego
     ujęcia, a walidator to sprawdza, jeśli film ma powiedzieć coś nowego,
@@ -96,7 +96,7 @@ Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
     głos czytający zdanie nie wie, nad którym filmem usiądzie.
     ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
   narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]
-                      [--similarity <0-1>] [--speaker-boost] [--dry-run]
+                      [--similarity <0-1>] [--speaker-boost] [--dry-run] [--json]
     Jak narrator serii CZYTA. Bez tej decyzji każde wywołanie szło na domyślnych
     ustawieniach dostawcy, stability 0.5 i style 0, które sam dostawca opisuje
     jako skłonne do monotonii; płaskie brzmienie nie było wadą głosu, tylko
@@ -106,7 +106,7 @@ Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
     unieważnia dokładnie te nagrania, które powstały pod starym brzmieniem.
     Głos to obsada (etap 0), sposób czytania to reżyseria (etap 9).
   narration mix <id> <episode-id> --track <gpt-image|seedream>
-                [--dry-run] [--regenerate]
+                [--dry-run] [--json] [--regenerate]
     Kładzie przyjęte kwestie na zatwierdzonym episode.mp4 i zapisuje
     <tor>/narrated.mp4. Obraz idzie kopią strumieniową, episode.mp4 nie jest
     nadpisywany ani przekodowywany. Kotwice z planu przelicza na oś TEGO toru,
@@ -176,7 +176,7 @@ Wspólne:
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
   check <id> <episode-id> --stage assembly --track <tor> [--json]
-  check <id> <episode-id> --stage soundtrack [--track <tor>]
+  check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]
   check <id> <episode-id> --stage sound-design [--track <tor>]
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>] [--json]
@@ -188,8 +188,8 @@ Wspólne:
   approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
                [--json]
   approve <id> <episode-id> --stage assembly --track <tor> [--json]
-  approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]
-  approve <id> <episode-id> --stage soundtrack --track <tor>
+  approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] [--json]
+  approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02]
   approve <id> <episode-id> --stage sound-design --track <tor>
 
@@ -200,9 +200,9 @@ Wspólne:
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve na razie wyłącznie z --stage prepare, screenplay,
                shot-list, prompt-package, character, references, opening-frame,
-               clips albo assembly, a z komend etapu na razie wyłącznie na
-               etapach 0–8; kolejne etapy dostają go po kolei razem ze swoim
-               panelem w UI
+               clips, assembly albo soundtrack, a z komend etapu na razie
+               wyłącznie na etapach 0–9; kolejne etapy dostają go po kolei
+               razem ze swoim panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

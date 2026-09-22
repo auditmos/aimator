@@ -235,6 +235,90 @@ export interface AssemblyReport {
 }
 
 /**
+ * One thing stage 9 reviewed: the script, one recording, or one track's mix.
+ *
+ * Three different artifacts under one shape, because stage 9 reviews all three
+ * the same way and only two of them are audible. `characters` is the bill this
+ * provider actually charges in, carried on the artifact rather than derived
+ * from the text, and `seconds` is what the bought bytes turned out to run.
+ */
+export interface LineState {
+  readonly approved: boolean;
+  readonly characters: number;
+  readonly id: string;
+  /** Recorded inputs whose bytes on disk no longer match what this line used. */
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  readonly seconds: number | null;
+  readonly state: "absent" | "completed" | "submitted";
+}
+
+/** Stage 9's shared half: the script and every line, with no track anywhere. */
+export interface NarrationStatus {
+  readonly approved: boolean;
+  readonly lines: readonly LineState[];
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly script: LineState;
+  /** The whole bill of the script, whether or not it has been paid yet. */
+  readonly totalCharacters: number;
+}
+
+/** Stage 9's per-track half: one narrated cut, and nothing to narrow it with. */
+export interface MixStatus {
+  readonly approved: boolean;
+  readonly artifact: LineState;
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/**
+ * Stage 9's report, and the first whose bill is **not** the count of calls.
+ *
+ * Both numbers travel because neither alone is what a person is deciding on:
+ * this provider charges for the characters of the text it is handed, so a
+ * panel printing the call count alone would put a number nobody is billed
+ * beside the button that spends. `contextCharacters` rides beside the bill and
+ * never inside it, because the provider does not say whether it charges for
+ * them and this tool does not guess with somebody else's account.
+ */
+export interface NarrationReport {
+  readonly calls: number;
+  readonly characters: number;
+  readonly contextCharacters: number;
+  readonly lines: readonly {
+    readonly characters: number;
+    readonly id: string;
+    readonly note: string;
+    readonly state: string;
+  }[];
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  /** `--dry-run` only: the exact text the script call would send. */
+  readonly prompt: string | null;
+  /** What would happen to the script itself, which decides what the bill is. */
+  readonly script: { readonly note: string; readonly state: string };
+}
+
+/** Stage 9's per-track report: where each accepted line landed on this film. */
+export interface MixReport {
+  readonly actualSeconds: number;
+  /** The local engine, once it has answered. `null` when it could not be asked. */
+  readonly engine: string | null;
+  readonly lines: readonly {
+    readonly atSeconds: number;
+    readonly id: string;
+    readonly plannedSeconds: number;
+    readonly seconds: number;
+  }[];
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+}
+
+/**
  * What every paid stage's report says that a panel has to show.
  *
  * The bill is deliberately **not** here, and that is the interesting part.

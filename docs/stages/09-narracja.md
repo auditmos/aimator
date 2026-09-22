@@ -25,7 +25,24 @@ pnpm dev approve dzielna-ewa 01-burza --stage soundtrack --track gpt-image
 ```
 
 Dodatkowe flagi: `--model <id>`, `--voice-model <id>`, `--max-output-tokens <n>`,
-`--artifact script|N01[,N02]`, `--regenerate`.
+`--artifact script|N01[,N02]`, `--regenerate`, `--json`.
+
+## `--json`, czyli obiekt na dwóch poziomach
+
+`narration generate`, `narration mix`, `narration direction`, `check --stage soundtrack`
+i `approve --stage soundtrack` przyjmują `--json` i wypisują obiekt etapu zamiast zdań:
+ten sam, który zwraca moduł, plus `command` i `stage`. `command` niesie **podpolecenie**
+(`generate`, `mix`, `direction`), bo jeden etap piszą tutaj trzy gramatyki i jedno słowo
+dla wszystkich odpowiadałoby zgadywaniem na pytanie „która komenda to zapisała".
+
+Poziom rozstrzyga `--track`, i to nie jest zawężenie, tylko **wybór pytania**: bez flagi
+`check` i `approve` odpowiadają o słowach, wspólnych dla obu torów, z flagą — o miksie
+tego toru. Dlatego zatwierdzenie skryptu i zatwierdzenie kwestii to dwie różne komendy
+(`--artifact script` oraz `--artifact N01,N02`), a zatwierdzenie miksu trzecia.
+
+Rachunek w obiekcie stoi w dwóch polach, `calls` i `characters`, i nigdy się ich nie
+sumuje: dostawca liczy znaki, więc liczba wywołań przestaje tu być rachunkiem.
+`contextCharacters` jest **obok** rachunku, nie w nim.
 
 ## Narracja jest podnoszona, nie pisana, i walidator to sprawdza
 

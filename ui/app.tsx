@@ -3,6 +3,7 @@ import { AssemblyPanel } from "./assembly";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
 import { Ladder } from "./ladder";
+import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
@@ -49,7 +50,7 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  * arrives. A row nobody can open says so by being a row, which is more honest
  * than a panel apologising for being empty.
  */
-const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
 function openable(cell: StatusCell): boolean {
   return PANELLED.has(cell.stage);
@@ -112,7 +113,18 @@ function StagePanel(props: PanelProps): JSX.Element | null {
     return <ClipsPanel {...props} />;
   }
 
-  return props.cell.stage === 8 ? <AssemblyPanel {...props} /> : null;
+  if (props.cell.stage === 8) {
+    return <AssemblyPanel {...props} />;
+  }
+
+  // Stage 9 is the first stage with two panels, because its artifacts live at
+  // two levels: the words are shared by both tracks and the mix is not. The
+  // cell's own track is what says which of the two questions this row is.
+  if (props.cell.stage === 9) {
+    return props.cell.track === null ? <NarrationPanel {...props} /> : <MixPanel {...props} />;
+  }
+
+  return null;
 }
 
 /**

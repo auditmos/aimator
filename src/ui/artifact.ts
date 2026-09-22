@@ -9,6 +9,7 @@ import {
   episodeTrackPaths,
   type ImageTrack,
   imageTracks,
+  narrationAudio,
   type ProjectPaths,
   projectPaths,
   referenceImage,
@@ -60,12 +61,22 @@ interface ArtifactRequest {
 const MARKDOWN = "text/markdown; charset=utf-8";
 const PNG = "image/png";
 const MP4 = "video/mp4";
+/**
+ * Stage 9 buys WAV rather than the provider's default MP3, and the browser is
+ * told so: a RIFF header states its own rate and length, which is what lets a
+ * bought line be measured on a machine with no media tools.
+ */
+const WAV = "audio/wav";
 
 /** The one artifact of stage 7 whose id is not simply the clip's. */
 const ENTRY = "entry:";
 
 /** Stage 8's own word for the one thing it makes, as `--artifact` spells it. */
 const EPISODE_CUT = "episode";
+
+/** Stage 9's two words that are not a line's id: the script, and the mix. */
+const SCRIPT = "script";
+const NARRATED = "narrated";
 
 /** What each episode stage publishes, in the stage's own word for it. */
 const UNDER_EPISODE: Readonly<
@@ -193,6 +204,44 @@ function underAssembly(project: ProjectPaths, request: ArtifactRequest): Located
 }
 
 /**
+ * Stage 9: the first stage whose artifacts live at **two levels of the tree**.
+ *
+ * The script and every bought recording are shared between the tracks and
+ * therefore carry no track at all: what their bytes depend on, the text, the
+ * voice and the speech model, does not differ per production. Only the mix
+ * does, because only the mix is timed against a particular cut, so `narrated`
+ * is the one id here that needs a track and the one that refuses without one.
+ *
+ * Getting that backwards would not be a 404; it would be a second copy of a
+ * recording nobody bought, or one film's narration served over the other's
+ * picture. So the level is read off the id rather than off whatever the
+ * caller happened to put in the query.
+ */
+function underSoundtrack(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const episode = episodePaths(project, request.episodeId);
+
+  if (!episode.ok) {
+    return null;
+  }
+
+  if (request.artifact === NARRATED) {
+    const track = trackOf(request);
+
+    return track === null
+      ? null
+      : { contentType: MP4, path: episodeTrackPaths(episode.data, track).narratedVideo };
+  }
+
+  if (request.artifact === SCRIPT) {
+    return { contentType: MARKDOWN, path: episode.data.narrationScript };
+  }
+
+  const line = narrationAudio(episode.data, request.artifact);
+
+  return line.ok ? { contentType: WAV, path: line.data } : null;
+}
+
+/**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
  * It is a function rather than a row in the table above because its artifacts
@@ -249,6 +298,10 @@ export function locateArtifact(
 
   if (request.stage === "assembly") {
     return underAssembly(project.data, request);
+  }
+
+  if (request.stage === "soundtrack") {
+    return underSoundtrack(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

@@ -87,6 +87,23 @@ interface TrackRef extends EpisodeRef {
 }
 
 /**
+ * How the narrator of a series reads: five knobs, none of them a number here.
+ *
+ * Strings for the reason every settings field is one: an empty box means the
+ * flag is not spelled at all and whatever was decided last stands. Coercing
+ * `""` to `0` would be this client dialling `style` down to the flattest value
+ * the provider has, which is precisely the silent default this file exists on
+ * the far side of.
+ */
+interface Delivery extends ProjectRef {
+  readonly similarity: string;
+  readonly speakerBoost: boolean;
+  readonly speed: string;
+  readonly stability: string;
+  readonly style: string;
+}
+
+/**
  * One character as one track draws it, and which of the ten pictures.
  *
  * `artifacts` is a list because the CLI takes one: six references or two views
@@ -140,7 +157,7 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Send, Settings, TrackRef {
+interface Everything extends Delivery, Send, Settings, TrackRef {
   readonly artifact: string;
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
@@ -154,6 +171,8 @@ interface Everything extends Send, Settings, TrackRef {
   readonly title: string;
   readonly videoModel: string;
   readonly voiceId: string;
+  /** Stage 9's second provider: the model that reads, not the one that lifts. */
+  readonly voiceModel: string;
 }
 
 /**
@@ -262,6 +281,52 @@ export const INTENTS = {
     "--track",
     one.track,
     ...artifacts(one.artifacts),
+  ],
+  /**
+   * Stage 9, accepted: this track's narrated cut, and nothing to narrow.
+   *
+   * `--track` here is not a narrowing but the **choice of question**: without
+   * it the same command accepts the words, which are shared by both tracks and
+   * were bought once. That is why there are four stage-9 approvals rather than
+   * one with flags: two levels of the tree, and two decisions at the top one.
+   */
+  approveMix: (one: TrackRef): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "soundtrack",
+    "--track",
+    one.track,
+  ],
+  /**
+   * Stage 9, accepted: recordings, listened to, several at a time.
+   *
+   * A recording is accepted by **hearing** it, exactly as an image is accepted
+   * by looking at one, so several in a sitting is one decision and one command.
+   * It is a different command from the script's for a reason that outlives the
+   * flag: accepting the script is what authorises the buying, and accepting
+   * what came back is a yes about different bytes entirely.
+   */
+  approveNarrationLines: (
+    one: EpisodeRef & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "soundtrack",
+    ...artifacts(one.artifacts),
+  ],
+  /** Stage 9, accepted: the script, which is the gate the recordings wait on. */
+  approveNarrationScript: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "approve",
+    projectId,
+    episodeId,
+    "--stage",
+    "soundtrack",
+    "--artifact",
+    "script",
   ],
   /**
    * Stage 6, accepted: the one frame, and no `--artifact` anywhere near it.
@@ -397,6 +462,24 @@ export const INTENTS = {
     "--track",
     one.track,
   ],
+  /** Stage 9, verified: this track's mix, which is where the words landed. */
+  checkMix: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "soundtrack",
+    "--track",
+    one.track,
+  ],
+  /** Stage 9, verified: the words, shared, with no track to ask about. */
+  checkNarration: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "check",
+    projectId,
+    episodeId,
+    "--stage",
+    "soundtrack",
+  ],
   /** Stage 6, verified: one frame on one track, and nothing to narrow. */
   checkOpeningFrame: (one: TrackRef): readonly string[] => [
     "check",
@@ -461,6 +544,29 @@ export const INTENTS = {
     one.projectId,
     one.characterId,
   ],
+  /**
+   * Stage 9: how the narrator of this series reads, which is direction.
+   *
+   * A project-level command, because a reading recurs between episodes exactly
+   * as a cast does, and one that writes stage 9's own file rather than stage
+   * 0's: `project.json` is a recorded input of nearly everything in the
+   * workspace, so a knob somebody is expected to turn would lapse approvals on
+   * bytes it never touched. The voice is casting and lives there; how that
+   * voice performs is direction and lives here.
+   *
+   * An empty field is not a value, rule 7 at the edge of the screen: the flag
+   * is not spelled at all and whatever was decided last stands.
+   */
+  directNarrator: (one: Delivery): readonly string[] => [
+    "narration",
+    "direction",
+    one.projectId,
+    ...flag("--stability", one.stability),
+    ...flag("--style", one.style),
+    ...flag("--speed", one.speed),
+    ...flag("--similarity", one.similarity),
+    ...(one.speakerBoost ? ["--speaker-boost"] : []),
+  ],
   /** Stage 0: the project itself, which is where an empty workspace starts. */
   initProject: (
     one: ProjectRef & { readonly aspectRatio: string; readonly title: string }
@@ -471,6 +577,25 @@ export const INTENTS = {
     "--title",
     one.title,
     ...flag("--aspect-ratio", one.aspectRatio),
+  ],
+  /**
+   * Stage 9's per-track half: it buys nothing, so it has no preview.
+   *
+   * Like stage 8 it needs a program on this machine rather than a provider,
+   * and unlike stage 8 it has nothing to show before running: where each line
+   * lands is arithmetic over a film that already exists, and the report says
+   * it afterwards. A line that would talk over the next one is a refusal here
+   * rather than a nudge, because the anchor came from a plan a human approved.
+   */
+  mixNarration: (one: TrackRef & { readonly regenerate: boolean }): readonly string[] => [
+    "narration",
+    "mix",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--json",
   ],
   /**
    * Stage 2, previewed: every prompt, and the count of pictures it would buy.
@@ -515,6 +640,35 @@ export const INTENTS = {
     ...artifacts(one.artifacts),
     ...flag("--image-model", one.imageModel),
     ...flag("--video-model", one.videoModel),
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
+  /**
+   * Stage 9, previewed: the script's one text call, or the recordings' bill.
+   *
+   * One command covers both halves, and which one it is doing is the report's
+   * answer rather than a flag: until the script exists and a human has
+   * accepted it, this buys the script; afterwards it buys the lines that yes
+   * authorised. Two model flags, because the stage buys from two providers and
+   * a bare `--model` would not say which — the same refusal stage 7 makes.
+   *
+   * What the preview is for is different here too. Every stage above this one
+   * is billed per call; this provider charges for the **characters** of the
+   * text it is handed, so the count of calls has stopped being the bill and
+   * the report prints both.
+   */
+  previewNarration: (
+    one: Send & { readonly artifacts: readonly string[]; readonly voiceModel: string }
+  ): readonly string[] => [
+    "narration",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    ...artifacts(one.artifacts),
+    ...flag("--model", one.model),
+    ...flag("--voice-model", one.voiceModel),
+    ...flag("--max-output-tokens", one.maxOutputTokens),
     ...(one.regenerate ? ["--regenerate"] : []),
     "--dry-run",
     "--json",

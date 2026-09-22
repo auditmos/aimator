@@ -17,7 +17,10 @@ import {
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  answerFlag,
+  asJson,
   maxOutputTokensOf,
   modeOf,
   numberFlag,
@@ -30,11 +33,22 @@ import {
   workspaceOf,
 } from "../common.js";
 
+/**
+ * Which stage this file answers for, in the word `--stage` takes.
+ *
+ * One stage written by three commands, which is why `command` carries the
+ * subcommand rather than the stage: `generate` lifts the words, `mix` lays
+ * them on one track, and `direction` decides how the narrator reads. A field
+ * that said the same word for all three would answer "which command wrote
+ * this" with a guess, the reason stage 0's is two words.
+ */
+const STAGE = "soundtrack";
+
 /** Stage 9: the words, shared by both tracks, and a mix that is not. */
 export const USAGE = `Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
   narration generate <id> <episode-id> [--model <id>] [--voice-model <id>]
                      [--max-output-tokens <n>] [--artifact script|N01[,N02]]
-                     [--dry-run] [--regenerate]
+                     [--dry-run] [--json] [--regenerate]
     Podnosi narrację z zatwierdzonej listy ujęć i kupuje ją głosem z project.json.
     Narracji nie pisze: każde zdanie musi wystąpić dosłownie w polu Audio swojego
     ujęcia, a walidator to sprawdza, jeśli film ma powiedzieć coś nowego,
@@ -42,7 +56,7 @@ export const USAGE = `Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
     głos czytający zdanie nie wie, nad którym filmem usiądzie.
     ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
   narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]
-                      [--similarity <0-1>] [--speaker-boost] [--dry-run]
+                      [--similarity <0-1>] [--speaker-boost] [--dry-run] [--json]
     Jak narrator serii CZYTA. Bez tej decyzji każde wywołanie szło na domyślnych
     ustawieniach dostawcy, stability 0.5 i style 0, które sam dostawca opisuje
     jako skłonne do monotonii; płaskie brzmienie nie było wadą głosu, tylko
@@ -52,7 +66,7 @@ export const USAGE = `Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
     unieważnia dokładnie te nagrania, które powstały pod starym brzmieniem.
     Głos to obsada (etap 0), sposób czytania to reżyseria (etap 9).
   narration mix <id> <episode-id> --track <gpt-image|seedream>
-                [--dry-run] [--regenerate]
+                [--dry-run] [--json] [--regenerate]
     Kładzie przyjęte kwestie na zatwierdzonym episode.mp4 i zapisuje
     <tor>/narrated.mp4. Obraz idzie kopią strumieniową, episode.mp4 nie jest
     nadpisywany ani przekodowywany. Kotwice z planu przelicza na oś TEGO toru,
@@ -71,6 +85,7 @@ export const USAGE = `Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
 async function runNarrationGenerate(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -116,15 +131,22 @@ async function runNarrationGenerate(argv: readonly string[]): Promise<Result<str
     workspace: workspace.data,
   });
 
-  return result.ok
-    ? ok(renderNarration(result.data, projectId.data, episodeId.data, mode))
-    : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("generate", STAGE, result.data)
+      : renderNarration(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /** Stage 9's per-track half: no model, no key, one program on this machine. */
 async function runNarrationMix(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
   });
@@ -163,7 +185,15 @@ async function runNarrationMix(argv: readonly string[]): Promise<Result<string>>
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderMix(result.data, projectId.data, episodeId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("mix", STAGE, result.data)
+      : renderMix(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /**
@@ -175,6 +205,7 @@ async function runNarrationMix(argv: readonly string[]): Promise<Result<string>>
  */
 async function runNarrationDirection(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
+    json: { type: "boolean" },
     similarity: { type: "string" },
     "speaker-boost": { type: "boolean" },
     speed: { type: "string" },
@@ -218,7 +249,15 @@ async function runNarrationDirection(argv: readonly string[]): Promise<Result<st
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderDirection(result.data, projectId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("direction", STAGE, result.data)
+      : renderDirection(result.data, projectId.data, mode)
+  );
 }
 
 /**
@@ -423,7 +462,8 @@ function renderMixStatus(headline: string, status: MixStatus): string {
 export async function checkSoundtrackStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
 
@@ -436,14 +476,18 @@ export async function checkSoundtrackStage(
   if (parsed.values.track === undefined) {
     const result = await checkNarration(scope);
 
-    return result.ok
-      ? ok(
-          renderNarrationStatus(
+    if (!result.ok) {
+      return result;
+    }
+
+    return ok(
+      answer === "json"
+        ? asJson("check", STAGE, result.data)
+        : renderNarrationStatus(
             `Odcinek "${episodeId.data}", etap 9, słowa${result.data.approved ? ", zatwierdzone" : ""}`,
             result.data
           )
-        )
-      : result;
+    );
   }
 
   const track = trackOf(parsed);
@@ -454,14 +498,18 @@ export async function checkSoundtrackStage(
 
   const result = await checkMix({ ...scope, track: track.data });
 
-  return result.ok
-    ? ok(
-        renderMixStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderMixStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, etap 9, miks${result.data.approved ? ", zatwierdzony" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 /** `approve --stage soundtrack`: the script and the lines, or one track's mix. */
@@ -482,14 +530,18 @@ export async function approveSoundtrackStage(
       episodeId: episodeId.data,
     });
 
-    return result.ok
-      ? ok(
-          renderNarrationStatus(
+    if (!result.ok) {
+      return result;
+    }
+
+    return ok(
+      approval.answer === "json"
+        ? asJson("approve", STAGE, result.data)
+        : renderNarrationStatus(
             `Odcinek "${episodeId.data}", zatwierdzono słowa etapu 9`,
             result.data
           )
-        )
-      : result;
+    );
   }
 
   const track = trackOf(parsed);
@@ -505,12 +557,16 @@ export async function approveSoundtrackStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderMixStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderMixStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono miks`,
           result.data
         )
-      )
-    : result;
+  );
 }

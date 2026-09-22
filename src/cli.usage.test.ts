@@ -192,7 +192,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]": [
+  "  approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] [--json]": [
     "approve",
     ...ON,
     "--stage",
@@ -203,7 +203,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage soundtrack --track <tor>": [
+  "  approve <id> <episode-id> --stage soundtrack --track <tor> [--json]": [
     "approve",
     ...ON,
     "--stage",
@@ -330,7 +330,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--track",
     T,
   ],
-  "  check <id> <episode-id> --stage soundtrack [--track <tor>]": [
+  "  check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]": [
     "check",
     ...ON,
     "--stage",

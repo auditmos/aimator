@@ -4,6 +4,12 @@ import { sha256Of } from "../lib/artifact/index.js";
 import { approveAssembly, generateAssembly } from "../lib/assembly/index.js";
 import { approveClips, generateClips } from "../lib/clips/index.js";
 import type { Muxer } from "../lib/muxer.js";
+import {
+  approveMix,
+  approveNarration,
+  generateMix,
+  generateNarration,
+} from "../lib/narration/index.js";
 import { approveOpeningFrame, generateOpeningFrame } from "../lib/opening-frame/index.js";
 import {
   addCharacter,
@@ -1165,6 +1171,144 @@ export async function makeCut(options: {
     track: options.track,
     workspace: options.workspace,
   });
+}
+
+/**
+ * The voice this series is narrated by, cast in stage 0 like the rest of the
+ * cast. A real ElevenLabs id shape, because the CLI validates nothing about it
+ * and a fixture that used `voice-1` would teach a reader the wrong thing.
+ */
+export const VOICE = "21m00Tcm4TlvDq8ikWAM";
+
+/** The two shots the fixture's narrator speaks over, and where each is anchored. */
+const SPOKEN = [
+  { at: "2s", id: "N01", shot: "U01", text: NARRATION.U01 },
+  { at: "22s", id: "N02", shot: "U04", text: NARRATION.U04 },
+] as const;
+
+/** A script the stage-9 validator accepts: each sentence lifted from its shot. */
+function narrationScript(): string {
+  return [
+    "## Plan",
+    "",
+    "Narrator otwiera i zamyka odcinek.",
+    "",
+    "## Lines",
+    "",
+    ...SPOKEN.flatMap((one) => [`### ${one.id} | ${one.shot} | ${one.at}`, "", one.text, ""]),
+    "## Review",
+    "",
+    "Obie kwestie pochodzą z pola Audio swoich ujęć.",
+    "",
+  ].join("\n");
+}
+
+/** Both of stage 9's providers behind one transport: a script, then the bytes. */
+function voiceProvider(seconds: number): typeof fetch {
+  return ((url: string | URL) =>
+    String(url).includes("elevenlabs")
+      ? Promise.resolve(
+          new Response(wav({ seconds }), {
+            headers: { "content-type": "audio/wav" },
+            status: 200,
+          })
+        )
+      : Promise.resolve(
+          Response.json({
+            id: "resp_fixture",
+            output: [
+              {
+                content: [{ text: narrationScript(), type: "output_text" }],
+                role: "assistant",
+                type: "message",
+              },
+            ],
+            status: "completed",
+          })
+        )) as unknown as typeof fetch;
+}
+
+/**
+ * Stage 9's words, bought and accepted, and optionally laid on a track.
+ *
+ * Promoted at the threshold the rest of this file is: the CLI's stage-9 tests
+ * and the UI server's both need a narrated episode that is *finished* rather
+ * than one they are testing, and neither is asking a question about how many
+ * calls it took. What it leaves on disk is `narration.md`, one WAV per line,
+ * both accepted, and `narrated.mp4` on every track it was handed.
+ *
+ * It does **not** replace stage 9's own instrumented transport. That one
+ * counts calls and reads the bodies, because for a stage billed per character
+ * the request *is* the assertion; this one only has to leave the artifacts.
+ *
+ * The episode has to have been built with `narration: true` and a cast voice,
+ * and each track with `makeCut`, because a mix is laid over an accepted cut.
+ */
+export async function makeNarration(options: {
+  /** How long each bought line comes back. Short enough to fit the plan. */
+  readonly lineSeconds?: number;
+  readonly root: string;
+  /** Tracks to lay the accepted lines on. None by default: the words are shared. */
+  readonly tracks?: readonly ImageTrack[];
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { lineSeconds = 1, tracks = [], workspace } = options;
+  const paid = {
+    artifacts: [],
+    episodeId: EPISODE,
+    fetch: voiceProvider(lineSeconds),
+    maxOutputTokens: 8000,
+    mode: "apply",
+    model: "gpt-6-astra",
+    openAiKey: API_KEY,
+    projectId: PROJECT,
+    regenerate: false,
+    voiceKey: API_KEY,
+    voiceModel: "eleven_multilingual_v2",
+    workspace,
+  } as const;
+  const accept = (artifacts: readonly string[]) =>
+    approveNarration({
+      artifacts,
+      episodeId: EPISODE,
+      mode: "apply" as const,
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "fixture",
+      workspace,
+    });
+
+  // The script first and on its own, because nothing may be bought until a
+  // human has read it: the same two passes a person makes by hand.
+  await generateNarration(paid);
+  await accept(["script"]);
+  await generateNarration(paid);
+  await accept(SPOKEN.map((one) => one.id));
+
+  for (const track of tracks) {
+    // biome-ignore lint/performance/noAwaitInLoops: one track's mix at a time
+    await generateMix({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      mux: muxer(),
+      projectId: PROJECT,
+      regenerate: false,
+      track,
+      workspace,
+    });
+
+    await approveMix({
+      artifacts: [],
+      episodeId: EPISODE,
+      mode: "apply",
+      note: "ok",
+      projectId: PROJECT,
+      reviewer: "fixture",
+      track,
+      workspace,
+    });
+  }
 }
 
 /** A clip of a length no plan orders, so an unmapped call is visibly wrong. */

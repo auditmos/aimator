@@ -181,6 +181,16 @@ export interface Billed {
  * and buys several prompts at once; stage 1 is billed in one and sends one.
  */
 export interface Priced {
+  /**
+   * A number that stands **beside** the bill and must never be added into it.
+   *
+   * Stage 9 is why it exists: the speech provider documents the continuity
+   * parameters and does not say whether it charges for their characters. On
+   * any ordinary reading of "billed per character converted to audio" they are
+   * free, but this tool does not guess with somebody else's account, so the
+   * figure is on screen and labelled as the one to add if that turns out wrong.
+   */
+  readonly aside?: string;
   /** Never summed: two media on one bill are two numbers a person reads. */
   readonly billed: readonly Billed[];
   readonly prompts: readonly { readonly label: string; readonly text: string }[];
@@ -395,6 +405,8 @@ function Bought(props: {
       <p className="bill">
         Do kupienia: {priced.billed.map((line) => plural(line.count, line.unit)).join(", ")}
       </p>
+
+      {priced.aside === undefined ? null : <p className="actions-note">{priced.aside}</p>}
 
       <Problems problems={problems} />
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "../cli/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
-import { EPISODE, makeCut, makeUpstream, PROJECT } from "../test/fixture.js";
+import { EPISODE, makeCut, makeNarration, makeUpstream, PROJECT, VOICE } from "../test/fixture.js";
 import { INTENTS } from "./commands.js";
 import { createUi } from "./index.js";
 
@@ -165,14 +165,29 @@ beforeAll(async () => {
   }
 
   workspace = resolved.data;
-  await makeUpstream({ answer: answer(), approvePackage: true, root, scratch, workspace });
+  // Narrated, and with a voice cast: stage 9 lifts the narrator's sentences
+  // out of the shots' own `Audio` prose, so an episode that says nothing has
+  // no script to buy and no gate to show.
+  await makeUpstream({
+    answer: answer(),
+    approvePackage: true,
+    narration: true,
+    root,
+    scratch,
+    voiceId: VOICE,
+    workspace,
+  });
   // One track drawn to the end and cut, so the resolver has real pictures and
   // a real film to serve, and the ladder has more than one kind of cell in it.
   // The cut is made with the fixture's own muxer, which is why it exists on a
   // machine whose `AIMATOR_FFMPEG` points at nothing: what the engine's
   // absence changes is what stage 8 will *do*, not what is already on disk.
   await makeCut({ root, track: TRACK, workspace });
-}, 120_000);
+  // Stage 9's words, bought and accepted, and laid on that one track: the
+  // resolver has a script to read, recordings to play and a narrated cut to
+  // watch, which are three different media under one stage.
+  await makeNarration({ root, tracks: [TRACK], workspace });
+}, 180_000);
 
 afterAll(async () => {
   await rm(root, { force: true, recursive: true });
@@ -453,6 +468,48 @@ describe("the artifact resolver", () => {
     expect(bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "episode.mp4")));
   });
 
+  /**
+   * Stage 9, the first stage whose artifacts live at **two levels** and in
+   * three media at once.
+   *
+   * The words are shared between the tracks, so the script and every bought
+   * line resolve without one; the mix is per track, because only the mix is
+   * timed against a particular cut. A resolver that put a track on all three
+   * would have invented a second copy of the recordings, and one that put a
+   * track on none of them would have served one film's narration over the
+   * other's picture.
+   *
+   * The WAV is the point of the whole row. An utterance is approved by
+   * **listening** to it, and approving a recording in a terminal is approving
+   * a filename, exactly as approving an image there was at stage 2.
+   */
+  it("should serve stage 9's three media, each at the level it lives at", async () => {
+    const app = createUi({ workspace });
+    const [script, line, narrated] = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/soundtrack/script?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/soundtrack/N01?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/soundtrack/narrated?episode=${EPISODE}&track=${TRACK}`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return {
+          bytes: Buffer.from(await response.arrayBuffer()),
+          status: response.status,
+          type: response.headers.get("content-type") ?? "",
+        };
+      })
+    );
+
+    expect([script?.status, line?.status, narrated?.status]).toEqual([200, 200, 200]);
+    expect(script?.type).toContain("text/markdown");
+    expect(line?.type).toBe("audio/wav");
+    expect(narrated?.type).toBe("video/mp4");
+    expect(script?.bytes).toEqual(await readFile(join(episodeRoot(), "narration.md")));
+    expect(line?.bytes).toEqual(await readFile(join(episodeRoot(), "narration", "N01.wav")));
+    expect(narrated?.bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "narrated.mp4")));
+  });
+
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
     const secret = join(scratch, "sekret.md");
 
@@ -489,6 +546,11 @@ describe("the artifact resolver", () => {
         // path at all: the two films of one episode are two different films.
         `/api/artifact/${PROJECT}/assembly/C01?episode=${EPISODE}&track=${TRACK}`,
         `/api/artifact/${PROJECT}/assembly/episode?episode=${EPISODE}`,
+        // Stage 9 lives at two levels and the resolver keeps them apart: the
+        // mix needs a track and the words must not have one, because a second
+        // copy of a recording per track is a recording nobody bought.
+        `/api/artifact/${PROJECT}/soundtrack/narrated?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/soundtrack/${encodeURIComponent("../../N01")}?episode=${EPISODE}`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -496,7 +558,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 17 }, () => 404));
+    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 19 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 });
@@ -763,6 +825,57 @@ describe("running a command", () => {
     expect(report.cut.map((one) => one.id)).toEqual(["C01", "C02"]);
     expect(report.plannedSeconds).toBe(30);
     expect(Object.keys(report)).not.toContain("paidCalls");
+    await events.close();
+  });
+
+  /**
+   * Stage 9's one knob somebody is **expected** to turn, and the reason it
+   * lives where it lives.
+   *
+   * How the narrator reads is dialled in by ear over several attempts. Stored
+   * beside `narratorVoiceId` in `project.json` it would have been a recorded
+   * input of nearly every artifact in the workspace, so moving it a tenth
+   * would have lapsed the acceptance of a screenplay, a shot list, ten
+   * character images and a cut episode whose bytes it never touched. It lives
+   * in a file stage 9 owns instead, and the proof a panel owes is the ladder:
+   * the same cells, in the same states, before and after the form is saved.
+   */
+  it("should not lapse an earlier stage's approval when the direction is saved", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const ladder = async (): Promise<readonly (readonly [string, string])[]> => {
+      const response = await app.request(`/api/status/${PROJECT}/${EPISODE}`);
+      const body = (await response.json()) as {
+        cells: readonly { id: string; stage: number; state: string }[];
+      };
+
+      return body.cells.filter((cell) => cell.stage < 9).map((cell) => [cell.id, cell.state]);
+    };
+    const before = await ladder();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: INTENTS.directNarrator({
+          projectId: PROJECT,
+          similarity: "",
+          speakerBoost: false,
+          speed: "",
+          stability: "0.35",
+          style: "0.4",
+        }),
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+
+    expect(JSON.parse(finished.data)).toMatchObject({ ok: true, runId });
+    expect(await ladder()).toEqual(before);
     await events.close();
   });
 

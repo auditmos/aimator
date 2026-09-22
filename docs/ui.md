@@ -47,6 +47,13 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   obejrzenia w całości, plan cięcia wyprowadzony z zatwierdzonej listy ujęć (nigdzie nie
   zapisany), cisza jako meldunek, a nie przeszkoda, i **jeden przycisk**. Bez `ffmpeg`
   panel pokazuje odmowę słowo w słowo taką, jaką wypisałby terminal.
+- **Panele etapu 9**, pierwszego etapu z **dwoma panelami**, bo jego artefakty leżą na
+  dwóch poziomach drzewa: skrypt i nagrania są wspólne dla obu torów (kwestia jako audio
+  do odsłuchania, z własnym polem wyboru, bo zatwierdza się **słuchając**), a miks jest
+  per tor i jest wideo. Rachunek stoi w **znakach i wywołaniach**, a znaki kontekstu obok
+  niego, nie w nim. Reżyseria narratora to formularz pięciu pokręteł mapowany na komendę
+  `narration direction`; jego zapis nie unieważnia zgód wcześniejszych etapów, bo nie
+  dotyka `project.json`.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
@@ -136,10 +143,19 @@ etapu, a nie z drugiego pliku — lista ujęć już go niesie, a dwa pliki z jed
 się przy pierwszej poprawce ręcznej.
 
 W jakich jednostkach, rozstrzyga **etap**, nie ekran: to on wie, za co dostawca liczy.
-Etapy tekstowe liczą wywołania, obrazowe obrazy, a etap 7 **dwie liczby naraz**, klatki
+Etapy tekstowe liczą wywołania, obrazowe obrazy, etap 7 **dwie liczby naraz**, klatki
 wejściowe i klipy, których nigdy się nie sumuje, bo obraz i wideo kosztują o rząd wielkości
-inaczej i suma byłaby liczbą, której nikt nie płaci. Dlatego `ui/panel.tsx` trzyma samo
-ułożenie rachunku, a to, które pola raportu są rachunkiem, przynosi panel etapu.
+inaczej i suma byłaby liczbą, której nikt nie płaci, a etap 9 **znaki**, bo dostawca mowy
+rozlicza tekst, który dostał, a nie wywołania. Dlatego `ui/panel.tsx` trzyma samo ułożenie
+rachunku, a to, które pola raportu są rachunkiem, przynosi panel etapu.
+
+Etap 9 pokazuje też, czym rachunek **nie** jest. Jedno polecenie robi tam dwa różne zakupy
+i raport mówi który: dopóki skryptu nie ma, kupuje się jedno wywołanie tekstowe; po jego
+zatwierdzeniu — kwestie, które ta zgoda otworzyła. Panel czyta więc dwa różne zestawy pól
+tego samego obiektu, bo wypisanie rachunku za mowę w pierwszej fazie pokazałoby człowiekowi
+`0` obok przycisku, który zaraz wyda pieniądze. Znaki kontekstu (`previous_text`/`next_text`)
+stoją **obok** rachunku i nigdy w nim: dostawca dokumentuje te parametry i nie mówi, czy je
+rozlicza, a narzędzie nie zgaduje cudzymi pieniędzmi.
 
 ## Uruchamianie komendy i artefakty
 
@@ -158,6 +174,14 @@ Na ścieżkę tłumaczy je jedno miejsce, przez `workspace.ts`; krotka, której 
 dostaje 404, **zanim powstanie jakakolwiek ścieżka**, więc `..` ani ścieżka bezwzględna nie
 wyprowadzą odczytu poza katalog roboczy. Obrazy wracają jako `image/png`, bo od etapu 2
 zatwierdza się patrząc, a zatwierdzanie obrazu w terminalu to zatwierdzanie nazwy pliku.
+Kwestie etapu 9 wracają jako `audio/wav` z tego samego powodu o jeden zmysł dalej: nagranie
+ocenione po nazwie pliku to nagranie nieocenione.
+
+Etap 9 jest też pierwszym, którego artefakty leżą na **dwóch poziomach**, i resolver to
+rozróżnia po identyfikatorze, a nie po tym, co wołający wpisał w zapytaniu: skrypt i kwestie
+są wspólne i nie przyjmują toru, `narrated` przyjmuje tylko z torem. Odwrotnie byłaby to
+druga kopia nagrania, którego nikt nie kupił, albo narracja jednego filmu nad obrazem
+drugiego.
 
 Od etapu 7 dochodzi film, a film się **przewija**, więc artefakt odpowiada na nagłówek
 `Range`: bez niego 200 i całość, z czytelnym zakresem 206 i dokładnie te bajty (200 kazałoby

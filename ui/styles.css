@@ -598,6 +598,13 @@ h1 {
   border-radius: 0.5rem;
 }
 /* A clip carries its own controls, so it is given the room to be scrubbed. */
+/* Etap 9: kwestię się odsłuchuje, tak jak obraz się ogląda. */
+.line-audio {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  margin-top: 0.5rem;
+}
 .link-film,
 .link-still {
   display: block;

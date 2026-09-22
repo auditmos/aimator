@@ -60,13 +60,19 @@ const scope = {
   nature: "law-or-idea",
   projectId: "dzielna-ewa",
   regenerate: false,
+  similarity: "0.8",
   source: "/Users/ktos/Filmy/01-Burza.md",
   sources: ["/Users/ktos/Zdjecia/ewa-1.png"],
+  speakerBoost: false,
+  speed: "1",
+  stability: "0.35",
+  style: "0.4",
   subtitles: "none",
   title: "Dzielna Ewa",
   track: "gpt-image",
   videoModel: "dreamina-seedance-2-5-260628",
   voiceId: "voice-1",
+  voiceModel: "eleven_multilingual_v2",
 };
 
 /**
@@ -630,5 +636,75 @@ describe("the two steps of a paid call", () => {
   it("should refuse to build a purchase with no finished dry run behind it", () => {
     expect(() => buy({ argv: INTENTS.checkScreenplay(scope), runId: "9f1c" })).toThrow(NO_DRY_RUN);
     expect(() => buy({ argv: INTENTS.previewScreenplay(scope), runId: "" })).toThrow(NO_RUN_ID);
+  });
+});
+
+/**
+ * Stage 9, the first stage the dictionary has to keep apart at two levels.
+ *
+ * The words are shared by both tracks and the mix is not, so `--track` is not
+ * a narrowing here but a **choice of question**, and a screen that built one
+ * command for both would be asking about a film when somebody was reading a
+ * script. The same split runs through the approvals: accepting the script is
+ * what authorises buying the recordings, and accepting the recordings is a
+ * different yes about different bytes. Two decisions, two commands.
+ */
+describe("the stage-9 commands", () => {
+  it("should accept the script and the lines with two different commands", () => {
+    const script = INTENTS.approveNarrationScript(scope);
+    const lines = INTENTS.approveNarrationLines({ ...scope, artifacts: ["N01", "N02"] });
+
+    expect(script).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "soundtrack",
+      "--artifact",
+      "script",
+    ]);
+    expect(lines).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "soundtrack",
+      "--artifact",
+      "N01,N02",
+    ]);
+    expect(script).not.toEqual(lines);
+  });
+
+  it("should ask about the words and about one track's mix with two commands", () => {
+    expect(INTENTS.checkNarration(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "soundtrack",
+    ]);
+    expect(INTENTS.checkMix(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "soundtrack",
+      "--track",
+      "gpt-image",
+    ]);
+  });
+
+  /** Rule 7 again: a slider the form was not given is not a value of zero. */
+  it("should leave out a reading nobody dialled in", () => {
+    expect(
+      INTENTS.directNarrator({
+        projectId: "dzielna-ewa",
+        similarity: "",
+        speakerBoost: false,
+        speed: "",
+        stability: "0.35",
+        style: "",
+      })
+    ).toEqual(["narration", "direction", "dzielna-ewa", "--stability", "0.35"]);
   });
 });
