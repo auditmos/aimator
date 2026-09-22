@@ -416,6 +416,26 @@ h1 {
 .problem::before {
   content: "! ";
 }
+/* Co etap melduje, nie odmawiając: ten sam podział co "!" i "·" w terminalu. */
+.notice {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-neutral-400);
+}
+.notice::before {
+  content: "· ";
+}
+.cut {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  list-style: none;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
 .send {
   display: flex;
   flex-wrap: wrap;

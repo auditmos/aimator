@@ -64,6 +64,9 @@ const MP4 = "video/mp4";
 /** The one artifact of stage 7 whose id is not simply the clip's. */
 const ENTRY = "entry:";
 
+/** Stage 8's own word for the one thing it makes, as `--artifact` spells it. */
+const EPISODE_CUT = "episode";
+
 /** What each episode stage publishes, in the stage's own word for it. */
 const UNDER_EPISODE: Readonly<
   Record<string, Readonly<Record<string, (episode: EpisodePaths) => LocatedArtifact>>>
@@ -168,6 +171,28 @@ function underClips(project: ProjectPaths, request: ArtifactRequest): LocatedArt
 }
 
 /**
+ * Stage 8: one film per track, and the only artifact this table narrows to a
+ * single legal name.
+ *
+ * It is a row of its own rather than a line in `underTrack` because what it
+ * serves is neither a set nor a picture: there is exactly one cut per track,
+ * the stage's own word for it is `episode`, and its bytes are an MP4 the same
+ * way a clip's are. Anything else under this stage is a 404 before a path
+ * exists, for the reason stage 6's is: a name the stage does not have cannot
+ * be guessed into a file.
+ */
+function underAssembly(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const track = trackOf(request);
+  const episode = episodePaths(project, request.episodeId);
+
+  if (track === null || !episode.ok || request.artifact !== EPISODE_CUT) {
+    return null;
+  }
+
+  return { contentType: MP4, path: episodeTrackPaths(episode.data, track).episodeVideo };
+}
+
+/**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
  * It is a function rather than a row in the table above because its artifacts
@@ -220,6 +245,10 @@ export function locateArtifact(
 
   if (request.stage === "clips") {
     return underClips(project.data, request);
+  }
+
+  if (request.stage === "assembly") {
+    return underAssembly(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

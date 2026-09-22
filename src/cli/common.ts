@@ -161,6 +161,7 @@ const JSON_STAGES = [
   "references",
   "opening-frame",
   "clips",
+  "assembly",
 ] as const;
 
 /**

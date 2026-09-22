@@ -10,7 +10,10 @@ import { ffmpeg } from "../../lib/muxer.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  answerFlag,
+  asJson,
   modeOf,
   type Parsed,
   parse,
@@ -24,7 +27,7 @@ import {
 /** Stage 8: the cut, bought from nobody and rendered by a local engine. */
 export const USAGE = `Etap 8. Montaż (darmowy; per tor, jeden artefakt):
   assembly generate <id> <episode-id> --track <gpt-image|seedream>
-                    [--dry-run] [--regenerate]
+                    [--dry-run] [--json] [--regenerate]
     Skleja zatwierdzone klipy w <tor>/episode.mp4 bez przekodowania, w
     kolejności z zatwierdzonej listy ujęć, planu montażowego nie ma jako pliku,
     bo lista ujęć już go niesie. Nic nie kupuje i nie potrzebuje modelu ani
@@ -34,7 +37,13 @@ export const USAGE = `Etap 8. Montaż (darmowy; per tor, jeden artefakt):
     Jeden artefakt na tor, więc --artifact niczego nie zawęża i nie jest
     wymagane; --regenerate jest, bo gotowy montaż nosi zgodę człowieka.
     episode.mp4 jest NIEMY: ścieżka dźwiękowa musi powstać wobec sklejonego
-    filmu, a nie wobec planu, więc należy do etapu poniżej montażu.`;
+    filmu, a nie wobec planu, więc należy do etapu poniżej montażu.
+    --json wypisuje raport etapu: plan cięcia wyprowadzony z listy ujęć, klip
+    po klipie, sumy planu i klipów oraz silnik. Rachunku w nim nie ma i nie
+    będzie, bo ten etap niczego nie kupuje.`;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "assembly";
 
 /**
  * Stage 8 reports no bill and one arithmetic instead: what the approved plan
@@ -116,6 +125,7 @@ export async function runAssembly(argv: readonly string[]): Promise<Result<strin
 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
+    json: { type: "boolean" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
   });
@@ -154,14 +164,23 @@ export async function runAssembly(argv: readonly string[]): Promise<Result<strin
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderAssembly(result.data, projectId.data, episodeId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? asJson("generate", STAGE, result.data)
+      : renderAssembly(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /** `check --stage assembly` reports one episode's cut, per track. */
 export async function checkAssemblyStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
   const track = trackOf(parsed);
@@ -180,14 +199,18 @@ export async function checkAssemblyStage(
     workspace,
   });
 
-  return result.ok
-    ? ok(
-        renderAssemblyStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderAssemblyStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, etap 8${result.data.approved ? ", przyjęty w całości" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 /**
@@ -219,12 +242,16 @@ export async function approveAssemblyStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderAssemblyStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderAssemblyStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, całość przyjęta`,
           result.data
         )
-      )
-    : result;
+  );
 }

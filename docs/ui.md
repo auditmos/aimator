@@ -43,6 +43,10 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   jedną komendę (`--artifact C01,entry:C02`), rachunek stoi w **dwóch** liczbach, a obok
   płatnego wywołania jest jedyna komenda tego ekranu, która zapisuje, nie płacąc:
   `--republish` z archiwum.
+- **Panel etapu 8**, pierwszy **bez rachunku i bez „Kup”**: cały odcinek jako wideo do
+  obejrzenia w całości, plan cięcia wyprowadzony z zatwierdzonej listy ujęć (nigdzie nie
+  zapisany), cisza jako meldunek, a nie przeszkoda, i **jeden przycisk**. Bez `ffmpeg`
+  panel pokazuje odmowę słowo w słowo taką, jaką wypisałby terminal.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
@@ -121,6 +125,15 @@ jako liczba obok przycisku, który płaci, a szukanie jej w polskim zdaniu było
 klienta formatu tekstowego CLI. Wynik zakupu, jak wynik „Sprawdź" i „Zatwierdź", pokazuje
 się w całości, w słowach terminala. Gdy podgląd mówi `0 płatnych wywołań`, „Kup" nie
 pojawia się wcale, a pod spodem stoją przeszkody w słowach etapu.
+
+**Etap 8 nie ma tego wszystkiego i to jest jego opis, nie wyjątek.** Nie kupuje niczego, więc
+nie ma rachunku, nie ma dwóch kroków i nie ma przycisku „Kup”: jest jeden przycisk. Nie ma też
+pola modelu, bo nic nie leci do dostawcy; potrzebny jest `ffmpeg` na tej maszynie, a gdy go nie
+ma, CLI odmawia zamiast przekodowywać i panel pokazuje **tę samą odmowę, słowo w słowo**.
+Próba na sucho zostaje jako pole wyboru, bo preview bez rachunku wciąż odpowiada na drugą
+połowę pytania: co i w jakiej kolejności zostałoby sklejone. Plan cięcia bierze się z raportu
+etapu, a nie z drugiego pliku — lista ujęć już go niesie, a dwa pliki z jedną prawdą rozjechałyby
+się przy pierwszej poprawce ręcznej.
 
 W jakich jednostkach, rozstrzyga **etap**, nie ekran: to on wie, za co dostawca liczy.
 Etapy tekstowe liczą wywołania, obrazowe obrazy, a etap 7 **dwie liczby naraz**, klatki

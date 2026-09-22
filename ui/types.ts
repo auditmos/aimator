@@ -183,6 +183,58 @@ export interface ClipsStatus {
 }
 
 /**
+ * Stage 8's one artifact: the whole film of one track.
+ *
+ * It carries `seconds` where a clip's state carries none, and that is the
+ * stage rather than a difference of shape: what stage 8 measures on a finished
+ * cut is how long it runs, read from the file's own boxes, and that number is
+ * the one a person compares against the plan they approved.
+ */
+export interface CutState {
+  readonly approved: boolean;
+  readonly id: string;
+  /** Recorded inputs whose bytes on disk no longer match what this cut used. */
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  readonly seconds: number | null;
+  readonly state: "absent" | "completed";
+}
+
+/** Stage 8's own object: one cut per track, and what it says without refusing. */
+export interface AssemblyStatus {
+  readonly approved: boolean;
+  readonly artifact: CutState;
+  readonly nextStep: string;
+  /** Reported, never enforced: a silent cut is not a blocked one. */
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/**
+ * Stage 8's report, and the first on this screen with **no bill in it**.
+ *
+ * What stands where a count of paid calls stands everywhere else is an
+ * arithmetic: what the approved shot list ordered, what the clips actually
+ * run, and the difference nothing here trims away. The cut itself is derived
+ * from that shot list at call time and stored in no file, which is why the
+ * panel reads it out of this report rather than holding a plan of its own.
+ */
+export interface AssemblyReport {
+  readonly actualSeconds: number;
+  readonly cut: readonly {
+    readonly id: string;
+    readonly plannedSeconds: number;
+    readonly seconds: number | null;
+  }[];
+  /** The local engine, once it has answered. `null` when it could not be asked. */
+  readonly engine: string | null;
+  readonly notices: readonly string[];
+  readonly plannedSeconds: number;
+  readonly problems: readonly string[];
+}
+
+/**
  * What every paid stage's report says that a panel has to show.
  *
  * The bill is deliberately **not** here, and that is the interesting part.

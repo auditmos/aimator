@@ -26,6 +26,8 @@ import { buy, commandLine, INTENTS } from "./commands.js";
  */
 
 const WORD = /^[a-z][a-z-]*$/;
+/** Commands whose `generate` reaches no provider: stage 8 cuts locally. */
+const FREE = new Set(["assembly"]);
 const NO_DRY_RUN = /dry-run/;
 const NO_RUN_ID = /identyfikator/;
 const USAGE_LINE = /^ {2}(\S+)(?: (\S+))?/;
@@ -46,6 +48,7 @@ const scope = {
   aspectRatio: "16:9",
   audio: "narration",
   characterId: "ewa",
+  dryRun: false,
   duration: "30",
   episodeId: "01-burza",
   imageModel: "gpt-image-2.5-sunburst",
@@ -152,19 +155,24 @@ describe("the command dictionary", () => {
   });
 
   /**
-   * `--republish` is the one `generate` that is not a send, and saying so
-   * sharpens this claim rather than weakening it. By contract it publishes a
-   * clip again out of its own archive: it touches no key, reaches no provider
-   * and therefore has nothing to preview. Everything else that reaches a model
-   * has to arrive here as a dry run, because a purchase is derived from one
-   * and is the only intent that cannot be built from a scope.
+   * Two `generate` commands on this screen are not sends, and naming both
+   * sharpens this claim rather than weakening it.
+   *
+   * `--republish` publishes a clip again out of its own archive: it touches no
+   * key, reaches no provider and therefore has nothing to preview. Stage 8's
+   * whole command is the other one, and for a stronger reason than a flag: it
+   * buys nothing at all, from anybody, and what it needs instead is a program
+   * on this machine. Everything else that reaches a model has to arrive here
+   * as a dry run, because a purchase is derived from one and is the only
+   * intent that cannot be built from a scope.
    */
   it("should build no purchase from a scope alone", () => {
     const spending = Object.entries(INTENTS).filter(([, build]) => {
       const argv = build(scope);
 
       return (
-        argv.includes("generate") && !(argv.includes("--dry-run") || argv.includes("--republish"))
+        argv.includes("generate") &&
+        !(argv.includes("--dry-run") || argv.includes("--republish") || FREE.has(argv[0] ?? ""))
       );
     });
 

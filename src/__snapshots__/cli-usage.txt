@@ -70,7 +70,7 @@ Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
 
 Etap 8. Montaż (darmowy; per tor, jeden artefakt):
   assembly generate <id> <episode-id> --track <gpt-image|seedream>
-                    [--dry-run] [--regenerate]
+                    [--dry-run] [--json] [--regenerate]
     Skleja zatwierdzone klipy w <tor>/episode.mp4 bez przekodowania, w
     kolejności z zatwierdzonej listy ujęć, planu montażowego nie ma jako pliku,
     bo lista ujęć już go niesie. Nic nie kupuje i nie potrzebuje modelu ani
@@ -81,6 +81,9 @@ Etap 8. Montaż (darmowy; per tor, jeden artefakt):
     wymagane; --regenerate jest, bo gotowy montaż nosi zgodę człowieka.
     episode.mp4 jest NIEMY: ścieżka dźwiękowa musi powstać wobec sklejonego
     filmu, a nie wobec planu, więc należy do etapu poniżej montażu.
+    --json wypisuje raport etapu: plan cięcia wyprowadzony z listy ujęć, klip
+    po klipie, sumy planu i klipów oraz silnik. Rachunku w nim nie ma i nie
+    będzie, bo ten etap niczego nie kupuje.
 
 Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
   narration generate <id> <episode-id> [--model <id>] [--voice-model <id>]
@@ -172,7 +175,7 @@ Wspólne:
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
-  check <id> <episode-id> --stage assembly --track <tor>
+  check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>]
   check <id> <episode-id> --stage sound-design [--track <tor>]
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
@@ -184,7 +187,7 @@ Wspólne:
   approve <id> <episode-id> --stage opening-frame --track <tor> [--json]
   approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
                [--json]
-  approve <id> <episode-id> --stage assembly --track <tor>
+  approve <id> <episode-id> --stage assembly --track <tor> [--json]
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]
   approve <id> <episode-id> --stage soundtrack --track <tor>
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02]
@@ -196,9 +199,10 @@ Wspólne:
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve na razie wyłącznie z --stage prepare, screenplay,
-               shot-list, prompt-package, character, references, opening-frame
-               albo clips, a z komend etapu na razie wyłącznie na etapach 0–7;
-               kolejne etapy dostają go po kolei razem ze swoim panelem w UI
+               shot-list, prompt-package, character, references, opening-frame,
+               clips albo assembly, a z komend etapu na razie wyłącznie na
+               etapach 0–8; kolejne etapy dostają go po kolei razem ze swoim
+               panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

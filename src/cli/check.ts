@@ -31,7 +31,7 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
-  check <id> <episode-id> --stage assembly --track <tor>
+  check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>]
   check <id> <episode-id> --stage sound-design [--track <tor>]`;
 

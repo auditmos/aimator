@@ -1,4 +1,5 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
+import { AssemblyPanel } from "./assembly";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
 import { Ladder } from "./ladder";
@@ -48,7 +49,7 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  * arrives. A row nobody can open says so by being a row, which is more honest
  * than a panel apologising for being empty.
  */
-const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7]);
+const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
 function openable(cell: StatusCell): boolean {
   return PANELLED.has(cell.stage);
@@ -107,7 +108,11 @@ function StagePanel(props: PanelProps): JSX.Element | null {
     return <OpeningFramePanel {...props} />;
   }
 
-  return props.cell.stage === 7 ? <ClipsPanel {...props} /> : null;
+  if (props.cell.stage === 7) {
+    return <ClipsPanel {...props} />;
+  }
+
+  return props.cell.stage === 8 ? <AssemblyPanel {...props} /> : null;
 }
 
 /**

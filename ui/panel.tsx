@@ -100,6 +100,25 @@ export function Problems(props: { readonly problems: readonly string[] }): JSX.E
   ));
 }
 
+/**
+ * What a stage says **without** refusing, which is a different thing entirely.
+ *
+ * The split is load-bearing rather than cosmetic and the contract says so: a
+ * stage puts every reason it would refuse in `problems`, and everything it
+ * says while carrying on in `notices`. Stage 8's silent cut is the first one
+ * on this screen, and calling it a problem would paint a finished, accepted
+ * film as a blocked cell. It sits beside `Problems` for that reason: the two
+ * are one decision about one answer, and splitting them across files is how
+ * they would start to look alike.
+ */
+export function Notices(props: { readonly notices: readonly string[] }): JSX.Element[] {
+  return props.notices.map((notice) => (
+    <p className="notice" key={notice}>
+      {notice}
+    </p>
+  ));
+}
+
 /** The last command's whole answer, in the words the terminal would print. */
 export function RunOutput(props: {
   readonly run: RunDone | null;

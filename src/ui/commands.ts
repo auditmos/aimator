@@ -145,6 +145,8 @@ interface Everything extends Send, Settings, TrackRef {
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
   readonly characterId: string;
+  /** Stage 8 alone: the free `generate` that shows the cut without writing it. */
+  readonly dryRun: boolean;
   readonly imageModel: string;
   readonly name: string;
   readonly source: string;
@@ -204,6 +206,25 @@ export const INTENTS = {
     "--source",
     one.source,
     ...settings(one),
+  ],
+  /**
+   * Stage 8, accepted: the whole film of one track, and nothing to narrow.
+   *
+   * No `--artifact` for stage 6's reason, read one row lower: there is one cut
+   * per track, so a flag with one legal value would be ceremony standing where
+   * a decision used to be. What it accepts is also a different question from
+   * the clips' own yeses, which is why it is a separate command rather than a
+   * consequence of them: those say each shot is good, this says these clips in
+   * this order are a film.
+   */
+  approveAssembly: (one: TrackRef): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "assembly",
+    "--track",
+    one.track,
   ],
   /**
    * Stage 2, accepted: named pictures of one character on one track.
@@ -311,6 +332,29 @@ export const INTENTS = {
     "shot-list",
   ],
   /**
+   * Stage 8: the cut, and the only `generate` on this screen that is not a send.
+   *
+   * It has no model flag, no key and no bill, because it reaches no provider:
+   * what it needs is a program on this machine, and when that is missing the
+   * CLI refuses rather than re-encoding. So the two-step rule does not apply
+   * and `--dry-run` is here for the other half of a preview: the cut plan,
+   * derived from the approved shot list at call time and stored nowhere, plus
+   * how far the clips that came back drifted from it.
+   */
+  assembleEpisode: (
+    one: TrackRef & { readonly dryRun: boolean; readonly regenerate: boolean }
+  ): readonly string[] => [
+    "assembly",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...(one.regenerate ? ["--regenerate"] : []),
+    ...(one.dryRun ? ["--dry-run"] : []),
+    "--json",
+  ],
+  /**
    * Stage 0: the narrator of the series, cast rather than configured.
    *
    * A voice recurs between episodes exactly as the cast does, so it is stored
@@ -322,6 +366,16 @@ export const INTENTS = {
     one.projectId,
     "--voice-id",
     one.voiceId,
+  ],
+  /** Stage 8, verified: the cut of one track, read off its own boxes, offline. */
+  checkAssembly: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "assembly",
+    "--track",
+    one.track,
   ],
   /** Stage 2, verified: one character on one track, ten artifacts at a time. */
   checkCharacter: (one: CastRef & { readonly track: string }): readonly string[] => [

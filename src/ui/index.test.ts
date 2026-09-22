@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "../cli/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
-import { EPISODE, makeTrack, makeUpstream, PROJECT } from "../test/fixture.js";
+import { EPISODE, makeCut, makeUpstream, PROJECT } from "../test/fixture.js";
 import { INTENTS } from "./commands.js";
 import { createUi } from "./index.js";
 
@@ -166,9 +166,12 @@ beforeAll(async () => {
 
   workspace = resolved.data;
   await makeUpstream({ answer: answer(), approvePackage: true, root, scratch, workspace });
-  // One track drawn to the end, so the resolver has real pictures to serve and
-  // the ladder has more than one kind of cell in it.
-  await makeTrack({ root, track: TRACK, workspace });
+  // One track drawn to the end and cut, so the resolver has real pictures and
+  // a real film to serve, and the ladder has more than one kind of cell in it.
+  // The cut is made with the fixture's own muxer, which is why it exists on a
+  // machine whose `AIMATOR_FFMPEG` points at nothing: what the engine's
+  // absence changes is what stage 8 will *do*, not what is already on disk.
+  await makeCut({ root, track: TRACK, workspace });
 }, 120_000);
 
 afterAll(async () => {
@@ -226,13 +229,13 @@ describe("the UI server", () => {
    * What a person is promised is a refreshed ladder within two seconds of a
    * file changing, and that is measured where it means something: a browser on
    * a real workspace. A deadline asserted inside a runner working through
-   * thirty-five files at once would measure the runner instead, and would fail
+   * forty-odd files at once would measure the runner instead, and would fail
    * on a busy machine while the server was behaving perfectly. So what this
    * test holds is the claim a test can hold honestly: the write reaches the
    * stream at all, and what arrives is the ladder rather than a heartbeat.
    */
   it("should push the ladder again when a file under the episode changes", {
-    timeout: 20_000,
+    timeout: 45_000,
   }, async () => {
     const response = await createUi({ workspace }).request(`/api/events/${PROJECT}/${EPISODE}`);
     const events = new Events(response.body as ReadableStream<Uint8Array>);
@@ -243,7 +246,7 @@ describe("the UI server", () => {
     const pushed = await Promise.race([
       events.next(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("strumień nie wypchnął drabiny")), 15_000)
+        setTimeout(() => reject(new Error("strumień nie wypchnął drabiny")), 35_000)
       ),
     ]);
 
@@ -429,6 +432,27 @@ describe("the artifact resolver", () => {
     expect(response.headers.get("content-range")).toBe(`bytes */${whole.length}`);
   });
 
+  /**
+   * Stage 8, the first artifact that is the **whole film** rather than a piece.
+   *
+   * It is served exactly as a clip is, and the sameness is the point: the cut
+   * is one more thing a person has to watch before saying yes, and the only
+   * difference is that there is one of it per track. So the stage's own word
+   * for it is the id `--artifact` would take, and the layout module decides
+   * that it is an MP4.
+   */
+  it("should serve the cut as the film it is, per track", async () => {
+    const response = await createUi({ workspace }).request(
+      `/api/artifact/${PROJECT}/assembly/episode?episode=${EPISODE}&track=${TRACK}`
+    );
+    const bytes = Buffer.from(await response.arrayBuffer());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("video/mp4");
+    expect(response.headers.get("accept-ranges")).toBe("bytes");
+    expect(bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "episode.mp4")));
+  });
+
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
     const secret = join(scratch, "sekret.md");
 
@@ -460,6 +484,11 @@ describe("the artifact resolver", () => {
         `/api/artifact/${PROJECT}/clips/${encodeURIComponent("end:C01")}?episode=${EPISODE}&track=${TRACK}`,
         `/api/artifact/${PROJECT}/clips/${encodeURIComponent("entry:../../C01")}?episode=${EPISODE}&track=${TRACK}`,
         `/api/artifact/${PROJECT}/clips/C01?episode=${EPISODE}`,
+        // Stage 8 has exactly one artifact per track and one word for it, so
+        // there is nothing else its row may resolve to, and no track is no
+        // path at all: the two films of one episode are two different films.
+        `/api/artifact/${PROJECT}/assembly/C01?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/assembly/episode?episode=${EPISODE}`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -467,7 +496,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 15 }, () => 404));
+    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 17 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 });
@@ -640,6 +669,100 @@ describe("running a command", () => {
     });
 
     expect(checked.status).toBe(202);
+    await events.close();
+  });
+
+  /**
+   * The first stage whose obstacle is a **program**, and the whole reason the
+   * panel forwards refusals instead of phrasing them.
+   *
+   * Stage 8 buys nothing, so nothing here can go wrong with a key; what can go
+   * wrong is that the machine has no ffmpeg, and then the stage refuses rather
+   * than re-encoding, because a second road is the one thing it must not have.
+   * A screen that softened that sentence, or offered a button the terminal
+   * would refuse, would be teaching a person that the two disagree. So the
+   * words travel unchanged, which is checkable: the same argv run through the
+   * server and run in this process say the same thing, to the character.
+   */
+  it("should carry stage 8's refusal over a missing engine in the terminal's words", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const argv = INTENTS.assembleEpisode({
+      dryRun: false,
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      regenerate: false,
+      track: TRACK,
+    });
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({ argv }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+    const refused = await run([...argv, "--workspace", root]);
+
+    expect(refused.ok).toBe(false);
+    expect(JSON.parse(finished.data)).toEqual({
+      error: {
+        message: refused.ok ? "" : refused.error.message,
+        name: refused.ok ? "" : refused.error.name,
+      },
+      ok: false,
+      runId,
+    });
+    expect(refused.ok ? "" : refused.error.message).toContain("nie znaleziono ffmpeg");
+    await events.close();
+  });
+
+  /**
+   * Stage 8's one free question, and the only thing its panel arranges.
+   *
+   * A paid stage previews so a person can read the bill before spending; this
+   * one has no bill, so the dry run exists for the other half of a preview:
+   * what would be cut, in what order, and how far the clips that came back
+   * drifted from the plan somebody approved. That array is derived from the
+   * approved shot list at call time and stored nowhere, which is why the panel
+   * asks for the object rather than keeping a plan of its own.
+   */
+  it("should answer stage 8's dry run with the cut plan and no bill", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: INTENTS.assembleEpisode({
+          dryRun: true,
+          episodeId: EPISODE,
+          projectId: PROJECT,
+          regenerate: false,
+          track: TRACK,
+        }),
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+    const done = JSON.parse(finished.data) as { data: string; ok: boolean; runId: string };
+    const report = JSON.parse(done.data) as Record<string, unknown> & {
+      cut: readonly { id: string }[];
+      plannedSeconds: number;
+    };
+
+    expect(done).toMatchObject({ ok: true, runId });
+    expect(report.stage).toBe("assembly");
+    expect(report.cut.map((one) => one.id)).toEqual(["C01", "C02"]);
+    expect(report.plannedSeconds).toBe(30);
+    expect(Object.keys(report)).not.toContain("paidCalls");
     await events.close();
   });
 
