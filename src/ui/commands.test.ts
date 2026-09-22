@@ -48,6 +48,7 @@ const scope = {
   characterId: "ewa",
   duration: "30",
   episodeId: "01-burza",
+  imageModel: "gpt-image-2.5-sunburst",
   language: "pl",
   maxClip: "15",
   maxOutputTokens: "12000",
@@ -61,6 +62,7 @@ const scope = {
   subtitles: "none",
   title: "Dzielna Ewa",
   track: "gpt-image",
+  videoModel: "dreamina-seedance-2-5-260628",
   voiceId: "voice-1",
 };
 
@@ -149,10 +151,22 @@ describe("the command dictionary", () => {
     expect(commandLine(argv)).toBe(`aimator ${argv.join(" ")}`);
   });
 
+  /**
+   * `--republish` is the one `generate` that is not a send, and saying so
+   * sharpens this claim rather than weakening it. By contract it publishes a
+   * clip again out of its own archive: it touches no key, reaches no provider
+   * and therefore has nothing to preview. Everything else that reaches a model
+   * has to arrive here as a dry run, because a purchase is derived from one
+   * and is the only intent that cannot be built from a scope.
+   */
   it("should build no purchase from a scope alone", () => {
-    const spending = Object.entries(INTENTS).filter(
-      ([, build]) => build(scope).includes("generate") && !build(scope).includes("--dry-run")
-    );
+    const spending = Object.entries(INTENTS).filter(([, build]) => {
+      const argv = build(scope);
+
+      return (
+        argv.includes("generate") && !(argv.includes("--dry-run") || argv.includes("--republish"))
+      );
+    });
 
     expect(spending).toEqual([]);
   });
@@ -440,6 +454,100 @@ describe("the stage-5 and stage-6 panels", () => {
       expect(argv).toContain("--track");
       expect(argv).toContain("gpt-image");
     }
+  });
+});
+
+/**
+ * Stage 7, where one command buys in **two currencies**.
+ *
+ * Everything above it has one `--model`, because one call buys one thing. Here
+ * an entry frame is drawn by this track's image model and a clip is rendered
+ * by the one video model both tracks share, so `--model` does not say which,
+ * and the CLI refuses it with a sentence rather than picking. The dictionary
+ * spells the two flags it does take, which is the whole of user story 22: the
+ * screen must not be able to express less than the command.
+ *
+ * The rest is stage 5's arrangement over two media: a list of artifacts in one
+ * command, because a clip and its entry frame reviewed in one sitting is one
+ * decision, and the ids are the CLI's own, `C01` and `entry:C02`.
+ */
+describe("the stage-7 panel", () => {
+  it("should accept a clip and an entry frame in one command", () => {
+    expect(INTENTS.approveClips({ ...scope, artifacts: ["C01", "entry:C02"] })).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "clips",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01,entry:C02",
+    ]);
+  });
+
+  it("should name the two models the stage actually has, and no bare --model", () => {
+    const preview = INTENTS.previewClips({ ...scope, artifacts: [] });
+
+    expect(preview).toEqual([
+      "clip",
+      "generate",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--image-model",
+      "gpt-image-2.5-sunburst",
+      "--video-model",
+      "dreamina-seedance-2-5-260628",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(preview).not.toContain("--model");
+  });
+
+  it("should buy exactly the chain link it previewed", () => {
+    const preview = INTENTS.previewClips({ ...scope, artifacts: ["C02"], regenerate: true });
+    const bought = buy({ argv: preview, runId: "9f1c" });
+
+    expect(bought).toContain("--regenerate");
+    expect(bought).toContain("C02");
+    expect(bought).not.toContain("--dry-run");
+    expect(bought).not.toContain("--json");
+  });
+
+  /**
+   * The one command in this tool that writes without paying.
+   *
+   * A republication decides again what the still that came back with a clip
+   * is, out of the archive, sending nothing. It is not a purchase, so it has
+   * no preview: what it needs instead is a target, because it rewrites a
+   * record a human may already have accepted.
+   */
+  it("should aim a republication at named clips and never at everything", () => {
+    expect(INTENTS.republishClips({ ...scope, artifacts: ["C01"] })).toEqual([
+      "clip",
+      "generate",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01",
+      "--republish",
+    ]);
+  });
+
+  it("should ask about one track, because the two are rendered separately", () => {
+    expect(INTENTS.checkClips(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "clips",
+      "--track",
+      "gpt-image",
+    ]);
   });
 });
 

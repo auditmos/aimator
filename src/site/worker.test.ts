@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import worker, { type AssetEnv, parseRange } from "./worker.js";
+import worker, { type AssetEnv } from "./worker.js";
 
 /**
- * The worker, tested through its entry. Two things are worth proving: the
- * arithmetic of a byte range, which is where an off-by-one hides, and that a
- * partial response asks the bucket for exactly that span, the whole reason
- * the films moved out of the deployed assets.
+ * The worker, tested through its entry. What is worth proving here is that a
+ * partial response asks the bucket for exactly the span it was sent, which is
+ * the whole reason the films moved out of the deployed assets. The arithmetic
+ * of the range itself belongs to `lib/byte-range` and is tested beside it.
  */
 
 const BODY = "0123456789abcdefghijABCDEFGHIJ";
@@ -72,39 +72,6 @@ const media = (range?: string, method = "GET") =>
     headers: range ? { range } : {},
     method,
   });
-
-describe("parseRange", () => {
-  it("should read a span counted from the start", () => {
-    expect(parseRange("bytes=5-9", SIZE)).toEqual({ first: 5, last: 9 });
-  });
-
-  it("should run an open-ended span to the last byte", () => {
-    expect(parseRange("bytes=20-", SIZE)).toEqual({ first: 20, last: SIZE - 1 });
-  });
-
-  it("should read a suffix span counted back from the end", () => {
-    expect(parseRange("bytes=-10", SIZE)).toEqual({ first: SIZE - 10, last: SIZE - 1 });
-  });
-
-  it("should clamp a span that runs past the end of the file", () => {
-    expect(parseRange("bytes=25-999", SIZE)).toEqual({ first: 25, last: SIZE - 1 });
-  });
-
-  it("should clamp a suffix longer than the file to the whole file", () => {
-    expect(parseRange("bytes=-999", SIZE)).toEqual({ first: 0, last: SIZE - 1 });
-  });
-
-  it("should refuse a header that names no span at all", () => {
-    expect(parseRange("bytes=-", SIZE)).toBeNull();
-    expect(parseRange("bytes=abc", SIZE)).toBeNull();
-    expect(parseRange("items=0-9", SIZE)).toBeNull();
-  });
-
-  it("should refuse a span that starts at or past the end", () => {
-    expect(parseRange(`bytes=${SIZE}-`, SIZE)).toBeNull();
-    expect(parseRange("bytes=9-5", SIZE)).toBeNull();
-  });
-});
 
 describe("worker", () => {
   it("should answer a range request with 206 and only the bytes it asked for", async () => {

@@ -1,7 +1,15 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { IMAGES } from "./character";
-import { Action, artifactUrl, Field, Gallery, PaidCall, Problems, RunOutput } from "./panel";
+import {
+  Action,
+  artifactUrl,
+  asImages,
+  Field,
+  Gallery,
+  PaidCall,
+  Problems,
+  RunOutput,
+} from "./panel";
 import type { ReferencesStatus, RunDone, StatusCell } from "./types";
 
 /**
@@ -132,9 +140,9 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
         onRun={startRun}
         preview={preview}
         projectRun={run}
+        read={asImages}
         running={running}
         sent={sent}
-        unit={IMAGES}
       >
         <div className="send">
           <Field

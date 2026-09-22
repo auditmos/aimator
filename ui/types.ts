@@ -154,15 +154,72 @@ export interface OpeningFrameStatus {
 }
 
 /**
+ * One link of stage 7's chain: a clip, or the frame a clip starts on.
+ *
+ * It is `Drawn` with a `kind` and without a verdict, and both differences are
+ * the stage's rather than a shortening. The kind is there because two media
+ * are bought under one review; the measurements are not, because what stage 7
+ * records about a clip is a duration and a frame size in one sentence of its
+ * own, and a browser that re-derived either from the bytes would be measuring
+ * what the stage already measured.
+ */
+export interface ClipState {
+  readonly approved: boolean;
+  readonly id: string;
+  /** Recorded inputs whose bytes on disk no longer match what this run used. */
+  readonly inputsChanged: readonly string[];
+  readonly kind: "clip" | "entry-frame";
+  readonly note: string;
+  readonly state: "absent" | "completed" | "submitted";
+}
+
+/** Stage 7's own object: both media of one track, in the chain's order. */
+export interface ClipsStatus {
+  readonly approved: boolean;
+  readonly artifacts: readonly ClipState[];
+  readonly nextStep: string;
+  readonly problems: readonly string[];
+  readonly track: string;
+}
+
+/**
  * What every paid stage's report says that a panel has to show.
  *
- * The bill first, because it is the one number that must stand beside the
- * button that spends it rather than inside a sentence somebody has to parse.
+ * The bill is deliberately **not** here, and that is the interesting part.
+ * Every stage up to stage 6 is billed in one number and stage 7 is billed in
+ * two, counted apart because an image and a video cost differently by an order
+ * of magnitude; a shared `paidCalls` would have made the panel add up numbers
+ * nobody is billed. So each panel reads its own report's own fields, and what
+ * is common is only what every one of them has: the obstacles.
  */
 export interface PaidReport {
-  readonly paidCalls: number;
   readonly problems: readonly string[];
+}
+
+/** A stage billed in one number: one call buys one thing, once. */
+export interface CallsReport extends PaidReport {
+  readonly paidCalls: number;
+  /** `--dry-run` only: the exact text a paid call would send. */
   readonly prompt: string | null;
+}
+
+/**
+ * An image stage's: one call is one picture, and each picture has its own text.
+ *
+ * The prompt sits under the artifact rather than at the top of the report,
+ * because one command draws one picture or eight and each of them is sent a
+ * different instruction.
+ */
+export interface DrawnReport extends PaidReport {
+  readonly artifacts: readonly { readonly id: string; readonly prompt: string | null }[];
+  readonly paidCalls: number;
+}
+
+/** Stage 7's: two media, two bills, and a prompt under each artifact. */
+export interface MediaReport extends PaidReport {
+  readonly artifacts: readonly { readonly id: string; readonly prompt: string | null }[];
+  readonly paidImages: number;
+  readonly paidVideos: number;
 }
 
 /**

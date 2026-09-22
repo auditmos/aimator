@@ -563,6 +563,32 @@ h1 {
   color: var(--color-neutral-400);
 }
 
+/* Stage 7: the chain, one link per row, because a film is read wide. */
+.reel {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+}
+.link {
+  padding: 0.75rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+/* A clip carries its own controls, so it is given the room to be scrubbed. */
+.link-film,
+.link-still {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  height: auto;
+  margin-top: 0.5rem;
+  background: var(--color-neutral-950);
+  border-radius: 0.25rem;
+}
+
 /* Stage 4: the graph the package describes, and the send plan of one track. */
 .references,
 .plan {

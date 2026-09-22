@@ -3,13 +3,13 @@ import { INTENTS } from "../src/ui/commands.js";
 import {
   Action,
   artifactUrl,
+  asImages,
   Drift,
   Field,
   Gallery,
   PaidCall,
   Problems,
   RunOutput,
-  type Unit,
 } from "./panel";
 import type { CharacterStatus, RunDone, StatusCell } from "./types";
 
@@ -40,9 +40,6 @@ interface PanelProps {
   readonly run: RunDone | null;
   readonly running: boolean;
 }
-
-/** An image stage's bill counts pictures, because pictures are the decision. */
-export const IMAGES: Unit = ["obraz", "obrazy", "obrazów"];
 
 export function CharacterPanel(props: PanelProps): JSX.Element {
   const { cell, onRun, projectId, run, running } = props;
@@ -176,9 +173,9 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
         onRun={startRun}
         preview={preview}
         projectRun={run}
+        read={asImages}
         running={running}
         sent={sent}
-        unit={IMAGES}
       >
         <div className="send">
           <Field

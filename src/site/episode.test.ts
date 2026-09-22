@@ -125,7 +125,19 @@ afterEach(async () => {
   }
 });
 
-describe("freezeRelease", () => {
+/**
+ * The budget is declared because of what each case builds, not because
+ * anything here is slow to answer.
+ *
+ * Every test in this block raises a whole episode on **both** tracks from
+ * nothing, which is the same work the fixture's `beforeAll` is given two
+ * minutes for everywhere else in this repository. Here it happens inside the
+ * case, so Vitest's five-second default applied instead, and the block was
+ * passing on whatever slack the rest of the suite happened to leave it: it
+ * timed out the day another file was added beside it, having changed in no
+ * other way. A budget that is really the runner's idle time is not a budget.
+ */
+describe("freezeRelease", { timeout: 120_000 }, () => {
   it("should take one film, its stills and its documents out of each track", async () => {
     await episode();
 

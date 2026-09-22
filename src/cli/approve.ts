@@ -29,6 +29,7 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
                [--json]
   approve <id> <episode-id> --stage opening-frame --track <tor> [--json]
   approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
+               [--json]
   approve <id> <episode-id> --stage assembly --track <tor>
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]
   approve <id> <episode-id> --stage soundtrack --track <tor>

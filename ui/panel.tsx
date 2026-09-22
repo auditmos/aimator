@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { buy, commandLine, type Preview } from "../src/ui/commands.js";
-import type { Drawn, PaidReport, RunDone, TextStatus } from "./types";
+import type { CallsReport, Drawn, DrawnReport, PaidReport, RunDone, TextStatus } from "./types";
 
 /**
  * What every stage panel repeats, in one place, so eleven of them cannot drift.
@@ -143,6 +143,57 @@ function plural(count: number, forms: readonly [string, string, string]): string
 export type Unit = readonly [string, string, string];
 
 const CALLS: Unit = ["płatne wywołanie", "płatne wywołania", "płatnych wywołań"];
+/** An image stage's bill counts pictures, because pictures are the decision. */
+const IMAGES: Unit = ["obraz", "obrazy", "obrazów"];
+
+/** One line of a bill: how many of one thing, in that thing's own word. */
+export interface Billed {
+  readonly count: number;
+  readonly unit: Unit;
+}
+
+/**
+ * What a dry run costs and what it would send, in the stage's own fields.
+ *
+ * Both halves are a **reading** rather than a format: the report is the object
+ * the CLI already prints, and a panel says which of its fields are the bill
+ * and which are the text. That is why this is a function each stage brings and
+ * not a shape every stage is bent into. Stage 7 is billed in two currencies
+ * and buys several prompts at once; stage 1 is billed in one and sends one.
+ */
+export interface Priced {
+  /** Never summed: two media on one bill are two numbers a person reads. */
+  readonly billed: readonly Billed[];
+  readonly prompts: readonly { readonly label: string; readonly text: string }[];
+}
+
+/** A text stage's reading: one call, one prompt, both at the top of the report. */
+export function asCalls(report: CallsReport): Priced {
+  return {
+    billed: [{ count: report.paidCalls, unit: CALLS }],
+    prompts:
+      report.prompt === null
+        ? []
+        : [{ label: "Prompt, który poleci do modelu", text: report.prompt }],
+  };
+}
+
+/** An image stage's: the bill counts pictures, and each picture has its own text. */
+export function asImages(report: DrawnReport): Priced {
+  return {
+    billed: [{ count: report.paidCalls, unit: IMAGES }],
+    prompts: promptsOf(report.artifacts),
+  };
+}
+
+/** Every artifact this call would send a text to, under the id it belongs to. */
+export function promptsOf(
+  artifacts: readonly { readonly id: string; readonly prompt: string | null }[]
+): readonly { readonly label: string; readonly text: string }[] {
+  return artifacts.flatMap((one) =>
+    one.prompt === null ? [] : [{ label: `Prompt ${one.id}`, text: one.prompt }]
+  );
+}
 
 /** What a text stage's paid command is told, beyond which episode it is about. */
 export interface SendFlags {
@@ -212,9 +263,10 @@ export function SendFields(props: {
   );
 }
 
-/** A dry run that came back, beside the object it came back with. */
+/** A dry run that came back, beside the reading the stage made of it. */
 interface Previewed {
-  readonly report: PaidReport;
+  readonly priced: Priced;
+  readonly problems: readonly string[];
   readonly send: Preview;
 }
 
@@ -232,27 +284,29 @@ interface Previewed {
  * second dry run while the first is still in flight: two steps are only two if
  * the second one is about the first.
  */
-export function PaidCall(props: {
+export function PaidCall<Report extends PaidReport>(props: {
   /** The stage's own flags, which decide what the preview argv says. */
   readonly children: ReactNode;
   readonly note: string;
   readonly onRun: (argv: readonly string[]) => void;
   readonly preview: readonly string[];
   readonly projectRun: RunDone | null;
+  /**
+   * How this stage reads its own report: which fields are the bill, and which
+   * are the text that would be sent.
+   *
+   * It is a prop rather than a shape because the PRD's rule is that the bill
+   * stands in a unit **the CLI already counts**, not that every stage counts
+   * the same thing. One call is one picture on an image stage, and on stage 7
+   * it is either a frame or a clip, which cost differently by an order of
+   * magnitude and are therefore two numbers rather than one.
+   */
+  readonly read: (report: Report) => Priced;
   readonly running: boolean;
   /** The argv of the last command the panel started, whatever it was. */
   readonly sent: readonly string[] | null;
-  /**
-   * What this stage's bill counts, when calls is the wrong word for it.
-   *
-   * On an image stage one call is one picture, and pictures are what a person
-   * is deciding about, so the number says images. The PRD's rule is that the
-   * bill stands in a unit the CLI already counts, not that every stage counts
-   * the same thing.
-   */
-  readonly unit?: Unit;
 }): JSX.Element {
-  const { children, note, onRun, preview, projectRun, running, sent, unit = CALLS } = props;
+  const { children, note, onRun, preview, projectRun, read, running, sent } = props;
   const [previewed, setPreviewed] = useState<Previewed | null>(null);
 
   useEffect(() => {
@@ -263,14 +317,17 @@ export function PaidCall(props: {
     }
 
     try {
+      const report = JSON.parse(projectRun.data) as Report;
+
       setPreviewed({
-        report: JSON.parse(projectRun.data) as PaidReport,
+        priced: read(report),
+        problems: report.problems,
         send: { argv: sent, runId: projectRun.runId },
       });
     } catch {
       setPreviewed(null);
     }
-  }, [projectRun, sent]);
+  }, [projectRun, read, sent]);
 
   const runBuy = useCallback(() => {
     if (previewed !== null) {
@@ -292,28 +349,37 @@ export function PaidCall(props: {
           nic nie wychodzi do modelu.
         </p>
       ) : (
-        <Bought onBuy={runBuy} previewed={previewed} running={running} unit={unit} />
+        <Bought onBuy={runBuy} previewed={previewed} running={running} />
       )}
     </>
   );
 }
 
-/** What a finished dry run says, and the button it may or may not unlock. */
+/**
+ * What a finished dry run says, and the button it may or may not unlock.
+ *
+ * The bill is printed line by line and never summed. Two media on one bill are
+ * two decisions about two prices, so one total would be a number nobody is
+ * billed; what decides whether anything can be bought is whether **any** line
+ * is more than zero, which is the same question the CLI answers by refusing.
+ */
 function Bought(props: {
   readonly onBuy: () => void;
   readonly previewed: Previewed;
   readonly running: boolean;
-  readonly unit: Unit;
 }): JSX.Element {
-  const { report, send } = props.previewed;
+  const { priced, problems, send } = props.previewed;
+  const buying = priced.billed.some((line) => line.count > 0);
 
   return (
     <>
-      <p className="bill">Do kupienia: {plural(report.paidCalls, props.unit)}</p>
+      <p className="bill">
+        Do kupienia: {priced.billed.map((line) => plural(line.count, line.unit)).join(", ")}
+      </p>
 
-      <Problems problems={report.problems} />
+      <Problems problems={problems} />
 
-      {report.paidCalls === 0 ? null : (
+      {buying ? (
         <div className="actions">
           <button
             className="action action-primary"
@@ -325,14 +391,14 @@ function Bought(props: {
           </button>
           <Command argv={buy(send)} />
         </div>
-      )}
+      ) : null}
 
-      {report.prompt === null ? null : (
-        <>
-          <h3>Prompt, który poleci do modelu</h3>
-          <pre className="artifact-text">{report.prompt}</pre>
-        </>
-      )}
+      {priced.prompts.map((prompt) => (
+        <div key={prompt.label}>
+          <h3>{prompt.label}</h3>
+          <pre className="artifact-text">{prompt.text}</pre>
+        </div>
+      ))}
     </>
   );
 }
@@ -424,8 +490,12 @@ export function artifactUrl(one: ArtifactRef): string {
   }
 
   const query = axes.toString();
+  // Encoded rather than spelled: stage 7's entry frames are `entry:C02`, which
+  // is the id the CLI's own `--artifact` takes, and an id a panel had to
+  // rewrite before it could ask for it would be a second naming scheme.
+  const artifact = encodeURIComponent(one.artifact);
 
-  return `/api/artifact/${one.projectId}/${one.stage}/${one.artifact}${query === "" ? "" : `?${query}`}`;
+  return `/api/artifact/${one.projectId}/${one.stage}/${artifact}${query === "" ? "" : `?${query}`}`;
 }
 
 /** What the state of one picture means, in the word a person reads. */

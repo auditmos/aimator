@@ -145,11 +145,29 @@ interface Everything extends Send, Settings, TrackRef {
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
   readonly characterId: string;
+  readonly imageModel: string;
   readonly name: string;
   readonly source: string;
   readonly sources: readonly string[];
   readonly title: string;
+  readonly videoModel: string;
   readonly voiceId: string;
+}
+
+/**
+ * What stage 7's paid command is told: two media, so two models.
+ *
+ * It is the first scope on this screen with no bare `model`, and that is the
+ * stage rather than a naming choice. An entry frame is drawn by this track's
+ * image model and a clip is rendered by the one video model both tracks share,
+ * so a single flag would not say which; the CLI refuses `--model` here with a
+ * sentence, and a panel that offered one would be offering a refusal.
+ */
+interface ClipSend extends TrackRef {
+  readonly artifacts: readonly string[];
+  readonly imageModel: string;
+  readonly regenerate: boolean;
+  readonly videoModel: string;
 }
 
 export const INTENTS = {
@@ -201,6 +219,25 @@ export const INTENTS = {
     one.characterId,
     "--stage",
     "character",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+  ],
+  /**
+   * Stage 7, accepted: clips and entry frames of one track, several at a time.
+   *
+   * The list matters more here than anywhere above it, because the chain is
+   * what it unlocks: accepting C01 is what lets C02's entry frame be drawn,
+   * and accepting that frame is what lets C02 be rendered. One sitting in
+   * front of a clip and the frame it hands on is one decision, so it is one
+   * command, and the ids are the CLI's own.
+   */
+  approveClips: (one: TrackRef & { readonly artifacts: readonly string[] }): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "clips",
     "--track",
     one.track,
     ...artifacts(one.artifacts),
@@ -293,6 +330,16 @@ export const INTENTS = {
     one.characterId,
     "--stage",
     "character",
+    "--track",
+    one.track,
+  ],
+  /** Stage 7, verified: both media of one track, and where the chain stands. */
+  checkClips: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "clips",
     "--track",
     one.track,
   ],
@@ -394,6 +441,30 @@ export const INTENTS = {
     "--dry-run",
     "--json",
   ],
+  /**
+   * Stage 7, previewed: how many frames and how many clips this would buy.
+   *
+   * The only preview on this screen whose bill is **two numbers**, and they
+   * are never added up: an image and a video cost differently by an order of
+   * magnitude, so one total would be a number nobody is billed. Without a
+   * named artifact the command buys whatever the chain allows, which on a
+   * fresh track is nothing; naming a blocked link is the other question, why
+   * not that one yet, and the preview answers it with zero and a reason.
+   */
+  previewClips: (one: ClipSend): readonly string[] => [
+    "clip",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    ...flag("--image-model", one.imageModel),
+    ...flag("--video-model", one.videoModel),
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
   /** Stage 6, previewed: one image or the reason there is none. */
   previewOpeningFrame: (
     one: TrackRef & { readonly model: string; readonly regenerate: boolean }
@@ -470,6 +541,28 @@ export const INTENTS = {
     ...(send.regenerate ? ["--regenerate"] : []),
     "--dry-run",
     "--json",
+  ],
+  /**
+   * Stage 7, republished: the clip again, out of its own archive.
+   *
+   * The one command on this screen that writes without paying, and the one
+   * that therefore has no preview: there is no bill to read before clicking,
+   * because nothing is sent and no key is touched. What it does need is a
+   * target, and that is why it appears only under chosen clips: it rewrites a
+   * record and sends its review back to pending, so a bare republication would
+   * quietly withdraw approvals nobody meant to withdraw.
+   */
+  republishClips: (
+    one: TrackRef & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "clip",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    "--republish",
   ],
   /** Stage 0: the decisions of an episode that already exists. */
   setEpisode: (one: EpisodeRef & Settings): readonly string[] => [

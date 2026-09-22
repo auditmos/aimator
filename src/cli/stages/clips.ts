@@ -9,7 +9,9 @@ import { env } from "../../lib/env.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import type { ImageTrack, Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  asJson,
   keyFor,
   MODEL_ID,
   modeOf,
@@ -26,7 +28,7 @@ import {
 export const USAGE = `Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
   clip generate <id> <episode-id> --track <gpt-image|seedream>
                [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
-               [--dry-run] [--regenerate]
+               [--dry-run] [--json] [--regenerate]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
     i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL, klucz
@@ -36,6 +38,9 @@ export const USAGE = `Etap 7. Klipy (płatny; per tor, dwa media w jednym polece
     liczbę wywołań OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle.
     Długość klipu bierze się z listy ujęć; klipu, którego model nie renderuje,
     narzędzie nie zaokrągli, odmówi i wskaże poprawkę w etapie 3.`;
+
+/** Which stage this file answers for, in the word `--stage` takes. */
+const STAGE = "clips";
 
 /**
  * Stage 7 prints two counts, because it buys two media and they do not cost
@@ -142,6 +147,7 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
     "image-model": { type: "string" },
+    json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
     republish: { type: "boolean" },
@@ -210,14 +216,23 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderClips(result.data, projectId.data, episodeId.data, mode)) : result;
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("generate", STAGE, result.data)
+      : renderClips(result.data, projectId.data, episodeId.data, mode)
+  );
 }
 
 /** `check --stage clips` reports one episode's clips and entry frames, per track. */
 export async function checkClipsStage(
   parsed: Parsed,
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const episodeId = requirePositional(parsed, 1, "episode-id");
   const track = trackOf(parsed);
@@ -236,14 +251,18 @@ export async function checkClipsStage(
     workspace,
   });
 
-  return result.ok
-    ? ok(
-        renderClipsStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", STAGE, result.data)
+      : renderClipsStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, etap 7${result.data.approved ? ", zatwierdzony w całości" : ""}`,
           result.data
         )
-      )
-    : result;
+  );
 }
 
 export async function approveClipsStage(
@@ -267,12 +286,16 @@ export async function approveClipsStage(
     track: track.data,
   });
 
-  return result.ok
-    ? ok(
-        renderClipsStatus(
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", STAGE, result.data)
+      : renderClipsStatus(
           `Odcinek "${episodeId.data}", tor ${track.data}, zatwierdzono`,
           result.data
         )
-      )
-    : result;
+  );
 }

@@ -37,6 +37,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Panele etapów 5 i 6** na tym samym wzorcu obrazowym: referencje z wyborem kilku naraz
   i z powodem blokady w słowach etapu, nazywającym referencję, na którą zależna czeka;
   klatka otwarcia bez żadnego wyboru, bo ma jeden artefakt.
+- **Panel etapu 7**, pierwszy, w którym się nie patrzy, tylko **ogląda**: łańcuch ogniwo po
+  ogniwie, klatka wejściowa jako obraz, klip jako wideo z przewijaniem, pod każdym jego
+  stan w słowach etapu, więc zablokowane mówi, czyjej zgody brakuje. Zaznaczenie kilku daje
+  jedną komendę (`--artifact C01,entry:C02`), rachunek stoi w **dwóch** liczbach, a obok
+  płatnego wywołania jest jedyna komenda tego ekranu, która zapisuje, nie płacąc:
+  `--republish` z archiwum.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
@@ -116,6 +122,12 @@ klienta formatu tekstowego CLI. Wynik zakupu, jak wynik „Sprawdź" i „Zatwie
 się w całości, w słowach terminala. Gdy podgląd mówi `0 płatnych wywołań`, „Kup" nie
 pojawia się wcale, a pod spodem stoją przeszkody w słowach etapu.
 
+W jakich jednostkach, rozstrzyga **etap**, nie ekran: to on wie, za co dostawca liczy.
+Etapy tekstowe liczą wywołania, obrazowe obrazy, a etap 7 **dwie liczby naraz**, klatki
+wejściowe i klipy, których nigdy się nie sumuje, bo obraz i wideo kosztują o rząd wielkości
+inaczej i suma byłaby liczbą, której nikt nie płaci. Dlatego `ui/panel.tsx` trzyma samo
+ułożenie rachunku, a to, które pola raportu są rachunkiem, przynosi panel etapu.
+
 ## Uruchamianie komendy i artefakty
 
 Uruchomienie odpowiada **natychmiast identyfikatorem przebiegu**; wynik `run` przychodzi
@@ -133,6 +145,15 @@ Na ścieżkę tłumaczy je jedno miejsce, przez `workspace.ts`; krotka, której 
 dostaje 404, **zanim powstanie jakakolwiek ścieżka**, więc `..` ani ścieżka bezwzględna nie
 wyprowadzą odczytu poza katalog roboczy. Obrazy wracają jako `image/png`, bo od etapu 2
 zatwierdza się patrząc, a zatwierdzanie obrazu w terminalu to zatwierdzanie nazwy pliku.
+
+Od etapu 7 dochodzi film, a film się **przewija**, więc artefakt odpowiada na nagłówek
+`Range`: bez niego 200 i całość, z czytelnym zakresem 206 i dokładnie te bajty (200 kazałoby
+odtwarzaczowi uwierzyć, że dostał cały plik, i przestać pytać), z zakresem, którego plik nie
+ma, 416 i prawdziwy rozmiar. Bez tego zatwierdzenie dwunastej sekundy wymagałoby obejrzenia
+jedenastu. Samą arytmetykę zakresu liczy `src/lib/byte-range.ts`, wspólna z workerem
+opublikowanej strony: co dzieli kubełek i plik na dysku, to rachunek, i nic poza nim.
+Końcówki klipu (`end:Cnn`) resolver **nie serwuje**: jej format wybiera dostawca, więc nazwa
+pliku jest zapisana w stanie etapu, a ten resolver buduje ścieżki i niczego nie zgaduje.
 
 ## Czego pętla zwrotna nie załatwia
 

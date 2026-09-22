@@ -1,5 +1,6 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
 import { CharacterPanel } from "./character";
+import { ClipsPanel } from "./clips";
 import { Ladder } from "./ladder";
 import { OpeningFramePanel } from "./opening-frame";
 import { PreparePanel } from "./prepare";
@@ -47,7 +48,7 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  * arrives. A row nobody can open says so by being a row, which is more honest
  * than a panel apologising for being empty.
  */
-const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6]);
+const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7]);
 
 function openable(cell: StatusCell): boolean {
   return PANELLED.has(cell.stage);
@@ -102,7 +103,11 @@ function StagePanel(props: PanelProps): JSX.Element | null {
     return <ReferencesPanel {...props} />;
   }
 
-  return props.cell.stage === 6 ? <OpeningFramePanel {...props} /> : null;
+  if (props.cell.stage === 6) {
+    return <OpeningFramePanel {...props} />;
+  }
+
+  return props.cell.stage === 7 ? <ClipsPanel {...props} /> : null;
 }
 
 /**
@@ -275,8 +280,24 @@ export function App(): JSX.Element {
       );
   }, []);
 
+  /**
+   * Opening a cell forgets the last command, **both halves of it**.
+   *
+   * `run` alone is half a fact. What "w toku" is derived from is the pair: an
+   * identifier this window is waiting for, and the answer that has not come
+   * back under it yet. Clearing the answer and keeping the identifier made
+   * every finished command look like one still in flight, which disabled every
+   * button in the panel just opened, and there is no way out of that: starting
+   * a command is what clears it, and the buttons that start one are the
+   * disabled ones. Two states, one fact, cleared together.
+   *
+   * Nothing is lost while a real command is running: the result arrives on the
+   * stream whatever is open, and the cell itself says "w toku" off the stage's
+   * own lock file, which is the only progress this server claims to know.
+   */
   const openCell = useCallback((id: string) => {
     setRun(null);
+    setPending(null);
     setOpened((current) => (current === id ? null : id));
   }, []);
 

@@ -2,6 +2,8 @@ import {
   characterPaths,
   characterTrackPaths,
   characterViewImage,
+  clipFrame,
+  clipVideo,
   type EpisodePaths,
   episodePaths,
   episodeTrackPaths,
@@ -37,7 +39,7 @@ import {
  * would be one typo away from serving `/etc/passwd` over the loopback address.
  */
 
-interface LocatedArtifact {
+export interface LocatedArtifact {
   readonly contentType: string;
   readonly path: string;
 }
@@ -57,6 +59,10 @@ interface ArtifactRequest {
 
 const MARKDOWN = "text/markdown; charset=utf-8";
 const PNG = "image/png";
+const MP4 = "video/mp4";
+
+/** The one artifact of stage 7 whose id is not simply the clip's. */
+const ENTRY = "entry:";
 
 /** What each episode stage publishes, in the stage's own word for it. */
 const UNDER_EPISODE: Readonly<
@@ -123,6 +129,45 @@ function underTrack(project: ProjectPaths, request: ArtifactRequest): LocatedArt
 }
 
 /**
+ * Stage 7: the first artifact a person watches rather than looks at.
+ *
+ * The two media are one list here for the reason they are one list in the
+ * stage: a clip and the frame it starts on are two purchases and one review.
+ * The ids are the ones `--artifact` already spells, `C01` and `entry:C02`, so
+ * a panel that can approve something can also show it without a second naming
+ * scheme, and a clip's id resolving to an MP4 while a frame's resolves to a
+ * PNG is the layout module's answer rather than this table's guess.
+ *
+ * `end:Cnn` is deliberately absent although the chain talks about it
+ * constantly. Its format is the video provider's choice, `end.jpg` for the
+ * JPEG ModelArk returns, and the only honest way to name the file is to read
+ * what the stage recorded, which this resolver may not do: it builds paths and
+ * never asks the stage or the filesystem what it thinks. A table that tried
+ * both extensions would be guessing, and a guess is exactly what the 404 above
+ * exists to refuse.
+ */
+function underClips(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const track = trackOf(request);
+  const episode = episodePaths(project, request.episodeId);
+
+  if (track === null || !episode.ok) {
+    return null;
+  }
+
+  const paths = episodeTrackPaths(episode.data, track);
+
+  if (request.artifact.startsWith(ENTRY)) {
+    const frame = clipFrame(paths, request.artifact.slice(ENTRY.length), "entry");
+
+    return frame.ok ? { contentType: PNG, path: frame.data } : null;
+  }
+
+  const video = clipVideo(paths, request.artifact);
+
+  return video.ok ? { contentType: MP4, path: video.data } : null;
+}
+
+/**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
  * It is a function rather than a row in the table above because its artifacts
@@ -171,6 +216,10 @@ export function locateArtifact(
 
   if (request.stage === "references" || request.stage === "opening-frame") {
     return underTrack(project.data, request);
+  }
+
+  if (request.stage === "clips") {
+    return underClips(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

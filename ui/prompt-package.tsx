@@ -2,6 +2,7 @@ import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState }
 import { INTENTS } from "../src/ui/commands.js";
 import {
   Action,
+  asCalls,
   Drift,
   Field,
   NO_FLAGS,
@@ -304,6 +305,7 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
         onRun={startRun}
         preview={preview}
         projectRun={run}
+        read={asCalls}
         running={running}
         sent={sent}
       >

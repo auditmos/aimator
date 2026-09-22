@@ -355,6 +355,80 @@ describe("the artifact resolver", () => {
     expect(opening?.bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "opening-frame.png")));
   });
 
+  /**
+   * Stage 7, the first artifact a person has to **watch** rather than look at.
+   *
+   * Its two media are one review and one list, so they are one stage's word
+   * apiece under one tuple: a clip is its own id, an entry frame carries the
+   * `entry:` the CLI already spells in `--artifact`. Nothing here learns that a
+   * clip is an MP4 and a frame is a PNG from the bytes; both come from the
+   * layout module, which is the only place either name is written down.
+   */
+  it("should serve a clip as the film it is and its entry frame as the png", async () => {
+    const app = createUi({ workspace });
+    const [clip, entry] = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/clips/C01?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/clips/${encodeURIComponent("entry:C02")}?episode=${EPISODE}&track=${TRACK}`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return {
+          bytes: Buffer.from(await response.arrayBuffer()),
+          ranges: response.headers.get("accept-ranges") ?? "",
+          status: response.status,
+          type: response.headers.get("content-type") ?? "",
+        };
+      })
+    );
+
+    expect([clip?.status, entry?.status]).toEqual([200, 200]);
+    expect([clip?.type, entry?.type]).toEqual(["video/mp4", "image/png"]);
+    expect(clip?.bytes).toEqual(await readFile(join(episodeRoot(), TRACK, "clips", "C01.mp4")));
+    expect(entry?.bytes).toEqual(
+      await readFile(join(episodeRoot(), TRACK, "frames", "C02", "entry.png"))
+    );
+    // Said on the whole file as well as on a slice: a player asks for the
+    // first bytes and decides from this header whether it may seek at all.
+    expect([clip?.ranges, entry?.ranges]).toEqual(["bytes", "bytes"]);
+  });
+
+  /**
+   * Seeking, which is the whole difference between a film and a download.
+   *
+   * A browser that cannot ask for the middle of a file plays a clip from the
+   * start or not at all, so approving a twelfth second means watching eleven.
+   * The answer is the ordinary one HTTP already has, and it is the server's to
+   * get right rather than the player's: the bytes that were asked for, the
+   * range they came from, and 206 rather than 200, because a player reading
+   * 200 believes it was handed the whole film and stops asking.
+   */
+  it("should answer a Range request with exactly the bytes it names", async () => {
+    const whole = await readFile(join(episodeRoot(), TRACK, "clips", "C01.mp4"));
+    const response = await createUi({ workspace }).request(
+      `/api/artifact/${PROJECT}/clips/C01?episode=${EPISODE}&track=${TRACK}`,
+      { headers: { range: "bytes=16-47" } }
+    );
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get("content-range")).toBe(`bytes 16-47/${whole.length}`);
+    expect(response.headers.get("content-length")).toBe("32");
+    expect(response.headers.get("content-type")).toBe("video/mp4");
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(whole.subarray(16, 48));
+  });
+
+  /** A range past the end is answered, not guessed at: 416 and the real size. */
+  it("should refuse a range the file does not have", async () => {
+    const whole = await readFile(join(episodeRoot(), TRACK, "clips", "C01.mp4"));
+    const response = await createUi({ workspace }).request(
+      `/api/artifact/${PROJECT}/clips/C01?episode=${EPISODE}&track=${TRACK}`,
+      { headers: { range: `bytes=${whole.length}-` } }
+    );
+
+    expect(response.status).toBe(416);
+    expect(response.headers.get("content-range")).toBe(`bytes */${whole.length}`);
+  });
+
   it("should answer 404 for anything the layout does not name, and leak nothing", async () => {
     const secret = join(scratch, "sekret.md");
 
@@ -378,6 +452,14 @@ describe("the artifact resolver", () => {
         // under a name stage 6 does not have: neither becomes a path.
         `/api/artifact/${PROJECT}/references/${encodeURIComponent("../../opening-frame")}?episode=${EPISODE}&track=${TRACK}`,
         `/api/artifact/${PROJECT}/opening-frame/R01?episode=${EPISODE}&track=${TRACK}`,
+        // Stage 7 knows two words and neither of them is a reference's: a clip
+        // id, and the same id under `entry:`. Anything else is a 404 before a
+        // path exists, including the `end:` the chain talks about, whose format
+        // is the provider's and therefore nothing this table may guess at.
+        `/api/artifact/${PROJECT}/clips/R01?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/clips/${encodeURIComponent("end:C01")}?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/clips/${encodeURIComponent("entry:../../C01")}?episode=${EPISODE}&track=${TRACK}`,
+        `/api/artifact/${PROJECT}/clips/C01?episode=${EPISODE}`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -385,7 +467,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 11 }, () => 404));
+    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 15 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 });

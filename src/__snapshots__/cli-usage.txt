@@ -57,7 +57,7 @@ Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
 Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
   clip generate <id> <episode-id> --track <gpt-image|seedream>
                [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
-               [--dry-run] [--regenerate]
+               [--dry-run] [--json] [--regenerate]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
     i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL, klucz
@@ -171,7 +171,7 @@ Wspólne:
   check <id> <character-id> --stage character --track <tor> [--json]
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
-  check <id> <episode-id> --stage clips --track <tor>
+  check <id> <episode-id> --stage clips --track <tor> [--json]
   check <id> <episode-id> --stage assembly --track <tor>
   check <id> <episode-id> --stage soundtrack [--track <tor>]
   check <id> <episode-id> --stage sound-design [--track <tor>]
@@ -183,6 +183,7 @@ Wspólne:
                [--json]
   approve <id> <episode-id> --stage opening-frame --track <tor> [--json]
   approve <id> <episode-id> --stage clips --track <tor> --artifact C01[,entry:C02]
+               [--json]
   approve <id> <episode-id> --stage assembly --track <tor>
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02]
   approve <id> <episode-id> --stage soundtrack --track <tor>
@@ -195,10 +196,9 @@ Wspólne:
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve na razie wyłącznie z --stage prepare, screenplay,
-               shot-list, prompt-package, character, references albo
-               opening-frame, a z komend etapu na razie wyłącznie na etapach
-               0–6; kolejne etapy dostają go po kolei razem ze swoim panelem w
-               UI
+               shot-list, prompt-package, character, references, opening-frame
+               albo clips, a z komend etapu na razie wyłącznie na etapach 0–7;
+               kolejne etapy dostają go po kolei razem ze swoim panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

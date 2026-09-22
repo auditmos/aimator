@@ -1,6 +1,7 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import {
+  asCalls,
   Drift,
   NO_FLAGS,
   PaidCall,
@@ -127,6 +128,7 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
         onRun={startRun}
         preview={preview}
         projectRun={run}
+        read={asCalls}
         running={running}
         sent={sent}
       >

@@ -11,15 +11,18 @@ import { describe, expect, it } from "vitest";
  * the terminal cannot, and every later panel would quietly be allowed to do
  * the same. It reads as an ordinary import, so nothing but a test catches it.
  *
- * Two modules of the library are allowed, and neither is a stage. The layout
- * module says where the workspace is, which the watcher needs and nothing else
- * can answer; the environment module is the only one permitted to read
- * `process.env`, which the process entry needs to find the default workspace.
+ * Three modules of the library are allowed, and none of them is a stage, which
+ * is the line this rule actually draws. The layout module says where the
+ * workspace is, which the watcher needs and nothing else can answer; the
+ * environment module is the only one permitted to read `process.env`, which the
+ * process entry needs to find the default workspace; and the byte-range module
+ * is arithmetic over an HTTP header, shared with the published page's worker
+ * and knowing nothing about any stage or any artifact.
  */
 
 const ui = import.meta.dirname;
 const IMPORT = /^import\s[\s\S]*?["']([^"']+)["'];$/gm;
-const ALLOWED_LIBRARY = new Set(["../lib/env.js", "../lib/workspace.js"]);
+const ALLOWED_LIBRARY = new Set(["../lib/byte-range.js", "../lib/env.js", "../lib/workspace.js"]);
 
 function sourceFiles(): readonly string[] {
   return readdirSync(ui).filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"));

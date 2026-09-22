@@ -22,10 +22,9 @@ const FLAGS = `  --audio      music-and-effects | dialogue | narration | dialogu
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve na razie wyłącznie z --stage prepare, screenplay,
-               shot-list, prompt-package, character, references albo
-               opening-frame, a z komend etapu na razie wyłącznie na etapach
-               0–6; kolejne etapy dostają go po kolei razem ze swoim panelem w
-               UI
+               shot-list, prompt-package, character, references, opening-frame
+               albo clips, a z komend etapu na razie wyłącznie na etapach 0–7;
+               kolejne etapy dostają go po kolei razem ze swoim panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

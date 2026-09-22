@@ -13,9 +13,14 @@
  * The bucket stays private. Nothing reaches it except through this worker, on
  * the site's own origin, which is also what lets the page keep
  * `default-src 'self'` and what keeps a download link a download.
+ *
+ * The range itself is parsed by `lib/byte-range`, promoted there when the local
+ * UI became its second caller: what a bucket and a file on disk share is the
+ * arithmetic, and nothing around it.
  */
 
-const RANGE = /^bytes=(\d*)-(\d*)$/;
+import { parseRange } from "../lib/byte-range.js";
+
 const MEDIA_PREFIX = "/media/";
 /** A published file's bytes never change, so its cache never has to. */
 const CACHE_CONTROL = "public, max-age=31536000, immutable";
@@ -39,36 +44,6 @@ export interface AssetEnv {
     ) => Promise<MediaBody | null>;
     readonly head: (key: string) => Promise<MediaObject | null>;
   };
-}
-
-interface ByteRange {
-  readonly first: number;
-  readonly last: number;
-}
-
-/**
- * A single byte range, in both spellings HTTP allows: `bytes=100-` counts from
- * the start, `bytes=-100` counts back from the end. Anything else is `null`,
- * which the caller answers with 416 rather than guessing.
- */
-export function parseRange(header: string, size: number): ByteRange | null {
-  const match = RANGE.exec(header);
-  if (!match) {
-    return null;
-  }
-  const [, from = "", to = ""] = match;
-  if (!(from || to)) {
-    return null;
-  }
-  const first = from ? Number(from) : Math.max(0, size - Number(to));
-  const last = from && to ? Math.min(Number(to), size - 1) : size - 1;
-  if (!(Number.isSafeInteger(first) && Number.isSafeInteger(last))) {
-    return null;
-  }
-  if (first > last || first >= size) {
-    return null;
-  }
-  return { first, last };
 }
 
 function mediaHeaders(object: MediaObject): Headers {

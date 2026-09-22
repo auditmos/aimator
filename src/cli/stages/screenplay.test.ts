@@ -156,7 +156,7 @@ describe("--json on a stage that has no object yet", () => {
       // arrive, which is exactly what this test is watching: the flag refuses
       // for what is left rather than quietly printing prose.
       "--stage",
-      "clips",
+      "assembly",
       "--json",
       "--dry-run",
       "--workspace",

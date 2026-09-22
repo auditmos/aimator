@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { open } from "node:fs/promises";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { run } from "../cli/index.js";
+import { parseRange } from "../lib/byte-range.js";
 import type { Workspace } from "../lib/workspace.js";
-import { locateArtifact } from "./artifact.js";
+import { type LocatedArtifact, locateArtifact } from "./artifact.js";
 import { watchWorkspace } from "./watch.js";
 
 /**
@@ -135,6 +136,75 @@ export function createUi(options: UiOptions): Hono {
     return Response.json(refusal, { status: 404 });
   };
 
+  /**
+   * An artifact's bytes, and the one header that makes a film watchable.
+   *
+   * Reading a screenplay is reading the whole file; watching a clip is not.
+   * A player asks for the head of the file, reads how long it is, and then
+   * asks for the second somebody dragged to, so a server that only ever
+   * answered 200 with everything would leave a person watching eleven seconds
+   * in order to approve the twelfth. That is the same gap the pictures closed
+   * at stage 2: approving what you cannot look at is approving a filename.
+   *
+   * So `Range` is answered where HTTP says it is answered, and the three
+   * possible replies are kept apart on purpose. A request with no range gets
+   * the whole file and the header that says a range would have worked; a
+   * legible range gets 206 and exactly the bytes it named, because a player
+   * reading 200 believes it was handed the whole film and stops asking; a
+   * range the file does not have gets 416 and the real size, rather than a
+   * guess at what the caller meant.
+   */
+  const serve = async (located: LocatedArtifact, range: string | undefined): Promise<Response> => {
+    let file: Awaited<ReturnType<typeof open>> | null = null;
+
+    try {
+      // An artifact the layout knows and the stage has not written yet is the
+      // ordinary case here, not an error: the panel asks for it the moment a
+      // cell exists, which is before the stage has run. So every way of
+      // failing to read these bytes is answered the same way, exactly as it
+      // was when this was one `readFile`.
+      file = await open(located.path);
+
+      const { size } = await file.stat();
+      // Several ranges in one header are optional in HTTP and nothing here
+      // asks for them, so they are read as no range at all rather than refused.
+      const wanted = range === undefined || range.includes(",") ? null : range;
+      const span = wanted === null ? null : parseRange(wanted, size);
+
+      if (wanted !== null && span === null) {
+        return new Response(null, {
+          headers: {
+            "accept-ranges": "bytes",
+            "content-range": `bytes */${size}`,
+            "content-type": located.contentType,
+          },
+          status: 416,
+        });
+      }
+
+      const first = span?.first ?? 0;
+      const last = span?.last ?? size - 1;
+      const length = size === 0 ? 0 : last - first + 1;
+      const bytes = Buffer.alloc(length);
+
+      await file.read(bytes, 0, length, first);
+
+      return new Response(bytes, {
+        headers: {
+          "accept-ranges": "bytes",
+          "content-length": String(length),
+          "content-type": located.contentType,
+          ...(span === null ? {} : { "content-range": `bytes ${first}-${last}/${size}` }),
+        },
+        status: span === null ? 200 : 206,
+      });
+    } catch {
+      return missing("tego artefaktu jeszcze nie ma na dysku");
+    } finally {
+      await file?.close();
+    }
+  };
+
   /** One command, one answer, and the JSON the CLI already produced. */
   const answer = async (argv: readonly string[]): Promise<Response> => {
     const result = await ask(argv);
@@ -180,21 +250,9 @@ export function createUi(options: UiOptions): Hono {
       track: c.req.query("track") ?? "",
     });
 
-    if (located === null) {
-      return missing("nie ma takiego artefaktu w układzie katalogu roboczego");
-    }
-
-    try {
-      return new Response(await readFile(located.path), {
-        headers: { "content-type": located.contentType },
-        status: 200,
-      });
-    } catch {
-      // An artifact the layout knows and the stage has not written yet is the
-      // ordinary case here, not an error: the panel asks for it the moment a
-      // cell exists, which is before the stage has run.
-      return missing("tego artefaktu jeszcze nie ma na dysku");
-    }
+    return located === null
+      ? missing("nie ma takiego artefaktu w układzie katalogu roboczego")
+      : await serve(located, c.req.header("range"));
   });
 
   app.get(

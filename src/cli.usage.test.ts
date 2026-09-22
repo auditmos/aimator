@@ -277,7 +277,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--track",
     T,
   ],
-  "  check <id> <episode-id> --stage clips --track <tor>": [
+  "  check <id> <episode-id> --stage clips --track <tor> [--json]": [
     "check",
     ...ON,
     "--stage",

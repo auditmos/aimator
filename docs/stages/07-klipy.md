@@ -24,6 +24,16 @@ pnpm dev approve dzielna-ewa 01-burza --stage clips --track seedream --artifact 
 Dodatkowe flagi: `--artifact C01,entry:C02`, `--image-model <id>`, `--video-model <id>`,
 `--regenerate`, `--republish --artifact C01`.
 
+## `--json`
+
+`clip generate`, `check --stage clips` i `approve --stage clips` przyjmują `--json` i
+wypisują obiekt, który ten etap i tak zwraca: bez nowego formatu, z dwoma polami mówiącymi,
+skąd pochodzi (`command`, `stage`). Rachunek jest w nim **dwiema liczbami**, `paidImages`
+i `paidVideos`, nigdy jedną sumą: klatka wejściowa i klip kosztują o rząd wielkości
+inaczej, więc suma byłaby liczbą, której nikt nie płaci. Każde ogniwo niesie swój `kind`
+(`clip` albo `entry-frame`), swój stan i swoje zdanie o tym, na czyją zgodę czeka — i to
+jest to, co czyta panel etapu 7 i agent zamiast polskiego tekstu.
+
 ## Bramka jest łańcuchem
 
 Klip C01 czeka na zatwierdzoną klatkę otwarcia. Klatka wejściowa C02 czeka na zatwierdzoną

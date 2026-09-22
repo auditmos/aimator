@@ -232,7 +232,7 @@ Odcinek "01-burza", tor gpt-image, etap 8, przyjęty w całości
 Dalej: odcinek "01-burza" na torze gpt-image jest zmontowany i przyjęty"
 `;
 
-exports[`every command >   check <id> <episode-id> --stage clips --track <tor> 1`] = `
+exports[`every command >   check <id> <episode-id> --stage clips --track <tor> [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, etap 7, zatwierdzony w całości
   C01 (clip): zatwierdzony, 1920x1080, 15s
