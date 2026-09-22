@@ -1,19 +1,19 @@
 Usage: aimator <command>
 
 Etap 0. Przygotowanie projektu i odcinka:
-  project init <id> --title <tytuł> [--aspect-ratio <w:h>]
-  project voice <id> --voice-id <id głosu>
+  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
+  project voice <id> --voice-id <id głosu> [--json]
     Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
     etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
-  character new <id> <character-id> --name <nazwa>
-  character add <id> <character-id> --source <plik> [--source <plik>...]
-  character describe <id> <character-id>
+  character new <id> <character-id> --name <nazwa> [--json]
+  character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
+  character describe <id> <character-id> [--json]
   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
-                   [--max-clip <s>]
-  episode set <id> <episode-id> [te same flagi decyzji]
+                   [--max-clip <s>] [--json]
+  episode set <id> <episode-id> [te same flagi decyzji] [--json]
 
 Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
@@ -162,6 +162,7 @@ Wspólne:
     która komenda go wypisała, a każda komórka niesie obiekt swojego etapu bez
     zmian. Odmowa zostaje w Result, dokładnie jak bez flagi.
   check <id> [<episode-id>]
+  check <id> --stage prepare [--json]
   check <id> <episode-id> --stage screenplay [--json]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
@@ -188,9 +189,10 @@ Wspólne:
   --max-clip   najdłuższy planowany klip w sekundach (1–60); decyzja odcinka bez
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
-               i approve na razie wyłącznie z --stage screenplay, a z komend
-               etapu na razie wyłącznie na screenplay generate; kolejne etapy
-               dostają go po kolei razem ze swoim panelem w UI
+               i approve na razie wyłącznie z --stage prepare albo screenplay,
+               a z komend etapu na razie wyłącznie na etapie 0 i na screenplay
+               generate; kolejne etapy dostają go po kolei razem ze swoim
+               panelem w UI
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
   --artifact   card, hero albo nazwa widoku: front, slight-left, slight-right,

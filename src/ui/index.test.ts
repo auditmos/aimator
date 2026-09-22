@@ -377,6 +377,74 @@ describe("running a command", () => {
    * a foreign `Origin` is refused, and a body has to be JSON, which is what
    * makes the browser ask permission before sending anything at all.
    */
+  /**
+   * Stage 0's one promise the browser could quietly break.
+   *
+   * A person pastes a path out of Finder and the CLI copies the file, which is
+   * why `episode.json` records where it came from. Handing bytes over instead
+   * would have made that origin a temporary directory, and an answer to "skąd
+   * to jest" would have stopped existing: that is the whole reason the PRD
+   * refused an upload. So the string travels from the form to `--source`
+   * untouched, and what proves it is the archive rather than the argv.
+   */
+  it("should carry the path typed in a stage-0 form into the episode's archive", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const source = join(scratch, "02-Slonce.md");
+
+    await writeFile(source, "# Słońce\n\nEwa czeka na słońce.\n", "utf8");
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: INTENTS.addEpisode({
+          audio: "narration",
+          duration: "30",
+          language: "pl",
+          maxClip: "15",
+          nature: "law-or-idea",
+          projectId: PROJECT,
+          source,
+          subtitles: "none",
+        }),
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+
+    expect(JSON.parse(finished.data)).toMatchObject({ ok: true, runId });
+
+    const project = projectPaths(workspace, PROJECT);
+
+    if (!project.ok) {
+      throw project.error;
+    }
+
+    const added = episodePaths(project.data, "02-slonce");
+
+    if (!added.ok) {
+      throw added.error;
+    }
+
+    expect(JSON.parse(await readFile(added.data.file, "utf8"))).toMatchObject({
+      source: { originPath: source },
+    });
+
+    const checked = await app.request("/api/run", {
+      body: JSON.stringify({ argv: INTENTS.checkPrepare({ projectId: PROJECT }) }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+
+    expect(checked.status).toBe(202);
+    await events.close();
+  });
+
   it("should refuse a command posted by a page that is not this one", async () => {
     const response = await createUi({ workspace }).request("/api/run", {
       body: JSON.stringify({ argv: ["list"] }),

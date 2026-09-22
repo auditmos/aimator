@@ -222,7 +222,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     T,
     "--dry-run",
   ],
-  "  character add <id> <character-id> --source <plik> [--source <plik>...]": [
+  "  character add <id> <character-id> --source <plik> [--source <plik>...] [--json]": [
     "character",
     "add",
     PROJECT,
@@ -231,7 +231,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "<scratch>/ewa-2.png",
     "--dry-run",
   ],
-  "  character describe <id> <character-id>": [
+  "  character describe <id> <character-id> [--json]": [
     "character",
     "describe",
     PROJECT,
@@ -249,7 +249,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "gpt-image-2.5-sunburst",
     "--dry-run",
   ],
-  "  character new <id> <character-id> --name <nazwa>": [
+  "  character new <id> <character-id> --name <nazwa> [--json]": [
     "character",
     "new",
     PROJECT,
@@ -258,6 +258,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "Babcia",
     "--dry-run",
   ],
+  "  check <id> --stage prepare [--json]": ["check", PROJECT, "--stage", "prepare", "--json"],
   "  check <id> [<episode-id>]": ["check", ...ON],
   "  check <id> <character-id> --stage character --track <tor>": [
     "check",
@@ -347,7 +348,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "narration",
     "--dry-run",
   ],
-  "  episode set <id> <episode-id> [te same flagi decyzji]": [
+  "  episode set <id> <episode-id> [te same flagi decyzji] [--json]": [
     "episode",
     "set",
     ...ON,
@@ -396,7 +397,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "gpt-image-2.5-sunburst",
     "--dry-run",
   ],
-  "  project init <id> --title <tytuł> [--aspect-ratio <w:h>]": [
+  "  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]": [
     "project",
     "init",
     "nowy",
@@ -406,7 +407,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "16:9",
     "--dry-run",
   ],
-  "  project voice <id> --voice-id <id głosu>": [
+  "  project voice <id> --voice-id <id głosu> [--json]": [
     "project",
     "voice",
     PROJECT,

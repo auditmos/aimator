@@ -31,12 +31,34 @@ const NO_RUN_ID = /identyfikator/;
 const USAGE_LINE = /^ {2}(\S+)(?: (\S+))?/;
 const FLAG = /--[a-z][a-z-]+/g;
 
+/**
+ * One object wide enough for every intent, which only this test ever holds.
+ *
+ * Each intent declares the narrow shape it needs, and the record they live in
+ * is typed as taking this one, so a scope that grew a field nobody reads is a
+ * type error rather than a dead value on a form. The test hands the same
+ * object to all of them, because what it is checking is the argv, not who
+ * assembles it.
+ */
 const scope = {
+  aspectRatio: "16:9",
+  audio: "narration",
+  characterId: "ewa",
+  duration: "30",
   episodeId: "01-burza",
+  language: "pl",
+  maxClip: "15",
   maxOutputTokens: "12000",
   model: "gpt-6-astra",
+  name: "Ewa",
+  nature: "law-or-idea",
   projectId: "dzielna-ewa",
   regenerate: false,
+  source: "/Users/ktos/Filmy/01-Burza.md",
+  sources: ["/Users/ktos/Zdjecia/ewa-1.png"],
+  subtitles: "none",
+  title: "Dzielna Ewa",
+  voiceId: "voice-1",
 };
 
 /**
@@ -130,6 +152,77 @@ describe("the command dictionary", () => {
     );
 
     expect(spending).toEqual([]);
+  });
+});
+
+/**
+ * Stage 0, the one stage a person fills in rather than buys.
+ *
+ * It has no bill and no preview, so what the dictionary owes here is narrower
+ * and sharper: the **path** a person pastes out of Finder has to reach
+ * `--source` byte for byte, because `episode.json` records it as the file's
+ * origin. An upload would have recorded a temporary directory, which is why
+ * the PRD refused one, and a client that trimmed, resolved or re-encoded the
+ * string would have broken the same promise more quietly.
+ */
+describe("the stage-0 forms", () => {
+  it("should hand the typed path to --source without touching it", () => {
+    expect(INTENTS.addEpisode(scope)).toEqual([
+      "episode",
+      "add",
+      "dzielna-ewa",
+      "--source",
+      "/Users/ktos/Filmy/01-Burza.md",
+      "--duration",
+      "30",
+      "--audio",
+      "narration",
+      "--language",
+      "pl",
+      "--subtitles",
+      "none",
+      "--nature",
+      "law-or-idea",
+      "--max-clip",
+      "15",
+    ]);
+  });
+
+  /** Rule 7 at the edge of the screen: a field nobody filled in is undecided. */
+  it("should leave out a decision the form was not given", () => {
+    expect(
+      INTENTS.setEpisode({
+        ...scope,
+        audio: "",
+        language: "",
+        maxClip: "",
+        nature: "",
+        subtitles: "",
+      })
+    ).toEqual(["episode", "set", "dzielna-ewa", "01-burza", "--duration", "30"]);
+  });
+
+  it("should spell every photograph as its own --source", () => {
+    expect(
+      INTENTS.addCharacterSources({
+        ...scope,
+        sources: ["/Zdjecia/ewa-1.png", "/Zdjecia/ewa-2.png"],
+      })
+    ).toEqual([
+      "character",
+      "add",
+      "dzielna-ewa",
+      "ewa",
+      "--source",
+      "/Zdjecia/ewa-1.png",
+      "--source",
+      "/Zdjecia/ewa-2.png",
+    ]);
+  });
+
+  it("should name stage 0 when it asks about it, so the answer is stage 0 alone", () => {
+    expect(INTENTS.checkPrepare(scope)).toEqual(["check", "dzielna-ewa", "--stage", "prepare"]);
+    expect(INTENTS.approvePrepare(scope)).toEqual(["approve", "dzielna-ewa", "--stage", "prepare"]);
   });
 });
 

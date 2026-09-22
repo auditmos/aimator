@@ -1,0 +1,149 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`every stage-0 command under --json > should print the stage's report for approve 1`] = `
+{
+  "approved": true,
+  "command": "approve",
+  "created": [],
+  "nextStep": "etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:
+  aimator screenplay generate dzielna-ewa <episode-id> --dry-run
+  aimator character generate dzielna-ewa <character-id> --track <gpt-image|seedream> --dry-run",
+  "problems": [],
+  "ready": true,
+  "reused": [
+    "projects/dzielna-ewa/prepare.stage.json",
+    "projects/dzielna-ewa/episodes/01-burza/prepare.stage.json",
+  ],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for character add 1`] = `
+{
+  "approved": false,
+  "command": "character add",
+  "created": [
+    "projects/dzielna-ewa/characters/ewa/sources/ewa.png",
+  ],
+  "nextStep": "materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj",
+  "problems": [],
+  "ready": false,
+  "reused": [],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for character describe 1`] = `
+{
+  "approved": false,
+  "command": "character describe",
+  "created": [],
+  "nextStep": "opis wyglądu "Tata" w project.md jest jedynym wejściem etapu postaci, musi być konkretny",
+  "problems": [],
+  "ready": false,
+  "reused": [
+    "projects/dzielna-ewa/project.json",
+    "projects/dzielna-ewa/prepare.stage.json",
+  ],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for character new 1`] = `
+{
+  "approved": false,
+  "command": "character new",
+  "created": [],
+  "nextStep": "zdecyduj, skąd bierze się wygląd: aimator character add dzielna-ewa ewa --source <plik> albo aimator character describe dzielna-ewa ewa",
+  "problems": [],
+  "ready": false,
+  "reused": [
+    "projects/dzielna-ewa/project.json",
+    "projects/dzielna-ewa/prepare.stage.json",
+  ],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for check 1`] = `
+{
+  "approved": false,
+  "command": "check",
+  "created": [],
+  "nextStep": "pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve dzielna-ewa",
+  "problems": [],
+  "ready": true,
+  "reused": [
+    "01-burza",
+  ],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for episode add 1`] = `
+{
+  "approved": false,
+  "command": "episode add",
+  "created": [
+    "projects/dzielna-ewa/episodes/01-burza/source.md",
+    "projects/dzielna-ewa/episodes/01-burza/episode.json",
+    "projects/dzielna-ewa/episodes/01-burza/prepare.stage.json",
+  ],
+  "nextStep": "uzupełnij decyzje: aimator episode set dzielna-ewa 01-burza --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>",
+  "problems": [],
+  "ready": false,
+  "reused": [],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for episode set 1`] = `
+{
+  "approved": false,
+  "command": "episode set",
+  "created": [],
+  "nextStep": "aimator check dzielna-ewa",
+  "problems": [],
+  "ready": true,
+  "reused": [
+    "projects/dzielna-ewa/episodes/01-burza/episode.json",
+    "projects/dzielna-ewa/episodes/01-burza/prepare.stage.json",
+  ],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for project init 1`] = `
+{
+  "approved": false,
+  "command": "project init",
+  "created": [
+    "projects/dzielna-ewa/project.md",
+    "projects/dzielna-ewa/project.json",
+    "projects/dzielna-ewa/prepare.stage.json",
+  ],
+  "nextStep": "zadeklaruj obsadę: aimator character new dzielna-ewa <postać> --name <nazwa>",
+  "problems": [
+    "project.json: obsada jest pusta, wymień każdą powracającą postać serii; jednorazowe pojawienie to referencja etapu 5, nie postać",
+  ],
+  "ready": false,
+  "reused": [],
+  "stage": "prepare",
+}
+`;
+
+exports[`every stage-0 command under --json > should print the stage's report for project voice 1`] = `
+{
+  "approved": false,
+  "command": "project voice",
+  "created": [],
+  "nextStep": "aimator check dzielna-ewa",
+  "problems": [],
+  "ready": false,
+  "reused": [
+    "projects/dzielna-ewa/project.json",
+    "projects/dzielna-ewa/prepare.stage.json",
+  ],
+  "stage": "prepare",
+}
+`;

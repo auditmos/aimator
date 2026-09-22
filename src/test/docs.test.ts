@@ -89,6 +89,9 @@ const LOCAL_LINK = /\[[^\]]+\]\(([^)]+)\)/g;
  * site’s own page. Three copies of one list is the drift this file exists to
  * catch, and `--help` cannot settle it: the CLI names commands, not stages.
  */
+/** A block of the usage text that belongs to one stage, by its own heading. */
+const STAGE_HEADING = /^Etap (\d+)\./;
+
 const README_STAGE = /^\| \[(\d+)\. ([^\]]+)\]/gm;
 const PAGE_STAGE = /^### (\d+)\. (.+)$/gm;
 const SITE_STAGE = /data-stage="(\d+)"[\s\S]*?lang="pl">([^<]+)</g;
@@ -197,6 +200,37 @@ describe("documentation", () => {
       .map(([, number, name]) => `${number}. ${name?.trim()}`)
       .filter((stage) => !diagram?.includes(stage));
     expect(undrawn).toEqual([]);
+  });
+
+  /**
+   * `--json` arrives one stage at a time, and the page has to arrive with it.
+   *
+   * The flag is what an agent reads instead of Polish sentences, so a stage
+   * that takes it and never says so is a contract nobody can find. Which
+   * stages take it is not listed here, for the reason nothing else in this file
+   * is: it is read off `--help`, block by block, so the day a stage's usage
+   * fragment grows the flag, its page is what fails until somebody writes it.
+   */
+  it("should document --json on the page of every stage whose commands take it", () => {
+    const pages = markdownUnder(join(repoRoot, "docs", "stages"));
+    const undocumented: string[] = [];
+
+    for (const block of usage.split("\n\n")) {
+      const [, number] = STAGE_HEADING.exec(block) ?? [];
+
+      if (number === undefined || !block.includes("--json")) {
+        continue;
+      }
+
+      const prefix = `/${number.padStart(2, "0")}-`;
+      const page = pages.find((one) => relative(repoRoot, one).includes(prefix));
+
+      if (page === undefined || !readFileSync(page, "utf8").includes("--json")) {
+        undocumented.push(`etap ${number}`);
+      }
+    }
+
+    expect(undocumented).toEqual([]);
   });
 
   it("should give every implemented stage a page of its own", () => {

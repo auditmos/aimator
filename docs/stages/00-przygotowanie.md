@@ -55,6 +55,46 @@ odcinkowi innego lektora bez śladu na dysku. Bramkuje wyłącznie
 Każde polecenie zapisujące przyjmuje `--dry-run`: pokazuje, co powstanie, i nie zapisuje
 niczego. `--workspace <ścieżka>` nadpisuje `AIMATOR_WORKSPACE` dla jednego wywołania.
 
+## Etap 0 jako obiekt
+
+Każde polecenie tego etapu przyjmuje `--json` i wypisuje **obiekt, który zwraca moduł
+etapu**, bez osobnego formatu, plus dwa pola mówiące, skąd się wziął:
+
+```bash
+pnpm dev check dzielna-ewa --stage prepare --json
+```
+
+```json
+{
+  "command": "check",
+  "stage": "prepare",
+  "approved": false,
+  "created": [],
+  "nextStep": "pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve dzielna-ewa",
+  "problems": [],
+  "ready": true,
+  "reused": ["01-burza"]
+}
+```
+
+`stage` brzmi `prepare` dla wszystkich siedmiu poleceń, bo wszystkie piszą jeden artefakt.
+`command` ma tu **dwa słowa**, i to nie jest niekonsekwencja wobec etapu 1: tam `stage`
+i `command` składają się w całe wywołanie (`screenplay generate`), a tutaj jeden etap
+zapisują trzy gramatyki, więc pole mówiące `add` dla `character add` i dla `episode add`
+odpowiadałoby na pytanie „która komenda to wypisała" zgadywanką.
+
+`--stage prepare` zawęża `check` do etapu 0, także wtedy, gdy w wywołaniu stoi odcinek.
+Bez tej flagi `check <id> <episode-id>` skleja werdykty etapów 0, 1, 3 i 4 w jeden tekst,
+którego nie da się rozłożyć z powrotem: to dobre pytanie dla człowieka przy terminalu
+i złe dla wszystkiego, co chce werdyktu samego etapu 0. Identyfikator w wywołaniu mówi,
+o który odcinek chodzi, nigdy o który etap.
+
+Panel etapu 0 w [lokalnym UI](../ui.md) czyta właśnie te obiekty, a plik podaje się w nim
+**ścieżką w polu tekstowym**, przekazywaną do `--source` bez zmian. Dzięki temu
+`episode.json` zapisuje w `source.originPath` miejsce, z którego plik naprawdę pochodzi;
+upload przez przeglądarkę zapisałby katalog tymczasowy i odpowiedź na pytanie „skąd to
+jest" przestałaby istnieć.
+
 ## Co powstaje
 
 ```

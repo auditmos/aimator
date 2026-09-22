@@ -1,8 +1,16 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
 import { Ladder } from "./ladder";
-import { ScreenplayPanel } from "./panel";
+import { PreparePanel } from "./prepare";
+import { ScreenplayPanel } from "./screenplay";
 import { ThemeSelect } from "./theme";
-import type { EpisodeStatus, Refusal, RunDone, StatusCell, WorkspaceListing } from "./types";
+import type {
+  EpisodeStatus,
+  ListedProject,
+  Refusal,
+  RunDone,
+  StatusCell,
+  WorkspaceListing,
+} from "./types";
 
 /**
  * One screen: what is in the workspace, and where one episode stands.
@@ -30,25 +38,54 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
 /**
  * Which cells can be opened today.
  *
- * One stage, one slice: stage 1 has a panel, the other ten are driven from the
- * terminal until theirs arrives. A row nobody can open says so by being a row,
- * which is more honest than a panel apologising for being empty.
+ * One stage, one slice: the rest are driven from the terminal until theirs
+ * arrives. A row nobody can open says so by being a row, which is more honest
+ * than a panel apologising for being empty.
  */
 function openable(cell: StatusCell): boolean {
-  return cell.stage === 1;
+  return cell.stage === 0 || cell.stage === 1;
 }
 
-/** The first episode anybody could be looking at, when nothing is chosen yet. */
-function firstEpisode(listing: WorkspaceListing): { episode: string; project: string } | null {
-  for (const project of listing.projects) {
-    const [episode] = project.episodes;
+/**
+ * What the screen says about itself: the connection, a refusal, an empty tree.
+ *
+ * All three are the same kind of statement and none of them is a result, which
+ * is why they sit together and above everything that is one. § 9 of the design
+ * manual is the rule they follow: a lost stream leaves the last ladder on
+ * screen and says it is old, and an empty workspace says so plainly rather
+ * than looking like a tool that failed to load.
+ */
+function Notices(props: {
+  readonly connection: Connection;
+  /** Suppressed where stage 0 is the whole screen: there is no ladder to be stale. */
+  readonly ladderless: boolean;
+  readonly listing: WorkspaceListing | null;
+  readonly project: ListedProject | null;
+  readonly refusal: string | null;
+}): JSX.Element {
+  const { connection, ladderless, listing, project, refusal } = props;
+  const note = CONNECTION_NOTE[connection];
 
-    if (episode !== undefined) {
-      return { episode, project: project.id };
-    }
-  }
-
-  return null;
+  return (
+    <>
+      {note === null || ladderless ? null : (
+        <p aria-live="polite" className={`connection connection-${connection}`}>
+          {note}
+        </p>
+      )}
+      {refusal === null ? null : (
+        <p className="refusal" role="alert">
+          {refusal}
+        </p>
+      )}
+      {listing !== null && listing.projects.length === 0 ? (
+        <p className="empty">Katalog roboczy nie ma jeszcze żadnego projektu.</p>
+      ) : null}
+      {project !== null && project.episodes.length === 0 ? (
+        <p className="empty">Projekt {project.id} nie ma jeszcze odcinka.</p>
+      ) : null}
+    </>
+  );
 }
 
 export function App(): JSX.Element {
@@ -62,6 +99,14 @@ export function App(): JSX.Element {
   const [pending, setPending] = useState<string | null>(null);
   const [run, setRun] = useState<RunDone | null>(null);
 
+  /**
+   * The workspace's own contents, re-read whenever a command finishes.
+   *
+   * Stage 0 is why: a project and an episode are things this screen can
+   * create, and a picker that only read once would not show what the person
+   * just made. Every other command leaves the listing exactly as it was, so
+   * re-reading it costs one directory walk and never lies.
+   */
   useEffect(() => {
     let cancelled = false;
 
@@ -80,13 +125,6 @@ export function App(): JSX.Element {
       }
 
       setListing(body);
-
-      const first = firstEpisode(body);
-
-      if (first !== null) {
-        setProjectId(first.project);
-        setEpisodeId(first.episode);
-      }
     };
 
     read().catch(() => {
@@ -98,10 +136,33 @@ export function App(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [run]);
+
+  /** The first thing anybody could be looking at, when nothing is chosen yet. */
+  useEffect(() => {
+    if (listing === null) {
+      return;
+    }
+
+    const chosen = listing.projects.find((one) => one.id === projectId) ?? listing.projects[0];
+
+    if (chosen === undefined) {
+      return;
+    }
+
+    if (projectId === null) {
+      setProjectId(chosen.id);
+    }
+
+    if (episodeId === null || !chosen.episodes.includes(episodeId)) {
+      setEpisodeId(chosen.episodes[0] ?? null);
+    }
+  }, [episodeId, listing, projectId]);
 
   useEffect(() => {
     if (projectId === null || episodeId === null) {
+      setStatus(null);
+
       return;
     }
 
@@ -161,7 +222,6 @@ export function App(): JSX.Element {
   }, []);
 
   const project = listing?.projects.find((one) => one.id === projectId) ?? null;
-  const note = CONNECTION_NOTE[connection];
   /**
    * Still running, derived rather than remembered.
    *
@@ -175,6 +235,17 @@ export function App(): JSX.Element {
   // The panel renders the cell the ladder is carrying right now, so a finished
   // command refreshes what the panel says without the panel asking anything.
   const panel = status?.cells.find((cell) => cell.id === opened && openable(cell)) ?? null;
+  /**
+   * Stage 0 is reachable even when there is no ladder to open it from.
+   *
+   * That is not a convenience: an empty workspace has no project, a fresh
+   * project has no episode, and `status` answers about an episode. Stage 0 is
+   * what makes the rest exist, so it is the one panel that cannot be behind
+   * the thing it produces.
+   */
+  const ladderless =
+    listing !== null && (project === null || project.episodes.length === 0 || refusal !== null);
+  const preparing = panel?.stage === 0 || ladderless;
 
   /** Choosing a project chooses its first episode: no empty in-between. */
   const chooseProject = useCallback(
@@ -256,26 +327,27 @@ export function App(): JSX.Element {
             </select>
           </div>
         </div>
-        {note === null ? null : (
-          <p aria-live="polite" className={`connection connection-${connection}`}>
-            {note}
-          </p>
-        )}
-        {refusal === null ? null : (
-          <p className="refusal" role="alert">
-            {refusal}
-          </p>
-        )}
-        {listing !== null && listing.projects.length === 0 ? (
-          <p className="empty">Katalog roboczy nie ma jeszcze żadnego projektu.</p>
-        ) : null}
-        {project !== null && project.episodes.length === 0 ? (
-          <p className="empty">Projekt {project.id} nie ma jeszcze odcinka.</p>
-        ) : null}
+        <Notices
+          connection={connection}
+          ladderless={ladderless}
+          listing={listing}
+          project={project}
+          refusal={refusal}
+        />
         {status === null ? null : (
           <Ladder onOpen={openCell} openable={openable} opened={opened} status={status} />
         )}
-        {panel === null || projectId === null || episodeId === null ? null : (
+        {preparing ? (
+          <PreparePanel
+            cell={panel}
+            episodeId={episodeId}
+            onRun={start}
+            projectId={project?.id ?? null}
+            run={run}
+            running={running}
+          />
+        ) : null}
+        {panel === null || panel.stage !== 1 || projectId === null || episodeId === null ? null : (
           <ScreenplayPanel
             cell={panel}
             episodeId={episodeId}

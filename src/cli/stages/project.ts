@@ -7,10 +7,12 @@ import {
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
+  type Answer,
   type Approval,
+  answerFlag,
+  answerStage0,
   modeOf,
   parse,
-  renderStage0,
   requireFlag,
   requirePositional,
   UsageError,
@@ -18,8 +20,8 @@ import {
 } from "../common.js";
 
 /** Stage 0's project half: the rules a series shares, and who narrates it. */
-export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>]
-  project voice <id> --voice-id <id głosu>
+export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
+  project voice <id> --voice-id <id głosu> [--json]
     Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
@@ -31,7 +33,7 @@ export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>
  * a decision belongs to the project rather than to an episode or a shell.
  */
 async function runProjectVoice(argv: readonly string[]): Promise<Result<string>> {
-  const parsed = parse(argv, { "voice-id": { type: "string" } });
+  const parsed = parse(argv, { json: { type: "boolean" }, "voice-id": { type: "string" } });
 
   if (!parsed.ok) {
     return parsed;
@@ -61,7 +63,9 @@ async function runProjectVoice(argv: readonly string[]): Promise<Result<string>>
 
   return result.ok
     ? ok(
-        renderStage0(
+        answerStage0(
+          answerFlag(parsed.data),
+          "project voice",
           `Narratorem projektu "${projectId.data}" jest głos ${voiceId.data}`,
           result.data,
           mode
@@ -84,6 +88,7 @@ export async function runProject(argv: readonly string[]): Promise<Result<string
   // believe they had named a character when nothing was written.
   const parsed = parse(argv.slice(1), {
     "aspect-ratio": { type: "string" },
+    json: { type: "boolean" },
     title: { type: "string" },
   });
 
@@ -116,19 +121,38 @@ export async function runProject(argv: readonly string[]): Promise<Result<string
   });
 
   return result.ok
-    ? ok(renderStage0(`Utworzono projekt "${projectId.data}"`, result.data, mode))
+    ? ok(
+        answerStage0(
+          answerFlag(parsed.data),
+          "project init",
+          `Utworzono projekt "${projectId.data}"`,
+          result.data,
+          mode
+        )
+      )
     : result;
 }
 
-/** `check` with no `--stage`: whether stage 0 is ready, and whether it is accepted. */
+/**
+ * `check` with no `--stage`, and `--stage prepare`: whether stage 0 is ready,
+ * and whether it is accepted.
+ *
+ * What to print travels in rather than being defaulted, for the reason stage 1
+ * gives: both callers are in `check.ts`, the wide question renders prose and
+ * the narrow one renders whichever the flag asked for, and a default would
+ * decide for the next caller silently.
+ */
 export async function checkPrepareStage(
   projectId: string,
-  workspace: Workspace
+  workspace: Workspace,
+  answer: Answer
 ): Promise<Result<string>> {
   const result = await checkStage0({ projectId, workspace });
 
   return result.ok
-    ? ok(renderStage0(`Projekt "${projectId}", etap 0 gotowy`, result.data, "apply"))
+    ? ok(
+        answerStage0(answer, "check", `Projekt "${projectId}", etap 0 gotowy`, result.data, "apply")
+      )
     : result;
 }
 
@@ -138,7 +162,9 @@ export async function approvePrepareStage(approval: Approval): Promise<Result<st
 
   return result.ok
     ? ok(
-        renderStage0(
+        answerStage0(
+          approval.answer,
+          "approve",
           `Etap 0 projektu "${approval.projectId}" zatwierdzony`,
           result.data,
           approval.mode

@@ -23,6 +23,9 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   etapie 2, każda w jednym z pięciu stanów z etykietą tekstową, z powodem blokady w słowach
   etapu i z meldunkami pod spodem. Kolor nigdy nie niesie znaczenia sam.
 - **Jedno „Dalej:"**, wyróżnione, dokładnie to, które policzył `status`.
+- **Panel etapu 0**, jedyny, który istnieje **zanim** jest co pokazywać: formularze
+  założenia projektu, obsady, narratora, odcinka i jego sześciu decyzji, plus „Sprawdź"
+  i „Zatwierdź". Pliki podaje się **ścieżką w polu tekstowym**; patrz niżej.
 - **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
@@ -31,6 +34,26 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 
 Komórki pozostałych etapów są na razie wierszami bez panelu: każdy etap dostaje swój
 w osobnym wycinku, a wiersz, którego nie da się kliknąć, mówi to uczciwiej niż pusty panel.
+
+## Etap 0 i ścieżka w polu tekstowym
+
+Etap 0 jest wyjątkiem od zdania „panel otwiera się z komórki drabiny", i to nie jest
+odstępstwo, tylko opis tego, czym ten etap jest. Drabina odpowiada o **odcinku**, a pusty
+katalog roboczy nie ma projektu, świeży projekt nie ma odcinka. Panel etapu 0 pokazuje się
+więc także wtedy, gdy drabiny nie ma, i to on doprowadza pusty katalog do zatwierdzonego
+etapu 0: załóż projekt, uzupełnij `project.md` w edytorze, dopisz obsadę, dodaj odcinek,
+ustaw decyzje, „Sprawdź", „Zatwierdź".
+
+Plik podaje się **ścieżką wklejoną z Findera**, która trafia do `--source` bez zmian.
+Upload przez przeglądarkę został w PRD odrzucony z jednego powodu i widać go w
+`episode.json`: archiwum zapisuje `source.originPath`, czyli miejsce, z którego plik
+naprawdę pochodzi, a bajty podane przez przeglądarkę zapisałyby katalog tymczasowy
+i odpowiedź na pytanie „skąd to jest" przestałaby istnieć. Klient niczego z tą ścieżką nie
+robi: nie przycina, nie rozwija i nie normalizuje, a pilnuje tego test słownika komend.
+
+Jedyne pole, którego ten panel nie zastępuje, to `project.md`: zasady wspólne pisze
+człowiek w edytorze, bo to jedyny artefakt tego narzędzia pisany ręcznie. Wywiadu też tu
+nie ma — prowadzą go skille `prepare-project` i `develop-series` w terminalu.
 
 ## Przyciski, czyli komendy
 
@@ -138,5 +161,6 @@ otwierania portu: żądanie stanu zwraca to samo, co `status --json`, żądanie 
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
 jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem. Słownik
 komend jest sprawdzany względem `--help`, a zakup osobno: że jest tą samą wysyłką bez próby
-na sucho i że bez ukończonej próby nie daje się zbudować. Klient jest sprawdzany w
-przeglądarce, w obu motywach.
+na sucho i że bez ukończonej próby nie daje się zbudować. Ścieżka z formularza etapu 0 ma
+własny test przez `app.request()`: po uruchomieniu komendy `episode.json` zapisuje dokładnie
+ten ciąg znaków, który dostało pole. Klient jest sprawdzany w przeglądarce, w obu motywach.

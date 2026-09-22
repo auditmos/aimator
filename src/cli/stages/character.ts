@@ -14,12 +14,13 @@ import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
 import {
   type Approval,
+  answerFlag,
+  answerStage0,
   imageModelOf,
   keyFor,
   modeOf,
   type Parsed,
   parse,
-  renderStage0,
   requireFlag,
   requirePositional,
   trackOf,
@@ -36,9 +37,9 @@ import {
  * is what knows about stages, so the fragment goes to stage 0's block and the
  * one below to stage 2's.
  */
-export const CAST_USAGE = `  character new <id> <character-id> --name <nazwa>
-  character add <id> <character-id> --source <plik> [--source <plik>...]
-  character describe <id> <character-id>`;
+export const CAST_USAGE = `  character new <id> <character-id> --name <nazwa> [--json]
+  character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
+  character describe <id> <character-id> [--json]`;
 
 /** Stage 2: the card, the eight views and the hero, per track. */
 export const USAGE = `Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
@@ -86,7 +87,15 @@ async function runCharacterNew(parsed: Parsed): Promise<Result<string>> {
   const result = await addCharacter({ ...scope.data, mode, name: name.data });
 
   return result.ok
-    ? ok(renderStage0(`Postać "${name.data}" dopisana do obsady`, result.data, mode))
+    ? ok(
+        answerStage0(
+          answerFlag(parsed),
+          "character new",
+          `Postać "${name.data}" dopisana do obsady`,
+          result.data,
+          mode
+        )
+      )
     : result;
 }
 
@@ -105,7 +114,15 @@ async function runCharacterAdd(parsed: Parsed): Promise<Result<string>> {
   const result = await addCharacterSources({ ...scope.data, mode, sourcePaths: sources });
 
   return result.ok
-    ? ok(renderStage0(`Materiały postaci "${scope.data.characterId}"`, result.data, mode))
+    ? ok(
+        answerStage0(
+          answerFlag(parsed),
+          "character add",
+          `Materiały postaci "${scope.data.characterId}"`,
+          result.data,
+          mode
+        )
+      )
     : result;
 }
 
@@ -121,7 +138,9 @@ async function runCharacterDescribe(parsed: Parsed): Promise<Result<string>> {
 
   return result.ok
     ? ok(
-        renderStage0(
+        answerStage0(
+          answerFlag(parsed),
+          "character describe",
           `Postać "${scope.data.characterId}" powstaje z opisu w project.md, bez zdjęć`,
           result.data,
           mode
@@ -131,15 +150,15 @@ async function runCharacterDescribe(parsed: Parsed): Promise<Result<string>> {
 }
 
 const CHARACTER_OPTIONS = {
-  add: { source: { multiple: true, type: "string" } },
-  describe: {},
+  add: { json: { type: "boolean" }, source: { multiple: true, type: "string" } },
+  describe: { json: { type: "boolean" } },
   generate: {
     artifact: { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
     track: { type: "string" },
   },
-  new: { name: { type: "string" } },
+  new: { json: { type: "boolean" }, name: { type: "string" } },
 } as const satisfies Record<string, ParseArgsConfig["options"]>;
 
 export async function runCharacter(argv: readonly string[]): Promise<Result<string>> {

@@ -79,7 +79,7 @@ Próba na sucho: nic nie zapisano. Montaż ewa/01-burza, tor gpt-image
 Dalej: usuń powyższe przeszkody przed montażem"
 `;
 
-exports[`every command >   character add <id> <character-id> --source <plik> [--source <plik>...] 1`] = `
+exports[`every command >   character add <id> <character-id> --source <plik> [--source <plik>...] [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Materiały postaci "ewa"
   + projects/ewa/characters/ewa/sources/ewa-2.png
@@ -88,7 +88,7 @@ Próba na sucho: nic nie zapisano. Materiały postaci "ewa"
 Dalej: materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj"
 `;
 
-exports[`every command >   character describe <id> <character-id> 1`] = `
+exports[`every command >   character describe <id> <character-id> [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Postać "ewa" powstaje z opisu w project.md, bez zdjęć
   = projects/ewa/project.json
@@ -198,7 +198,7 @@ Płaskie 2D. Paleta dziesięciu barw.
 "
 `;
 
-exports[`every command >   character new <id> <character-id> --name <nazwa> 1`] = `
+exports[`every command >   character new <id> <character-id> --name <nazwa> [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Postać "Babcia" dopisana do obsady
   = projects/ewa/project.json
@@ -307,6 +307,22 @@ Odcinek "01-burza", etap 4: completed, zatwierdzony
     R01 (location) Living room, evening ← hero:ewa"
 `;
 
+exports[`every command >   check <id> --stage prepare [--json] 1`] = `
+"ok
+{
+  "command": "check",
+  "stage": "prepare",
+  "approved": true,
+  "created": [],
+  "nextStep": "etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:\\n  aimator screenplay generate ewa <episode-id> --dry-run\\n  aimator character generate ewa <character-id> --track <gpt-image|seedream> --dry-run",
+  "problems": [],
+  "ready": true,
+  "reused": [
+    "01-burza"
+  ]
+}"
+`;
+
 exports[`every command >   clip generate <id> <episode-id> --track <gpt-image|seedream> 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Klipy ewa/01-burza, tor gpt-image, kadr 2816x1584
@@ -324,7 +340,7 @@ Próba na sucho: nic nie zapisano. Dodano odcinek
 Dalej: uzupełnij decyzje: aimator episode set ewa 02-slonce --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>"
 `;
 
-exports[`every command >   episode set <id> <episode-id> [te same flagi decyzji] 1`] = `
+exports[`every command >   episode set <id> <episode-id> [te same flagi decyzji] [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Ustawienia odcinka "01-burza"
   = projects/ewa/episodes/01-burza/episode.json
@@ -640,7 +656,7 @@ Płaskie 2D. Paleta dziesięciu barw.
 "
 `;
 
-exports[`every command >   project init <id> --title <tytuł> [--aspect-ratio <w:h>] 1`] = `
+exports[`every command >   project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Utworzono projekt "nowy"
   + projects/nowy/project.md
@@ -650,7 +666,7 @@ Próba na sucho: nic nie zapisano. Utworzono projekt "nowy"
 Dalej: zadeklaruj obsadę: aimator character new nowy <postać> --name <nazwa>"
 `;
 
-exports[`every command >   project voice <id> --voice-id <id głosu> 1`] = `
+exports[`every command >   project voice <id> --voice-id <id głosu> [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Narratorem projektu "ewa" jest głos voice-1
   = projects/ewa/project.json

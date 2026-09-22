@@ -21,9 +21,34 @@
  * screen is the text a terminal would have printed, refusals included.
  */
 
-interface EpisodeRef {
-  readonly episodeId: string;
+interface ProjectRef {
   readonly projectId: string;
+}
+
+interface EpisodeRef extends ProjectRef {
+  readonly episodeId: string;
+}
+
+/** One member of the cast, which is a directory level and never a filename. */
+interface CastRef extends ProjectRef {
+  readonly characterId: string;
+}
+
+/**
+ * The five decisions an episode carries, plus the sixth stage 3 asks for.
+ *
+ * Every one of them is a string, including the two that are numbers, because
+ * what the form holds is what somebody typed and an empty field means
+ * undecided. Coercing "" to 0 here would be this client answering a question
+ * rule 7 says only a person may answer.
+ */
+interface Settings {
+  readonly audio: string;
+  readonly duration: string;
+  readonly language: string;
+  readonly maxClip: string;
+  readonly nature: string;
+  readonly subtitles: string;
 }
 
 /**
@@ -69,7 +94,79 @@ function flag(name: string, value: string): readonly string[] {
   return value === "" ? [] : [name, value];
 }
 
+/** The six decisions, in the order the usage text lists them. */
+function settings(one: Settings): readonly string[] {
+  return [
+    ...flag("--duration", one.duration),
+    ...flag("--audio", one.audio),
+    ...flag("--language", one.language),
+    ...flag("--subtitles", one.subtitles),
+    ...flag("--nature", one.nature),
+    ...flag("--max-clip", one.maxClip),
+  ];
+}
+
+/**
+ * Everything any intent needs, which nothing but the dictionary's test holds.
+ *
+ * Each intent below declares the narrow shape it actually reads, and the
+ * record is typed as taking this wide one, which is legal because a function
+ * asking for less is assignable to one asked for more. The point is the test:
+ * it hands one object to every intent, so a new intent is checked against
+ * `--help` the moment it exists rather than when somebody remembers to add it.
+ */
+interface Everything extends Send, Settings {
+  readonly aspectRatio: string;
+  readonly characterId: string;
+  readonly name: string;
+  readonly source: string;
+  readonly sources: readonly string[];
+  readonly title: string;
+  readonly voiceId: string;
+}
+
 export const INTENTS = {
+  /** Stage 0: one more member of the cast, declared rather than inferred. */
+  addCharacter: (one: CastRef & { readonly name: string }): readonly string[] => [
+    "character",
+    "new",
+    one.projectId,
+    one.characterId,
+    "--name",
+    one.name,
+  ],
+  /**
+   * Stage 0: photographs this character is drawn from, by path.
+   *
+   * Several `--source` flags rather than one comma-separated value, because
+   * that is what the command takes and a path may contain a comma. The paths
+   * travel exactly as typed: the archive records where each file came from.
+   */
+  addCharacterSources: (
+    one: CastRef & { readonly sources: readonly string[] }
+  ): readonly string[] => [
+    "character",
+    "add",
+    one.projectId,
+    one.characterId,
+    ...one.sources.filter((path) => path !== "").flatMap((path) => ["--source", path]),
+  ],
+  /** Stage 0: the episode, named by its own source file and nothing else. */
+  addEpisode: (one: ProjectRef & Settings & { readonly source: string }): readonly string[] => [
+    "episode",
+    "add",
+    one.projectId,
+    "--source",
+    one.source,
+    ...settings(one),
+  ],
+  /** Stage 0, accepted: the rules, the cast and the episode's decisions. */
+  approvePrepare: (one: ProjectRef): readonly string[] => [
+    "approve",
+    one.projectId,
+    "--stage",
+    "prepare",
+  ],
   /** Stage 1, accepted: a human saying yes, bound to the digests it has now. */
   approveScreenplay: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
     "approve",
@@ -78,6 +175,32 @@ export const INTENTS = {
     "--stage",
     "screenplay",
   ],
+  /**
+   * Stage 0: the narrator of the series, cast rather than configured.
+   *
+   * A voice recurs between episodes exactly as the cast does, so it is stored
+   * beside them in `project.json` and gates stage 9 alone.
+   */
+  castNarrator: (one: ProjectRef & { readonly voiceId: string }): readonly string[] => [
+    "project",
+    "voice",
+    one.projectId,
+    "--voice-id",
+    one.voiceId,
+  ],
+  /**
+   * Stage 0, verified: named, so the answer is stage 0 and nothing else.
+   *
+   * Without `--stage` the same command glues four stages into one string,
+   * which is the right answer for a person at a terminal and unreadable for a
+   * panel showing one stage.
+   */
+  checkPrepare: (one: ProjectRef): readonly string[] => [
+    "check",
+    one.projectId,
+    "--stage",
+    "prepare",
+  ],
   /** Stage 1, verified: reads, reports drift, writes nothing. */
   checkScreenplay: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
     "check",
@@ -85,6 +208,24 @@ export const INTENTS = {
     episodeId,
     "--stage",
     "screenplay",
+  ],
+  /** Stage 0: this character is drawn from `project.md`, not from photographs. */
+  describeCharacter: (one: CastRef): readonly string[] => [
+    "character",
+    "describe",
+    one.projectId,
+    one.characterId,
+  ],
+  /** Stage 0: the project itself, which is where an empty workspace starts. */
+  initProject: (
+    one: ProjectRef & { readonly aspectRatio: string; readonly title: string }
+  ): readonly string[] => [
+    "project",
+    "init",
+    one.projectId,
+    "--title",
+    one.title,
+    ...flag("--aspect-ratio", one.aspectRatio),
   ],
   /** Stage 1, previewed: the whole send, priced, with nothing sent. */
   previewScreenplay: (send: Send): readonly string[] => [
@@ -98,7 +239,15 @@ export const INTENTS = {
     "--dry-run",
     "--json",
   ],
-} as const satisfies Record<string, (send: Send) => readonly string[]>;
+  /** Stage 0: the decisions of an episode that already exists. */
+  setEpisode: (one: EpisodeRef & Settings): readonly string[] => [
+    "episode",
+    "set",
+    one.projectId,
+    one.episodeId,
+    ...settings(one),
+  ],
+} as const satisfies Record<string, (one: Everything) => readonly string[]>;
 
 /**
  * Stage 1, bought: the previewed send, with the dry run taken off.

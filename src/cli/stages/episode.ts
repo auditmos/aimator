@@ -2,10 +2,11 @@ import type { ParseArgsConfig } from "node:util";
 import { addEpisode, setEpisodeSettings } from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import {
+  answerFlag,
+  answerStage0,
   modeOf,
   type Parsed,
   parse,
-  renderStage0,
   requireFlag,
   requirePositional,
   UsageError,
@@ -15,8 +16,8 @@ import {
 /** Stage 0's episode half: the five production settings, stored or undecided. */
 export const USAGE = `  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
-                   [--max-clip <s>]
-  episode set <id> <episode-id> [te same flagi decyzji]`;
+                   [--max-clip <s>] [--json]
+  episode set <id> <episode-id> [te same flagi decyzji] [--json]`;
 
 const SETTINGS_OPTIONS = {
   audio: { type: "string" },
@@ -80,7 +81,9 @@ async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
     workspace: workspace.data,
   });
 
-  return result.ok ? ok(renderStage0("Dodano odcinek", result.data, mode)) : result;
+  return result.ok
+    ? ok(answerStage0(answerFlag(parsed), "episode add", "Dodano odcinek", result.data, mode))
+    : result;
 }
 
 async function runEpisodeSet(parsed: Parsed): Promise<Result<string>> {
@@ -108,7 +111,15 @@ async function runEpisodeSet(parsed: Parsed): Promise<Result<string>> {
   });
 
   return result.ok
-    ? ok(renderStage0(`Ustawienia odcinka "${episodeId.data}"`, result.data, mode))
+    ? ok(
+        answerStage0(
+          answerFlag(parsed),
+          "episode set",
+          `Ustawienia odcinka "${episodeId.data}"`,
+          result.data,
+          mode
+        )
+      )
     : result;
 }
 
@@ -121,6 +132,7 @@ export async function runEpisode(argv: readonly string[]): Promise<Result<string
 
   const parsed = parse(argv.slice(1), {
     ...SETTINGS_OPTIONS,
+    json: { type: "boolean" },
     ...(action === "add" ? { source: { type: "string" as const } } : {}),
   });
 

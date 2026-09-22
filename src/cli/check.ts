@@ -14,6 +14,7 @@ import { checkSoundDesignStage } from "./stages/sound-design.js";
 
 /** Every question `check` answers, in the words the usage text promises. */
 export const USAGE = `  check <id> [<episode-id>]
+  check <id> --stage prepare [--json]
   check <id> <episode-id> --stage screenplay [--json]
   check <id> <character-id> --stage character --track <tor>
   check <id> <episode-id> --stage references --track <tor>
@@ -54,6 +55,13 @@ export async function runCheck(argv: readonly string[]): Promise<Result<string>>
   }
   if (!answer.ok) {
     return answer;
+  }
+
+  // Naming stage 0 narrows the question to it, exactly as naming stage 1 does,
+  // and it narrows even when an episode is named as well: an id in the argv
+  // says which episode, never which stage.
+  if (parsed.data.values.stage === "prepare") {
+    return await checkPrepareStage(projectId.data, workspace.data, answer.data);
   }
 
   // Naming stage 1 narrows the question to it. The wide check answers four
@@ -104,7 +112,7 @@ export async function runCheck(argv: readonly string[]): Promise<Result<string>>
     return await checkSoundDesignStage(parsed.data, projectId.data, workspace.data);
   }
 
-  const stage0 = await checkPrepareStage(projectId.data, workspace.data);
+  const stage0 = await checkPrepareStage(projectId.data, workspace.data, "text");
 
   if (!stage0.ok) {
     return stage0;

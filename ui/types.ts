@@ -11,6 +11,24 @@
 export type CellState = "approved" | "blocked" | "ready" | "review" | "running";
 
 /**
+ * Stage 0's report, as all seven of its commands print it under `--json` and
+ * as the ladder carries it inside the stage-0 cell.
+ *
+ * `problems` here is advisory rather than blocking, and the panel treats it
+ * that way: a project with no episode yet says so and is still acceptable,
+ * exactly as the CLI accepts it. The blocking kind never reaches this shape,
+ * because the stage refuses to answer at all.
+ */
+export interface Stage0Report {
+  readonly approved: boolean;
+  readonly created: readonly string[];
+  readonly nextStep: string;
+  readonly problems: readonly string[];
+  readonly ready: boolean;
+  readonly reused: readonly string[];
+}
+
+/**
  * Stage 1's own object, as `check --stage screenplay --json` prints it and as
  * the ladder carries it inside its stage-1 cell. Declared, never derived: the
  * panel renders these fields and computes no verdict of its own.

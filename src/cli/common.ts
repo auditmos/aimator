@@ -152,7 +152,7 @@ export type Answer = "json" | "text";
  * command because both commands take the flag and both owe the same answer to
  * "which spellings work", and two lists would disagree the day one grew.
  */
-const JSON_STAGES = ["screenplay"] as const;
+const JSON_STAGES = ["prepare", "screenplay"] as const;
 
 /**
  * What to print, refusing the spellings that would print the wrong thing.
@@ -173,9 +173,21 @@ export function answerOf(parsed: Parsed): Result<Answer> {
     ? ok("json")
     : err(
         new UsageError(
-          `--json wypisuje obiekt na razie wyłącznie dla --stage ${JSON_STAGES.join(", ")}; kolejne etapy dostają go po kolei, razem ze swoim panelem`
+          `--json wypisuje obiekt na razie wyłącznie dla: ${JSON_STAGES.map((name) => `--stage ${name}`).join(", ")}; kolejne etapy dostają go po kolei, razem ze swoim panelem`
         )
       );
+}
+
+/**
+ * What a command that names its own stage was asked to print.
+ *
+ * There is no refusal here and there cannot be one, for the reason
+ * `answerOf` has both: `check` and `approve` answer for eleven stages, so they
+ * have to reject a `--stage` whose object does not exist yet, while a command
+ * whose first word *is* its stage can only ever print its own report.
+ */
+export function answerFlag(parsed: Parsed): Answer {
+  return parsed.values.json === true ? "json" : "text";
 }
 
 /**
@@ -288,11 +300,38 @@ export interface Approval {
   readonly workspace: Workspace;
 }
 
-export function renderStage0(
+/**
+ * Stage 0's word for itself, in the spelling `--stage` takes.
+ *
+ * One stage written by seven commands, which is why it is a constant here
+ * rather than a literal in each of the three files that write it: `project`,
+ * `episode` and `character` are three grammars, and what they produce is one
+ * artifact with one contract.
+ */
+const PREPARE = "prepare";
+
+/**
+ * A stage-0 command's answer: the shared report, as prose or as the object.
+ *
+ * `command` is two words here where stage 1's is one, and the difference is
+ * not an inconsistency. A stage-1 object is written by `screenplay generate`,
+ * so `stage` and `command` spell the invocation between them; stage 0 is
+ * written by `character add` and by `episode add`, and a field saying `add`
+ * for both would answer "which command wrote this" with a guess.
+ */
+export function answerStage0(
+  answer: Answer,
+  command: string,
   headline: string,
   report: Stage0Report,
   mode: "apply" | "dry-run"
 ): string {
+  return answer === "json"
+    ? asJson(command, PREPARE, report)
+    : renderStage0(headline, report, mode);
+}
+
+function renderStage0(headline: string, report: Stage0Report, mode: "apply" | "dry-run"): string {
   const lines = [mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline];
 
   for (const path of report.created) {
