@@ -36,7 +36,8 @@ import { createUi } from "./index.js";
  * - **Nothing here writes.** This slice serves the ladder and the listing;
  *   running commands and serving artifacts are the rows below it.
  *
- * Not tested here: the client. It is verified in a browser, per the issue.
+ * Not tested here: the client, apart from its readers, which have their own file
+ * beside them. Everything else there is verified in a browser, per the issue.
  */
 
 vi.mock("../lib/env.js", () => ({ env: { AIMATOR_FFMPEG: "/nonexistent/aimator-ffmpeg" } }));
@@ -619,6 +620,59 @@ describe("the artifact resolver", () => {
 
     expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 22 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
+  });
+
+  /**
+   * A film is handed over a piece at a time, because it is a film.
+   *
+   * What a cut weighs is decided by the episode rather than by this server: a
+   * finished one runs minutes and carries both pictures and sound, so the
+   * honest size to design for is hundreds of megabytes rather than the
+   * kilobytes a fixture makes. An answer built by reading the whole file into
+   * one buffer costs that much memory for as long as the response is alive,
+   * and it is exactly as wrong for the request it was written for, the one
+   * with no `Range` header, which is the request a download link makes.
+   *
+   * So what is asserted is the shape of the handover rather than a number of
+   * bytes anybody measured: a body that arrives in one piece **is** the whole
+   * file in memory, and a body that arrives in several is the file being read
+   * as it is sent. The same change is what makes a short read impossible to
+   * paper over, because a stream ends when the file does rather than when a
+   * pre-sized buffer is full.
+   */
+  it("should hand a film over in pieces rather than hold it whole", async () => {
+    const cut = join(episodeRoot(), TRACK, "episode.mp4");
+    const original = await readFile(cut);
+
+    // Larger than one read of a stream, so "several pieces" is a claim about
+    // the handover and not about the fixture's size.
+    await writeFile(cut, Buffer.alloc(512 * 1024, 7));
+
+    try {
+      const response = await createUi({ workspace }).request(
+        `/api/artifact/${PROJECT}/assembly/episode?episode=${EPISODE}&track=${TRACK}`
+      );
+      const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+      let pieces = 0;
+      let bytes = 0;
+
+      for (;;) {
+        // biome-ignore lint/performance/noAwaitInLoops: a body arrives in order
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        pieces += 1;
+        bytes += value.byteLength;
+      }
+
+      expect(bytes).toBe(512 * 1024);
+      expect(pieces).toBeGreaterThan(1);
+    } finally {
+      await writeFile(cut, original);
+    }
   });
 });
 

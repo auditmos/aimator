@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { open } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { run } from "../cli/index.js";
@@ -79,6 +80,16 @@ function hostOf(url: string): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * The one range this server reads, or nothing.
+ *
+ * Several ranges in one header are optional in HTTP and nothing here asks for
+ * them, so they are read as no range at all rather than refused.
+ */
+function oneRange(range: string | undefined): string | null {
+  return range === undefined || range.includes(",") ? null : range;
 }
 
 /** Whether a request came from the page this server itself is serving. */
@@ -166,9 +177,7 @@ export function createUi(options: UiOptions): Hono {
       file = await open(located.path);
 
       const { size } = await file.stat();
-      // Several ranges in one header are optional in HTTP and nothing here
-      // asks for them, so they are read as no range at all rather than refused.
-      const wanted = range === undefined || range.includes(",") ? null : range;
+      const wanted = oneRange(range);
       const span = wanted === null ? null : parseRange(wanted, size);
 
       if (wanted !== null && span === null) {
@@ -185,11 +194,7 @@ export function createUi(options: UiOptions): Hono {
       const first = span?.first ?? 0;
       const last = span?.last ?? size - 1;
       const length = size === 0 ? 0 : last - first + 1;
-      const bytes = Buffer.alloc(length);
-
-      await file.read(bytes, 0, length, first);
-
-      return new Response(bytes, {
+      const answer = {
         headers: {
           "accept-ranges": "bytes",
           "content-length": String(length),
@@ -197,7 +202,33 @@ export function createUi(options: UiOptions): Hono {
           ...(span === null ? {} : { "content-range": `bytes ${first}-${last}/${size}` }),
         },
         status: span === null ? 200 : 206,
-      });
+      };
+
+      if (length === 0) {
+        return new Response(null, answer);
+      }
+
+      /**
+       * The bytes are read as they are sent, never gathered first.
+       *
+       * How heavy an artifact is belongs to the episode rather than to this
+       * server: a finished cut runs minutes and carries both pictures and
+       * sound, so the size to write for is hundreds of megabytes. Reading one
+       * into a buffer would hold all of it for as long as the response lived,
+       * and would do it on the request that asks for no range at all, which is
+       * the request a download link makes. A stream also ends where the file
+       * does, so there is no pre-sized buffer for a short read to leave half
+       * full of zeroes.
+       *
+       * The handle goes with it. `createReadStream` closes what it was given
+       * when the last piece has been read, or when a viewer navigates away
+       * mid-film, so it must not be closed again on the way out of here.
+       */
+      const body = file.createReadStream({ end: last, start: first });
+
+      file = null;
+
+      return new Response(Readable.toWeb(body) as ReadableStream<Uint8Array>, answer);
     } catch {
       return missing("tego artefaktu jeszcze nie ma na dysku");
     } finally {
@@ -295,17 +326,32 @@ export function createUi(options: UiOptions): Hono {
       await push();
 
       let pushing = Promise.resolve();
-      const stop = watchWorkspace(options.workspace.root, () => {
-        // One recompute at a time: a burst that outruns `status` would
-        // otherwise interleave two answers on one socket.
-        pushing = pushing.then(push);
-      });
+      /**
+       * One writer at a time, and a failed write that costs one frame.
+       *
+       * The queue is here because a burst that outruns `status` would
+       * otherwise interleave two answers on one socket. The `catch` is here
+       * because a queue is a chain, and a chain ends at its first rejection:
+       * every link behind a failed one is skipped rather than run, so a single
+       * throw anywhere below, a stage that threw where it meant to refuse, a
+       * write that lost its socket, would silence this stream for as long as
+       * the tab stayed open. Nothing on screen could tell that apart from a
+       * workspace where nothing is happening, which is the worst thing this
+       * server could do: the ladder would stop, a command's result would never
+       * land, and the panel that started it would wait for an answer nobody
+       * was going to send. So a link that fails is dropped and the next one
+       * runs, and since what travels here is the whole ladder rather than a
+       * description of what changed, the recompute after it corrects the
+       * screen by itself.
+       */
+      const queue = (step: () => Promise<void>): void => {
+        pushing = pushing.then(step).catch(() => undefined);
+      };
+      const stop = watchWorkspace(options.workspace.root, () => queue(push));
       // A finished command joins the same queue as a recomputed ladder, for
       // the same reason: two writers on one socket would interleave frames.
       const listener = (done: RunDone): void => {
-        pushing = pushing.then(
-          async () => await stream.writeSSE({ data: JSON.stringify(done), event: "run" })
-        );
+        queue(async () => await stream.writeSSE({ data: JSON.stringify(done), event: "run" }));
       };
 
       listeners.add(listener);
