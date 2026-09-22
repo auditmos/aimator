@@ -18,11 +18,21 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 
 ## Co ten ekran pokazuje
 
-- **Wybór projektu i odcinka** z `list --json`.
+- **Wybór projektu i odcinka** z `list --json`, pod nagłówkiem mówiącym, czym te dwie
+  listy są, i z dwoma przyciskami obok: „+ Nowy projekt" i „+ Nowy odcinek". Oba otwierają
+  panel etapu 0 i przewijają go do właściwego formularza. To jedyna droga do projektu,
+  którego jeszcze nie ma: drabina odpowiada o odcinku, a takiego projektu żadna drabina nie
+  opisuje, więc bez tych przycisków etap 0 dawał się otworzyć tylko z wiersza drabiny, o
+  czym nikt nie mógł wiedzieć.
 - **Drabinę etapów** z `status --json`: komórka na etap, na tor od etapu 2 i na postać w
   etapie 2, każda w jednym z pięciu stanów z etykietą tekstową, z powodem blokady w słowach
   etapu i z meldunkami pod spodem. Kolor nigdy nie niesie znaczenia sam.
-- **Jedno „Dalej:"**, wyróżnione, dokładnie to, które policzył `status`.
+- **Jeden „Następny krok"**, dokładnie ten, który policzył `status`: zdanie etapu w
+  całości i dwa przyciski pod nim. „Pokaż etap N" otwiera panel tej komórki, „Kopiuj”
+  wkłada zdanie do schowka takim, jakie jest, bo `nextStep` bywa gołą komendą, a bywa
+  zdaniem z komendą w środku i skracanie go tutaj byłoby redagowaniem cudzej odpowiedzi.
+  Etykieta jest etykietą: cyjanowa plakietka, którą zastąpiła, wyglądała na przycisk,
+  nie robiła nic po kliknięciu i zostawiała zdanie obok bez zastosowania.
 - **Panel etapu 0**, jedyny, który istnieje **zanim** jest co pokazywać: formularze
   założenia projektu, obsady, narratora, odcinka i jego sześciu decyzji, plus „Sprawdź"
   i „Zatwierdź". Pliki podaje się **ścieżką w polu tekstowym**; patrz niżej.
@@ -68,6 +78,19 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 
 Tym etapem drabina domyka się w panelach: każdy zaimplementowany etap, od 0 do 10, ma swój
 ekran, a dwa ostatnie mają po dwa, bo ich artefakty leżą na dwóch poziomach drzewa.
+
+## Gdzie stoi panel
+
+Panel otwartej komórki stoi **obok** drabiny, nie pod nią. Okno szersze niż 64rem dzieli
+ekran na dwie kolumny i przykleja panel do góry, więc drabinę da się przewijać, a panel
+zostaje w widoku razem z przyciskiem „Zamknij panel"; węższe układa je jedno pod drugim,
+przewija do panelu i daje mu fokus, żeby klawiatura i czytnik ekranu wylądowały tam, gdzie
+wzrok. Powód jest jeden: klik, którego wynik ląduje poza ekranem, jest klikiem bez
+odpowiedzi, a przy dwudziestu wierszach tak wyglądało każde otwarcie panelu z góry
+drabiny. Otwarty wiersz mówi o tym pogrubieniem i tłem, nie samym kolorem.
+
+Panel etapu 0 otwarty w katalogu bez projektu zajmuje całą szerokość, bo nie ma wtedy
+drabiny, obok której miałby stanąć.
 
 ## Czego ten ekran nie robi
 

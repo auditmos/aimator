@@ -67,7 +67,9 @@ function NewProject(props: {
   );
 
   return (
-    <>
+    // Addressable, because the picker's "+ Nowy projekt" opens the whole
+    // stage-0 panel and this is the form it meant.
+    <div id="prepare-new-project">
       <h3>Nowy projekt</h3>
       <p className="actions-note">
         Zakłada katalog serii i szkielet <code>project.md</code>. Zasady wspólne uzupełnia się potem
@@ -97,7 +99,7 @@ function NewProject(props: {
         />
       </div>
       <Action argv={argv} disabled={props.running} label="Załóż projekt" onRun={props.onRun} />
-    </>
+    </div>
   );
 }
 
@@ -233,7 +235,7 @@ function Episode(props: {
   );
 
   return (
-    <>
+    <div id="prepare-episode">
       <h3>Odcinek</h3>
       <p className="actions-note">
         Plik podaje się <strong>ścieżką</strong>, wklejoną z Findera; trafia do{" "}
@@ -299,7 +301,7 @@ function Episode(props: {
       {episodeId === null ? null : (
         <Action argv={set} disabled={running} label="Zapisz decyzje odcinka" onRun={onRun} />
       )}
-    </>
+    </div>
   );
 }
 

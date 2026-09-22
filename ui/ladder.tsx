@@ -1,4 +1,4 @@
-import { type JSX, useCallback } from "react";
+import { type JSX, useCallback, useEffect, useState } from "react";
 import type { CellState, EpisodeStatus, StatusCell } from "./types.js";
 
 /**
@@ -29,6 +29,79 @@ function where(cell: StatusCell): string | null {
   const parts = [cell.character, cell.track].filter((part) => part !== null);
 
   return parts.length === 0 ? null : parts.join(" · ");
+}
+
+const COPY_NOTE: Record<Copied, string | null> = {
+  done: "Skopiowane do schowka.",
+  failed: "Przeglądarka nie dała dostępu do schowka; zaznacz i skopiuj ręcznie.",
+  idle: null,
+};
+
+type Copied = "done" | "failed" | "idle";
+
+/**
+ * The one next move, and the two things a person can actually do with it.
+ *
+ * It used to be a cyan badge reading "Dalej" beside a line of text, which is
+ * the one shape a screen must not have: it looked like a button, did nothing
+ * when clicked, and left the sentence beside it with no use. So the label
+ * stops pretending and the two real uses become buttons. Opening the stage is
+ * this client's own navigation rather than a command, which is why it is
+ * allowed: `status` already said which cell this is, and the panel it opens
+ * runs the same `run(argv)` as every other one.
+ *
+ * "Kopiuj" copies exactly what is on screen, which is sometimes a bare command
+ * and sometimes a sentence with one inside it, because a stage's `nextStep` is
+ * the stage's own words. Trimming it to what looks like a command here would
+ * be the screen editing an answer it did not write.
+ */
+function Next(props: {
+  readonly cell: StatusCell | null;
+  readonly command: string;
+  /** Set only where the next cell has a panel to open. */
+  readonly onOpen: ((id: string) => void) | null;
+}): JSX.Element {
+  const { cell, command, onOpen } = props;
+  const [copied, setCopied] = useState<Copied>("idle");
+  const open = useCallback(() => {
+    if (cell !== null) {
+      onOpen?.(cell.id);
+    }
+  }, [cell, onOpen]);
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(command).then(
+      () => setCopied("done"),
+      () => setCopied("failed")
+    );
+  }, [command]);
+
+  // A note about a command that is no longer on screen would be a lie about
+  // what is in the schowek right now.
+  useEffect(() => {
+    setCopied("idle");
+  }, [command]);
+
+  return (
+    <div className="next-step">
+      <p className="next-label" id="next-label">
+        Następny krok
+      </p>
+      <code className="next-command">{command}</code>
+      <div className="next-actions">
+        {cell === null || onOpen === null ? null : (
+          <button className="action action-primary" onClick={open} type="button">
+            Pokaż etap {cell.stage}
+          </button>
+        )}
+        <button className="action" onClick={copy} type="button">
+          Kopiuj
+        </button>
+        <span aria-live="polite" className="next-copied">
+          {COPY_NOTE[copied]}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 interface CellProps {
@@ -90,6 +163,7 @@ export function Ladder(props: {
   readonly status: EpisodeStatus;
 }): JSX.Element {
   const { onOpen, openable, opened, status } = props;
+  const next = status.cells.find((cell) => cell.id === status.next?.cell) ?? null;
 
   return (
     <section aria-labelledby="ladder-title" className="ladder-section">
@@ -100,10 +174,11 @@ export function Ladder(props: {
         {status.next === null ? (
           <p className="next-done">Odcinek zamknięty: każdy etap zatwierdzony.</p>
         ) : (
-          <p className="next-command">
-            <span className="next-label">Dalej</span>
-            <code>{status.next.command}</code>
-          </p>
+          <Next
+            cell={next}
+            command={status.next.command}
+            onOpen={next !== null && openable(next) ? onOpen : null}
+          />
         )}
       </div>
       <ol className="ladder">

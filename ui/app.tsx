@@ -1,4 +1,12 @@
-import { type ChangeEvent, type JSX, useCallback, useEffect, useState } from "react";
+import {
+  type ChangeEvent,
+  type JSX,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AssemblyPanel } from "./assembly";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
@@ -177,6 +185,208 @@ function Notices(props: {
   );
 }
 
+/**
+ * A panel that opened somewhere a person is not looking has not opened.
+ *
+ * The two-column layout answers this for a wide window: the panel stands
+ * beside the row that was clicked and is in view already, so `nearest` moves
+ * nothing. A narrow window stacks, and there the panel lands below the whole
+ * ladder, which is the arrangement this replaces: a click whose result is
+ * off-screen. The panel takes focus either way, because a keyboard and a
+ * screen reader are in exactly the position a scrolled-past panel leaves the
+ * eye in. An anchor overrides both: it names a form inside the panel, and the
+ * point of naming it is to put it at the top.
+ */
+function useReveal(props: {
+  readonly anchor: string | null;
+  readonly opened: string | null;
+  readonly panel: RefObject<HTMLDivElement | null>;
+  readonly showing: boolean;
+}): void {
+  const { anchor, opened, panel, showing } = props;
+
+  useEffect(() => {
+    // A stage-0 panel standing in for an empty workspace opened itself; there
+    // was no click, so nothing has moved and nothing should be moved to.
+    if (!showing || (opened === null && anchor === null)) {
+      return;
+    }
+
+    const wide = window.matchMedia("(min-width: 64rem)").matches;
+    const part = anchor === null ? null : document.getElementById(anchor);
+
+    (part ?? panel.current)?.scrollIntoView({
+      behavior: "smooth",
+      block: wide && part === null ? "nearest" : "start",
+    });
+    panel.current?.focus({ preventScroll: true });
+  }, [anchor, opened, panel, showing]);
+}
+
+/**
+ * The ladder and the panel of the row somebody opened, side by side.
+ *
+ * They are one component because they are one answer: a click on a row and
+ * the thing that click produced. Under them the panel used to be rendered
+ * after the whole ladder, so opening a cell near the top of a twenty-row
+ * episode put the result below the fold with nothing on screen saying
+ * anything had happened. A wide window now puts the two in columns and keeps
+ * the panel in view while the ladder scrolls; a narrow one stacks them and
+ * the client scrolls to the panel instead.
+ *
+ * Stage 0 is the exception that shapes the rest: it has a panel and may have
+ * no ladder at all, so the grid drops to one column rather than leaving an
+ * empty half beside a form.
+ */
+function Workbench(props: {
+  readonly anchor: string | null;
+  readonly cell: StatusCell | null;
+  readonly episodeId: string | null;
+  readonly onClose: () => void;
+  readonly onOpen: (id: string) => void;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly opened: string | null;
+  readonly preparing: boolean;
+  readonly projectId: string | null;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+  readonly status: EpisodeStatus | null;
+}): JSX.Element {
+  const { anchor, cell, episodeId, onClose, onOpen, onRun, opened, preparing, status } = props;
+  const { projectId, run, running } = props;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const showing = preparing || cell !== null;
+  const stage = cell === null || projectId === null || episodeId === null ? null : cell;
+
+  useReveal({ anchor, opened, panel: panelRef, showing });
+
+  return (
+    <div className={status !== null && showing ? "workbench workbench-split" : "workbench"}>
+      {status === null ? null : (
+        <div className="workbench-ladder">
+          <Ladder onOpen={onOpen} openable={openable} opened={opened} status={status} />
+        </div>
+      )}
+      {showing ? (
+        // `tabIndex` because opening a cell moves focus here: the panel is the
+        // answer to that click, and a keyboard has to land in it.
+        <div className="workbench-panel" ref={panelRef} tabIndex={-1}>
+          {opened === null ? null : (
+            <div className="panel-bar">
+              <button className="panel-close" onClick={onClose} type="button">
+                Zamknij panel
+              </button>
+            </div>
+          )}
+          {preparing ? (
+            <PreparePanel
+              cell={cell}
+              episodeId={episodeId}
+              onRun={onRun}
+              projectId={projectId}
+              run={run}
+              running={running}
+            />
+          ) : null}
+          {stage === null || projectId === null || episodeId === null ? null : (
+            <StagePanel
+              cell={stage}
+              episodeId={episodeId}
+              onRun={onRun}
+              projectId={projectId}
+              run={run}
+              running={running}
+            />
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * What this screen is looking at, and the two ways into something that is not
+ * in the workspace yet.
+ *
+ * Two dropdowns alone answered only half the question. They say which project
+ * and which episode are being shown, and they have no word at all for "I want
+ * a new one", which left the only road into stage 0 running through a row of
+ * a ladder that an empty workspace does not have. The buttons are that road,
+ * and they are buttons rather than an entry in the lists because starting
+ * something new is not one of the things you can pick.
+ */
+function Picker(props: {
+  readonly episodeId: string | null;
+  readonly onEpisode: (event: ChangeEvent<HTMLSelectElement>) => void;
+  readonly onNewEpisode: () => void;
+  readonly onNewProject: () => void;
+  readonly onProject: (event: ChangeEvent<HTMLSelectElement>) => void;
+  readonly project: ListedProject | null;
+  readonly projectId: string | null;
+  /** Null until `list` has answered; empty once it has and found nothing. */
+  readonly projects: readonly ListedProject[] | null;
+}): JSX.Element {
+  const { episodeId, onEpisode, onNewEpisode, onNewProject, onProject, project, projectId } = props;
+  const projects = props.projects ?? [];
+
+  return (
+    <section aria-labelledby="picker-title" className="picker-section">
+      <h2 className="picker-title" id="picker-title">
+        Nad czym pracujesz
+      </h2>
+      <div className="picker">
+        <div className="field">
+          <label htmlFor="project">Projekt</label>
+          <select
+            disabled={projects.length === 0}
+            id="project"
+            onChange={onProject}
+            value={projectId ?? ""}
+          >
+            {projects.map((one) => (
+              <option key={one.id} value={one.id}>
+                {one.id}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="episode">Odcinek</label>
+          <select
+            disabled={project === null || project.episodes.length === 0}
+            id="episode"
+            onChange={onEpisode}
+            value={episodeId ?? ""}
+          >
+            {project?.episodes.map((one) => (
+              <option key={one} value={one}>
+                {one}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="picker-actions">
+        <button className="action" onClick={onNewProject} type="button">
+          + Nowy projekt
+        </button>
+        <button
+          className="action"
+          disabled={projectId === null}
+          onClick={onNewEpisode}
+          type="button"
+        >
+          + Nowy odcinek
+        </button>
+        <p className="picker-note">
+          Oba otwierają etap 0: to tam pusty katalog staje się serią, a projekt bez odcinka dostaje
+          pierwszy.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function App(): JSX.Element {
   const [listing, setListing] = useState<WorkspaceListing | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -187,6 +397,13 @@ export function App(): JSX.Element {
   const [opened, setOpened] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [run, setRun] = useState<RunDone | null>(null);
+  /**
+   * Which part of the open panel a person was asking for, when they asked for
+   * a part of it. "Nowy projekt" and "Nowy odcinek" open the same stage-0
+   * panel, so what tells them apart is where the panel is scrolled to; a
+   * panel opened from the ladder has no such part and leaves this null.
+   */
+  const [anchor, setAnchor] = useState<string | null>(null);
 
   /**
    * The workspace's own contents, re-read whenever a command finishes.
@@ -323,8 +540,33 @@ export function App(): JSX.Element {
   const openCell = useCallback((id: string) => {
     setRun(null);
     setPending(null);
+    setAnchor(null);
     setOpened((current) => (current === id ? null : id));
   }, []);
+  const close = useCallback(() => {
+    setAnchor(null);
+    setOpened(null);
+  }, []);
+  /**
+   * Stage 0 reached from the picker rather than from the ladder.
+   *
+   * A workspace that already holds a project has a ladder, and the only way
+   * into "a project that does not exist yet" was to know that stage 0's row
+   * opens the form. That is a road nobody finds. Both buttons open the same
+   * panel, because it is one stage; what differs is which of its forms the
+   * panel is scrolled to.
+   */
+  const openPrepare = useCallback(
+    (part: string) => {
+      setRun(null);
+      setPending(null);
+      setAnchor(part);
+      setOpened(status?.cells.find((cell) => cell.stage === 0)?.id ?? null);
+    },
+    [status]
+  );
+  const newProject = useCallback(() => openPrepare("prepare-new-project"), [openPrepare]);
+  const newEpisode = useCallback(() => openPrepare("prepare-episode"), [openPrepare]);
 
   const project = listing?.projects.find((one) => one.id === projectId) ?? null;
   /**
@@ -400,38 +642,16 @@ export function App(): JSX.Element {
           Stan jednego odcinka, etap po etapie, prosto z komend <code>list</code> i{" "}
           <code>status</code>. Odświeża się sam, gdy coś w katalogu roboczym się zmieni.
         </p>
-        <div className="picker">
-          <div className="field">
-            <label htmlFor="project">Projekt</label>
-            <select
-              disabled={listing === null}
-              id="project"
-              onChange={chooseProject}
-              value={projectId ?? ""}
-            >
-              {listing?.projects.map((one) => (
-                <option key={one.id} value={one.id}>
-                  {one.id}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="episode">Odcinek</label>
-            <select
-              disabled={project === null || project.episodes.length === 0}
-              id="episode"
-              onChange={chooseEpisode}
-              value={episodeId ?? ""}
-            >
-              {project?.episodes.map((one) => (
-                <option key={one} value={one}>
-                  {one}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <Picker
+          episodeId={episodeId}
+          onEpisode={chooseEpisode}
+          onNewEpisode={newEpisode}
+          onNewProject={newProject}
+          onProject={chooseProject}
+          project={project}
+          projectId={projectId}
+          projects={listing?.projects ?? null}
+        />
         <Notices
           connection={connection}
           ladderless={ladderless}
@@ -439,29 +659,23 @@ export function App(): JSX.Element {
           project={project}
           refusal={refusal}
         />
-        {status === null ? null : (
-          <Ladder onOpen={openCell} openable={openable} opened={opened} status={status} />
-        )}
-        {preparing ? (
-          <PreparePanel
-            cell={panel}
-            episodeId={episodeId}
-            onRun={start}
-            projectId={project?.id ?? null}
-            run={run}
-            running={running}
-          />
-        ) : null}
-        {panel === null || projectId === null || episodeId === null ? null : (
-          <StagePanel
-            cell={panel}
-            episodeId={episodeId}
-            onRun={start}
-            projectId={projectId}
-            run={run}
-            running={running}
-          />
-        )}
+        <Workbench
+          anchor={anchor}
+          cell={panel}
+          episodeId={episodeId}
+          onClose={close}
+          onOpen={openCell}
+          onRun={start}
+          opened={opened}
+          preparing={preparing}
+          // The project the listing actually holds, never the one this client
+          // last remembered: a panel aimed at a directory nobody has any more
+          // would spell commands the CLI can only refuse.
+          projectId={project?.id ?? null}
+          run={run}
+          running={running}
+          status={status}
+        />
       </main>
       <footer className="app-footer">
         <div className="wrap">
