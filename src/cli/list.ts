@@ -18,7 +18,10 @@ interface ListedProject {
 }
 
 interface WorkspaceListing {
-  /** Which command wrote this object. The one field `--json` adds anywhere. */
+  /**
+   * Which command wrote this object, and the only field `--json` adds here:
+   * this one answers for the whole workspace, so it has no stage to name.
+   */
   readonly command: "list";
   readonly projects: readonly ListedProject[];
   /** Which tree was read, because a workspace is chosen per shell. */

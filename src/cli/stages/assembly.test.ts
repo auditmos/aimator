@@ -19,7 +19,7 @@ import { run } from "../index.js";
  *
  * The other half is the engine. `AIMATOR_FFMPEG` is pointed at a path no
  * machine has, exactly as the usage freeze points it, so what this stage says
- * about a missing engine is the same sentence wherever the test runs — and the
+ * about a missing engine is the same sentence wherever the test runs, and the
  * same sentence in the object as in the prose, which is the whole promise the
  * flag makes.
  */

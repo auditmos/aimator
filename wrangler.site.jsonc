@@ -10,7 +10,7 @@
   "assets": {
     "directory": "./out/site",
     "binding": "ASSETS",
-    // `/media/*` is not in the bundle at all any more — it is the bucket — so
+    // `/media/*` is not in the bundle at all any more (it is the bucket), so
     // the worker has to be asked before the asset router answers a miss with
     // the 404 page. Every other path is served straight from the assets, with
     // `_headers` applied and no worker invocation.

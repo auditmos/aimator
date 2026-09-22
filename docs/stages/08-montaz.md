@@ -30,7 +30,7 @@ To jest to, co czyta agent i co układa panel etapu 8 w [lokalnym UI](../ui.md).
 
 Ten obiekt jest pierwszym w całym narzędziu, w którym **nie ma rachunku**, i to nie jest
 przeoczenie: ten etap niczego nie kupuje, więc nie ma liczby, którą można by postawić obok
-przycisku płacącego. Na jej miejscu stoi arytmetyka — `plannedSeconds`, `actualSeconds` i pole
+przycisku płacącego. Na jej miejscu stoi arytmetyka: `plannedSeconds`, `actualSeconds` i pole
 `cut`, czyli plan cięcia klip po klipie, wyprowadzony z zatwierdzonej listy ujęć w chwili
 wywołania. Dlatego wolna próba `--dry-run --json` ma tu sens mimo braku rachunku: pokazuje, co
 i w jakiej kolejności zostałoby sklejone, oraz czy silnik w ogóle odpowiada (`engine`).

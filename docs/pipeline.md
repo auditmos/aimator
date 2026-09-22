@@ -171,7 +171,7 @@ Obowiązują we wszystkich etapach.
   `!` to odmowa, `·` to meldunek. Rozdział istnieje, bo czyta je maszyna: `status`
   wyprowadza „zablokowany" wyłącznie z `problems`, więc meldunek wrzucony między odmowy
   kłamałby na drabinie, a odmowa schowana w notatce artefaktu kłamałaby tak samo w drugą
-  stronę. **Każdy etap ma trzymać w `problems` wszystkie swoje odmowy** — także te, które
+  stronę. **Każdy etap ma trzymać w `problems` wszystkie swoje odmowy**, także te, które
   dotyczą pojedynczego artefaktu, o ile zatrzymują cały etap. Etap 7 zgłasza tak swój
   łańcuch dopiero wtedy, gdy na torze nie ma już nic do kupienia, bo klip czekający na
   poprzednika nie jest odmową, dopóki obok da się kupić klatkę wejściową.
@@ -325,14 +325,19 @@ odcinek jest zamknięty.
 Drabina **nie odtwarza grafu bramek** i nigdy nie będzie: druga kopia tego grafu
 rozjechałaby się z pierwszą przy pierwszej ręcznej poprawce. Stan komórki jest dokładnie
 tak dobry, jak `problems` etapu, i to etap odpowiada za to, żeby były tam wszystkie jego
-odmowy — patrz niezmiennik „odmowa to nie meldunek" wyżej.
+odmowy; patrz niezmiennik „odmowa to nie meldunek" wyżej.
 
 ### Kształt `--json`
 
 `--json` wypisuje **ten sam obiekt, który renderuje tekst**, i ustala kształt dla każdej
 kolejnej komendy, która tę flagę dostanie:
 
-- **jedno pole identyfikujące komendę**, `command`, tu `"status"`;
+- **pola mówiące, skąd obiekt pochodzi**: `command`, tu `"status"`, zawsze, a `stage`
+  wszędzie tam, gdzie obiekt należy do jednego etapu. `status` i `list` niosą samo
+  `command`, bo odpowiadają za cały odcinek i za cały katalog roboczy, więc nie mają etapu
+  do nazwania; `check`, `approve` i każda komenda, której pierwsze słowo **jest** jej
+  etapem, niosą oba, bo `check` odpowiada za jedenaście etapów i odpowiedź musi mówić, o
+  który chodzi;
 - **reszta to obiekty etapów bez zmian**: `cells[].status` niesie dokładnie to, co zwrócił
   `check` tego etapu, co do pola. Nie powstaje osobny format i nie ma warstwy tłumaczącej;
 - **odmowa zostaje w `Result`**. `--json` zmienia wyłącznie gałąź powodzenia, więc nieznany

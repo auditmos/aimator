@@ -353,7 +353,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
       <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
       <PaidCall
-        note="Jedno polecenie, dwa zakupy, a raport mówi który: dopóki skryptu nie ma, kupuje się jedno wywołanie tekstowe; po jego zatwierdzeniu — kwestie, które ta zgoda otworzyła. Dostawca mowy liczy ZNAKI, nie wywołania, więc rachunek podaje jedno i drugie. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
+        note="Jedno polecenie, dwa zakupy, a raport mówi który: dopóki skryptu nie ma, kupuje się jedno wywołanie tekstowe; po jego zatwierdzeniu kupuje się kwestie, które ta zgoda otworzyła. Dostawca mowy liczy ZNAKI, nie wywołania, więc rachunek podaje jedno i drugie. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
         onRun={startRun}
         preview={preview}
         projectRun={run}
@@ -541,7 +541,7 @@ export function MixPanel(props: PanelProps): JSX.Element {
           <p className="actions-note">
             <code>episode.mp4</code> nie jest dotykany: to nowy plik, którego obraz jest kopią
             strumieniową zatwierdzonego cięcia, klatka w klatkę. Odsłuchaj, gdzie narrator siedzi
-            wobec obrazu — kotwice pochodzą z planu, a klipy wróciły z dryfem, więc to jedyne
+            wobec obrazu: kotwice pochodzą z planu, a klipy wróciły z dryfem, więc to jedyne
             miejsce, w którym słychać, co z tego wyszło.
           </p>
           {narrated.state === "absent" ? (

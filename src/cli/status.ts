@@ -71,7 +71,10 @@ interface StatusCell {
 
 interface EpisodeStatus {
   readonly cells: readonly StatusCell[];
-  /** Which command wrote this object. The one field `--json` adds anywhere. */
+  /**
+   * Which command wrote this object, and the only field `--json` adds here:
+   * this one answers for a whole episode, so it has no stage to name.
+   */
   readonly command: "status";
   readonly episodeId: string;
   /** The one unblocked step of the whole episode, or null when there is none. */

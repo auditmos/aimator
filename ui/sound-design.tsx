@@ -293,7 +293,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
             którego powstaje, jest polskim materiałem, którego nie wolno tłumaczyć. Walidator
             sprawdza więc <strong>okablowanie</strong>: czy ujęcia cue to dokładnie te, które leżą w
             jego sekundach, czy podkład kafelkuje film bez dziur i czy każda długość jest taka, jaką
-            dostawca zrenderuje. Czy angielski opisuje polską prozę — zostaje człowiekowi, tutaj,
+            dostawca zrenderuje. To, czy angielski opisuje polską prozę, zostaje człowiekowi, tutaj,
             przed zakupem.
           </p>
           <p className="picture-state">
@@ -355,7 +355,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
       <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
       <PaidCall
-        note="Jedno polecenie, dwa zakupy, a raport mówi który: dopóki arkusza nie ma, kupuje się jedno wywołanie tekstowe; po jego zatwierdzeniu — stemy, które ta zgoda otworzyła. Dostawca wycenia SEKUNDY dźwięku, nie wywołania, więc rachunek podaje jedno i drugie. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
+        note="Jedno polecenie, dwa zakupy, a raport mówi który: dopóki arkusza nie ma, kupuje się jedno wywołanie tekstowe; po jego zatwierdzeniu kupuje się stemy, które ta zgoda otworzyła. Dostawca wycenia SEKUNDY dźwięku, nie wywołania, więc rachunek podaje jedno i drugie. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
         onRun={startRun}
         preview={preview}
         projectRun={run}

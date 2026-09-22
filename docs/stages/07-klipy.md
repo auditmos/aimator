@@ -31,7 +31,7 @@ wypisują obiekt, który ten etap i tak zwraca: bez nowego formatu, z dwoma pola
 skąd pochodzi (`command`, `stage`). Rachunek jest w nim **dwiema liczbami**, `paidImages`
 i `paidVideos`, nigdy jedną sumą: klatka wejściowa i klip kosztują o rząd wielkości
 inaczej, więc suma byłaby liczbą, której nikt nie płaci. Każde ogniwo niesie swój `kind`
-(`clip` albo `entry-frame`), swój stan i swoje zdanie o tym, na czyją zgodę czeka — i to
+(`clip` albo `entry-frame`), swój stan i swoje zdanie o tym, na czyją zgodę czeka, i to
 jest to, co czyta panel etapu 7 i agent zamiast polskiego tekstu.
 
 ## Bramka jest łańcuchem

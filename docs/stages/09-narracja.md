@@ -36,8 +36,8 @@ ten sam, który zwraca moduł, plus `command` i `stage`. `command` niesie **podp
 dla wszystkich odpowiadałoby zgadywaniem na pytanie „która komenda to zapisała".
 
 Poziom rozstrzyga `--track`, i to nie jest zawężenie, tylko **wybór pytania**: bez flagi
-`check` i `approve` odpowiadają o słowach, wspólnych dla obu torów, z flagą — o miksie
-tego toru. Dlatego zatwierdzenie skryptu i zatwierdzenie kwestii to dwie różne komendy
+`check` i `approve` odpowiadają o słowach, wspólnych dla obu torów; z flagą odpowiadają
+o miksie tego toru. Dlatego zatwierdzenie skryptu i zatwierdzenie kwestii to dwie różne komendy
 (`--artifact script` oraz `--artifact N01,N02`), a zatwierdzenie miksu trzecia.
 
 Rachunek w obiekcie stoi w dwóch polach, `calls` i `characters`, i nigdy się ich nie

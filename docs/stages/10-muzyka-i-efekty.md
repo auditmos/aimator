@@ -36,8 +36,8 @@ wypisują obiekt etapu zamiast zdań: ten sam, który zwraca moduł, plus `comma
 trzy gramatyki, tak samo jak w [etapie 9](09-narracja.md).
 
 Poziom rozstrzyga `--track`, i to nie jest zawężenie, tylko **wybór pytania**: bez flagi
-`check` i `approve` odpowiadają o arkuszu i stemach, wspólnych dla obu torów, z flagą —
-o pełnej ścieżce tego toru.
+`check` i `approve` odpowiadają o arkuszu i stemach, wspólnych dla obu torów; z flagą
+odpowiadają o pełnej ścieżce tego toru.
 
 Rachunek w obiekcie stoi w dwóch polach, `calls` i `seconds`, i nigdy się ich nie sumuje:
 dostawca wycenia **za minutę wygenerowanego dźwięku**, więc jedno wywołanie na

@@ -89,8 +89,8 @@ katalog tymczasowy zamiast miejsca, z którego plik naprawdę pochodzi.
 w edytorze, a rozwinięcie pomysłu i etap 0 prowadzą skille `develop-series`
 i `prepare-project` w terminalu.
 
-**Nie pokazuje pieniędzy.** Rachunek stoi w jednostkach, które liczy etap — wywołaniach,
-obrazach, znakach, sekundach — i nigdy w dolarach. Cennika, salda ani progu „tanie kupuj
+**Nie pokazuje pieniędzy.** Rachunek stoi w jednostkach, które liczy etap (wywołaniach,
+obrazach, znakach, sekundach), i nigdy w dolarach. Cennika, salda ani progu „tanie kupuj
 jednym kliknięciem" tu nie ma, bo próg to decyzja, którą ktoś musiałby ustalać
 i utrzymywać.
 
@@ -99,7 +99,7 @@ sygnatury; blokada etapu daje „w toku" i na tym kończy się wiedza serwera o 
 pracy.
 
 **Nie kolejkuje i nie ponawia.** Przed dwoma uruchomieniami naraz, z ekranu i z terminala,
-chronią blokady etapów — te same, które chronią przed dwoma terminalami. Drugiej ochrony
+chronią blokady etapów: te same, które chronią przed dwoma terminalami. Drugiej ochrony
 nie ma i nie jest potrzebna.
 
 **Nie zapisuje niczego od siebie i niczego nie publikuje.** Wszystko, co powstaje, zapisuje
@@ -128,7 +128,7 @@ robi: nie przycina, nie rozwija i nie normalizuje, a pilnuje tego test słownika
 
 Jedyne pole, którego ten panel nie zastępuje, to `project.md`: zasady wspólne pisze
 człowiek w edytorze, bo to jedyny artefakt tego narzędzia pisany ręcznie. Wywiadu też tu
-nie ma — prowadzą go skille `prepare-project` i `develop-series` w terminalu.
+nie ma: prowadzą go skille `prepare-project` i `develop-series` w terminalu.
 
 ## Plan wysyłki, czyli reguła 8 na ekranie
 
@@ -188,7 +188,7 @@ pola modelu, bo nic nie leci do dostawcy; potrzebny jest `ffmpeg` na tej maszyni
 ma, CLI odmawia zamiast przekodowywać i panel pokazuje **tę samą odmowę, słowo w słowo**.
 Próba na sucho zostaje jako pole wyboru, bo preview bez rachunku wciąż odpowiada na drugą
 połowę pytania: co i w jakiej kolejności zostałoby sklejone. Plan cięcia bierze się z raportu
-etapu, a nie z drugiego pliku — lista ujęć już go niesie, a dwa pliki z jedną prawdą rozjechałyby
+etapu, a nie z drugiego pliku: lista ujęć już go niesie, a dwa pliki z jedną prawdą rozjechałyby
 się przy pierwszej poprawce ręcznej.
 
 W jakich jednostkach, rozstrzyga **etap**, nie ekran: to on wie, za co dostawca liczy.
@@ -202,9 +202,9 @@ ułożenie rachunku, a to, które pola raportu są rachunkiem, przynosi panel et
 
 Etap 9 pokazuje też, czym rachunek **nie** jest. Jedno polecenie robi tam dwa różne zakupy
 i raport mówi który: dopóki skryptu nie ma, kupuje się jedno wywołanie tekstowe; po jego
-zatwierdzeniu — kwestie, które ta zgoda otworzyła. Panel czyta więc dwa różne zestawy pól
-tego samego obiektu, bo wypisanie rachunku za mowę w pierwszej fazie pokazałoby człowiekowi
-`0` obok przycisku, który zaraz wyda pieniądze. Znaki kontekstu (`previous_text`/`next_text`)
+zatwierdzeniu kupuje się kwestie, które ta zgoda otworzyła. Panel czyta więc dwa różne
+zestawy pól tego samego obiektu, bo wypisanie rachunku za mowę w pierwszej fazie pokazałoby
+człowiekowi `0` obok przycisku, który zaraz wyda pieniądze. Znaki kontekstu (`previous_text`/`next_text`)
 stoją **obok** rachunku i nigdy w nim: dostawca dokumentuje te parametry i nie mówi, czy je
 rozlicza, a narzędzie nie zgaduje cudzymi pieniędzmi.
 
@@ -222,7 +222,7 @@ odpytuje dostawcę minutami, a ekran ma przez ten czas pozostać używalny. Serw
 czyta przekazanego `argv`**: co jest legalną komendą, rozstrzyga CLI, odmawiając.
 
 Artefakty są serwowane tylko do odczytu i adresowane **tym, czym są**: projektem, etapem,
-własnym słowem etapu, oraz tą z trzech osi, którą ten etap ma — odcinkiem, torem, postacią.
+własnym słowem etapu, oraz tą z trzech osi, którą ten etap ma: odcinkiem, torem, postacią.
 Osie jadą obok ścieżki, a nie w niej, bo karta postaci nie leży pod żadnym odcinkiem,
 a scenariusz pod żadnym torem: segment, który każdy wołający musiałby wypełnić czymkolwiek,
 byłby identyfikatorem, który kłamie.
@@ -240,7 +240,7 @@ są wspólne i nie przyjmują toru, `narrated` przyjmuje tylko z torem. Odwrotni
 druga kopia nagrania, którego nikt nie kupił, albo narracja jednego filmu nad obrazem
 drugiego. Etap 10 czyta się tak samo: `cues` i stemy (`M01`, `E01`) bez toru, `mixed` tylko
 z torem. Stemy wracają jako `audio/mpeg`, bo tylko taki kontener dają oba endpointy tego
-dostawcy — wybór jest jego, nie tego potoku, i dlatego werdykt na stemie chodzi po nagłówkach
+dostawcy; wybór jest jego, nie tego potoku, i dlatego werdykt na stemie chodzi po nagłówkach
 ramek, a nie po nagłówku RIFF.
 
 Od etapu 7 dochodzi film, a film się **przewija**, więc artefakt odpowiada na nagłówek

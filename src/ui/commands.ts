@@ -759,7 +759,7 @@ export const INTENTS = {
    * answer rather than a flag: until the script exists and a human has
    * accepted it, this buys the script; afterwards it buys the lines that yes
    * authorised. Two model flags, because the stage buys from two providers and
-   * a bare `--model` would not say which — the same refusal stage 7 makes.
+   * a bare `--model` would not say which: the same refusal stage 7 makes.
    *
    * What the preview is for is different here too. Every stage above this one
    * is billed per call; this provider charges for the **characters** of the

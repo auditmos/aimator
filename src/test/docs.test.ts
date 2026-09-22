@@ -209,7 +209,7 @@ describe("documentation", () => {
    * that takes it and never says so is a contract nobody can find. This used
    * to ask only about the stages whose usage block already carried the flag,
    * because it arrived one stage at a time. `cli.usage.test.ts` now holds that
-   * end — every command the usage text defines declares it — so the condition
+   * end (every command the usage text defines declares it), so the condition
    * here could no longer be false, and a condition with no false is a comment
    * pretending to be code.
    *

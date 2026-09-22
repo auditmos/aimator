@@ -94,7 +94,7 @@ src/
 ├── cli.test.ts
 ├── cli.usage.test.ts # The freeze: --help byte for byte, one snapshot per usage line
 ├── __snapshots__/    # What the freeze compares against
-├── cli/              # Folder form: index.ts is the only entry, one file per stage
+├── cli/              # Folder form: index.ts is the only entry, one file per command
 │   ├── index.ts      # Public: run(argv): Promise<Result<string>>, nothing else
 │   ├── usage.ts      # Internal: one --help text, assembled from the fragments
 │   ├── common.ts     # Internal: the grammar under every command
@@ -106,7 +106,7 @@ src/
 │   ├── status.test.ts
 │   ├── imports.test.ts # The shape: one export at the entry, no stage reaching
 │   │                   #            into another
-│   └── stages/       # Internal: usage fragment, flags, dispatch, renderers
+│   └── stages/       # Internal: fragment, flags, dispatch, renderers, and their tests
 │       ├── project.ts        # Etap 0: the rules, and who narrates
 │       ├── episode.ts        # Etap 0: the five production settings
 │       ├── character.ts      # Etap 0's cast and etap 2's images: one command
@@ -137,9 +137,15 @@ src/
 ├── ui/               # Folder form: the local server over the CLI; not a domain
 │   ├── index.ts      # Public: createUi, the Hono app a test can call
 │   ├── serve.ts      # Process entry: one port, Vite for the page, Hono for /api
+│   ├── commands.ts   # Internal: every command the screen can express, and the
+│   │                 #           only place it knows one
+│   ├── artifact.ts   # Internal: where an identifier becomes a path, and the
+│   │                 #           only place allowed to build one
 │   ├── watch.ts      # Internal: something under the workspace changed; never what
 │   ├── index.test.ts # Every route, through the entry, without opening a port
-│   └── imports.test.ts # The one rule: the pipeline is reached only through run
+│   ├── commands.test.ts # Every intent, looked up in --help
+│   ├── stream.test.ts   # The event stream's one promise: it keeps talking
+│   └── imports.test.ts  # The one rule: the pipeline is reached only through run
 └── lib/
     ├── env.ts        # Single-file form: loads .env files, validates with Zod
     ├── env.test.ts   # Co-located test for env validation
@@ -294,8 +300,39 @@ src/
     ├── muxer.ts      # Single-file form: the local engine, shared by stages 8, 9 and 10
     ├── muxer.test.ts
     ├── timeline.ts   # Single-file form: the plan's clock as one film's, stages 9 and 10
+    ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
+    │                 #                   page's worker and the local screen
+    ├── byte-range.test.ts
     ├── result.ts     # Result<T>: the recoverable-error contract
     └── result.test.ts
+```
+
+The browser half of the UI lives outside `src/`, for the reason the published page's own
+files do:
+
+```
+ui/                    # The client: browser files where the browser files go
+├── index.html         # Vite's entry, served in middleware mode by src/ui/serve.ts
+├── main.tsx           # The one place the browser and the application meet
+├── app.tsx            # One screen: what is in the workspace, where one episode stands
+├── ladder.tsx         # The ladder of one episode, cell by cell, as status wrote it
+├── panel.tsx          # What every stage panel repeats, in one place
+├── panel.test.ts      # The readers: a stage's report as a bill and as a prompt
+├── theme.tsx          # System, Light or Dark, the way the design manual specifies it
+├── types.ts           # What the server hands over, which is what the CLI already prints
+├── styles.css         # The portable website shell, one room over from site/
+├── prepare.tsx        # Etap 0
+├── screenplay.tsx     # Etap 1
+├── character.tsx      # Etap 0's cast and etap 2's images: one panel
+├── shot-list.tsx      # Etap 3
+├── prompt-package.tsx # Etap 4, and rule 8 on screen
+├── references.tsx     # Etap 5
+├── opening-frame.tsx  # Etap 6
+├── clips.tsx          # Etap 7
+├── assembly.tsx       # Etap 8
+├── narration.tsx      # Etap 9
+├── sound-design.tsx   # Etap 10
+└── tsconfig.json      # Its own project: the DOM and JSX that src must not have
 ```
 
 `lib/artifact` exists because five stages now write the same state file, and
@@ -411,6 +448,16 @@ purpose. `readAcceptedLines` moved the other way and is worth distinguishing: it
 promoted into a module but **exported from stage 9's own entry**, because "which lines did a
 human accept" is a question about stage 9's artifact, and a later stage consuming an earlier
 stage's artifact through its public entry is the ordinary direction.
+
+`lib/byte-range` is the same promotion at the same threshold, and it is worth noting because
+its two callers are not two stages: the published page's worker serves a film out of a
+bucket, the local screen serves one out of the workspace, and turning `bytes=16-47` into an
+offset and a length is one piece of arithmetic in both. The second caller was a certainty
+rather than a discovery, so it was promoted there, exactly as `lib/timeline` was. What it
+deliberately does **not** hold is everything around the parse: where the bytes come from,
+what an `ETag` means, whether a miss is a 404 or a 416. Those differ between a bucket and a
+file on disk, and a module that decided them would be a process rather than an operation,
+which is the line `lib/muxer` draws one row up.
 
 `lib/muxer` grew a **third operation**, `master`, and did not absorb `mix` into it although
 it is a superset. They answer different questions and both stay: `mix` produces the film a
@@ -604,6 +651,9 @@ Small interface, large implementation (Ousterhout). A module absorbs complexity 
 | Layout | `src/lib/workspace.ts` | Path builders + id rules | Every directory and file name in the workspace |
 | CLI | `src/cli/index.ts` | `run(argv): Promise<Result<string>>` | Argument parsing, usage text, command dispatch |
 | Executable | `src/bin.ts` | none, a process entry | `process.argv`, stdout/stderr, exit code |
+| Site | `src/site/index.ts` | `freezeRelease`, `buildSite`, `publishMedia` | The registry, the encoder, the bucket, the markup |
+| UI server | `src/ui/index.ts` | `createUi(options): Hono` | Routes, argv building, the watcher, the event stream |
+| UI client | `ui/`, with its own `tsconfig` | `/api`, which is the argv the terminal takes | React, JSX, the DOM, every panel on screen |
 
 `bin.ts` stays a shim on purpose: keeping streams and exit codes out of `run()` is what lets the CLI be tested by calling a function instead of spawning a process. `run` is async because stages write files and later stages call HTTP, but it still never touches `process`, a stream or an exit code, which is the invariant that matters.
 

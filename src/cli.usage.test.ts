@@ -49,7 +49,7 @@ const WRAPPED = /^ {5,}\S/;
  * A second word belongs to the name only when it is a word: `project init` is
  * a command and `check <id>` is `check` with an argument. That is the rule
  * `docs.test.ts` reads an invocation by, and it is the same rule for the same
- * reason — what the parser dispatches on is one or two words, never a shape.
+ * reason: what the parser dispatches on is one or two words, never a shape.
  */
 function commandOf(line: string): string | null {
   const [, first, second] = COMMAND.exec(line) ?? [];
