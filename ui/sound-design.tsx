@@ -15,6 +15,7 @@ import {
   type Priced,
   Problems,
   pickable,
+  Said,
   SendFields,
   type SendFlags,
   type Unit,
@@ -289,7 +290,9 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 
@@ -571,7 +574,9 @@ export function MasterPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 

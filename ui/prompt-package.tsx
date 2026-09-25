@@ -242,15 +242,18 @@ function Call(props: {
   return (
     <div className="call">
       <p className="call-name">
-        <code>{artifact.name}</code> {KIND[artifact.kind] ?? artifact.kind}
-        {artifact.seconds === null ? null : <span> · {artifact.seconds} s</span>}
-        {subject === null ? null : <span> · {subject}</span>}
+        <code>{artifact.name}</code>
+        <span>
+          {KIND[artifact.kind] ?? artifact.kind}
+          {artifact.seconds === null ? null : `, ${artifact.seconds} s`}
+        </span>
         <span
           className={artifact.blockers.length === 0 ? "state state-ready" : "state state-blocked"}
         >
           {artifact.blockers.length === 0 ? "gotowy do wysłania" : "zablokowany"}
         </span>
       </p>
+      {subject === null ? null : <p className="call-subject">{subject}</p>}
       <Problems problems={artifact.blockers} />
 
       <h4 className="call-heading">Załączniki, w kolejności wysyłki</h4>
@@ -301,13 +304,74 @@ function Call(props: {
   );
 }
 
+/** One row of the plan's table of contents: a reference, the opening, or a clip. */
+interface Entry {
+  readonly blocked: boolean;
+  /** The calls behind the row: a clip's entry frame first, then the clip. */
+  readonly calls: readonly PlannedArtifact[];
+  readonly detail: string;
+  readonly key: string;
+  readonly label: string;
+}
+
+/** What a tab over one of a clip's two calls is called. */
+function partOf(artifact: PlannedArtifact): string {
+  return artifact.kind === "entry-frame" ? "Klatka wejściowa" : "Klip";
+}
+
+/**
+ * The plan in the order the film is bought: references, the opening frame,
+ * then the clips, each clip one row with its entry frame inside it.
+ *
+ * A clip is two calls, the frame it starts on and the video grown out of it,
+ * and they are one decision in the chain, so they are one row here and two
+ * tabs once it is open. The entry frame comes first, because it is the call
+ * that carries the references; the clip itself carries only that frame.
+ */
+function entriesOf(
+  artifacts: readonly PlannedArtifact[],
+  subjects: ReadonlyMap<string, string>
+): readonly (readonly [string, readonly Entry[]])[] {
+  const entry = (key: string, label: string, detail: string, calls: PlannedArtifact[]): Entry => ({
+    blocked: calls.some((one) => one.blockers.length > 0),
+    calls,
+    detail,
+    key,
+    label,
+  });
+  const references = artifacts
+    .filter((one) => one.kind === "reference")
+    .map((one) => entry(one.name, one.name, subjects.get(one.name) ?? "", [one]));
+  const opening = artifacts
+    .filter((one) => one.kind === "opening")
+    .map((one) => entry(one.name, one.name, "klatka otwarcia, pierwszy kadr filmu", [one]));
+  const clips = artifacts
+    .filter((one) => one.kind === "clip")
+    .map((one) => {
+      const start = artifacts.find((other) => other.name === `entry:${one.name}`);
+
+      return entry(
+        one.name,
+        one.name,
+        `${one.seconds ?? "?"} s${start === undefined ? ", startuje z klatki otwarcia" : ""}`,
+        start === undefined ? [one] : [start, one]
+      );
+    });
+
+  return [
+    ["Referencje", references],
+    ["Otwarcie", opening],
+    ["Klipy", clips],
+  ];
+}
+
 /**
  * The plan of one track, one call at a time.
  *
- * The calls are listed in the order the pipeline buys them, grouped by what
- * they are, and one is open at a time: twenty-two prompts of thirteen
- * thousand characters each are a document nobody reads, while one of them
- * beside its pictures is a decision somebody can make.
+ * A table of contents on one side and the open call on the other: twenty-two
+ * prompts of thirteen thousand characters each are a document nobody reads,
+ * while one of them beside its pictures is a decision somebody can make, and
+ * the list beside it says where in the film that decision sits.
  */
 function PlanReview(props: {
   readonly episodeId: string;
@@ -318,12 +382,16 @@ function PlanReview(props: {
   const { episodeId, projectId, revision, subjects } = props;
   const [track, setTrack] = useState<string>(TRACKS[0]);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [part, setPart] = useState(0);
   const plan = useSendPlan(
     `/api/send-plan/${projectId}/${episodeId}?${new URLSearchParams({ track }).toString()}`,
     revision
   );
   const artifacts = plan.kind === "shown" ? plan.value.artifacts : [];
-  const open = artifacts.find((one) => one.name === chosen) ?? artifacts[0];
+  const groups = useMemo(() => entriesOf(artifacts, subjects), [artifacts, subjects]);
+  const rows = groups.flatMap(([, members]) => members);
+  const open = rows.find((one) => one.key === chosen) ?? rows[0];
+  const call = open?.calls[part] ?? open?.calls[0];
   /** How long each clip is planned to run, which is where its last frame sits. */
   const clipSeconds = useMemo(
     () =>
@@ -332,21 +400,20 @@ function PlanReview(props: {
       ),
     [artifacts]
   );
-  const groups = useMemo(
-    () =>
-      [
-        ["Referencje", artifacts.filter((one) => one.kind === "reference")],
-        ["Kadry i klipy", artifacts.filter((one) => one.kind !== "reference")],
-      ] as const,
-    [artifacts]
+  const pick = useCallback(
+    (key: string) => () => {
+      setChosen(key);
+      setPart(0);
+    },
+    []
   );
-  const pick = useCallback((name: string) => () => setChosen(name), []);
+  const pickPart = useCallback((index: number) => () => setPart(index), []);
   const pickTrack = useCallback((one: string) => () => setTrack(one), []);
 
   return (
     <div className="plan-review">
-      <div className="plan-row">
-        <span className="plan-row-label">Tor</span>
+      <div className="plan-bar">
+        <span className="plan-bar-label">Tor</span>
         {TRACKS.map((one) => (
           <button
             aria-pressed={one === track}
@@ -358,6 +425,11 @@ function PlanReview(props: {
             {one}
           </button>
         ))}
+        {plan.kind === "shown" ? (
+          <span className="plan-bar-note">
+            kadr {plan.value.size} ({plan.value.aspectRatio}) · do {plan.value.limit} załączników
+          </span>
+        ) : null}
       </div>
 
       {plan.kind === "loading" ? <p className="panel-empty">Czytam plan wysyłki…</p> : null}
@@ -367,50 +439,68 @@ function PlanReview(props: {
         </p>
       ) : null}
       {plan.kind === "shown" ? (
-        <>
-          <p className="actions-note">
-            Kadr {plan.value.size} ({plan.value.aspectRatio}), najwyżej {plan.value.limit}{" "}
-            załączników na wywołanie.
-          </p>
-          {plan.value.problems.length === 0 ? null : (
-            <details className="prompt">
-              <summary>Co jeszcze blokuje wysyłkę ({plan.value.problems.length})</summary>
-              <Problems problems={plan.value.problems} />
-            </details>
-          )}
-          {groups.map(([label, members]) =>
-            members.length === 0 ? null : (
-              <div className="plan-row" key={label}>
-                <span className="plan-row-label">{label}</span>
-                {members.map((one) => (
-                  <button
-                    aria-pressed={one.name === open?.name}
-                    className={
-                      one.blockers.length === 0 ? "plan-chip" : "plan-chip plan-chip-blocked"
-                    }
-                    key={one.name}
-                    onClick={pick(one.name)}
-                    type="button"
-                  >
-                    {one.name}
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-          {open === undefined ? null : (
-            <Call
-              artifact={open}
-              clipSeconds={clipSeconds}
-              episodeId={episodeId}
-              key={`${track}-${open.name}`}
-              projectId={projectId}
-              revision={revision}
-              subject={subjects.get(open.name) ?? null}
-              track={track}
-            />
-          )}
-        </>
+        <div className="plan-layout">
+          <nav aria-label="Wywołania planu" className="plan-toc">
+            {groups.map(([label, members]) =>
+              members.length === 0 ? null : (
+                <div key={label}>
+                  <p className="plan-toc-group">{label}</p>
+                  <ul>
+                    {members.map((one) => (
+                      <li key={one.key}>
+                        <button
+                          aria-current={one.key === open?.key ? "true" : undefined}
+                          className={one.blocked ? "plan-item plan-item-blocked" : "plan-item"}
+                          onClick={pick(one.key)}
+                          type="button"
+                        >
+                          <span className="plan-item-label">{one.label}</span>
+                          <span className="plan-item-detail">{one.detail}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            )}
+            {/* The plan's own problems are left out on purpose: they are always
+                stage 4's problems plus "approve stage 4 first", which the Stan
+                block and the decision below already say. Each call's own
+                blockers stay, on the call. */}
+          </nav>
+
+          <div className="plan-detail">
+            {open === undefined || call === undefined ? null : (
+              <>
+                {open.calls.length > 1 ? (
+                  <div className="plan-bar plan-tabs">
+                    {open.calls.map((one, index) => (
+                      <button
+                        aria-pressed={one === call}
+                        className="plan-chip plan-chip-text"
+                        key={one.name}
+                        onClick={pickPart(index)}
+                        type="button"
+                      >
+                        {partOf(one)} <code>{one.name}</code>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <Call
+                  artifact={call}
+                  clipSeconds={clipSeconds}
+                  episodeId={episodeId}
+                  key={`${track}-${call.name}`}
+                  projectId={projectId}
+                  revision={revision}
+                  subject={subjects.get(call.name) ?? null}
+                  track={track}
+                />
+              </>
+            )}
+          </div>
+        </div>
       ) : null}
     </div>
   );

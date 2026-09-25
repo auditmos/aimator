@@ -15,6 +15,7 @@ import {
   type Priced,
   Problems,
   pickable,
+  Said,
   SendFields,
   type SendFlags,
   type Unit,
@@ -291,7 +292,9 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 
@@ -567,7 +570,9 @@ export function MixPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 

@@ -1,6 +1,16 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, artifactUrl, asImages, Block, Field, Gallery, PaidCall, Problems } from "./panel";
+import {
+  Action,
+  artifactUrl,
+  asImages,
+  Block,
+  Field,
+  Gallery,
+  PaidCall,
+  Problems,
+  Said,
+} from "./panel";
 import type { OpeningFrameStatus, RunDone, StatusCell } from "./types";
 
 /**
@@ -82,7 +92,9 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 

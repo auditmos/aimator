@@ -1,6 +1,6 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, artifactUrl, Block, Drift, Notices, Problems } from "./panel";
+import { Action, artifactUrl, Block, Drift, Notices, Problems, Said } from "./panel";
 import type { AssemblyReport, AssemblyStatus, CutState, RunDone, StatusCell } from "./types";
 
 /**
@@ -162,7 +162,9 @@ export function AssemblyPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 

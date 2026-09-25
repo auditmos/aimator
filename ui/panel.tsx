@@ -259,10 +259,58 @@ export function Field(props: {
 /** How many refusals stand open before the rest fold away. */
 const PROBLEMS_SHOWN = 2;
 
+/** Where a stage's sentence hands over to the terminal: "…: aimator approve …". */
+const HANDOVER = ": aimator ";
+/** A workspace path a sentence opens with, "projects/dzielna-ewa/project.json: …". */
+const LEADING_PATH = /^((?:[\w.-]+\/)+)([\w.-]+): /;
+
+/**
+ * One sentence of the CLI, said on a screen rather than in a terminal.
+ *
+ * The words are the stage's own and stay whole; only two things change, and
+ * both are about where the sentence is read. The command it ends with is the
+ * terminal's way of saying "do this", and here the button under the same
+ * decision already does it, so the command is shown only to somebody who
+ * asked to see commands, like the one under every button. A workspace path it
+ * opens with is shortened to the file's name, the whole path kept on hover,
+ * because on a page about one episode the first two segments are always the
+ * same two words. A sentence that is nothing but a command stays a command.
+ */
+export function Said(props: { readonly text: string }): JSX.Element {
+  const { text } = props;
+
+  if (text.startsWith("aimator ")) {
+    return <code className="said-command">{text}</code>;
+  }
+
+  const at = text.indexOf(HANDOVER);
+  const words = at === -1 ? text : text.slice(0, at);
+  const path = LEADING_PATH.exec(words);
+
+  return (
+    <>
+      {path === null ? (
+        words
+      ) : (
+        <>
+          <code title={`${path[1] ?? ""}${path[2] ?? ""}`}>{path[2]}</code>
+          {words.slice(path[0].length - 2)}
+        </>
+      )}
+      {at === -1 ? null : <Command argv={text.slice(at + HANDOVER.length).split(" ")} />}
+    </>
+  );
+}
+
+/** What the box says before the sentences: that something waits, and how much. */
+function ProblemsTitle(props: { readonly count: number }): JSX.Element {
+  return <p className="problems-title">Wymaga uwagi{props.count > 1 ? ` (${props.count})` : ""}</p>;
+}
+
 function problemLines(problems: readonly string[]): JSX.Element[] {
   return problems.map((problem) => (
     <p className="problem" key={problem}>
-      {problem}
+      <Said text={problem} />
     </p>
   ));
 }
@@ -285,13 +333,19 @@ export function Problems(props: { readonly problems: readonly string[] }): JSX.E
 
   // One more than the fold would hide is not worth a fold.
   if (problems.length <= PROBLEMS_SHOWN + 1) {
-    return <div className="problems">{problemLines(problems)}</div>;
+    return (
+      <div className="problems">
+        <ProblemsTitle count={problems.length} />
+        {problemLines(problems)}
+      </div>
+    );
   }
 
   const rest = problems.slice(PROBLEMS_SHOWN);
 
   return (
     <div className="problems">
+      <ProblemsTitle count={problems.length} />
       {problemLines(problems.slice(0, PROBLEMS_SHOWN))}
       <details className="problems-more">
         <summary>Pokaż pozostałe powody ({rest.length})</summary>
@@ -315,7 +369,7 @@ export function Problems(props: { readonly problems: readonly string[] }): JSX.E
 export function Notices(props: { readonly notices: readonly string[] }): JSX.Element[] {
   return props.notices.map((notice) => (
     <p className="notice" key={notice}>
-      {notice}
+      <Said text={notice} />
     </p>
   ));
 }

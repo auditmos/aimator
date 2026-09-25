@@ -275,8 +275,10 @@ pyta o obiekt zamiast czytać zdanie: liczba i kolejność to dokładnie to, co 
 zobaczyć, zanim cokolwiek poleci.
 
 Tak też się go przegląda, bo zatwierdza się tu plan, a nie graf identyfikatorów. Wybierasz
-tor i jedno przyszłe wywołanie (referencję, klatkę otwarcia, klatkę wejściową albo klip).
-Panel pokazuje jego załączniki jako obrazy, podpisane `Image N` w kolejności wysyłki,
+tor i jedno przyszłe wywołanie ze spisu ułożonego w kolejności filmu: referencje z ich
+opisem, klatka otwarcia, klipy. Klip to jeden wiersz, a jego klatka wejściowa i on sam to
+dwie zakładki w środku, bo to jedna decyzja w łańcuchu. Klatka wejściowa jest pierwsza, bo
+to ona niesie referencje; klip dostaje tylko ją. Panel pokazuje jego załączniki jako obrazy, podpisane `Image N` w kolejności wysyłki,
 a pod nimi **cały złożony tekst**, czyli plik z `prompts/` razem z tym, co dokleja do niego
 etap wysyłający. Dlatego resolver artefaktów nie serwuje `prompts/**`: stamtąd dostałbyś
 połowę promptu, a `show --artifact` daje całość. Obraz załącznika to ten sam adres, pod
@@ -299,6 +301,14 @@ znalezienie przycisków. Wybór zapamiętuje ta przeglądarka i nic poza nią. K
 dalej uruchamia dokładnie jedno `argv`, a pasek wyniku zawsze pokazuje komendę, która
 właśnie poszła. Całą gramatykę CLI zna jeden plik (`src/ui/commands.ts`), a test
 sprawdza każde zbudowane `argv` względem `--help` tą samą metodą, co test dokumentacji.
+
+Ten sam przełącznik dotyczy zdań etapu. Odmowa, meldunek i „Dalej” często kończą się
+komendą (`…zatwierdź ponownie: aimator approve …`), która w terminalu mówi, co zrobić,
+a na ekranie powtarza przycisk stojący przy tej samej decyzji. Zdanie zostaje więc całe,
+a komenda pod nim pokazuje się tylko przy włączonym przełączniku. Ścieżka w katalogu
+roboczym, od której zdanie się zaczyna, skraca się do nazwy pliku, a pełna jest w
+podpowiedzi. Odmowy stoją w jednej spokojnej ramce z tytułem „Wymaga uwagi (N)” i akcentem
+z boku, zamiast barwić każde zdanie na żółto, tak samo jak ramka dryfu wejść.
 
 „Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów**, a artefakt
 czeka na przyjęcie. Przycisk, któremu CLI i tak by odmówiło, uczy człowieka, że ekran

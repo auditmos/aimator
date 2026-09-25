@@ -12,6 +12,7 @@ import {
   PickAll,
   Problems,
   pickable,
+  Said,
 } from "./panel";
 import type { CharacterStatus, RunDone, StatusCell } from "./types";
 
@@ -138,7 +139,9 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 

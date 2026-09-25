@@ -16,6 +16,7 @@ import {
   Problems,
   pickable,
   promptsOf,
+  Said,
   type Unit,
   Zoomable,
 } from "./panel";
@@ -303,7 +304,9 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 

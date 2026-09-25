@@ -1,6 +1,6 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, Block, Field, Problems } from "./panel";
+import { Action, Block, Field, Problems, Said } from "./panel";
 import type { RunDone, Stage0Report, StatusCell } from "./types";
 
 /**
@@ -348,7 +348,9 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{report.nextStep}</dd>
+                <dd>
+                  <Said text={report.nextStep} />
+                </dd>
               </div>
             </dl>
             <Problems problems={report.problems} />

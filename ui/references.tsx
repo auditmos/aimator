@@ -11,6 +11,7 @@ import {
   PickAll,
   Problems,
   pickable,
+  Said,
 } from "./panel";
 import type { ReferencesStatus, RunDone, StatusCell } from "./types";
 
@@ -111,7 +112,9 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
               </div>
               <div>
                 <dt>Dalej</dt>
-                <dd>{status.nextStep}</dd>
+                <dd>
+                  <Said text={status.nextStep} />
+                </dd>
               </div>
             </dl>
 
