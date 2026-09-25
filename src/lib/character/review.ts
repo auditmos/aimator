@@ -6,6 +6,7 @@ import {
   type StageFile,
   serialize,
   type WriteMode,
+  withInputs,
 } from "../artifact/index.js";
 import { type ImageVerdict, validateImage } from "../image-model/index.js";
 import { readStage0Character, type Stage0Character } from "../project/index.js";
@@ -81,6 +82,8 @@ class CharacterStateError extends Error {
 
 interface Inspection {
   readonly paths: CharacterTrackPaths;
+  /** Every recorded input's digest as it stands now, `null` for one that is gone. */
+  readonly seen: ReadonlyMap<string, string | null>;
   readonly stage: StageFile;
   readonly status: CharacterStatus;
 }
@@ -163,6 +166,7 @@ async function inspect(input: TrackScope): Promise<Result<Inspection>> {
 
   return ok({
     paths,
+    seen,
     stage,
     status: {
       approved: artifacts.every((entry) => entry.approved),
@@ -268,9 +272,13 @@ async function inspectOne(
 
   const changed = await changedInputs(input.workspace, record.inputs, scope.seen);
 
+  // Drift revokes the approval, and an approval is also what settles it: the
+  // image is intact, it was drawn from something that has since changed, and
+  // looking at it again beside the new version is exactly what a yes is here,
+  // as it is on every other reviewed stage.
   for (const path of changed) {
     problems.push(
-      `${path}: zmienił się od czasu narysowania ${artifact}, wynik opisuje inne wejście`
+      `${path}: zmienił się od czasu narysowania ${artifact}, obejrzyj obraz jeszcze raz i zatwierdź ponownie albo kup go ponownie: aimator character generate ${input.projectId} ${input.characterId} --track ${input.track} --regenerate --artifact ${artifact}`
     );
   }
 
@@ -329,15 +337,34 @@ export async function approveCharacter(input: ApproveScope): Promise<Result<Char
     return inspection;
   }
 
-  const { paths, stage, status } = inspection.data;
+  const { paths, seen, stage, status } = inspection.data;
   const problems: string[] = [];
+  let rebound = stage;
 
   for (const artifact of input.artifacts) {
     const entry = status.artifacts.find((item) => item.artifact === artifact);
 
     if (entry === undefined || entry.state !== "completed") {
       problems.push(`${artifact}: nie ma czego zatwierdzić (${entry?.state ?? "brak"})`);
+      continue;
     }
+
+    // The yes is bound to the inputs as they stand now, which is what makes
+    // it one `check` still honours after an input moved. An input that is
+    // gone has nothing to bind to, so it stays a refusal.
+    const inputs: RecordedFile[] = [];
+
+    for (const recorded of stage.artifacts[artifact]?.inputs ?? []) {
+      const now = seen.get(recorded.path) ?? null;
+
+      if (now === null) {
+        problems.push(`${artifact} (${input.track}): brakuje wejścia ${recorded.path}`);
+      } else {
+        inputs.push({ ...recorded, sha256: now });
+      }
+    }
+
+    rebound = withInputs(rebound, artifact, inputs);
   }
 
   problems.push(
@@ -352,7 +379,7 @@ export async function approveCharacter(input: ApproveScope): Promise<Result<Char
     );
   }
 
-  const approved = approveArtifacts(stage, input.artifacts, {
+  const approved = approveArtifacts(rebound, input.artifacts, {
     note: input.note,
     reviewer: input.reviewer,
   });
@@ -365,12 +392,26 @@ export async function approveCharacter(input: ApproveScope): Promise<Result<Char
     return written;
   }
 
+  // The drift an approval just settled is no longer drift, so it is neither
+  // reported nor counted: the answer has to read the way the next check will.
+  const settled = (problem: string): boolean =>
+    input.artifacts.some((artifact) => problem.includes(`od czasu narysowania ${artifact},`));
+  const stillChanged = new Set(
+    Object.values(approved.artifacts).flatMap((record) =>
+      (record?.inputs ?? [])
+        .filter((one) => (seen.get(one.path) ?? null) !== one.sha256)
+        .map((one) => one.path)
+    )
+  );
+
   return ok({
     ...status,
     artifacts: status.artifacts.map((entry) =>
       input.artifacts.includes(entry.artifact) ? { ...entry, approved: true } : entry
     ),
+    inputsChanged: status.inputsChanged.filter((path) => stillChanged.has(path)),
     nextStep: nextStepOf(input, approved),
+    problems: status.problems.filter((problem) => !settled(problem)),
   });
 }
 

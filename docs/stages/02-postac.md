@@ -67,6 +67,12 @@ Akceptacja dotyczy jednego obrazu naraz i jest związana z jego sha256. `approve
 bez `--artifact`: przyjęcie karty uruchamia osiem płatnych wywołań, więc musi być czymś,
 co ktoś napisał.
 
+Gdy po narysowaniu zmieni się wejście obrazu (np. `project.json` po dopisaniu postaci do
+obsady albo karta narysowana ponownie pod gotowymi widokami), `check` cofa zgodę i mówi,
+które pliki się zmieniły. Rozstrzyga to człowiek, jak na każdym ocenianym etapie: obejrzyj
+obraz jeszcze raz obok nowej wersji i zatwierdź go ponownie (`approve` wiąże wtedy zgodę z
+wejściami w ich obecnej postaci) albo kup go od nowa z `--regenerate --artifact <obraz>`.
+
 ## Model i klucz
 
 `--model <id>`, a bez tej flagi `AIMATOR_IMAGE_MODEL_GPT_IMAGE` albo

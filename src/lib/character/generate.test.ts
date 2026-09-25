@@ -592,6 +592,35 @@ describe("approveCharacter", () => {
 
     expect(result.ok ? null : result.error.message).toContain("nie ma czego zatwierdzić");
   });
+
+  it("should hold an approval given after an input changed, as check reads it", async () => {
+    await makeStage0();
+    await generate({ fetch: recorder().fetch });
+    // A second member of the cast rewrites project.json, which the card was
+    // drawn from. Looking at the card again beside that change and saying yes
+    // is what an approval is, so the yes has to be one check still honours.
+    await addCharacter({
+      characterId: "tata",
+      mode: "apply",
+      name: "Tata",
+      projectId: PROJECT,
+      workspace,
+    });
+
+    expect((await accept(["card"])).ok).toBe(true);
+
+    const status = await checkCharacter({
+      characterId: CHARACTER,
+      projectId: PROJECT,
+      track: "gpt-image",
+      workspace,
+    });
+
+    expect(
+      status.ok && status.data.artifacts.find((one) => one.artifact === "card")?.approved
+    ).toBe(true);
+    expect(status.ok && status.data.inputsChanged).toEqual([]);
+  });
 });
 
 describe("checkCharacter", () => {
