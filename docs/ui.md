@@ -30,7 +30,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Wczytaj projekt** (`#/wczytaj`): projekty z `list --json` jako lista odnośników z
   liczbą odcinków. Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
 - **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
-  odcinek” albo „Wczytaj odcinek”, i nic więcej.
+  odcinek” albo „Wczytaj odcinek”, a pod nimi, ciszej, odnośnik „Obsada i narrator”.
+- **Obsada i narrator** (`#/projekt/<id>/obsada`): `character new`, `character add`,
+  `character describe` i `project voice`, plus „Sprawdź etap 0”. Są na poziomie projektu,
+  bo mieszkają w `project.json` i powracają między odcinkami; świeży projekt ustawia je,
+  zanim ma jakikolwiek odcinek. Obecnej obsady ten ekran nie wypisuje, bo nie wypisuje jej
+  żadna komenda CLI.
 - **Nowy odcinek** (`#/projekt/<id>/nowy-odcinek`): ścieżka do pliku źródłowego i sześć
   decyzji, czyli `episode add`. Identyfikator odcinka czyta z nazwy pliku CLI, więc ekran
   go nie zgaduje: pamięta, jakie odcinki projekt miał w chwili wysłania komendy, i
@@ -49,9 +54,9 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   zdaniem z komendą w środku i skracanie go tutaj byłoby redagowaniem cudzej odpowiedzi.
   Etykieta jest etykietą: cyjanowa plakietka, którą zastąpiła, wyglądała na przycisk,
   nie robiła nic po kliknięciu i zostawiała zdanie obok bez zastosowania.
-- **Panel etapu 0**: formularze obsady, narratora i sześciu decyzji tego odcinka, plus
-  „Sprawdź" i „Zatwierdź". Założenie projektu i dodanie odcinka są krok wcześniej, na
-  własnych ekranach, bo pyta się o nie, zanim jest w czym być. Gdy `status` odmawia (np.
+- **Panel etapu 0**: formularz sześciu decyzji tego odcinka, „Sprawdź" i „Zatwierdź",
+  oraz odnośnik do obsady projektu. Założenie projektu, obsada i dodanie odcinka mają
+  własne ekrany, bo pyta się o nie na innym poziomie niż o odcinek. Gdy `status` odmawia (np.
   etap 0 jest niekompletny), panel etapu 0 stoi zamiast drabiny, bo to w nim naprawia się
   to, o co drabina się zatrzymała. Pliki podaje się **ścieżką w polu tekstowym**; patrz
   niżej.
@@ -157,10 +162,11 @@ co z tego nie wynika, opisuje osobna sekcja niżej.
 Etap 0 jest wyjątkiem od zdania „panel otwiera się z komórki drabiny", i to nie jest
 odstępstwo, tylko opis tego, czym ten etap jest. Drabina odpowiada o **odcinku**, a świeży
 projekt nie ma odcinka, a świeży odcinek zwykle nie ma jeszcze kompletnego etapu 0, więc
-`status` go odrzuca. Dlatego dwa pytania etapu 0 mają własne ekrany („Nowy projekt”,
-„Nowy odcinek”), a panel etapu 0 pokazuje się także wtedy, gdy drabina odmawia. Razem
-doprowadzają pusty katalog do zatwierdzonego etapu 0: załóż projekt, uzupełnij
-`project.md` w edytorze, dodaj odcinek, dopisz obsadę, „Sprawdź", „Zatwierdź".
+`status` go odrzuca. Dlatego pytania etapu 0 mają własne ekrany na swoich poziomach
+(„Nowy projekt”, „Obsada i narrator”, „Nowy odcinek”), a panel etapu 0 pokazuje się także
+wtedy, gdy drabina odmawia. Razem doprowadzają pusty katalog do zatwierdzonego etapu 0:
+załóż projekt, uzupełnij `project.md` w edytorze, dopisz obsadę, dodaj odcinek,
+„Sprawdź", „Zatwierdź".
 
 Plik podaje się **ścieżką wklejoną z Findera**, która trafia do `--source` bez zmian.
 Upload przez przeglądarkę został w PRD odrzucony z jednego powodu i widać go w

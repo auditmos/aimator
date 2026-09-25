@@ -1,4 +1,12 @@
-import { type JSX, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type JSX,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AssemblyPanel } from "./assembly";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
@@ -6,7 +14,7 @@ import { Ladder } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { plural } from "./panel";
-import { NewEpisode, NewProject, PreparePanel } from "./prepare";
+import { NewEpisode, NewProject, PreparePanel, ProjectCast } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ScreenplayPanel } from "./screenplay";
@@ -64,6 +72,7 @@ type Route =
   | { readonly kind: "new" }
   | { readonly kind: "open" }
   | { readonly kind: "project"; readonly projectId: string }
+  | { readonly kind: "cast"; readonly projectId: string }
   | { readonly kind: "new-episode"; readonly projectId: string }
   | { readonly kind: "episodes"; readonly projectId: string }
   | { readonly kind: "episode"; readonly episodeId: string; readonly projectId: string };
@@ -77,6 +86,10 @@ const OPEN = "#/wczytaj";
 
 function projectHref(projectId: string): string {
   return `#/projekt/${encodeURIComponent(projectId)}`;
+}
+
+function castHref(projectId: string): string {
+  return `${projectHref(projectId)}/obsada`;
 }
 
 function newEpisodeHref(projectId: string): string {
@@ -121,6 +134,10 @@ function routeOf(hash: string): Route {
 
   if (projectId === null) {
     return { kind: "home" };
+  }
+
+  if (third === "obsada") {
+    return { kind: "cast", projectId };
   }
 
   if (third === "nowy-odcinek") {
@@ -359,6 +376,7 @@ function Workbench(props: {
           )}
           {preparing ? (
             <PreparePanel
+              castHref={castHref(projectId)}
               cell={cell}
               episodeId={episodeId}
               onRun={onRun}
@@ -391,22 +409,27 @@ function Workbench(props: {
  * place is what the address bar, the back button and a middle click are for.
  */
 function Choices(props: {
+  /** Something quieter than the two choices, under them and centred with them. */
+  readonly children?: ReactNode;
   readonly label: string;
   readonly load: { readonly href: string; readonly label: string };
   readonly make: { readonly href: string; readonly label: string };
 }): JSX.Element {
-  const { label, load, make } = props;
+  const { children, label, load, make } = props;
 
   return (
     <div className="home">
-      <nav aria-label={label} className="home-choices">
-        <a className="choice" href={make.href}>
-          {make.label}
-        </a>
-        <a className="choice" href={load.href}>
-          {load.label}
-        </a>
-      </nav>
+      <div className="home-stack">
+        <nav aria-label={label} className="home-choices">
+          <a className="choice" href={make.href}>
+            {make.label}
+          </a>
+          <a className="choice" href={load.href}>
+            {load.label}
+          </a>
+        </nav>
+        {children}
+      </div>
     </div>
   );
 }
@@ -584,7 +607,9 @@ function EpisodeView(props: {
   return (
     <section aria-labelledby="episode-title">
       <Back href={episodesHref(projectId)} label="Odcinki" />
-      <h1 id="episode-title">{episodeId}</h1>
+      <h1 id="episode-title">
+        <span className="title-context">{projectId} /</span> {episodeId}
+      </h1>
       <Notices connection={connection} ladderless={ladderless} refusal={refusal} />
       <Workbench
         cell={panel}
@@ -670,6 +695,16 @@ function ProjectScreens(props: {
     return <OpenEpisode project={project} />;
   }
 
+  if (route.kind === "cast") {
+    return (
+      <section aria-labelledby="cast-title">
+        <Back href={projectHref(project.id)} label={project.id} />
+        <h1 id="cast-title">Obsada i narrator</h1>
+        <ProjectCast onRun={onRun} projectId={project.id} run={run} running={running} />
+      </section>
+    );
+  }
+
   if (route.kind === "episode") {
     return project.episodes.includes(route.episodeId) ? (
       // Keyed by episode, so moving between two of them starts the second
@@ -701,7 +736,13 @@ function ProjectScreens(props: {
         label="Odcinek"
         load={{ href: episodesHref(project.id), label: "Wczytaj odcinek" }}
         make={{ href: newEpisodeHref(project.id), label: "Nowy odcinek" }}
-      />
+      >
+        {/* Quieter than the two choices: the cast is set once and revisited
+            rarely, while an episode is what a visit is for. */}
+        <p className="home-aside">
+          <a href={castHref(project.id)}>Obsada i narrator</a>
+        </p>
+      </Choices>
     </section>
   );
 }

@@ -168,8 +168,11 @@ export function Ladder(props: {
   return (
     <section aria-labelledby="ladder-title" className="ladder-section">
       <div className="next">
-        <h2 id="ladder-title">
-          Odcinek {status.episodeId}, projekt {status.projectId}
+        {/* Named for a screen reader only: the page's own heading already says
+            which episode of which project this is, and saying it twice on
+            screen was the first thing a reader had to skip. */}
+        <h2 className="sr-only" id="ladder-title">
+          Etapy odcinka
         </h2>
         {status.next === null ? (
           <p className="next-done">Odcinek zamknięty: każdy etap zatwierdzony.</p>

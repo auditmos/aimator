@@ -6,11 +6,11 @@ import type { RunDone, Stage0Report, StatusCell } from "./types";
 /**
  * Stage 0, which is the one stage a person writes rather than buys.
  *
- * Two of its questions are asked before there is anything to be in, so they
- * are screens of their own rather than forms in this panel: `NewProject`
- * before there is a project, `NewEpisode` before there is an episode. What is
- * left here is what belongs to an episode that exists: the cast, the narrator,
- * the episode's decisions, and the verdict on all of it.
+ * Its questions are asked at three levels, and each is answered where it
+ * belongs rather than all in one panel: `NewProject` before there is a
+ * project, `ProjectCast` for what recurs across the project's episodes, and
+ * `NewEpisode` before there is an episode. What is left in the panel is what
+ * belongs to an episode that exists: its decisions, and the verdict.
  *
  * The file field is a **path**, typed or pasted out of Finder, and it travels
  * to `--source` exactly as it was written. The PRD refused an upload for one
@@ -25,6 +25,8 @@ import type { RunDone, Stage0Report, StatusCell } from "./types";
  */
 
 interface PrepareProps {
+  /** Where the project's cast is set; the address is the app's to know. */
+  readonly castHref: string;
   /** The ladder's stage-0 cell, or nothing when the ladder itself was refused. */
   readonly cell: StatusCell | null;
   readonly episodeId: string;
@@ -158,7 +160,7 @@ function Cast(props: {
 
   return (
     <>
-      <h3>Obsada</h3>
+      <h2>Obsada</h2>
       <p className="actions-note">
         Obsada jest decyzją, nie wnioskiem: wymień każdą powracającą postać. Twarz widziana raz to
         referencja etapu 5, nie postać. Każda ma własną podstawę, zdjęcia albo opis w{" "}
@@ -206,7 +208,7 @@ function Narrator(props: {
 
   return (
     <>
-      <h3>Narrator</h3>
+      <h2>Narrator</h2>
       <p className="actions-note">
         Głos jest obsadą, nie konfiguracją: powraca między odcinkami, więc mieszka w{" "}
         <code>project.json</code> obok postaci. Bramkuje wyłącznie etap 9; film bez narracji nigdy
@@ -411,7 +413,7 @@ export function NewEpisode(props: {
 }
 
 export function PreparePanel(props: PrepareProps): JSX.Element {
-  const { cell, episodeId, onRun, projectId, run, running } = props;
+  const { castHref, cell, episodeId, onRun, projectId, run, running } = props;
   const report = (cell?.status ?? null) as Stage0Report | null;
   const check = useMemo(() => INTENTS.checkPrepare({ projectId }), [projectId]);
   const approve = useMemo(() => INTENTS.approvePrepare({ projectId }), [projectId]);
@@ -458,11 +460,43 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
         </p>
       )}
 
-      <Cast onRun={onRun} projectId={projectId} running={running} />
-      <Narrator onRun={onRun} projectId={projectId} running={running} />
+      <p className="actions-note">
+        Obsada i narrator należą do projektu, nie do odcinka, więc ustawia się je na{" "}
+        <a href={castHref}>ekranie obsady projektu</a>.
+      </p>
+
       <Episode episodeId={episodeId} onRun={onRun} projectId={projectId} running={running} />
 
       <RunOutput run={run} running={running} />
     </section>
+  );
+}
+
+/**
+ * The cast and the narrator, which belong to the project rather than to any
+ * episode of it.
+ *
+ * Both recur between episodes, which is exactly why they live in
+ * `project.json`, so they are set where the project is and not inside one
+ * episode's stage-0 panel, where a fresh project could not reach them before
+ * it had an episode. "Sprawdź" is here because stage 0's verdict is about the
+ * project too, and it is the one way to hear whether the cast now holds.
+ */
+export function ProjectCast(props: {
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { onRun, projectId, run, running } = props;
+  const check = useMemo(() => INTENTS.checkPrepare({ projectId }), [projectId]);
+
+  return (
+    <div className="panel">
+      <Cast onRun={onRun} projectId={projectId} running={running} />
+      <Narrator onRun={onRun} projectId={projectId} running={running} />
+      <Action argv={check} disabled={running} label="Sprawdź etap 0" onRun={onRun} />
+      <RunOutput run={run} running={running} />
+    </div>
   );
 }

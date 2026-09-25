@@ -159,6 +159,11 @@ h1 {
   font-weight: 600;
   color: var(--color-neutral-50);
 }
+/* Which project an episode belongs to, said once and quieter than the episode. */
+.title-context {
+  font-weight: 400;
+  color: var(--color-neutral-400);
+}
 
 /* The start screen: two choices, centred in the room the page has, and
    nothing competing with them. Large enough to be the obvious target, equal
@@ -168,11 +173,27 @@ h1 {
   place-items: center;
   min-height: 55vh;
 }
+.home-stack {
+  display: grid;
+  gap: 1.25rem;
+  justify-items: center;
+  width: min(100%, 36rem);
+}
 .home-choices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: 1.25rem;
-  width: min(100%, 36rem);
+  width: 100%;
+}
+.home-aside {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+.home-aside a {
+  color: var(--color-neutral-400);
+}
+.home-aside a:hover {
+  color: var(--color-neutral-50);
 }
 .choice {
   display: grid;
@@ -347,15 +368,8 @@ h1 {
 .ladder-section {
   margin-top: 2.5rem;
 }
-.next h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-neutral-50);
-}
 .next-step {
-  margin: 0.75rem 0 1.5rem;
+  margin: 0 0 1.5rem;
 }
 /* A label, not a badge: the cyan pill it replaces looked like the button it
    was standing next to and did nothing when clicked. */
@@ -387,7 +401,7 @@ h1 {
   color: var(--color-neutral-400);
 }
 .next-done {
-  margin: 0.5rem 0 1.5rem;
+  margin: 0 0 1.5rem;
   color: var(--color-success-text);
 }
 .ladder {
