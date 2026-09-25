@@ -153,7 +153,11 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
 
 1. **Stan**: werdykt `check`, odmowy, meldunki i dryf wejść.
 2. **To, co etap wyprodukował**: tekst, obrazy, łańcuch klipów, film albo nagrania, pod
-   nazwą tego etapu.
+   nazwą tego etapu. Na liście z wyborem pozycja już zatwierdzona ma pole zaznaczone i
+   zablokowane oraz zieloną ramkę, więc po powrocie na stronę widać, co przyjęto, a
+   kolejne „Zatwierdź” obejmuje tylko nowo zaznaczone. Odblokowuje je jedynie wybór, który
+   z definicji dotyczy rzeczy przyjętych: „Nowa płatna próba”, a w klipach także zgoda na
+   publikację z archiwum.
 3. **Decyzja**: „Sprawdź” i „Zatwierdź”, a w etapach 9 i 10 oba „tak” tego etapu
    (skrypt i kwestie, arkusz i stemy). Gdy w bloku stoi przycisk zatwierdzenia, blok jedzie
    z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na

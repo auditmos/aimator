@@ -97,7 +97,14 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
             }
             title="Klatka otwarcia"
           >
-            <Gallery chosen={[]} idPrefix="opening" items={[frame]} onToggle={null} urlOf={urlOf} />
+            <Gallery
+              chosen={[]}
+              idPrefix="opening"
+              items={[frame]}
+              onToggle={null}
+              unlocked={false}
+              urlOf={urlOf}
+            />
           </Block>
         </>
       )}

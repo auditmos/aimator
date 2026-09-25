@@ -10,6 +10,7 @@ import {
   Gallery,
   PaidCall,
   Problems,
+  pickable,
 } from "./panel";
 import type { CharacterStatus, RunDone, StatusCell } from "./types";
 
@@ -50,9 +51,17 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
   const [model, setModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
   const [sent, setSent] = useState<readonly string[] | null>(null);
+  /** The stage's word for a picture is `artifact`; the gallery's is `id`. */
+  const drawn = useMemo(
+    () => (status?.artifacts ?? []).map((one) => ({ ...one, id: one.artifact })),
+    [status]
+  );
+  // An accepted picture stays ticked and locked unless a new paid attempt is
+  // what is being chosen for.
+  const selected = useMemo(() => pickable(drawn, chosen, regenerate), [chosen, drawn, regenerate]);
   const scope = useMemo(
-    () => ({ artifacts: chosen, characterId, projectId, track }),
-    [characterId, chosen, projectId, track]
+    () => ({ artifacts: selected, characterId, projectId, track }),
+    [characterId, projectId, selected, track]
   );
   const check = useMemo(
     () => INTENTS.checkCharacter({ characterId, projectId, track }),
@@ -79,11 +88,6 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
     (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
     []
   );
-  /** The stage's word for a picture is `artifact`; the gallery's is `id`. */
-  const drawn = useMemo(
-    () => (status?.artifacts ?? []).map((one) => ({ ...one, id: one.artifact })),
-    [status]
-  );
   const urlOf = useCallback(
     (artifact: string) =>
       `${artifactUrl({ artifact, characterId, projectId, stage: "character", track })}&v=${encodeURIComponent(cell.state)}`,
@@ -105,7 +109,7 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
    * exists and nobody has accepted yet. An approval the terminal would refuse
    * is a click that teaches a person the screen lies.
    */
-  const picked = drawn.filter((one) => chosen.includes(one.id));
+  const picked = drawn.filter((one) => selected.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
 
@@ -154,10 +158,11 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
             title="Obrazy"
           >
             <Gallery
-              chosen={chosen}
+              chosen={selected}
               idPrefix="character"
               items={drawn}
               onToggle={toggle}
+              unlocked={regenerate}
               urlOf={urlOf}
             />
           </Block>

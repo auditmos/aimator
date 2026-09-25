@@ -8,8 +8,10 @@ import {
   Drift,
   Field,
   PaidCall,
+  PickBox,
   type Priced,
   Problems,
+  pickable,
   promptsOf,
   type Unit,
 } from "./panel";
@@ -90,9 +92,11 @@ function Reel(props: {
   readonly chosen: readonly string[];
   readonly items: readonly ClipState[];
   readonly onToggle: (id: string, wanted: boolean) => void;
+  /** Whether an accepted link may be chosen; see `pickable`. */
+  readonly unlocked: boolean;
   readonly urlOf: (id: string) => string;
 }): JSX.Element {
-  const { chosen, items, onToggle, urlOf } = props;
+  const { chosen, items, onToggle, unlocked, urlOf } = props;
 
   return (
     <ul className="reel">
@@ -102,6 +106,7 @@ function Reel(props: {
           item={item}
           key={item.id}
           onToggle={onToggle}
+          unlocked={unlocked}
           url={urlOf(item.id)}
         />
       ))}
@@ -138,21 +143,21 @@ function Link(props: {
   readonly chosen: boolean;
   readonly item: ClipState;
   readonly onToggle: (id: string, wanted: boolean) => void;
+  readonly unlocked: boolean;
   readonly url: string;
 }): JSX.Element {
-  const { chosen, item, onToggle, url } = props;
-  const boxId = `clip-${item.id}`;
-  const toggle = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => onToggle(item.id, event.target.checked),
-    [item.id, onToggle]
-  );
+  const { chosen, item, onToggle, unlocked, url } = props;
 
   return (
-    <li className="link">
-      <label className="field-check" htmlFor={boxId}>
-        <input checked={chosen} id={boxId} onChange={toggle} type="checkbox" />
-        <code>{item.id}</code>
-      </label>
+    <li className={item.approved ? "link picture-approved" : "link"}>
+      <PickBox
+        approved={item.approved}
+        boxId={`clip-${item.id}`}
+        chosen={chosen}
+        id={item.id}
+        onToggle={onToggle}
+        unlocked={unlocked}
+      />
       <Seen item={item} url={url} />
       <p className="picture-state">
         {item.approved ? "zatwierdzony" : LINK_STATE[item.state]} · {item.note}
@@ -169,10 +174,17 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   const [imageModel, setImageModel] = useState("");
   const [videoModel, setVideoModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
+  /** Republishing rewrites accepted clips on purpose, so it unlocks them too. */
+  const [reopen, setReopen] = useState(false);
   const [sent, setSent] = useState<readonly string[] | null>(null);
+  const unlocked = regenerate || reopen;
+  const selected = useMemo(
+    () => pickable(status?.artifacts ?? [], chosen, unlocked),
+    [chosen, status, unlocked]
+  );
   const scope = useMemo(
-    () => ({ artifacts: chosen, episodeId, projectId, track }),
-    [chosen, episodeId, projectId, track]
+    () => ({ artifacts: selected, episodeId, projectId, track }),
+    [episodeId, projectId, selected, track]
   );
   const check = useMemo(
     () => INTENTS.checkClips({ episodeId, projectId, track }),
@@ -198,6 +210,10 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
     (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
     []
   );
+  const changeReopen = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setReopen(event.target.checked),
+    []
+  );
   const urlOf = useCallback(
     (artifact: string) =>
       `${artifactUrl({ artifact, episodeId, projectId, stage: "clips", track })}&v=${encodeURIComponent(cell.state)}`,
@@ -210,7 +226,7 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   }, [episodeId, track]);
 
   const artifacts = status?.artifacts ?? [];
-  const picked = artifacts.filter((one) => chosen.includes(one.id));
+  const picked = artifacts.filter((one) => selected.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
   // A republication rewrites a record out of its own archive, and an entry
@@ -256,7 +272,13 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
             }
             title="Łańcuch"
           >
-            <Reel chosen={chosen} items={artifacts} onToggle={toggle} urlOf={urlOf} />
+            <Reel
+              chosen={selected}
+              items={artifacts}
+              onToggle={toggle}
+              unlocked={unlocked}
+              urlOf={urlOf}
+            />
           </Block>
         </>
       )}
@@ -323,6 +345,12 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
         }
         title="Publikacja z archiwum (bez płacenia)"
       >
+        <div className="send">
+          <label className="field-check" htmlFor="clips-reopen">
+            <input checked={reopen} id="clips-reopen" onChange={changeReopen} type="checkbox" />
+            Pozwól wybrać zatwierdzone klipy (publikacja cofa ich ocenę)
+          </label>
+        </div>
         {republishable ? (
           <Action argv={republish} disabled={running} label="Opublikuj ponownie" onRun={startRun} />
         ) : (

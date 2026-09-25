@@ -10,8 +10,10 @@ import {
   NO_FLAGS,
   Notices,
   PaidCall,
+  PickBox,
   type Priced,
   Problems,
+  pickable,
   SendFields,
   type SendFlags,
   type Unit,
@@ -134,21 +136,22 @@ function Stem(props: {
   readonly chosen: boolean;
   readonly item: CueState;
   readonly onToggle: (id: string, wanted: boolean) => void;
+  /** Whether an accepted stem may be chosen; see `pickable`. */
+  readonly unlocked: boolean;
   readonly url: string;
 }): JSX.Element {
-  const { chosen, item, onToggle, url } = props;
-  const boxId = `stem-${item.id}`;
-  const toggle = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => onToggle(item.id, event.target.checked),
-    [item.id, onToggle]
-  );
+  const { chosen, item, onToggle, unlocked, url } = props;
 
   return (
-    <li className="link">
-      <label className="field-check" htmlFor={boxId}>
-        <input checked={chosen} id={boxId} onChange={toggle} type="checkbox" />
-        <code>{item.id}</code>
-      </label>
+    <li className={item.approved ? "link picture-approved" : "link"}>
+      <PickBox
+        approved={item.approved}
+        boxId={`stem-${item.id}`}
+        chosen={chosen}
+        id={item.id}
+        onToggle={onToggle}
+        unlocked={unlocked}
+      />
       {item.state === "absent" ? (
         <p className="picture-empty">{CUE_STATE[item.state]}</p>
       ) : (
@@ -186,24 +189,30 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
   const [levels, setLevels] = useState<LevelsForm>(NO_LEVELS);
   const [sent, setSent] = useState<readonly string[] | null>(null);
   const scope = useMemo(() => ({ episodeId, projectId }), [episodeId, projectId]);
+  // An accepted stem stays ticked and locked unless a new paid attempt is what
+  // is being chosen for.
+  const selected = useMemo(
+    () => pickable(status?.cues ?? [], chosen, flags.regenerate),
+    [chosen, flags.regenerate, status]
+  );
   const check = useMemo(() => INTENTS.checkSoundDesign(scope), [scope]);
   const approveSheet = useMemo(() => INTENTS.approveCueSheet(scope), [scope]);
   const approveStems = useMemo(
-    () => INTENTS.approveStems({ ...scope, artifacts: chosen }),
-    [chosen, scope]
+    () => INTENTS.approveStems({ ...scope, artifacts: selected }),
+    [scope, selected]
   );
   const preview = useMemo(
     () =>
       INTENTS.previewSoundDesign({
         ...scope,
-        artifacts: chosen,
+        artifacts: selected,
         effectsModel,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         musicModel,
         regenerate: flags.regenerate,
       }),
-    [chosen, effectsModel, flags, musicModel, scope]
+    [effectsModel, flags, musicModel, scope, selected]
   );
   const setMix = useMemo(() => INTENTS.setLevels({ ...levels, projectId }), [levels, projectId]);
   const startRun = useCallback(
@@ -248,7 +257,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
     cell.state
   );
   const cues = status?.cues ?? [];
-  const picked = cues.filter((one) => chosen.includes(one.id));
+  const picked = cues.filter((one) => selected.includes(one.id));
   const sheetAcceptable =
     status !== null && status.sheet.state === "completed" && !status.sheet.approved;
   const stemsAcceptable =
@@ -322,10 +331,11 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
             <ul className="reel">
               {cues.map((item) => (
                 <Stem
-                  chosen={chosen.includes(item.id)}
+                  chosen={selected.includes(item.id)}
                   item={item}
                   key={item.id}
                   onToggle={toggle}
+                  unlocked={flags.regenerate}
                   url={urlOf(item.id)}
                 />
               ))}

@@ -784,6 +784,68 @@ const DRAWN_STATE: Record<Drawn["state"], string> = {
 };
 
 /**
+ * Which of the ticked ids a command may carry.
+ *
+ * An approved item is shown ticked and locked, so it cannot slip into the next
+ * "Zatwierdź" by accident; what somebody ticked before it was approved does
+ * not survive that either. It is unlocked only where choosing something already
+ * accepted is the point: a new paid attempt, or stage 7's republication. The
+ * answer is always a subset of what was ticked, so a lock never adds anything
+ * to a command.
+ */
+export function pickable(
+  items: readonly { readonly approved: boolean; readonly id: string }[],
+  chosen: readonly string[],
+  unlocked: boolean
+): readonly string[] {
+  if (unlocked) {
+    return chosen;
+  }
+
+  const accepted = new Set(items.filter((item) => item.approved).map((item) => item.id));
+
+  return chosen.filter((id) => !accepted.has(id));
+}
+
+/**
+ * The box beside one item of a list, and the item's name.
+ *
+ * Checked and disabled for an approved item while approved items are locked,
+ * which says "already accepted" in the one place a person looks for it;
+ * otherwise an ordinary choice. The state line under the item still says
+ * "zatwierdzony" in words, because a ticked box alone is a colour-free sign
+ * that means two things.
+ */
+export function PickBox(props: {
+  readonly approved: boolean;
+  readonly boxId: string;
+  readonly chosen: boolean;
+  readonly id: string;
+  readonly onToggle: (id: string, wanted: boolean) => void;
+  readonly unlocked: boolean;
+}): JSX.Element {
+  const { approved, boxId, chosen, id, onToggle, unlocked } = props;
+  const locked = approved && !unlocked;
+  const toggle = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onToggle(id, event.target.checked),
+    [id, onToggle]
+  );
+
+  return (
+    <label className={locked ? "field-check pick-locked" : "field-check"} htmlFor={boxId}>
+      <input
+        checked={locked || chosen}
+        disabled={locked}
+        id={boxId}
+        onChange={toggle}
+        type="checkbox"
+      />
+      <code>{id}</code>
+    </label>
+  );
+}
+
+/**
  * The pictures of one stage on one track, each beside the box that picks it.
  *
  * It is here rather than in a stage's panel because three stages draw and the
@@ -798,9 +860,11 @@ export function Gallery(props: {
   readonly idPrefix: string;
   readonly items: readonly Drawn[];
   readonly onToggle: ((id: string, wanted: boolean) => void) | null;
+  /** Whether an approved picture may be chosen; see `pickable`. */
+  readonly unlocked: boolean;
   readonly urlOf: (id: string) => string;
 }): JSX.Element {
-  const { chosen, idPrefix, items, onToggle, urlOf } = props;
+  const { chosen, idPrefix, items, onToggle, unlocked, urlOf } = props;
 
   return (
     <ul className="pictures">
@@ -811,6 +875,7 @@ export function Gallery(props: {
           item={item}
           key={item.id}
           onToggle={onToggle}
+          unlocked={unlocked}
           url={urlOf(item.id)}
         />
       ))}
@@ -823,26 +888,26 @@ function Shown(props: {
   readonly idPrefix: string;
   readonly item: Drawn;
   readonly onToggle: ((id: string, wanted: boolean) => void) | null;
+  readonly unlocked: boolean;
   readonly url: string;
 }): JSX.Element {
-  const { chosen, idPrefix, item, onToggle, url } = props;
-  const boxId = `${idPrefix}-${item.id}`;
-  const toggle = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => onToggle?.(item.id, event.target.checked),
-    [item.id, onToggle]
-  );
+  const { chosen, idPrefix, item, onToggle, unlocked, url } = props;
 
   return (
-    <li className="picture">
+    <li className={item.approved ? "picture picture-approved" : "picture"}>
       {onToggle === null ? (
         <p className="picture-name">
           <code>{item.id}</code>
         </p>
       ) : (
-        <label className="field-check" htmlFor={boxId}>
-          <input checked={chosen} id={boxId} onChange={toggle} type="checkbox" />
-          <code>{item.id}</code>
-        </label>
+        <PickBox
+          approved={item.approved}
+          boxId={`${idPrefix}-${item.id}`}
+          chosen={chosen}
+          id={item.id}
+          onToggle={onToggle}
+          unlocked={unlocked}
+        />
       )}
       {item.verdict === null ? (
         <p className="picture-empty">{DRAWN_STATE[item.state]}</p>

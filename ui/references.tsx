@@ -1,6 +1,16 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, artifactUrl, asImages, Block, Field, Gallery, PaidCall, Problems } from "./panel";
+import {
+  Action,
+  artifactUrl,
+  asImages,
+  Block,
+  Field,
+  Gallery,
+  PaidCall,
+  Problems,
+  pickable,
+} from "./panel";
 import type { ReferencesStatus, RunDone, StatusCell } from "./types";
 
 /**
@@ -33,11 +43,17 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
   const [chosen, setChosen] = useState<readonly string[]>([]);
   const [model, setModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
-  const [sent, setSent] = useState<readonly string[] | null>(null);
-  const scope = useMemo(
-    () => ({ artifacts: chosen, episodeId, projectId, track }),
-    [chosen, episodeId, projectId, track]
+  // An accepted reference stays ticked and locked unless a new paid attempt is
+  // what is being chosen for.
+  const selected = useMemo(
+    () => pickable(status?.artifacts ?? [], chosen, regenerate),
+    [chosen, regenerate, status]
   );
+  const scope = useMemo(
+    () => ({ artifacts: selected, episodeId, projectId, track }),
+    [episodeId, projectId, selected, track]
+  );
+  const [sent, setSent] = useState<readonly string[] | null>(null);
   const check = useMemo(
     () => INTENTS.checkReferences({ episodeId, projectId, track }),
     [episodeId, projectId, track]
@@ -72,7 +88,7 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
     setSent(null);
   }, [episodeId, track]);
 
-  const picked = (status?.artifacts ?? []).filter((one) => chosen.includes(one.id));
+  const picked = (status?.artifacts ?? []).filter((one) => selected.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
 
@@ -111,10 +127,11 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
             title="Referencje"
           >
             <Gallery
-              chosen={chosen}
+              chosen={selected}
               idPrefix="reference"
               items={status.artifacts}
               onToggle={toggle}
+              unlocked={regenerate}
               urlOf={urlOf}
             />
           </Block>

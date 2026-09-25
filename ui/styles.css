@@ -1227,3 +1227,26 @@ main:has(.dock) {
 section:has(> .dock) .block-decision:has(.action-primary) {
   bottom: 5.25rem;
 }
+
+/* An accepted picture, clip, line or stem: its box stays ticked and locked,
+   and the card says "accepted" in its border and its state line as well, so
+   it is not the colour alone that carries it. */
+.picture-approved {
+  border-color: var(--color-success-text);
+}
+.picture-approved .picture-state {
+  color: var(--color-success-text);
+}
+.pick-locked {
+  color: var(--color-success-text);
+  cursor: default;
+}
+.pick-locked input {
+  accent-color: var(--color-success-text);
+  cursor: default;
+}
+/* A disabled box is drawn grey whatever its accent, so the name beside it
+   carries the green. */
+.pick-locked code {
+  color: var(--color-success-text);
+}

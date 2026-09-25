@@ -10,8 +10,10 @@ import {
   NO_FLAGS,
   Notices,
   PaidCall,
+  PickBox,
   type Priced,
   Problems,
+  pickable,
   SendFields,
   type SendFlags,
   type Unit,
@@ -125,21 +127,22 @@ function Heard(props: {
   readonly chosen: boolean;
   readonly item: LineState;
   readonly onToggle: (id: string, wanted: boolean) => void;
+  /** Whether an accepted line may be chosen; see `pickable`. */
+  readonly unlocked: boolean;
   readonly url: string;
 }): JSX.Element {
-  const { chosen, item, onToggle, url } = props;
-  const boxId = `line-${item.id}`;
-  const toggle = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => onToggle(item.id, event.target.checked),
-    [item.id, onToggle]
-  );
+  const { chosen, item, onToggle, unlocked, url } = props;
 
   return (
-    <li className="link">
-      <label className="field-check" htmlFor={boxId}>
-        <input checked={chosen} id={boxId} onChange={toggle} type="checkbox" />
-        <code>{item.id}</code>
-      </label>
+    <li className={item.approved ? "link picture-approved" : "link"}>
+      <PickBox
+        approved={item.approved}
+        boxId={`line-${item.id}`}
+        chosen={chosen}
+        id={item.id}
+        onToggle={onToggle}
+        unlocked={unlocked}
+      />
       {item.state === "absent" ? (
         <p className="picture-empty">{LINE_STATE[item.state]}</p>
       ) : (
@@ -181,23 +184,29 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
   const [delivery, setDelivery] = useState<DeliveryForm>(NO_DELIVERY);
   const [sent, setSent] = useState<readonly string[] | null>(null);
   const scope = useMemo(() => ({ episodeId, projectId }), [episodeId, projectId]);
+  // An accepted kwestia stays ticked and locked unless a new paid attempt is what
+  // is being chosen for.
+  const selected = useMemo(
+    () => pickable(status?.lines ?? [], chosen, flags.regenerate),
+    [chosen, flags.regenerate, status]
+  );
   const check = useMemo(() => INTENTS.checkNarration(scope), [scope]);
   const approveScript = useMemo(() => INTENTS.approveNarrationScript(scope), [scope]);
   const approveLines = useMemo(
-    () => INTENTS.approveNarrationLines({ ...scope, artifacts: chosen }),
-    [chosen, scope]
+    () => INTENTS.approveNarrationLines({ ...scope, artifacts: selected }),
+    [scope, selected]
   );
   const preview = useMemo(
     () =>
       INTENTS.previewNarration({
         ...scope,
-        artifacts: chosen,
+        artifacts: selected,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         regenerate: flags.regenerate,
         voiceModel,
       }),
-    [chosen, flags, scope, voiceModel]
+    [flags, scope, selected, voiceModel]
   );
   const direct = useMemo(
     () => INTENTS.directNarrator({ ...delivery, projectId }),
@@ -250,7 +259,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
     cell.state
   );
   const lines = status?.lines ?? [];
-  const picked = lines.filter((one) => chosen.includes(one.id));
+  const picked = lines.filter((one) => selected.includes(one.id));
   const scriptAcceptable =
     status !== null && status.script.state === "completed" && !status.script.approved;
   const linesAcceptable =
@@ -322,10 +331,11 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
             <ul className="reel">
               {lines.map((item) => (
                 <Heard
-                  chosen={chosen.includes(item.id)}
+                  chosen={selected.includes(item.id)}
                   item={item}
                   key={item.id}
                   onToggle={toggle}
+                  unlocked={flags.regenerate}
                   url={urlOf(item.id)}
                 />
               ))}
