@@ -6,11 +6,11 @@ import type { RunDone, Stage0Report, StatusCell } from "./types";
 /**
  * Stage 0, which is the one stage a person writes rather than buys.
  *
- * It is also the only panel that has to exist **before** there is a ladder: a
- * project with no episode has nothing for `status` to answer about, so this
- * panel stands on its own until the first episode is added. Creating the
- * project itself is one step earlier still and has a screen of its own,
- * `NewProject`, because it is asked before there is a project to be in.
+ * Two of its questions are asked before there is anything to be in, so they
+ * are screens of their own rather than forms in this panel: `NewProject`
+ * before there is a project, `NewEpisode` before there is an episode. What is
+ * left here is what belongs to an episode that exists: the cast, the narrator,
+ * the episode's decisions, and the verdict on all of it.
  *
  * The file field is a **path**, typed or pasted out of Finder, and it travels
  * to `--source` exactly as it was written. The PRD refused an upload for one
@@ -25,9 +25,9 @@ import type { RunDone, Stage0Report, StatusCell } from "./types";
  */
 
 interface PrepareProps {
-  /** The ladder's stage-0 cell, or nothing at all in a project with no episode. */
+  /** The ladder's stage-0 cell, or nothing when the ladder itself was refused. */
   readonly cell: StatusCell | null;
-  readonly episodeId: string | null;
+  readonly episodeId: string;
   readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
   readonly run: RunDone | null;
@@ -226,23 +226,11 @@ function Narrator(props: {
   );
 }
 
-/**
- * The episode: its source file, and the six decisions it carries.
- *
- * One set of fields serves both actions, because they are one set of
- * decisions: `episode add` takes them for an episode that does not exist yet
- * and `episode set` takes the same six for one that does. A field left empty
- * is not spelled at all, so "zapisz" changes what was typed and leaves the
- * rest exactly as it was.
- */
-function Episode(props: {
-  readonly episodeId: string | null;
-  readonly onRun: (argv: readonly string[]) => void;
-  readonly projectId: string;
-  readonly running: boolean;
-}): JSX.Element {
-  const { episodeId, onRun, projectId, running } = props;
-  const [source, setSource] = useState("");
+/** The six fields, and one setter per field, held as the strings somebody typed. */
+function useSettings(): {
+  readonly change: Record<keyof Settings, (value: string) => void>;
+  readonly settings: Settings;
+} {
   const [settings, setSettings] = useState<Settings>(EMPTY);
   const change = useMemo(
     () => ({
@@ -255,83 +243,170 @@ function Episode(props: {
     }),
     []
   );
-  const add = useMemo(
-    () => INTENTS.addEpisode({ ...settings, projectId, source }),
-    [projectId, settings, source]
+
+  return { change, settings };
+}
+
+/**
+ * The six decisions of an episode, as fields.
+ *
+ * One set of fields serves both actions, because they are one set of
+ * decisions: `episode add` takes them for an episode that does not exist yet
+ * and `episode set` takes the same six for one that does. A field left empty
+ * is not spelled at all, so "zapisz" changes what was typed and leaves the
+ * rest exactly as it was.
+ */
+function SettingsFields(props: {
+  readonly change: Record<keyof Settings, (value: string) => void>;
+  readonly settings: Settings;
+}): JSX.Element {
+  const { change, settings } = props;
+
+  return (
+    <div className="send">
+      <Field
+        id="episode-duration"
+        label="Długość (s)"
+        onValue={change.duration}
+        placeholder="60"
+        value={settings.duration}
+      />
+      <Field
+        id="episode-audio"
+        label="Dźwięk"
+        onValue={change.audio}
+        placeholder="narration"
+        value={settings.audio}
+      />
+      <Field
+        id="episode-language"
+        label="Język"
+        onValue={change.language}
+        placeholder="pl"
+        value={settings.language}
+      />
+      <Field
+        id="episode-subtitles"
+        label="Napisy"
+        onValue={change.subtitles}
+        placeholder="none"
+        value={settings.subtitles}
+      />
+      <Field
+        id="episode-nature"
+        label="Rodzaj źródła"
+        onValue={change.nature}
+        placeholder="law-or-idea"
+        value={settings.nature}
+      />
+      <Field
+        id="episode-max-clip"
+        label="Najdłuższy klip (s)"
+        onValue={change.maxClip}
+        placeholder="6"
+        value={settings.maxClip}
+      />
+    </div>
   );
+}
+
+const SETTINGS_NOTE =
+  "Pięć decyzji blokuje bramkę, --max-clip jest wymagany dopiero przez etap 3. Pole zostawione puste znaczy „nierozstrzygnięte”, nigdy zero.";
+
+/** The decisions of the episode on screen, changed in place. */
+function Episode(props: {
+  readonly episodeId: string;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly running: boolean;
+}): JSX.Element {
+  const { episodeId, onRun, projectId, running } = props;
+  const { change, settings } = useSettings();
   const set = useMemo(
-    () => INTENTS.setEpisode({ ...settings, episodeId: episodeId ?? "", projectId }),
+    () => INTENTS.setEpisode({ ...settings, episodeId, projectId }),
     [episodeId, projectId, settings]
   );
 
   return (
-    <div id="prepare-episode">
-      <h3>Odcinek</h3>
+    <>
+      <h3>Decyzje odcinka</h3>
+      <p className="actions-note">{SETTINGS_NOTE}</p>
+      <SettingsFields change={change} settings={settings} />
+      <Action argv={set} disabled={running} label="Zapisz decyzje odcinka" onRun={onRun} />
+    </>
+  );
+}
+
+/**
+ * An episode the project does not have yet: its source file and its six
+ * decisions.
+ *
+ * It is a screen of its own, the way a new project is, because it is asked
+ * before there is an episode to be in. The identifier comes from the source's
+ * file name and the CLI is what reads it, so this screen does not guess: it
+ * remembers which episodes the project had when the command was sent, and the
+ * one that appears in the listing afterwards is the one it created.
+ */
+export function NewEpisode(props: {
+  readonly episodes: readonly string[];
+  readonly onCreated: (episodeId: string) => void;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { episodes, onCreated, onRun, projectId, run, running } = props;
+  const [source, setSource] = useState("");
+  const { change, settings } = useSettings();
+  /** The episodes that existed when the command was sent, or null before. */
+  const [known, setKnown] = useState<readonly string[] | null>(null);
+  const add = useMemo(
+    () => INTENTS.addEpisode({ ...settings, projectId, source }),
+    [projectId, settings, source]
+  );
+  const submit = useCallback(
+    (one: readonly string[]) => {
+      setKnown(episodes);
+      onRun(one);
+    },
+    [episodes, onRun]
+  );
+
+  useEffect(() => {
+    if (known === null || running || run?.ok !== true) {
+      return;
+    }
+
+    const fresh = episodes.find((one) => !known.includes(one));
+
+    if (fresh !== undefined) {
+      onCreated(fresh);
+    }
+  }, [episodes, known, onCreated, run, running]);
+
+  return (
+    <section aria-labelledby="new-episode-title" className="panel">
+      <h2 id="new-episode-title">Nowy odcinek</h2>
       <p className="actions-note">
         Plik podaje się <strong>ścieżką</strong>, wklejoną z Findera; trafia do{" "}
         <code>--source</code> bez zmian, więc <code>episode.json</code> zapisuje prawdziwe
         pochodzenie pliku. Numer i identyfikator odcinka biorą się z jego nazwy (
-        <code>NN-tytul.md</code>). Pięć decyzji blokuje bramkę, <code>--max-clip</code> jest
-        wymagany dopiero przez etap 3. Pole zostawione puste znaczy „nierozstrzygnięte”, nigdy zero.
+        <code>NN-tytul.md</code>).
       </p>
       <div className="send">
         <Field
-          id="prepare-source"
+          id="episode-source"
           label="Ścieżka do pliku źródłowego"
           onValue={setSource}
           placeholder="/Users/ktos/Filmy/01-burza.md"
           value={source}
         />
       </div>
-      <div className="send">
-        <Field
-          id="prepare-duration"
-          label="Długość (s)"
-          onValue={change.duration}
-          placeholder="60"
-          value={settings.duration}
-        />
-        <Field
-          id="prepare-audio"
-          label="Dźwięk"
-          onValue={change.audio}
-          placeholder="narration"
-          value={settings.audio}
-        />
-        <Field
-          id="prepare-language"
-          label="Język"
-          onValue={change.language}
-          placeholder="pl"
-          value={settings.language}
-        />
-        <Field
-          id="prepare-subtitles"
-          label="Napisy"
-          onValue={change.subtitles}
-          placeholder="none"
-          value={settings.subtitles}
-        />
-        <Field
-          id="prepare-nature"
-          label="Rodzaj źródła"
-          onValue={change.nature}
-          placeholder="law-or-idea"
-          value={settings.nature}
-        />
-        <Field
-          id="prepare-max-clip"
-          label="Najdłuższy klip (s)"
-          onValue={change.maxClip}
-          placeholder="6"
-          value={settings.maxClip}
-        />
-      </div>
-      <Action argv={add} disabled={running} label="Dodaj odcinek" onRun={onRun} />
-      {episodeId === null ? null : (
-        <Action argv={set} disabled={running} label="Zapisz decyzje odcinka" onRun={onRun} />
-      )}
-    </div>
+      <p className="actions-note">{SETTINGS_NOTE}</p>
+      <SettingsFields change={change} settings={settings} />
+      <Action argv={add} disabled={running} label="Dodaj odcinek" onRun={submit} primary />
+      <RunOutput run={run} running={running} />
+    </section>
   );
 }
 
@@ -351,10 +426,7 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
       <h2 id="prepare-title">Etap 0: przygotowanie</h2>
 
       {report === null ? (
-        <p className="panel-empty">
-          Bez odcinka nie ma drabiny, która oceniłaby ten etap. Dopisz obsadę i dodaj pierwszy
-          odcinek poniżej.
-        </p>
+        <p className="panel-empty">Ten etap nie odpowiedział; powód stoi wyżej.</p>
       ) : (
         <>
           <dl className="verdict">

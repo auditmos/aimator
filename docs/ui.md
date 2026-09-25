@@ -22,16 +22,24 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Ekran startowy** z dwoma wyborami i niczym więcej: „Nowy projekt” i „Wczytaj
   projekt”. To jedyne dwa pytania, na które ktoś wchodzący tu umie odpowiedzieć; odcinek,
   drabina i panel etapu dotyczą projektu, więc czekają, aż jakiś jest. Gdzie stoi ekran,
-  zapisuje adres (`#/nowy`, `#/wczytaj`, `#/projekt/<id>`), więc odświeżenie zostaje w
-  miejscu, a przycisk „wstecz” przeglądarki cofa. Wordmark w nagłówku wraca na start.
-- **Nowy projekt**: sam formularz `project init` (identyfikator, tytuł, proporcje). Gdy
-  CLI powie „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod formularzem,
-  słowo w słowo.
-- **Wczytaj projekt**: projekty z `list --json` jako lista odnośników z liczbą odcinków.
-  Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
-- **Widok projektu**: wybór odcinka i obok niego „+ Nowy odcinek”, który otwiera panel
-  etapu 0 przewinięty do formularza odcinka. Projektu się tu już nie wybiera: wybrano go
-  po drodze i nazywa go adres.
+  zapisuje adres, więc odświeżenie zostaje w miejscu, a przycisk „wstecz” przeglądarki
+  cofa. Wordmark w nagłówku wraca na start.
+- **Nowy projekt** (`#/nowy`): sam formularz `project init` (identyfikator, tytuł,
+  proporcje). Gdy CLI powie „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod
+  formularzem, słowo w słowo.
+- **Wczytaj projekt** (`#/wczytaj`): projekty z `list --json` jako lista odnośników z
+  liczbą odcinków. Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
+- **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
+  odcinek” albo „Wczytaj odcinek”, i nic więcej.
+- **Nowy odcinek** (`#/projekt/<id>/nowy-odcinek`): ścieżka do pliku źródłowego i sześć
+  decyzji, czyli `episode add`. Identyfikator odcinka czyta z nazwy pliku CLI, więc ekran
+  go nie zgaduje: pamięta, jakie odcinki projekt miał w chwili wysłania komendy, i
+  przechodzi do tego, który po niej pojawił się w `list`.
+- **Wczytaj odcinek** (`#/projekt/<id>/odcinki`): odcinki projektu jako lista odnośników.
+- **Widok odcinka** (`#/projekt/<id>/odcinek/<odcinek>`): drabina i panel otwartej
+  komórki, opisane niżej. Odcinka się tu nie wybiera: wybrano go po drodze i nazywa go
+  adres. Projekt albo odcinek, którego nie ma w `list`, dostaje komunikat zamiast ekranu
+  zbudowanego na czymś, czego CLI i tak by odmówiło.
 - **Drabinę etapów** z `status --json`: komórka na etap, na tor od etapu 2 i na postać w
   etapie 2, każda w jednym z pięciu stanów z etykietą tekstową, z powodem blokady w słowach
   etapu i z meldunkami pod spodem. Kolor nigdy nie niesie znaczenia sam.
@@ -41,10 +49,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   zdaniem z komendą w środku i skracanie go tutaj byłoby redagowaniem cudzej odpowiedzi.
   Etykieta jest etykietą: cyjanowa plakietka, którą zastąpiła, wyglądała na przycisk,
   nie robiła nic po kliknięciu i zostawiała zdanie obok bez zastosowania.
-- **Panel etapu 0**, jedyny, który istnieje **zanim** jest drabina: formularze obsady,
-  narratora, odcinka i jego sześciu decyzji, plus „Sprawdź" i „Zatwierdź". Założenie
-  projektu jest krok wcześniej, na własnym ekranie. Pliki podaje się **ścieżką w polu
-  tekstowym**; patrz niżej.
+- **Panel etapu 0**: formularze obsady, narratora i sześciu decyzji tego odcinka, plus
+  „Sprawdź" i „Zatwierdź". Założenie projektu i dodanie odcinka są krok wcześniej, na
+  własnych ekranach, bo pyta się o nie, zanim jest w czym być. Gdy `status` odmawia (np.
+  etap 0 jest niekompletny), panel etapu 0 stoi zamiast drabiny, bo to w nim naprawia się
+  to, o co drabina się zatrzymała. Pliki podaje się **ścieżką w polu tekstowym**; patrz
+  niżej.
 - **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
@@ -98,7 +108,7 @@ wzrok. Powód jest jeden: klik, którego wynik ląduje poza ekranem, jest klikie
 odpowiedzi, a przy dwudziestu wierszach tak wyglądało każde otwarcie panelu z góry
 drabiny. Otwarty wiersz mówi o tym pogrubieniem i tłem, nie samym kolorem.
 
-Panel etapu 0 otwarty w projekcie bez odcinka zajmuje całą szerokość, bo nie ma wtedy
+Panel etapu 0 stojący zamiast odrzuconej drabiny zajmuje całą szerokość, bo nie ma wtedy
 drabiny, obok której miałby stanąć.
 
 ## Czego ten ekran nie robi
@@ -146,10 +156,11 @@ co z tego nie wynika, opisuje osobna sekcja niżej.
 
 Etap 0 jest wyjątkiem od zdania „panel otwiera się z komórki drabiny", i to nie jest
 odstępstwo, tylko opis tego, czym ten etap jest. Drabina odpowiada o **odcinku**, a świeży
-projekt nie ma odcinka. Panel etapu 0 pokazuje się więc także wtedy, gdy drabiny nie ma,
-i to on, razem z ekranem „Nowy projekt”, doprowadza pusty katalog do zatwierdzonego
-etapu 0: załóż projekt, uzupełnij `project.md` w edytorze, dopisz obsadę, dodaj odcinek,
-ustaw decyzje, „Sprawdź", „Zatwierdź".
+projekt nie ma odcinka, a świeży odcinek zwykle nie ma jeszcze kompletnego etapu 0, więc
+`status` go odrzuca. Dlatego dwa pytania etapu 0 mają własne ekrany („Nowy projekt”,
+„Nowy odcinek”), a panel etapu 0 pokazuje się także wtedy, gdy drabina odmawia. Razem
+doprowadzają pusty katalog do zatwierdzonego etapu 0: załóż projekt, uzupełnij
+`project.md` w edytorze, dodaj odcinek, dopisz obsadę, „Sprawdź", „Zatwierdź".
 
 Plik podaje się **ścieżką wklejoną z Findera**, która trafia do `--source` bez zmian.
 Upload przez przeglądarkę został w PRD odrzucony z jednego powodu i widać go w

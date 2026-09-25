@@ -204,7 +204,7 @@ h1 {
 .back:hover {
   color: var(--color-neutral-50);
 }
-.project-list {
+.pick-list {
   display: grid;
   gap: 0.5rem;
   max-width: 36rem;
@@ -212,7 +212,7 @@ h1 {
   margin: 1.5rem 0 0;
   list-style: none;
 }
-.project-link {
+.pick-link {
   display: flex;
   gap: 1rem;
   align-items: baseline;
@@ -225,30 +225,17 @@ h1 {
   border: 1px solid var(--color-neutral-800);
   border-radius: 0.5rem;
 }
-.project-link:hover {
+.pick-link:hover {
   border-color: var(--color-brand-ink);
 }
-.project-id {
+.pick-id {
   font-family: var(--font-mono);
 }
-.project-meta {
+.pick-meta {
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
 }
 
-/* Inside a project, the episode is the one thing left to choose, and the way
-   to a new one stands beside it. */
-.picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-end;
-  padding: 1rem;
-  margin-top: 1.5rem;
-  background: var(--color-neutral-900);
-  border: 1px solid var(--color-neutral-800);
-  border-radius: 0.5rem;
-}
 .field {
   display: flex;
   flex-direction: column;

@@ -1,12 +1,4 @@
-import {
-  type ChangeEvent,
-  type JSX,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type JSX, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { AssemblyPanel } from "./assembly";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
@@ -14,7 +6,7 @@ import { Ladder } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { plural } from "./panel";
-import { NewProject, PreparePanel } from "./prepare";
+import { NewEpisode, NewProject, PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ScreenplayPanel } from "./screenplay";
@@ -33,11 +25,11 @@ import type {
 /**
  * The screen, and the order a person meets it in.
  *
- * It opens on exactly two choices, a new project or an existing one, because
- * those are the only two questions anybody arriving here can answer. Everything
- * else (the episode, the ladder, a stage's panel) is about a project, so it
- * waits until there is one. The earlier screen opened on all of it at once and
- * read as a dashboard nobody had asked for yet.
+ * Every level asks one question with two answers. The start screen asks for a
+ * new project or an existing one; a project asks for a new episode or an
+ * existing one; only an episode shows its ladder and the panels beside it.
+ * The earlier screen opened on all of it at once and read as a dashboard
+ * nobody had asked for yet.
  *
  * Every answer is still a command. The listing is `list`, the ladder is
  * `status`, and both arrive on streams that re-ask whenever the workspace
@@ -65,14 +57,19 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  *
  * In the hash rather than in state, so that a reload lands where it was, the
  * browser's back button goes back, and an address can be pasted. The bare
- * address is the start screen, which is the whole of what a person asked to
- * see when they open this tool.
+ * address is the start screen.
  */
 type Route =
   | { readonly kind: "home" }
   | { readonly kind: "new" }
   | { readonly kind: "open" }
-  | { readonly kind: "project"; readonly projectId: string };
+  | { readonly kind: "project"; readonly projectId: string }
+  | { readonly kind: "new-episode"; readonly projectId: string }
+  | { readonly kind: "episodes"; readonly projectId: string }
+  | { readonly kind: "episode"; readonly episodeId: string; readonly projectId: string };
+
+/** Every screen that is about one project, which is every screen past the start. */
+type InProject = Extract<Route, { readonly projectId: string }>;
 
 const HOME = "#/";
 const NEW = "#/nowy";
@@ -82,10 +79,35 @@ function projectHref(projectId: string): string {
   return `#/projekt/${encodeURIComponent(projectId)}`;
 }
 
+function newEpisodeHref(projectId: string): string {
+  return `${projectHref(projectId)}/nowy-odcinek`;
+}
+
+function episodesHref(projectId: string): string {
+  return `${projectHref(projectId)}/odcinki`;
+}
+
+function episodeHref(projectId: string, episodeId: string): string {
+  return `${projectHref(projectId)}/odcinek/${encodeURIComponent(episodeId)}`;
+}
+
 const LEADING_HASH = /^#/;
 
+/** A segment as it was meant, or nothing when somebody typed a broken escape. */
+function segment(raw: string | undefined): string | null {
+  if (raw === undefined || raw === "") {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
 function routeOf(hash: string): Route {
-  const [, first, second] = hash.replace(LEADING_HASH, "").split("/");
+  const [, first, second, third, fourth] = hash.replace(LEADING_HASH, "").split("/");
 
   if (first === "nowy") {
     return { kind: "new" };
@@ -95,11 +117,25 @@ function routeOf(hash: string): Route {
     return { kind: "open" };
   }
 
-  if (first === "projekt" && second !== undefined && second !== "") {
-    return { kind: "project", projectId: decodeURIComponent(second) };
+  const projectId = first === "projekt" ? segment(second) : null;
+
+  if (projectId === null) {
+    return { kind: "home" };
   }
 
-  return { kind: "home" };
+  if (third === "nowy-odcinek") {
+    return { kind: "new-episode", projectId };
+  }
+
+  if (third === "odcinki") {
+    return { kind: "episodes", projectId };
+  }
+
+  const episodeId = third === "odcinek" ? segment(fourth) : null;
+
+  return episodeId === null
+    ? { kind: "project", projectId }
+    : { episodeId, kind: "episode", projectId };
 }
 
 function useRoute(): Route {
@@ -208,23 +244,20 @@ function StagePanel(props: PanelProps): JSX.Element | null {
 }
 
 /**
- * What the project screen says about itself: the connection, a refusal, a
- * project with nothing in it yet.
+ * What the episode screen says about itself: the connection and a refusal.
  *
- * All three are the same kind of statement and none of them is a result, which
- * is why they sit together and above everything that is one. § 9 of the design
+ * Both are the same kind of statement and neither is a result, which is why
+ * they sit together and above everything that is one. § 9 of the design
  * manual is the rule they follow: a lost stream leaves the last ladder on
- * screen and says it is old, and an empty project says so plainly rather than
- * looking like a tool that failed to load.
+ * screen and says it is old.
  */
 function Notices(props: {
   readonly connection: Connection;
   /** Suppressed where stage 0 is the whole screen: there is no ladder to be stale. */
   readonly ladderless: boolean;
-  readonly project: ListedProject;
   readonly refusal: string | null;
 }): JSX.Element {
-  const { connection, ladderless, project, refusal } = props;
+  const { connection, ladderless, refusal } = props;
   const note = CONNECTION_NOTE[connection];
 
   return (
@@ -239,9 +272,6 @@ function Notices(props: {
           {refusal}
         </p>
       )}
-      {project.episodes.length === 0 ? (
-        <p className="empty">Projekt {project.id} nie ma jeszcze odcinka.</p>
-      ) : null}
     </>
   );
 }
@@ -252,58 +282,46 @@ function Notices(props: {
  * The two-column layout answers this for a wide window: the panel stands
  * beside the row that was clicked and is in view already, so `nearest` moves
  * nothing. A narrow window stacks, and there the panel lands below the whole
- * ladder, which is the arrangement this replaces: a click whose result is
- * off-screen. The panel takes focus either way, because a keyboard and a
- * screen reader are in exactly the position a scrolled-past panel leaves the
- * eye in. An anchor overrides both: it names a form inside the panel, and the
- * point of naming it is to put it at the top.
+ * ladder: a click whose result is off-screen. The panel takes focus either
+ * way, because a keyboard and a screen reader are in exactly the position a
+ * scrolled-past panel leaves the eye in.
  */
 function useReveal(props: {
-  readonly anchor: string | null;
   readonly opened: string | null;
   readonly panel: RefObject<HTMLDivElement | null>;
   readonly showing: boolean;
 }): void {
-  const { anchor, opened, panel, showing } = props;
+  const { opened, panel, showing } = props;
 
   useEffect(() => {
-    // A stage-0 panel standing in for a project with no episode opened
-    // itself; there was no click, so nothing has moved and nothing should be
-    // moved to.
-    if (!showing || (opened === null && anchor === null)) {
+    // A stage-0 panel standing in for a refused ladder opened itself; there
+    // was no click, so nothing has moved and nothing should be moved to.
+    if (!showing || opened === null) {
       return;
     }
 
     const wide = window.matchMedia("(min-width: 64rem)").matches;
-    const part = anchor === null ? null : document.getElementById(anchor);
 
-    (part ?? panel.current)?.scrollIntoView({
-      behavior: "smooth",
-      block: wide && part === null ? "nearest" : "start",
-    });
+    panel.current?.scrollIntoView({ behavior: "smooth", block: wide ? "nearest" : "start" });
     panel.current?.focus({ preventScroll: true });
-  }, [anchor, opened, panel, showing]);
+  }, [opened, panel, showing]);
 }
 
 /**
  * The ladder and the panel of the row somebody opened, side by side.
  *
  * They are one component because they are one answer: a click on a row and
- * the thing that click produced. Under them the panel used to be rendered
- * after the whole ladder, so opening a cell near the top of a twenty-row
- * episode put the result below the fold with nothing on screen saying
- * anything had happened. A wide window now puts the two in columns and keeps
- * the panel in view while the ladder scrolls; a narrow one stacks them and
- * the client scrolls to the panel instead.
+ * the thing that click produced. A wide window puts the two in columns and
+ * keeps the panel in view while the ladder scrolls; a narrow one stacks them
+ * and the client scrolls to the panel instead.
  *
- * Stage 0 is the exception that shapes the rest: it has a panel and may have
- * no ladder at all, so the grid drops to one column rather than leaving an
- * empty half beside a form.
+ * Stage 0 is the exception that shapes the rest: when the ladder is refused it
+ * is the one panel left to fix things from, so the grid drops to one column
+ * rather than leaving an empty half beside a form.
  */
 function Workbench(props: {
-  readonly anchor: string | null;
   readonly cell: StatusCell | null;
-  readonly episodeId: string | null;
+  readonly episodeId: string;
   readonly onClose: () => void;
   readonly onOpen: (id: string) => void;
   readonly onRun: (argv: readonly string[]) => void;
@@ -314,12 +332,12 @@ function Workbench(props: {
   readonly running: boolean;
   readonly status: EpisodeStatus | null;
 }): JSX.Element {
-  const { anchor, cell, episodeId, onClose, onOpen, onRun, opened, preparing, status } = props;
+  const { cell, episodeId, onClose, onOpen, onRun, opened, preparing, status } = props;
   const { projectId, run, running } = props;
   const panelRef = useRef<HTMLDivElement>(null);
   const showing = preparing || cell !== null;
 
-  useReveal({ anchor, opened, panel: panelRef, showing });
+  useReveal({ opened, panel: panelRef, showing });
 
   return (
     <div className={status !== null && showing ? "workbench workbench-split" : "workbench"}>
@@ -349,7 +367,7 @@ function Workbench(props: {
               running={running}
             />
           ) : null}
-          {cell === null || episodeId === null ? null : (
+          {cell === null ? null : (
             <StagePanel
               cell={cell}
               episodeId={episodeId}
@@ -366,26 +384,30 @@ function Workbench(props: {
 }
 
 /**
- * The start screen: two choices and nothing else.
+ * Two ways forward, and nothing else.
  *
+ * The same pair at every level: something new, or something that exists.
  * They are links rather than buttons because each one goes somewhere, and a
  * place is what the address bar, the back button and a middle click are for.
  */
-function Home(): JSX.Element {
+function Choices(props: {
+  readonly label: string;
+  readonly load: { readonly href: string; readonly label: string };
+  readonly make: { readonly href: string; readonly label: string };
+}): JSX.Element {
+  const { label, load, make } = props;
+
   return (
-    <section aria-labelledby="home-title" className="home">
-      <h1 className="sr-only" id="home-title">
-        aimator
-      </h1>
-      <nav aria-label="Od czego zacząć" className="home-choices">
-        <a className="choice" href={NEW}>
-          Nowy projekt
+    <div className="home">
+      <nav aria-label={label} className="home-choices">
+        <a className="choice" href={make.href}>
+          {make.label}
         </a>
-        <a className="choice" href={OPEN}>
-          Wczytaj projekt
+        <a className="choice" href={load.href}>
+          {load.label}
         </a>
       </nav>
-    </section>
+    </div>
   );
 }
 
@@ -399,12 +421,29 @@ function Back(props: { readonly href: string; readonly label: string }): JSX.Ele
 }
 
 /**
- * The projects in the workspace, each one a way in.
+ * A list of things to open, each one a link.
  *
- * A list of links rather than a dropdown, because a dropdown hides the answer
- * behind a click and this screen has nothing else to show. An empty workspace
- * says so and offers the other choice, rather than a list that is simply blank.
+ * A list rather than a dropdown, because a dropdown hides the answer behind a
+ * click and the screen it stands on has nothing else to show.
  */
+function PickList(props: {
+  readonly items: readonly { readonly href: string; readonly id: string; readonly meta?: string }[];
+}): JSX.Element {
+  return (
+    <ul className="pick-list">
+      {props.items.map((one) => (
+        <li key={one.id}>
+          <a className="pick-link" href={one.href}>
+            <span className="pick-id">{one.id}</span>
+            {one.meta === undefined ? null : <span className="pick-meta">{one.meta}</span>}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The projects in the workspace. An empty one says so and offers the other choice. */
 function OpenProject(props: {
   readonly listing: WorkspaceListing | null;
   readonly refusal: string | null;
@@ -429,124 +468,62 @@ function OpenProject(props: {
         </p>
       ) : null}
       {listing === null || listing.projects.length === 0 ? null : (
-        <ul className="project-list">
-          {listing.projects.map((one) => (
-            <li key={one.id}>
-              <a className="project-link" href={projectHref(one.id)}>
-                <span className="project-id">{one.id}</span>
-                <span className="project-meta">
-                  {plural(one.episodes.length, ["odcinek", "odcinki", "odcinków"])}
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <PickList
+          items={listing.projects.map((one) => ({
+            href: projectHref(one.id),
+            id: one.id,
+            meta: plural(one.episodes.length, ["odcinek", "odcinki", "odcinków"]),
+          }))}
+        />
+      )}
+    </section>
+  );
+}
+
+/** The episodes of one project, the same list one level down. */
+function OpenEpisode(props: { readonly project: ListedProject }): JSX.Element {
+  const { project } = props;
+
+  return (
+    <section aria-labelledby="episodes-title">
+      <Back href={projectHref(project.id)} label={project.id} />
+      <h1 id="episodes-title">Wczytaj odcinek</h1>
+      {project.episodes.length === 0 ? (
+        <p className="empty">
+          Projekt {project.id} nie ma jeszcze odcinka.{" "}
+          <a href={newEpisodeHref(project.id)}>Dodaj nowy.</a>
+        </p>
+      ) : (
+        <PickList
+          items={project.episodes.map((one) => ({ href: episodeHref(project.id, one), id: one }))}
+        />
       )}
     </section>
   );
 }
 
 /**
- * Which episode of the open project is being shown, and the way to a new one.
+ * One episode: its ladder, and the panel open beside it.
  *
- * The project is no longer chosen here: it was chosen on the way in, and the
- * address says which one it is. What is left is the episode, and "+ Nowy
- * odcinek" beside it, which opens stage 0 at the episode form.
+ * This is the screen that used to be the whole application, now reached from
+ * a project rather than landed on. The episode is chosen on the way in and
+ * the address names it, so nothing here chooses it again.
  */
-function EpisodePicker(props: {
-  readonly episodeId: string | null;
-  readonly onEpisode: (event: ChangeEvent<HTMLSelectElement>) => void;
-  readonly onNewEpisode: () => void;
-  readonly project: ListedProject;
-}): JSX.Element {
-  const { episodeId, onEpisode, onNewEpisode, project } = props;
-
-  return (
-    <div className="picker">
-      <div className="field">
-        <label htmlFor="episode">Odcinek</label>
-        <select
-          disabled={project.episodes.length === 0}
-          id="episode"
-          onChange={onEpisode}
-          value={episodeId ?? ""}
-        >
-          {project.episodes.map((one) => (
-            <option key={one} value={one}>
-              {one}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button className="action" onClick={onNewEpisode} type="button">
-        + Nowy odcinek
-      </button>
-    </div>
-  );
-}
-
-/** The episode on screen: the one picked, if this project has it, else its first. */
-function shownEpisode(project: ListedProject | null, picked: string | null): string | null {
-  if (project === null) {
-    return null;
-  }
-
-  return picked !== null && project.episodes.includes(picked)
-    ? picked
-    : (project.episodes[0] ?? null);
-}
-
-/**
- * One project: its episodes, the ladder of the chosen one, and the panel open
- * beside it.
- *
- * This is the screen that used to be the whole application. It is unchanged in
- * what it answers; what changed is that it is now reached, rather than being
- * where everybody lands.
- */
-function ProjectView(props: {
-  readonly listing: WorkspaceListing | null;
+function EpisodeView(props: {
+  readonly episodeId: string;
   readonly onRun: (argv: readonly string[]) => void;
   readonly onRunCleared: () => void;
   readonly projectId: string;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { listing, onRun, onRunCleared, projectId, run, running } = props;
-  const project = listing?.projects.find((one) => one.id === projectId) ?? null;
-  /**
-   * The episode somebody picked, which is a preference rather than a fact.
-   *
-   * What is shown is derived from it and from the listing, so an episode that
-   * is not in this project (a stale pick, a project just created) falls back
-   * to the first one in the same render rather than one effect later, which
-   * would have opened a stream for an episode the project does not have.
-   */
-  const [picked, setPicked] = useState<string | null>(null);
-  const episodeId = shownEpisode(project, picked);
+  const { episodeId, onRun, onRunCleared, projectId, run, running } = props;
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
   const [opened, setOpened] = useState<string | null>(null);
-  /**
-   * Which part of the open panel a person was asking for, when they asked for
-   * a part of it. "+ Nowy odcinek" opens the stage-0 panel scrolled to the
-   * episode form; a panel opened from the ladder has no such part and leaves
-   * this null.
-   */
-  const [anchor, setAnchor] = useState<string | null>(null);
 
   useEffect(() => {
-    if (episodeId === null) {
-      setStatus(null);
-
-      return;
-    }
-
-    setStatus(null);
-    setRefusal(null);
-    setConnection("opening");
-
     const events = new EventSource(
       `/api/events/${encodeURIComponent(projectId)}/${encodeURIComponent(episodeId)}`
     );
@@ -587,76 +564,29 @@ function ProjectView(props: {
   const openCell = useCallback(
     (id: string) => {
       onRunCleared();
-      setAnchor(null);
       setOpened((current) => (current === id ? null : id));
     },
     [onRunCleared]
   );
-  const close = useCallback(() => {
-    setAnchor(null);
-    setOpened(null);
-  }, []);
-  /**
-   * Stage 0 at its episode form, reached from beside the episode picker
-   * rather than from the ladder, where nobody would think to look for it.
-   */
-  const newEpisode = useCallback(() => {
-    onRunCleared();
-    setAnchor("prepare-episode");
-    setOpened(status?.cells.find((cell) => cell.stage === 0)?.id ?? null);
-  }, [onRunCleared, status]);
-  const chooseEpisode = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => setPicked(event.target.value),
-    []
-  );
-
-  if (listing === null) {
-    return <p className="empty">Czytam katalog roboczy…</p>;
-  }
-
-  if (project === null) {
-    return (
-      <section aria-labelledby="project-title">
-        <Back href={OPEN} label="Projekty" />
-        <h1 id="project-title">{projectId}</h1>
-        <p className="refusal" role="alert">
-          W katalogu roboczym nie ma projektu {projectId}.
-        </p>
-      </section>
-    );
-  }
+  const close = useCallback(() => setOpened(null), []);
 
   // The panel renders the cell the ladder is carrying right now, so a finished
   // command refreshes what the panel says without the panel asking anything.
   const panel = status?.cells.find((cell) => cell.id === opened && openable(cell)) ?? null;
   /**
-   * Stage 0 is reachable even when there is no ladder to open it from.
-   *
-   * That is not a convenience: a fresh project has no episode, and `status`
-   * answers about an episode. Stage 0 is what makes the rest exist, so it is
-   * the one panel that cannot be behind the thing it produces.
+   * A refused ladder leaves stage 0 on screen, because stage 0 is where the
+   * things a ladder is refused over (a missing file, a broken decision) are
+   * put right.
    */
-  const ladderless = project.episodes.length === 0 || refusal !== null;
+  const ladderless = refusal !== null;
   const preparing = panel?.stage === 0 || ladderless;
 
   return (
-    <section aria-labelledby="project-title">
-      <Back href={OPEN} label="Projekty" />
-      <h1 id="project-title">{project.id}</h1>
-      <EpisodePicker
-        episodeId={episodeId}
-        onEpisode={chooseEpisode}
-        onNewEpisode={newEpisode}
-        project={project}
-      />
-      <Notices
-        connection={connection}
-        ladderless={ladderless}
-        project={project}
-        refusal={refusal}
-      />
+    <section aria-labelledby="episode-title">
+      <Back href={episodesHref(projectId)} label="Odcinki" />
+      <h1 id="episode-title">{episodeId}</h1>
+      <Notices connection={connection} ladderless={ladderless} refusal={refusal} />
       <Workbench
-        anchor={anchor}
         cell={panel}
         episodeId={episodeId}
         onClose={close}
@@ -664,10 +594,113 @@ function ProjectView(props: {
         onRun={onRun}
         opened={opened}
         preparing={preparing}
-        projectId={project.id}
+        projectId={projectId}
         run={run}
         running={running}
         status={status}
+      />
+    </section>
+  );
+}
+
+/**
+ * Every screen inside a project, once the project is known to exist.
+ *
+ * The address can name a project or an episode nobody has, by a typo or
+ * because it was deleted in a terminal, so each is looked up in the listing
+ * before any screen is built on it. A screen aimed at a directory nobody has
+ * any more would spell commands the CLI can only refuse.
+ */
+function ProjectScreens(props: {
+  readonly listing: WorkspaceListing | null;
+  readonly listingRefusal: string | null;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly onRunCleared: () => void;
+  readonly route: InProject;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { listing, listingRefusal, onRun, onRunCleared, route, run, running } = props;
+  const project = listing?.projects.find((one) => one.id === route.projectId) ?? null;
+  const createdEpisode = useCallback(
+    (episodeId: string) => {
+      window.location.hash = episodeHref(route.projectId, episodeId);
+    },
+    [route.projectId]
+  );
+
+  if (listing === null) {
+    return listingRefusal === null ? (
+      <p className="empty">Czytam katalog roboczy…</p>
+    ) : (
+      <p className="refusal" role="alert">
+        {listingRefusal}
+      </p>
+    );
+  }
+
+  if (project === null) {
+    return (
+      <section>
+        <Back href={OPEN} label="Projekty" />
+        <p className="refusal" role="alert">
+          W katalogu roboczym nie ma projektu {route.projectId}.
+        </p>
+      </section>
+    );
+  }
+
+  if (route.kind === "new-episode") {
+    return (
+      <>
+        <Back href={projectHref(project.id)} label={project.id} />
+        <NewEpisode
+          episodes={project.episodes}
+          onCreated={createdEpisode}
+          onRun={onRun}
+          projectId={project.id}
+          run={run}
+          running={running}
+        />
+      </>
+    );
+  }
+
+  if (route.kind === "episodes") {
+    return <OpenEpisode project={project} />;
+  }
+
+  if (route.kind === "episode") {
+    return project.episodes.includes(route.episodeId) ? (
+      // Keyed by episode, so moving between two of them starts the second
+      // with nothing left over from the first: no open panel, no old ladder.
+      <EpisodeView
+        episodeId={route.episodeId}
+        key={route.episodeId}
+        onRun={onRun}
+        onRunCleared={onRunCleared}
+        projectId={project.id}
+        run={run}
+        running={running}
+      />
+    ) : (
+      <section>
+        <Back href={episodesHref(project.id)} label="Odcinki" />
+        <p className="refusal" role="alert">
+          W projekcie {project.id} nie ma odcinka {route.episodeId}.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-labelledby="project-title">
+      <Back href={OPEN} label="Projekty" />
+      <h1 id="project-title">{project.id}</h1>
+      <Choices
+        label="Odcinek"
+        load={{ href: episodesHref(project.id), label: "Wczytaj odcinek" }}
+        make={{ href: newEpisodeHref(project.id), label: "Nowy odcinek" }}
       />
     </section>
   );
@@ -684,10 +717,10 @@ export function App(): JSX.Element {
    * The workspace's own stream, open on every screen.
    *
    * It carries the listing, re-read whenever something under the workspace
-   * moves, so a project created here or by an agent in a terminal shows up
-   * without a reload. And it carries every finished command, which is the
-   * reason it exists at all: a project is created before there is an episode
-   * whose stream could have delivered the answer.
+   * moves, so a project or an episode created here or by an agent in a
+   * terminal shows up without a reload. And it carries every finished command,
+   * which is the reason it exists at all: a project and an episode are both
+   * created before there is an episode whose stream could deliver the answer.
    */
   useEffect(() => {
     const events = new EventSource("/api/events");
@@ -739,7 +772,7 @@ export function App(): JSX.Element {
     setRun(null);
     setPending(null);
   }, []);
-  const created = useCallback((projectId: string) => {
+  const createdProject = useCallback((projectId: string) => {
     window.location.hash = projectHref(projectId);
   }, []);
 
@@ -750,7 +783,7 @@ export function App(): JSX.Element {
    * result nobody on it asked for. It is adjusted while rendering rather than
    * in an effect, so no frame ever shows the old answer on the new screen.
    */
-  const routeKey = route.kind === "project" ? `project:${route.projectId}` : route.kind;
+  const routeKey = JSON.stringify(route);
   const [shownRoute, setShownRoute] = useState(routeKey);
 
   if (shownRoute !== routeKey) {
@@ -798,23 +831,32 @@ export function App(): JSX.Element {
         </div>
       </header>
       <main className="wrap" id="main">
-        {route.kind === "home" ? <Home /> : null}
+        {route.kind === "home" ? (
+          <section aria-labelledby="home-title">
+            <h1 className="sr-only" id="home-title">
+              aimator
+            </h1>
+            <Choices
+              label="Od czego zacząć"
+              load={{ href: OPEN, label: "Wczytaj projekt" }}
+              make={{ href: NEW, label: "Nowy projekt" }}
+            />
+          </section>
+        ) : null}
         {route.kind === "new" ? (
           <>
             <Back href={HOME} label="Start" />
-            <NewProject onCreated={created} onRun={start} run={run} running={running} />
+            <NewProject onCreated={createdProject} onRun={start} run={run} running={running} />
           </>
         ) : null}
         {route.kind === "open" ? <OpenProject listing={listing} refusal={listingRefusal} /> : null}
-        {route.kind === "project" ? (
-          // Keyed by project, so moving between two of them starts the second
-          // with nothing left over from the first: no open panel, no pick.
-          <ProjectView
-            key={route.projectId}
+        {"projectId" in route ? (
+          <ProjectScreens
             listing={listing}
+            listingRefusal={listingRefusal}
             onRun={start}
             onRunCleared={clearRun}
-            projectId={route.projectId}
+            route={route}
             run={run}
             running={running}
           />
