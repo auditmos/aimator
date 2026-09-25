@@ -15,8 +15,30 @@ and provenance the tool computes. You author exactly one file by hand: `project.
 
 ## 1. Read before you ask
 
-Read `docs/pipeline.md` for the stage contract, then run `aimator check <project-id>`
-for an existing project. Inspect the actual files under `$AIMATOR_WORKSPACE`.
+Read `docs/pipeline.md` for the stage contract. Then ask the CLI what already exists; it
+has a read for every part of stage 0, none of them writes anything, and each prints an
+object under `--json`:
+
+```sh
+aimator list --json                                     # projects and their episodes
+aimator project show <project-id> --json                # title, aspect ratio, narrator,
+                                                        # cast with each basis and photo
+aimator episode show <project-id> <episode-id> --json   # source and its six decisions
+aimator check <project-id> --stage prepare --json       # the verdict on stage 0 alone
+```
+
+`project show` and `episode show` are **descriptions, not verdicts**: an undecided field
+comes back as `null`, never missing and never guessed. `check` is the verdict. When stage 0
+is incomplete it refuses, and the refusal lists every missing piece in the stage's own
+words. That list is your agenda. Once the files hold together it answers `ready: true`
+with `approved`, and with `changedSinceApproval` naming any accepted file edited since the
+yes (in practice `project.md`). Keep `--stage prepare`: with an episode id and no flag,
+`check` glues the verdicts of stages 0, 1, 3 and 4 into one text.
+
+Read `project.md` and the episode's `source.md` as files. They are prose, and there is no
+command that says more about them than their text. Do **not** open `project.json`,
+`episode.json` or `prepare.stage.json` to find out what was decided: those files record
+digests and provenance, and the commands above are the contract that reads them.
 
 Do not infer facts from other conversations, and do not borrow another project's story,
 character, setting or runtime. If the user has not named the project or the episode
@@ -24,8 +46,10 @@ source, ask.
 
 ## 2. Collect decisions
 
-First summarise what is **already** approved in the existing files and in this
-conversation. Then ask only about what is missing or contradictory, in small groups.
+First summarise what is **already** decided, from the reads above and this conversation:
+the cast and each basis, the narrator, each episode's decisions, and whether stage 0 is
+approved. Then ask only about what is missing or contradictory, in small groups. A `null`
+in `project show` or `episode show` is a question to ask, not a value to fill in.
 
 Label every suggestion of yours as a proposal. A proposal the user has not answered is
 not a decision, and writing it into `project.md` as though it were is the one failure
@@ -89,7 +113,8 @@ For each episode establish:
 ### The narrator's voice, when an episode asks for one
 
 An `audio` mode of `narration` or `dialogue-and-narration` puts a narrator in the film, and
-that narrator has to be cast. **Who reads the series is casting, not configuration** — the
+that narrator has to be cast. Whether one is cast already is `narratorVoiceId` in
+`project show`. **Who reads the series is casting, not configuration** — the
 same reader comes back in episode seven exactly as the characters do — so it belongs to the
 project, beside the roster, and a later stage reads it from there.
 
@@ -120,6 +145,11 @@ aimator project voice <project-id> --voice-id <id głosu>   # only when an episo
 ```
 
 Add `--dry-run` to any of these to see what would be written without writing it.
+
+`episode set` changes only the flags it is given and leaves every other decision as it
+stands, so pass exactly what the user changed. After saving, read the result back with
+`project show` or `episode show` rather than repeating what you meant to write: the
+command's output is the evidence, your intention is not.
 
 **Declare every recurring character, not just the lead.** The roster is an explicit
 decision and an empty one blocks the gate — a project with nobody in it used to mean
@@ -153,7 +183,7 @@ Model choice and API keys are not part of these decisions and never belong in
 ## 4. Hand off
 
 ```sh
-aimator check <project-id>
+aimator check <project-id> --stage prepare --json
 aimator approve <project-id> [--note "<co zostało przeczytane>"]
 ```
 
@@ -167,7 +197,10 @@ evidence that a narrated episode is ready to reach it.
 said yes — never on your own initiative, and never to make a report look finished. It
 refuses anything `check` rejects, and it binds the approval to the bytes as they stand,
 including `project.md`, which acquires its digest at this moment and at no earlier one.
-Editing an approved artifact afterwards revokes the approval, and `check` will say so.
+Editing an approved artifact afterwards revokes the approval, and `check` will say so: a
+sentence in `problems`, and the file itself in `changedSinceApproval`. When that happens
+after your own edit to `project.md`, tell the user the rules they approved have changed
+and must be read and approved again; never re-approve to make the lapse go away.
 
 Report what was created, what was reused, what is still open, and the exact next command.
 Stage 0 ends there.
