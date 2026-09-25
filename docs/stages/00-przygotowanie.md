@@ -55,6 +55,27 @@ odcinkowi innego lektora bez śladu na dysku. Bramkuje wyłącznie
 Każde polecenie zapisujące przyjmuje `--dry-run`: pokazuje, co powstanie, i nie zapisuje
 niczego. `--workspace <ścieżka>` nadpisuje `AIMATOR_WORKSPACE` dla jednego wywołania.
 
+Co projekt już trzyma, pokazuje jedno polecenie, które niczego nie zapisuje:
+
+```bash
+pnpm dev project show dzielna-ewa
+```
+
+```
+Projekt "dzielna-ewa": Dzielna Ewa
+  Proporcje: 16:9
+  Narrator: 21m00Tcm4TlvDq8ikWAM
+  Obsada:
+    ewa   Ewa   ze zdjęć (1)
+    tata  Tata  z opisu w project.md
+```
+
+To **opis, nie werdykt**: czy obsada, proporcje i zasady wystarczają, odpowiada `check`.
+Pole, którego nikt nie rozstrzygnął, pokazuje się jako nierozstrzygnięte, a nie znika.
+Pod `--json` wypisuje ten sam opis jako obiekt (`command`, `projectId`, `title`,
+`aspectRatio`, `narratorVoiceId`, `cast` z `id`, `name`, `basis` i `sources`), bez pola
+`stage`, bo nie jest raportem etapu.
+
 ## Etap 0 jako obiekt
 
 Każde polecenie tego etapu przyjmuje `--json` i wypisuje **obiekt, który zwraca moduł

@@ -840,6 +840,16 @@ Próba na sucho: nic nie zapisano. Utworzono projekt "nowy"
 Dalej: zadeklaruj obsadę: aimator character new nowy <postać> --name <nazwa>"
 `;
 
+exports[`every command >   project show <id> [--json] 1`] = `
+"ok
+Projekt "ewa": Dzielna Ewa
+  Proporcje: 16:9
+  Narrator: nieobsadzony
+  Obsada:
+    ewa   Ewa   z opisu w project.md
+    tata  Tata  z opisu w project.md"
+`;
+
 exports[`every command >   project voice <id> --voice-id <id głosu> [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Narratorem projektu "ewa" jest głos voice-1

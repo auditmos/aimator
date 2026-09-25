@@ -1,8 +1,11 @@
 import {
   approveStage0,
+  type CastEntry,
   checkStage0,
   initProject,
+  type ProjectOverview,
   setNarratorVoice,
+  showProject,
 } from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
@@ -21,6 +24,10 @@ import {
 
 /** Stage 0's project half: the rules a series shares, and who narrates it. */
 export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
+  project show <id> [--json]
+    Co projekt trzyma: tytuł, proporcje, narratora i obsadę, każdą postać z
+    podstawą (zdjęcia albo opis w project.md) i zdjęciami. Opis, nie werdykt:
+    czy to wystarcza, mówi check. Niczego nie zapisuje i niczego nie wydaje.
   project voice <id> --voice-id <id głosu> [--json]
     Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
@@ -74,9 +81,85 @@ async function runProjectVoice(argv: readonly string[]): Promise<Result<string>>
     : result;
 }
 
+/** Where one character is drawn from, in the words a person decides it in. */
+function basisOf(entry: CastEntry): string {
+  if (entry.basis === "photographs") {
+    return `ze zdjęć (${entry.sources.length})`;
+  }
+
+  return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
+}
+
+function renderProject(overview: ProjectOverview): string {
+  const idWidth = Math.max(0, ...overview.cast.map((entry) => entry.id.length));
+  const nameWidth = Math.max(0, ...overview.cast.map((entry) => entry.name.length));
+  const lines = [
+    `Projekt "${overview.projectId}": ${overview.title}`,
+    `  Proporcje: ${overview.aspectRatio ?? "nierozstrzygnięte"}`,
+    `  Narrator: ${overview.narratorVoiceId ?? "nieobsadzony"}`,
+  ];
+
+  if (overview.cast.length === 0) {
+    lines.push("  Obsada: pusta");
+  } else {
+    lines.push("  Obsada:");
+    lines.push(
+      ...overview.cast.map(
+        (entry) =>
+          `    ${entry.id.padEnd(idWidth)}  ${entry.name.padEnd(nameWidth)}  ${basisOf(entry)}`
+      )
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * What the project holds, read back without judging it.
+ *
+ * Every other stage-0 command writes and reports what it changed; none said
+ * what the project now is, so the cast could be read only by opening
+ * `project.json`, which a screen over this CLI must never do. Under `--json`
+ * it is `showProject`'s object plus the field that names the command, the
+ * shape `list` has, because this too answers about no stage.
+ */
+async function runProjectShow(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, { json: { type: "boolean" } });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const result = await showProject({ projectId: projectId.data, workspace: workspace.data });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? JSON.stringify({ command: "project show", ...result.data }, null, 2)
+      : renderProject(result.data)
+  );
+}
+
 export async function runProject(argv: readonly string[]): Promise<Result<string>> {
   if (argv[0] === "voice") {
     return runProjectVoice(argv.slice(1));
+  }
+
+  if (argv[0] === "show") {
+    return runProjectShow(argv.slice(1));
   }
 
   if (argv[0] !== "init") {

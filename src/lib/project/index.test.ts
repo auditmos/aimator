@@ -13,6 +13,7 @@ import {
   setCharacterBasis,
   setEpisodeSettings,
   setNarratorVoice,
+  showProject,
 } from "./index.js";
 
 let root = "";
@@ -972,5 +973,83 @@ describe("layout drift", () => {
 
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? null : result.error.message).toContain("katalog nic nie zawiera");
+  });
+});
+
+/**
+ * What a project is, read back: the answer every write above has no command
+ * to give.
+ *
+ * Each stage-0 write reports what it changed, and nothing reported what the
+ * project now holds, so a screen that wanted to show the cast could only have
+ * read `project.json` itself, which is the private road the UI is forbidden.
+ * The read is deliberately a description and not a verdict: whether stage 0
+ * holds is `checkStage0`'s question, and a second answer to it here would be
+ * two gates that drift.
+ */
+describe("showProject", () => {
+  it("should say what is undecided as undecided, not leave it out", async () => {
+    await initProject({
+      aspectRatio: null,
+      mode: "apply",
+      projectId: "demo",
+      title: "Demo",
+      workspace,
+    });
+
+    const result = await showProject({ projectId: "demo", workspace });
+
+    expect(result.ok ? result.data : result.error.message).toEqual({
+      aspectRatio: null,
+      cast: [],
+      narratorVoiceId: null,
+      projectId: "demo",
+      title: "Demo",
+    });
+  });
+
+  it("should read the cast in declaration order, each with its basis and photos", async () => {
+    await makeProject();
+    await addCharacter({
+      characterId: "tata",
+      mode: "apply",
+      name: "Tata",
+      projectId: "demo",
+      workspace,
+    });
+    const photo = join(scratch, "portret.png");
+    await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    await addCharacterSources({
+      characterId: "tata",
+      mode: "apply",
+      projectId: "demo",
+      sourcePaths: [photo],
+      workspace,
+    });
+    await setNarratorVoice({ mode: "apply", projectId: "demo", voiceId: "voice-1", workspace });
+
+    const result = await showProject({ projectId: "demo", workspace });
+
+    expect(result.ok ? result.data : result.error.message).toEqual({
+      aspectRatio: "16:9",
+      cast: [
+        { basis: "description", id: "ewa", name: "Ewa", sources: [] },
+        {
+          basis: "photographs",
+          id: "tata",
+          name: "Tata",
+          sources: ["projects/demo/characters/tata/sources/portret.png"],
+        },
+      ],
+      narratorVoiceId: "voice-1",
+      projectId: "demo",
+      title: "Demo",
+    });
+  });
+
+  it("should refuse a project that does not exist, in the words every stage uses", async () => {
+    const result = await showProject({ projectId: "nie-ma", workspace });
+
+    expect(result.ok ? null : result.error.message).toContain('projekt "nie-ma" nie istnieje');
   });
 });

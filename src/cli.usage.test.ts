@@ -475,6 +475,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "16:9",
     "--dry-run",
   ],
+  "  project show <id> [--json]": ["project", "show", PROJECT],
   "  project voice <id> --voice-id <id głosu> [--json]": [
     "project",
     "voice",

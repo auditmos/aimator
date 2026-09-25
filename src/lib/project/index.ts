@@ -91,6 +91,24 @@ export interface CastMember {
   readonly name: string;
 }
 
+/** One member of the cast as the project records it, for a person to read. */
+export interface CastEntry extends CastMember {
+  /** Null until somebody decides between photographs and a description. */
+  readonly basis: CharacterBasis | null;
+  /** The photographs this character is drawn from, workspace-relative. */
+  readonly sources: readonly string[];
+}
+
+/** What a project holds, described rather than judged. */
+export interface ProjectOverview {
+  readonly aspectRatio: string | null;
+  /** In declaration order, which is the order `project.json` keeps. */
+  readonly cast: readonly CastEntry[];
+  readonly narratorVoiceId: string | null;
+  readonly projectId: string;
+  readonly title: string;
+}
+
 /** Everything stage 1 is allowed to read, with the digests of the bytes it read. */
 export interface Stage0Inputs {
   /** Whether a human accepted stage 0 for this project *and* this episode. */
@@ -1067,6 +1085,44 @@ export async function readStage0Inputs(
     rules: rules.data.bytes.toString("utf8"),
     settings: settings.data,
     source: source.data.bytes.toString("utf8"),
+    title: file.data.title,
+  });
+}
+
+/**
+ * What a project holds: its title, its frame, its narrator and its cast.
+ *
+ * The one read of stage 0 that needs no episode and judges nothing. Every
+ * write above reports what it changed, and none reports what the project now
+ * holds, so without this a screen that wanted to show the cast would have had
+ * to read `project.json` itself. Undecided fields come back as null rather
+ * than absent, for the reason the file stores them that way: "nobody chose"
+ * is a fact to state, not an absence to infer. Whether any of it is enough is
+ * `checkStage0`'s question, and answering it here too would be two gates.
+ */
+export async function showProject(input: CheckInput): Promise<Result<ProjectOverview>> {
+  const project = await resolveProject({ ...input, mode: "dry-run" });
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const file = await readProjectFile(project.data.file);
+
+  if (!file.ok) {
+    return file;
+  }
+
+  return ok({
+    aspectRatio: file.data.aspectRatio,
+    cast: Object.entries(file.data.characters).map(([id, entry]) => ({
+      basis: entry.basis,
+      id,
+      name: entry.name,
+      sources: entry.sources.map((asset) => asset.path),
+    })),
+    narratorVoiceId: file.data.narratorVoiceId,
+    projectId: input.projectId,
     title: file.data.title,
   });
 }

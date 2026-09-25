@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { checkStage0 } from "../../lib/project/index.js";
+import { checkStage0, showProject } from "../../lib/project/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
 import { png } from "../../test/fixture.js";
 import { run } from "../index.js";
@@ -44,6 +44,10 @@ vi.mock("../../lib/env.js", () => ({ env: {} }));
 
 const PROJECT = "dzielna-ewa";
 const EPISODE = "01-burza";
+
+/** How `project show` lays out one cast row: id, name, basis, in columns. */
+const EWA_FROM_PHOTOS = /ewa\s+Ewa\s+ze zdjęć \(1\)/;
+const TATA_FROM_DESCRIPTION = /tata\s+Tata\s+z opisu w project\.md/;
 
 /** Every stage-0 command, in the words `--help` spells them. */
 const COMMANDS = [
@@ -244,5 +248,41 @@ describe("approve with no --stage", () => {
 
     expect(plain).toContain("etap 0");
     expect(tagged).toMatchObject({ command: "approve", stage: "prepare" });
+  });
+});
+
+/**
+ * The one stage-0 command that writes nothing: what the project holds.
+ *
+ * It is not in `COMMANDS` above, because those print the stage's report and
+ * this prints the project. Its object is `showProject` to the field, plus the
+ * one field that says which command printed it, exactly as `list` does.
+ */
+describe("project show", () => {
+  it("should print what the project holds, as the object the module returns", async () => {
+    const printed = await object("project", "show", PROJECT, "--json");
+    const shown = await showProject({ projectId: PROJECT, workspace });
+
+    if (!shown.ok) {
+      throw shown.error;
+    }
+
+    expect(printed).toEqual({ command: "project show", ...shown.data });
+  });
+
+  it("should name the cast, where each one is drawn from, and who narrates", async () => {
+    const text = await cli("project", "show", PROJECT);
+
+    expect(text).toContain("Dzielna Ewa");
+    expect(text).toContain("16:9");
+    expect(text).toMatch(EWA_FROM_PHOTOS);
+    expect(text).toMatch(TATA_FROM_DESCRIPTION);
+    expect(text).toContain("voice-1");
+  });
+
+  it("should refuse a project that does not exist rather than print an empty one", async () => {
+    const result = await run(["project", "show", "nie-ma", "--workspace", root]);
+
+    expect(result.ok ? null : result.error.message).toContain('projekt "nie-ma" nie istnieje');
   });
 });

@@ -2,6 +2,10 @@ Usage: aimator <command>
 
 Etap 0. Przygotowanie projektu i odcinka:
   project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
+  project show <id> [--json]
+    Co projekt trzyma: tytuł, proporcje, narratora i obsadę, każdą postać z
+    podstawą (zdjęcia albo opis w project.md) i zdjęciami. Opis, nie werdykt:
+    czy to wystarcza, mówi check. Niczego nie zapisuje i niczego nie wydaje.
   project voice <id> --voice-id <id głosu> [--json]
     Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
