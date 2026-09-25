@@ -8,6 +8,7 @@ import {
   EpisodeOverview,
   type HrefOf,
   Neighbours,
+  PrepareReadiness,
   Readiness,
   StageNav,
   stageName,
@@ -29,6 +30,7 @@ import type {
   ListedProject,
   Refusal,
   RunDone,
+  Stage0Report,
   StatusCell,
   WorkspaceListing,
 } from "./types";
@@ -400,12 +402,86 @@ function PickList(props: {
   );
 }
 
+type PrepareAnswer = Stage0Report | Refusal | "loading";
+
+/**
+ * Where each project's stage 0 stands, as `check --stage prepare` says.
+ *
+ * Asked again whenever `revision` moves, unlike an episode's mark: this check
+ * reads a project's own few files rather than a whole ladder, so it is cheap
+ * enough to follow the workspace, and the rules it judges are written in an
+ * editor, where nothing but the workspace moving says they changed. A refusal
+ * is kept as the answer rather than as a failure, because for this check a
+ * refusal is the ordinary word for "unfinished".
+ */
+function usePrepareReadiness(
+  projectIds: readonly string[],
+  revision: unknown
+): ReadonlyMap<string, PrepareAnswer> {
+  const [known, setKnown] = useState<ReadonlyMap<string, PrepareAnswer>>(new Map());
+  const key = projectIds.join("\n");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    for (const projectId of key === "" ? [] : key.split("\n")) {
+      fetch(`/api/prepare/${encodeURIComponent(projectId)}`)
+        .then(async (response) => (await response.json()) as Stage0Report | Refusal)
+        .then((body) => {
+          if (!cancelled) {
+            setKnown((current) => new Map(current).set(projectId, body));
+          }
+        })
+        .catch(() => undefined);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [key, revision]);
+
+  return known;
+}
+
+/**
+ * Where this project's stage 0 stands, said on the project's own screen.
+ *
+ * The mark, and while stage 0 still wants something, the check's own words
+ * for what: the refusal's list of what is missing, or the sentence that says
+ * nobody has said yes yet. Verbatim, because what is missing is a list only
+ * the stage knows how to make.
+ */
+function PrepareStanding(props: {
+  readonly projectId: string;
+  readonly revision: unknown;
+}): JSX.Element {
+  const { projectId, revision } = props;
+  const answer = usePrepareReadiness([projectId], revision).get(projectId) ?? "loading";
+  let words: string | null = null;
+
+  if (answer !== "loading") {
+    if ("error" in answer) {
+      words = answer.error.message;
+    } else if (!answer.approved) {
+      words = answer.nextStep;
+    }
+  }
+
+  return (
+    <div className="prepare-standing">
+      <PrepareReadiness answer={answer} />
+      {words === null ? null : <p className="prepare-words">{words}</p>}
+    </div>
+  );
+}
+
 /** The projects in the workspace. An empty one says so and offers the other choice. */
 function OpenProject(props: {
   readonly listing: WorkspaceListing | null;
   readonly refusal: string | null;
 }): JSX.Element {
   const { listing, refusal } = props;
+  const prepared = usePrepareReadiness(listing?.projects.map((one) => one.id) ?? [], listing);
 
   return (
     <section aria-labelledby="open-title">
@@ -429,7 +505,12 @@ function OpenProject(props: {
           items={listing.projects.map((one) => ({
             href: projectHref(one.id),
             id: one.id,
-            meta: plural(one.episodes.length, ["odcinek", "odcinki", "odcinków"]),
+            meta: (
+              <>
+                {plural(one.episodes.length, ["odcinek", "odcinki", "odcinków"])}
+                <PrepareReadiness answer={prepared.get(one.id) ?? "loading"} />
+              </>
+            ),
           }))}
         />
       )}
@@ -824,6 +905,7 @@ function ProjectScreens(props: {
         load={{ href: episodesHref(project.id), label: "Wczytaj odcinek" }}
         make={{ href: newEpisodeHref(project.id), label: "Nowy odcinek" }}
       >
+        <PrepareStanding projectId={project.id} revision={listing} />
         {/* Quieter than the two choices: the cast is set once and revisited
             rarely, while an episode is what a visit is for. */}
         <p className="home-aside">

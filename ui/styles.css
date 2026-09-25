@@ -253,8 +253,30 @@ h1 {
   font-family: var(--font-mono);
 }
 .pick-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  justify-content: flex-end;
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
+}
+/* A project's stage 0 on its own screen: the mark, then the check's words
+   for what is still missing, kept as the CLI broke them into lines. */
+.prepare-standing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9375rem;
+}
+.prepare-words {
+  max-width: 44rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 /* Where an episode stands, as one mark beside its name: a filled check when
    every stage is approved, a ring filling up with the share that is otherwise.

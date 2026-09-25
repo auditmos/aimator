@@ -233,6 +233,40 @@ describe("the UI server", () => {
     );
   });
 
+  it("should answer a project's mark with exactly what check --stage prepare --json prints", async () => {
+    const response = await createUi({ workspace }).request(`/api/prepare/${PROJECT}`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      JSON.parse(await cli("check", PROJECT, "--stage", "prepare", "--json"))
+    );
+  });
+
+  /**
+   * An unfinished stage 0 is the ordinary state of a new project, and `check`
+   * answers it by refusing. The mark reads the refusal's name, so it has to
+   * arrive as the terminal's own, not as a server error.
+   */
+  it("should hand an unfinished stage 0 over as the CLI's refusal, by name", async () => {
+    const elsewhere = await mkdtemp(join(tmpdir(), "aimator-ui-draft-"));
+    const draft = resolveWorkspace(elsewhere);
+
+    if (!draft.ok) {
+      throw draft.error;
+    }
+
+    await run(["project", "init", "szkic", "--title", "Szkic", "--workspace", elsewhere]);
+
+    const response = await createUi({ workspace: draft.data }).request("/api/prepare/szkic");
+    const body = (await response.json()) as { error: { message: string; name: string } };
+
+    await rm(elsewhere, { force: true, recursive: true });
+
+    expect(response.status).toBe(400);
+    expect(body.error.name).toBe("NotReadyError");
+    expect(body.error.message).toContain("etap 0 nie jest ukończony");
+  });
+
   it("should answer stage 0's panel with exactly what episode show --json prints", async () => {
     const response = await createUi({ workspace }).request(`/api/episode/${PROJECT}/${EPISODE}`);
 

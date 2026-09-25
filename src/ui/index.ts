@@ -265,6 +265,14 @@ export function createUi(options: UiOptions): Hono {
     async (c) => await answer(["project", "show", c.req.param("projectId")])
   );
 
+  // Where a project's stage 0 stands, for the mark beside its name: `check
+  // --stage prepare`, whose refusal is the answer "unfinished" and travels as
+  // the CLI's own, by name, rather than as something this server judged.
+  app.get(
+    "/api/prepare/:projectId",
+    async (c) => await answer(["check", c.req.param("projectId"), "--stage", "prepare"])
+  );
+
   // What one episode holds, for stage 0's panel: `episode show`, the same
   // rule one level down, so the decisions on screen are the ones on disk.
   app.get(

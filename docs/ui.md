@@ -28,9 +28,19 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   proporcje). Gdy CLI powie „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod
   formularzem, słowo w słowo.
 - **Wczytaj projekt** (`#/wczytaj`): projekty z `list --json` jako lista odnośników z
-  liczbą odcinków. Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
+  liczbą odcinków i znakiem etapu 0. Pusty katalog roboczy mówi o tym i odsyła do nowego
+  projektu. Znak to odpowiedź `check <id> --stage prepare` (pod `/api/prepare/<id>`)
+  w jednym z trzech słów: „etap 0 niekompletny” (odmowa `NotReadyError`, pusty pierścień),
+  „etap 0 czeka na zatwierdzenie” albo „zasady zmienione po akceptacji” (pliki się
+  zgadzają, nikt ich nie przyjął; pierścień w połowie, bo etap 0 ma dwa kroki) i zielone
+  „etap 0 zatwierdzony”. Inna odmowa daje „stan nieznany”, nie zgadywankę. Etap 0 to
+  jedyny etap projektu, więc tylko nim da się oznaczyć projekt, który nie ma jeszcze
+  odcinka. Ten `check` czyta kilka plików projektu, a nie całą drabinę, więc w odróżnieniu
+  od znaku odcinka czyta się na nowo przy każdej zmianie w katalogu roboczym.
 - **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
-  odcinek” albo „Wczytaj odcinek”, a pod nimi, ciszej, odnośnik „Obsada i narrator”.
+  odcinek” albo „Wczytaj odcinek”, pod nimi ten sam znak etapu 0, a dopóki etap 0 czegoś
+  chce, słowa samego `check`: lista braków z odmowy albo zdanie, że nikt jeszcze nie
+  powiedział „tak”. Pod nimi, ciszej, odnośnik „Obsada i narrator”.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
@@ -486,7 +496,8 @@ adres, który już jest.
 Serwer jest testowany przez `app.request()` na tym samym fixture, którego używają etapy, bez
 otwierania portu: żądanie stanu zwraca to samo, co `status --json`, żądanie listy to samo, co
 `list --json`, żądanie projektu to samo, co `project show --json`, żądanie odcinka to samo,
-co `episode show --json`, odmowa zostaje odmową
+co `episode show --json`, znak etapu 0 to samo, co `check --stage prepare --json`, a
+niekompletny etap 0 przychodzi jako odmowa CLI z jej nazwą, odmowa zostaje odmową
 z tym samym komunikatem, strumień zdarzeń wypycha
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
 jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem, także

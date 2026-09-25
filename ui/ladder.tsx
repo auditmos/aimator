@@ -1,6 +1,6 @@
-import { type JSX, useCallback, useEffect, useState } from "react";
+import { type JSX, type ReactNode, useCallback, useEffect, useState } from "react";
 import { plural, type Unit } from "./panel";
-import type { CellState, EpisodeStatus, StatusCell } from "./types.js";
+import type { CellState, EpisodeStatus, Refusal, Stage0Report, StatusCell } from "./types.js";
 
 /**
  * The ladder of one episode, read at two distances.
@@ -422,6 +422,17 @@ export function Readiness(props: {
   const finished = stages.length > 0 && done === stages.length;
 
   return finished ? (
+    <Done>gotowy</Done>
+  ) : (
+    <Work share={done / stages.length}>
+      wymaga pracy · {done} z {stages.length} etapów
+    </Work>
+  );
+}
+
+/** Finished: a filled check, and the word that says so beside it. */
+function Done(props: { readonly children: ReactNode }): JSX.Element {
+  return (
     <span className="readiness readiness-done">
       <svg aria-hidden="true" className="readiness-icon" viewBox="0 0 16 16">
         <circle cx="8" cy="8" fill="currentColor" r="8" />
@@ -434,16 +445,64 @@ export function Readiness(props: {
           strokeWidth="1.8"
         />
       </svg>
-      gotowy
+      {props.children}
     </span>
-  ) : (
+  );
+}
+
+/** Still wanting work: a ring filled `share` of the way round, and the words. */
+function Work(props: { readonly children: ReactNode; readonly share: number }): JSX.Element {
+  return (
     <span className="readiness readiness-work">
       <svg aria-hidden="true" className="readiness-icon" viewBox="0 0 16 16">
         <circle cx="8" cy="8" fill="none" r="7" stroke="currentColor" strokeWidth="1.5" />
-        {done === 0 ? null : <path d={wedge(done / stages.length)} fill="currentColor" />}
+        {props.share === 0 ? null : <path d={wedge(props.share)} fill="currentColor" />}
       </svg>
-      wymaga pracy · {done} z {stages.length} etapów
+      {props.children}
     </span>
+  );
+}
+
+/**
+ * Where a project's stage 0 stands, as one mark: `check --stage prepare`,
+ * read without being judged again.
+ *
+ * Stage 0 is the one stage that belongs to the project, so it is the one a
+ * project can be marked by before it has an episode. The answer has three
+ * shapes and the mark has one word for each: a refusal named `NotReadyError`
+ * is a stage still being written, a report nobody has approved is waiting for
+ * a yes (or for one again, when the rules changed after it), and an approved
+ * report is done. Any other refusal is a project this screen cannot read, and
+ * says so rather than guessing. The ring counts the stage's two steps, files
+ * that hold together and a human's yes, so waiting for the yes is half full.
+ */
+export function PrepareReadiness(props: {
+  readonly answer: Stage0Report | Refusal | "loading";
+}): JSX.Element {
+  const { answer } = props;
+
+  if (answer === "loading") {
+    return <span className="readiness readiness-loading">sprawdzam…</span>;
+  }
+
+  if ("error" in answer) {
+    return answer.error.name === "NotReadyError" ? (
+      <Work share={0}>etap 0 niekompletny</Work>
+    ) : (
+      <span className="readiness readiness-unknown">stan nieznany</span>
+    );
+  }
+
+  if (answer.approved) {
+    return <Done>etap 0 zatwierdzony</Done>;
+  }
+
+  return (
+    <Work share={0.5}>
+      {answer.changedSinceApproval.length > 0
+        ? "zasady zmienione po akceptacji"
+        : "etap 0 czeka na zatwierdzenie"}
+    </Work>
   );
 }
 
