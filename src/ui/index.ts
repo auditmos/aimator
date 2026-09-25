@@ -265,6 +265,14 @@ export function createUi(options: UiOptions): Hono {
     async (c) => await answer(["project", "show", c.req.param("projectId")])
   );
 
+  // What one episode holds, for stage 0's panel: `episode show`, the same
+  // rule one level down, so the decisions on screen are the ones on disk.
+  app.get(
+    "/api/episode/:projectId/:episodeId",
+    async (c) =>
+      await answer(["episode", "show", c.req.param("projectId"), c.req.param("episodeId")])
+  );
+
   /**
    * An artifact, read-only, addressed by what it is rather than where it is.
    *

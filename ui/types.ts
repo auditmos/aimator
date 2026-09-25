@@ -21,6 +21,8 @@ export type CellState = "approved" | "blocked" | "ready" | "review" | "running";
  */
 export interface Stage0Report {
   readonly approved: boolean;
+  /** Accepted files whose bytes changed since the yes; in practice, `project.md`. */
+  readonly changedSinceApproval: readonly string[];
   readonly created: readonly string[];
   readonly nextStep: string;
   readonly problems: readonly string[];
@@ -563,6 +565,24 @@ export interface ProjectOverview {
   readonly narratorVoiceId: string | null;
   readonly projectId: string;
   readonly title: string;
+}
+
+/** What one episode holds, as `episode show --json` prints it: a description, not a verdict. */
+export interface EpisodeOverview {
+  readonly command: "episode show";
+  readonly episodeId: string;
+  readonly number: number;
+  readonly projectId: string;
+  /** Every decision, null where nobody has made it yet. */
+  readonly settings: {
+    readonly audio: string | null;
+    readonly durationSeconds: number | null;
+    readonly language: string | null;
+    readonly maxClipSeconds: number | null;
+    readonly sourceNature: string | null;
+    readonly subtitles: string | null;
+  };
+  readonly source: { readonly originPath: string; readonly path: string };
 }
 
 export interface WorkspaceListing {

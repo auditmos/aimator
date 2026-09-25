@@ -36,7 +36,9 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
   identyfikatora nie wpisuje się drugi raz; pod kartami `character new`. „Narrator”:
   obecny głos i `project voice`. „Sprawdzenie etapu 0”: `check --stage prepare`. Wynik
-  komendy pokazuje się w pasku na dole okna, jak na każdym ekranie (patrz niżej).
+  komendy pokazuje się w pasku na dole okna, jak na każdym ekranie (patrz niżej). Pole,
+  którego komenda się udała (nowa postać, ścieżka zdjęcia, głos narratora), się opróżnia,
+  bo to, co trzymało, stoi już wyżej na liście; odmowa zostawia je tak, jak je wpisano.
   Są na poziomie projektu, bo mieszkają w `project.json` i powracają między
   odcinkami; świeży projekt ustawia je, zanim ma jakikolwiek odcinek. Lista czyta się na
   nowo przy każdej zmianie w katalogu roboczym, więc postać dopisana z terminala też się
@@ -72,8 +74,15 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   Komórki jednego etapu w tym samym stanie dają jedną etykietę; różne dają liczniki
   („zatwierdzony 1/2”, „do przeglądu 1/2”). To arytmetyka na komórkach `status`, nie
   werdykt: pięć stanów ma etykiety tekstowe, kolor nigdy nie niesie znaczenia sam.
-- **Panel etapu 0**: formularz sześciu decyzji tego odcinka, „Sprawdź" i „Zatwierdź",
-  oraz odnośnik do obsady projektu. Założenie projektu, obsada i dodanie odcinka mają
+- **Panel etapu 0**: to, co się tu zatwierdza, do przeczytania, czyli treść `project.md`
+  („Zasady projektu”) i `source.md` („Źródło odcinka”, z numerem i ścieżką, z której plik
+  skopiowano); sześć decyzji odcinka w polach wypełnionych tym, co mówi `episode show
+  --json`, z listą nierozstrzygniętych, a „Zapisz” wysyła tylko pola zmienione na tym
+  ekranie; „Sprawdź" i „Zatwierdź"; odnośnik do obsady projektu. Gdy `project.md` zmienił
+  się po akceptacji (`changedSinceApproval` w raporcie `check`), blok decyzji mówi, że
+  zgoda wygasła i trzeba przeczytać zasady jeszcze raz, tak jak etapy 1, 3 i 4 mówią o
+  dryfie wejść. Treść obu plików czyta się na nowo przy każdej zmianie w katalogu
+  roboczym, bo `project.md` pisze się w edytorze. Założenie projektu, obsada i dodanie odcinka mają
   własne ekrany, bo pyta się o nie na innym poziomie niż o odcinek. Gdy `status` odmawia (np.
   etap 0 jest niekompletny), panel etapu 0 stoi na przeglądzie zamiast listy etapów, bo to
   w nim naprawia się to, o co drabina się zatrzymała. Pliki podaje się **ścieżką w polu
@@ -476,7 +485,8 @@ adres, który już jest.
 
 Serwer jest testowany przez `app.request()` na tym samym fixture, którego używają etapy, bez
 otwierania portu: żądanie stanu zwraca to samo, co `status --json`, żądanie listy to samo, co
-`list --json`, żądanie projektu to samo, co `project show --json`, odmowa zostaje odmową
+`list --json`, żądanie projektu to samo, co `project show --json`, żądanie odcinka to samo,
+co `episode show --json`, odmowa zostaje odmową
 z tym samym komunikatem, strumień zdarzeń wypycha
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
 jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem, także

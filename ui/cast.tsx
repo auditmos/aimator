@@ -1,6 +1,6 @@
-import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
+import { type JSX, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, Field } from "./panel";
+import { Action, Field, useOwnRun } from "./panel";
 import type { CastEntry, ProjectOverview, Refusal, RunDone } from "./types";
 
 /**
@@ -83,14 +83,18 @@ function CharacterCard(props: {
   readonly entry: CastEntry;
   readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
+  readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { entry, onRun, projectId, running } = props;
+  const { entry, onRun, projectId, run, running } = props;
   const [photo, setPhoto] = useState("");
   const sources = useMemo(
     () => INTENTS.addCharacterSources({ characterId: entry.id, projectId, sources: [photo] }),
     [entry.id, photo, projectId]
   );
+  // Once copied in, the photograph is listed above the field, and the path
+  // left in it would only copy the same file again.
+  const addPhoto = useOwnRun({ onRun, run, running, succeeded: () => setPhoto("") });
   const describe = useMemo(
     () => INTENTS.describeCharacter({ characterId: entry.id, projectId }),
     [entry.id, projectId]
@@ -123,7 +127,7 @@ function CharacterCard(props: {
           value={photo}
         />
       </div>
-      <Action argv={sources} disabled={running} label="Dodaj zdjęcie" onRun={onRun} />
+      <Action argv={sources} disabled={running} label="Dodaj zdjęcie" onRun={addPhoto} />
       <Action argv={describe} disabled={running} label="Buduj z opisu" onRun={onRun} />
     </article>
   );
@@ -135,9 +139,7 @@ function CharacterCard(props: {
  * The fields empty themselves once the CLI has said yes, because the name
  * they still held was then a character that already exists, and sending it
  * again is only a refusal waiting to happen. A refusal leaves them as typed,
- * so the mistake can be corrected rather than retyped. Only this form's own
- * command counts: `submitted` is set here and cleared by the first answer, so
- * a "Sprawdź" run afterwards cannot empty a form nobody sent.
+ * so the mistake can be corrected rather than retyped.
  */
 function NewCharacter(props: {
   readonly onRun: (argv: readonly string[]) => void;
@@ -148,31 +150,19 @@ function NewCharacter(props: {
   const { onRun, projectId, run, running } = props;
   const [characterId, setCharacterId] = useState("");
   const [name, setName] = useState("");
-  const [submitted, setSubmitted] = useState(false);
   const add = useMemo(
     () => INTENTS.addCharacter({ characterId, name, projectId }),
     [characterId, name, projectId]
   );
-  const submit = useCallback(
-    (argv: readonly string[]) => {
-      setSubmitted(true);
-      onRun(argv);
-    },
-    [onRun]
-  );
-
-  useEffect(() => {
-    if (!submitted || running || run === null) {
-      return;
-    }
-
-    if (run.ok) {
+  const submit = useOwnRun({
+    onRun,
+    run,
+    running,
+    succeeded: () => {
       setCharacterId("");
       setName("");
-    }
-
-    setSubmitted(false);
-  }, [run, running, submitted]);
+    },
+  });
 
   return (
     <div className="cast-new">
@@ -198,15 +188,22 @@ function NewCharacter(props: {
   );
 }
 
-/** Who reads the series: the voice now, and the one field that changes it. */
+/**
+ * Who reads the series: the one field that changes it.
+ *
+ * It empties once the voice is cast, because the voice then stands above it
+ * as "Obecny głos" and a second copy in the field reads as an unsaved change.
+ */
 function NarratorForm(props: {
   readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
+  readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { onRun, projectId, running } = props;
+  const { onRun, projectId, run, running } = props;
   const [voiceId, setVoiceId] = useState("");
   const argv = useMemo(() => INTENTS.castNarrator({ projectId, voiceId }), [projectId, voiceId]);
+  const cast = useOwnRun({ onRun, run, running, succeeded: () => setVoiceId("") });
 
   return (
     <>
@@ -219,7 +216,7 @@ function NarratorForm(props: {
           value={voiceId}
         />
       </div>
-      <Action argv={argv} disabled={running} label="Obsadź narratora" onRun={onRun} />
+      <Action argv={argv} disabled={running} label="Obsadź narratora" onRun={cast} />
     </>
   );
 }
@@ -262,7 +259,13 @@ export function ProjectCast(props: {
         ) : null}
         {overview?.cast.map((entry) => (
           <div key={entry.id}>
-            <CharacterCard entry={entry} onRun={onRun} projectId={projectId} running={running} />
+            <CharacterCard
+              entry={entry}
+              onRun={onRun}
+              projectId={projectId}
+              run={run}
+              running={running}
+            />
           </div>
         ))}
         <NewCharacter onRun={onRun} projectId={projectId} run={run} running={running} />
@@ -279,7 +282,7 @@ export function ProjectCast(props: {
         <p className="actions-note">
           Potrzebny tylko wtedy, gdy film ma narrację: bramkuje wyłącznie etap 9.
         </p>
-        <NarratorForm onRun={onRun} projectId={projectId} running={running} />
+        <NarratorForm onRun={onRun} projectId={projectId} run={run} running={running} />
       </section>
 
       <section aria-labelledby="cast-check" className="panel">

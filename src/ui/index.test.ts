@@ -233,6 +233,15 @@ describe("the UI server", () => {
     );
   });
 
+  it("should answer stage 0's panel with exactly what episode show --json prints", async () => {
+    const response = await createUi({ workspace }).request(`/api/episode/${PROJECT}/${EPISODE}`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      JSON.parse(await cli("episode", "show", PROJECT, EPISODE, "--json"))
+    );
+  });
+
   it("should answer stage 4's review with exactly what prompt-package show --json prints", async () => {
     const ui = createUi({ workspace });
     const plan = await ui.request(`/api/send-plan/${PROJECT}/${EPISODE}?track=${TRACK}`);
@@ -379,6 +388,23 @@ describe("the artifact resolver", () => {
     expect(await response.text()).toBe(
       await readFile(join(episodeRoot(), "screenplay.md"), "utf8")
     );
+  });
+
+  /**
+   * Stage 0's two texts, which a person approves by reading: the rules under
+   * no episode, because they belong to the series, and the source under one.
+   */
+  it("should serve the project's rules and the episode's source as markdown", async () => {
+    const app = createUi({ workspace });
+    const rules = await app.request(`/api/artifact/${PROJECT}/prepare/rules`);
+    const source = await app.request(`/api/artifact/${PROJECT}/prepare/source?episode=${EPISODE}`);
+
+    expect(rules.headers.get("content-type")).toContain("text/markdown");
+    expect(await rules.text()).toBe(
+      await readFile(join(root, "projects", PROJECT, "project.md"), "utf8")
+    );
+    expect(source.headers.get("content-type")).toContain("text/markdown");
+    expect(await source.text()).toBe(await readFile(join(episodeRoot(), "source.md"), "utf8"));
   });
 
   it("should serve each text stage's artifact with the type it actually is", async () => {
@@ -680,6 +706,10 @@ describe("the artifact resolver", () => {
         `/api/artifact/${PROJECT}/sound-design/mixed?episode=${EPISODE}`,
         `/api/artifact/${PROJECT}/sound-design/${encodeURIComponent("../../M01")}?episode=${EPISODE}`,
         `/api/artifact/${PROJECT}/sound-design/N01?episode=${EPISODE}`,
+        // Stage 0 has two words: the rules need no episode, the source needs
+        // one, and the files beside them that carry digests are not served.
+        `/api/artifact/${PROJECT}/prepare/source`,
+        `/api/artifact/${PROJECT}/prepare/project.json`,
       ].map(async (path) => {
         const response = await app.request(path);
 
@@ -687,7 +717,7 @@ describe("the artifact resolver", () => {
       })
     );
 
-    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 22 }, () => 404));
+    expect(answers.map((one) => one.status)).toEqual(Array.from({ length: 24 }, () => 404));
     expect(answers.every((one) => !one.body.includes("TAJNE"))).toBe(true);
   });
 

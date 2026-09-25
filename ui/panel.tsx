@@ -276,6 +276,50 @@ export function Field(props: {
   );
 }
 
+/**
+ * A form's own command, and what to do once the CLI has said yes to it.
+ *
+ * A form whose fields held what it just sent should let go of it once the
+ * command succeeds, because sending the same thing again is only a duplicate
+ * or a refusal waiting to happen; a refusal leaves the fields as typed, so the
+ * mistake can be corrected rather than retyped. Only this form's command
+ * counts: `submitted` is set when it sends and cleared by the first answer, so
+ * a "Sprawdź" pressed elsewhere afterwards cannot empty a form nobody sent.
+ */
+export function useOwnRun(props: {
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+  readonly succeeded: () => void;
+}): (argv: readonly string[]) => void {
+  const { onRun, run, running, succeeded } = props;
+  const [submitted, setSubmitted] = useState(false);
+  // Held in a ref so a caller's inline function does not re-run the effect.
+  const after = useRef(succeeded);
+
+  after.current = succeeded;
+
+  useEffect(() => {
+    if (!submitted || running || run === null) {
+      return;
+    }
+
+    if (run.ok) {
+      after.current();
+    }
+
+    setSubmitted(false);
+  }, [run, running, submitted]);
+
+  return useCallback(
+    (argv: readonly string[]) => {
+      setSubmitted(true);
+      onRun(argv);
+    },
+    [onRun]
+  );
+}
+
 /** How many refusals stand open before the rest fold away. */
 const PROBLEMS_SHOWN = 2;
 
@@ -1390,10 +1434,11 @@ function Shown(props: {
  * An artifact's bytes as text, re-read whenever the stage says it moved.
  *
  * `revision` is whatever the caller has that changes when the file might have:
- * the cell's state, usually. Nothing here polls, because the ladder already
- * arrives on a stream and a second clock would only disagree with it.
+ * the cell's state, usually, or the cell itself where a hand-written file can
+ * change without the state moving. Nothing here polls, because the ladder
+ * already arrives on a stream and a second clock would only disagree with it.
  */
-export function useArtifactText(one: ArtifactRef, revision: string): string | null {
+export function useArtifactText(one: ArtifactRef, revision: unknown): string | null {
   const [text, setText] = useState<string | null>(null);
   const url = artifactUrl(one);
 

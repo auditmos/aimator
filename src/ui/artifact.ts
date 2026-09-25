@@ -76,6 +76,9 @@ const WAV = "audio/wav";
  */
 const MP3 = "audio/mpeg";
 
+/** Stage 0's word for `project.md`, which lives above every episode. */
+const RULES = "rules";
+
 /** The one artifact of stage 7 whose id is not simply the clip's. */
 const ENTRY = "entry:";
 
@@ -94,6 +97,15 @@ const MIXED = "mixed";
 const UNDER_EPISODE: Readonly<
   Record<string, Readonly<Record<string, (episode: EpisodePaths) => LocatedArtifact>>>
 > = {
+  /**
+   * Stage 0's episode half: the source, which is what a person approves the
+   * episode's decisions against. `episode.json` is deliberately not here: its
+   * decisions reach the screen as `episode show`, and its digests are no
+   * reader's business.
+   */
+  prepare: {
+    source: (episode) => ({ contentType: MARKDOWN, path: episode.source }),
+  },
   /**
    * Stage 4's manifest, and only the manifest.
    *
@@ -331,6 +343,12 @@ export function locateArtifact(
 
   if (!project.ok) {
     return null;
+  }
+
+  // The one artifact under no episode, no track and no character: the rules a
+  // series shares, and the only file of this pipeline a person writes by hand.
+  if (request.stage === "prepare" && request.artifact === RULES) {
+    return { contentType: MARKDOWN, path: project.data.rules };
   }
 
   if (request.stage === "character") {
