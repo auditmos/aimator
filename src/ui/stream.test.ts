@@ -70,16 +70,46 @@ async function frameOf(
   throw new Error(`strumień nie wypchnął zdarzenia "${event}"`);
 }
 
-/** The watcher settles for 150 ms, so a poke is answered a little after that. */
-async function poke(name: string): Promise<void> {
-  await writeFile(join(root, name), "ktoś coś zapisał\n", "utf8");
+/**
+ * Writes a file until the server has answered, rather than writing it once.
+ *
+ * `fs.watch` under a busy runner drops the occasional event outright. Measured
+ * inside this suite, a write went unreported to the server's watcher and to a
+ * second watcher on the same directory alike, in a few of every twenty-five
+ * tries, and never on an idle machine. One lost poke used to be fatal here:
+ * the next poke landed on the recompute the mock makes throw, and the frame
+ * the test waited for could not come. What these tests hold is what the server
+ * does with an event, not whether the platform delivers every one, so a write
+ * nobody reported is written again. The watcher settles for 150 ms, so an
+ * answered poke is answered well inside the wait between two of them.
+ */
+async function pokeUntil(answered: () => boolean, name: string): Promise<void> {
+  for (let attempt = 0; attempt < 10 && !answered(); attempt += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: each write waits on the last
+    await writeFile(join(root, `${name}-${attempt}.txt`), "ktoś coś zapisał\n", "utf8");
+
+    for (let waited = 0; waited < 1500 && !answered(); waited += 50) {
+      // biome-ignore lint/performance/noAwaitInLoops: polling a flag
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
 }
 
-async function untilLadders(count: number): Promise<void> {
-  for (let waited = 0; waited < 8000 && ladders < count; waited += 50) {
-    // biome-ignore lint/performance/noAwaitInLoops: polling a counter
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
+/** The next frame of one kind, with the workspace poked until it arrives. */
+async function pokedFrame(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  event: string
+): Promise<string> {
+  let arrived = false;
+  // One read, left running while the pokes go out: a read abandoned on a
+  // timeout would swallow the frame the next one is waiting for.
+  const frame = frameOf(reader, event, 20_000).finally(() => {
+    arrived = true;
+  });
+
+  await pokeUntil(() => arrived, event);
+
+  return await frame;
 }
 
 beforeEach(async () => {
@@ -113,29 +143,26 @@ afterEach(async () => {
 });
 
 describe("the event stream", () => {
-  it("should keep pushing after one recompute fails", { timeout: 30_000 }, async () => {
+  it("should keep pushing after one recompute fails", { timeout: 45_000 }, async () => {
     const response = await createUi({ workspace }).request(`/api/events/${PROJECT}/${EPISODE}`);
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
 
     await frameOf(reader, "status", 5000);
-    await poke("pierwszy.txt");
-    await untilLadders(2);
-    await poke("drugi.txt");
+    await pokeUntil(() => ladders >= 2, "pierwszy");
 
-    await expect(frameOf(reader, "status", 8000)).resolves.toContain("event: status");
+    await expect(pokedFrame(reader, "status")).resolves.toContain("event: status");
     await reader.cancel();
   });
 
   it("should still deliver a finished command after one recompute fails", {
-    timeout: 30_000,
+    timeout: 45_000,
   }, async () => {
     const app = createUi({ workspace });
     const response = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
 
     await frameOf(reader, "status", 5000);
-    await poke("pierwszy.txt");
-    await untilLadders(2);
+    await pokeUntil(() => ladders >= 2, "pierwszy");
 
     const started = await app.request("/api/run", {
       body: JSON.stringify({ argv: ["check", PROJECT] }),

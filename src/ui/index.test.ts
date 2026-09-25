@@ -281,8 +281,14 @@ describe("the UI server", () => {
    * a real workspace. A deadline asserted inside a runner working through
    * forty-odd files at once would measure the runner instead, and would fail
    * on a busy machine while the server was behaving perfectly. So what this
-   * test holds is the claim a test can hold honestly: the write reaches the
+   * test holds is the claim a test can hold honestly: a write reaches the
    * stream at all, and what arrives is the ladder rather than a heartbeat.
+   *
+   * "A write", not "the first write": under a runner this busy, `fs.watch`
+   * drops the occasional event outright, unreported to any watcher on the
+   * directory, which is the platform's behaviour rather than this server's.
+   * So a write nobody reported is written again, while one read waits for the
+   * frame; a read abandoned on a timeout would swallow the frame it waited for.
    */
   it("should push the ladder again when a file under the episode changes", {
     timeout: 45_000,
@@ -291,12 +297,26 @@ describe("the UI server", () => {
     const events = new Events(response.body as ReadableStream<Uint8Array>);
 
     await events.next();
-    await writeFile(join(episodeRoot(), "poke.txt"), "ktoś coś zapisał\n", "utf8");
+
+    let arrived = false;
+    const next = events.next().finally(() => {
+      arrived = true;
+    });
+
+    for (let attempt = 0; attempt < 10 && !arrived; attempt += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: each write waits on the last
+      await writeFile(join(episodeRoot(), `poke-${attempt}.txt`), "ktoś coś zapisał\n", "utf8");
+
+      for (let waited = 0; waited < 3000 && !arrived; waited += 50) {
+        // biome-ignore lint/performance/noAwaitInLoops: polling a flag
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
 
     const pushed = await Promise.race([
-      events.next(),
+      next,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("strumień nie wypchnął drabiny")), 35_000)
+        setTimeout(() => reject(new Error("strumień nie wypchnął drabiny")), 5000)
       ),
     ]);
 
