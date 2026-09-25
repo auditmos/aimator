@@ -4,6 +4,7 @@ import {
   Action,
   artifactUrl,
   type Billed,
+  Block,
   Drift,
   Field,
   NO_FLAGS,
@@ -11,7 +12,6 @@ import {
   PaidCall,
   type Priced,
   Problems,
-  RunOutput,
   SendFields,
   type SendFlags,
   type Unit,
@@ -267,96 +267,106 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzone w całości</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Cały arkusz</dt>
-              <dd>{status.totalSeconds}s dźwięku</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzone w całości</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Cały arkusz</dt>
+                <dd>{status.totalSeconds}s dźwięku</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-          <Notices notices={status.notices} />
-          <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+            <Problems problems={status.problems} />
+            <Notices notices={status.notices} />
+            <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+          </Block>
 
-          <h3>Arkusz cue</h3>
-          <p className="actions-note">
-            Tutaj <strong>nie ma</strong> reguły „podnoszone, nie pisane" i nie da się jej mieć:
-            prompt muzyczny jest instrukcją, więc idzie po angielsku, a pole <code>Audio</code>, z
-            którego powstaje, jest polskim materiałem, którego nie wolno tłumaczyć. Walidator
-            sprawdza więc <strong>okablowanie</strong>: czy ujęcia cue to dokładnie te, które leżą w
-            jego sekundach, czy podkład kafelkuje film bez dziur i czy każda długość jest taka, jaką
-            dostawca zrenderuje. To, czy angielski opisuje polską prozę, zostaje człowiekowi, tutaj,
-            przed zakupem.
-          </p>
-          <p className="picture-state">
-            {status.sheet.approved ? "zatwierdzony" : CUE_STATE[status.sheet.state]} ·{" "}
-            {status.sheet.note}
-          </p>
-          {sheet === null ? null : <pre className="artifact-text">{sheet}</pre>}
-
-          {sheetAcceptable ? (
-            <Action
-              argv={approveSheet}
-              disabled={running}
-              label="Zatwierdź arkusz"
-              onRun={startRun}
-              primary
-            />
-          ) : (
-            <p className="actions-note">
-              „Zatwierdź arkusz” pojawia się, gdy arkusz istnieje i czeka na przyjęcie. To ta zgoda
-              otwiera zakup stemów.
+          <Block
+            hint={
+              <>
+                Tutaj <strong>nie ma</strong> reguły „podnoszone, nie pisane" i nie da się jej mieć:
+                prompt muzyczny jest instrukcją, więc idzie po angielsku, a pole <code>Audio</code>,
+                z którego powstaje, jest polskim materiałem, którego nie wolno tłumaczyć. Walidator
+                sprawdza więc <strong>okablowanie</strong>: czy ujęcia cue to dokładnie te, które
+                leżą w jego sekundach, czy podkład kafelkuje film bez dziur i czy każda długość jest
+                taka, jaką dostawca zrenderuje. To, czy angielski opisuje polską prozę, zostaje
+                człowiekowi, tutaj, przed zakupem.
+              </>
+            }
+            title="Arkusz cue"
+          >
+            <p className="picture-state">
+              {status.sheet.approved ? "zatwierdzony" : CUE_STATE[status.sheet.state]} ·{" "}
+              {status.sheet.note}
             </p>
-          )}
+            {sheet === null ? null : <pre className="artifact-text">{sheet}</pre>}
+          </Block>
 
-          <h3>Stemy</h3>
-          <p className="actions-note">
-            Podkład i efekty są <strong>wspólne dla obu torów</strong>: grzmot nie wie, nad którym
-            filmem usiądzie. Odsłuchaj i zaznacz; zaznaczenie kilku daje jedną komendę z listą{" "}
-            <code>--artifact</code>.
-          </p>
-          <ul className="reel">
-            {cues.map((item) => (
-              <Stem
-                chosen={chosen.includes(item.id)}
-                item={item}
-                key={item.id}
-                onToggle={toggle}
-                url={urlOf(item.id)}
-              />
-            ))}
-          </ul>
-
-          {stemsAcceptable ? (
-            <Action
-              argv={approveStems}
-              disabled={running}
-              label="Zatwierdź stemy"
-              onRun={startRun}
-              primary
-            />
-          ) : (
-            <p className="actions-note">
-              „Zatwierdź stemy” pojawia się, gdy zaznaczone stemy istnieją i czekają na przyjęcie.
-              Tak samo odmówiłby terminal.
-            </p>
-          )}
+          <Block
+            hint={
+              <>
+                Podkład i efekty są <strong>wspólne dla obu torów</strong>: grzmot nie wie, nad
+                którym filmem usiądzie. Odsłuchaj i zaznacz; zaznaczenie kilku daje jedną komendę z
+                listą <code>--artifact</code>.
+              </>
+            }
+            title="Stemy"
+          >
+            <ul className="reel">
+              {cues.map((item) => (
+                <Stem
+                  chosen={chosen.includes(item.id)}
+                  item={item}
+                  key={item.id}
+                  onToggle={toggle}
+                  url={urlOf(item.id)}
+                />
+              ))}
+            </ul>
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+        {sheetAcceptable ? (
+          <Action
+            argv={approveSheet}
+            disabled={running}
+            label="Zatwierdź arkusz"
+            onRun={startRun}
+            primary
+          />
+        ) : null}
+        {stemsAcceptable ? (
+          <Action
+            argv={approveStems}
+            disabled={running}
+            label="Zatwierdź stemy"
+            onRun={startRun}
+            primary
+          />
+        ) : null}
+        {sheetAcceptable || stemsAcceptable ? null : (
+          <p className="actions-note">
+            „Zatwierdź arkusz” pojawia się, gdy arkusz istnieje i czeka na przyjęcie, i to ta zgoda
+            otwiera zakup stemów; „Zatwierdź stemy”, gdy zaznaczone stemy istnieją i czekają na
+            przyjęcie. Tak samo odmówiłby terminal.
+          </p>
+        )}
+      </Block>
 
       <PaidCall
         note="Jedno polecenie, dwa zakupy, a raport mówi który: dopóki arkusza nie ma, kupuje się jedno wywołanie tekstowe; po jego zatwierdzeniu kupuje się stemy, które ta zgoda otworzyła. Dostawca wycenia SEKUNDY dźwięku, nie wywołania, więc rachunek podaje jedno i drugie. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asSound}
@@ -388,50 +398,54 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
         </div>
       </PaidCall>
 
-      <h3>Poziomy: jak głośno to siedzi</h3>
-      <p className="actions-note">
-        To, jak narrator <strong>czyta</strong>, mieszka w pliku etapu 9; to, jak głośno pod nim
-        siedzi podkład, mieszka w pliku tego etapu, w <code>mix.json</code>. Nie jest to kaprys
-        układu: głośność muzyki nie mówi nic o tym, jak ktoś przeczytał zdanie, więc zmiana miksu
-        nie może unieważniać nagrania, którego nie dotknęła. Unieważnia dokładnie miks. Wartości
-        startowe są tylko tutaj i mają własne uzasadnienie:{" "}
-        <strong>tej decyzji nie da się podjąć, zanim się ją usłyszy</strong>, a miks nic nie
-        kosztuje. Puste pole to brak decyzji, nie zero: flaga wtedy nie pada i zostaje to, co
-        ustawiono ostatnio.
-      </p>
-      <div className="send">
-        <Field
-          id="sound-design-music-db"
-          label="music-db (niżej = podkład dalej)"
-          onValue={changeMusicDb}
-          placeholder="-18"
-          value={levels.musicDb}
-        />
-        <Field
-          id="sound-design-effects-db"
-          label="effects-db (efekty mają być słyszalne)"
-          onValue={changeEffectsDb}
-          placeholder="-10"
-          value={levels.effectsDb}
-        />
-        <Field
-          id="sound-design-duck-db"
-          label="duck-db (o tyle podkład ustępuje pod mową)"
-          onValue={changeDuckDb}
-          placeholder="-12"
-          value={levels.duckDb}
-        />
-        <Field
-          id="sound-design-duck-release"
-          label="duck-release w ms (jak szybko wraca)"
-          onValue={changeDuckRelease}
-          placeholder="400"
-          value={levels.duckRelease}
-        />
-      </div>
-      <Action argv={setMix} disabled={running} label="Zapisz poziomy" onRun={startRun} />
-
-      <RunOutput run={run} running={running} />
+      <Block
+        fold={false}
+        hint={
+          <>
+            To, jak narrator <strong>czyta</strong>, mieszka w pliku etapu 9; to, jak głośno pod nim
+            siedzi podkład, mieszka w pliku tego etapu, w <code>mix.json</code>. Nie jest to kaprys
+            układu: głośność muzyki nie mówi nic o tym, jak ktoś przeczytał zdanie, więc zmiana
+            miksu nie może unieważniać nagrania, którego nie dotknęła. Unieważnia dokładnie miks.
+            Wartości startowe są tylko tutaj i mają własne uzasadnienie:{" "}
+            <strong>tej decyzji nie da się podjąć, zanim się ją usłyszy</strong>, a miks nic nie
+            kosztuje. Puste pole to brak decyzji, nie zero: flaga wtedy nie pada i zostaje to, co
+            ustawiono ostatnio.
+          </>
+        }
+        title="Poziomy: jak głośno to siedzi"
+      >
+        <div className="send">
+          <Field
+            id="sound-design-music-db"
+            label="music-db (niżej = podkład dalej)"
+            onValue={changeMusicDb}
+            placeholder="-18"
+            value={levels.musicDb}
+          />
+          <Field
+            id="sound-design-effects-db"
+            label="effects-db (efekty mają być słyszalne)"
+            onValue={changeEffectsDb}
+            placeholder="-10"
+            value={levels.effectsDb}
+          />
+          <Field
+            id="sound-design-duck-db"
+            label="duck-db (o tyle podkład ustępuje pod mową)"
+            onValue={changeDuckDb}
+            placeholder="-12"
+            value={levels.duckDb}
+          />
+          <Field
+            id="sound-design-duck-release"
+            label="duck-release w ms (jak szybko wraca)"
+            onValue={changeDuckRelease}
+            placeholder="400"
+            value={levels.duckRelease}
+          />
+        </div>
+        <Action argv={setMix} disabled={running} label="Zapisz poziomy" onRun={startRun} />
+      </Block>
     </section>
   );
 }
@@ -531,85 +545,90 @@ export function MasterPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzony</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzony</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-          <Notices notices={status.notices} />
-          <Drift paths={mixed.inputsChanged} title="Wejścia zmieniły się po tym miksie:" />
+            <Problems problems={status.problems} />
+            <Notices notices={status.notices} />
+            <Drift paths={mixed.inputsChanged} title="Wejścia zmieniły się po tym miksie:" />
+          </Block>
 
-          <h3>Film ze wszystkim</h3>
-          <p className="actions-note">
-            To ostatni plik, jaki ten proces produkuje. Powstaje z <code>episode.mp4</code> i
-            bezstratnych stemów, <strong>nie</strong> z <code>narrated.mp4</code>: dzięki temu mowa
-            koduje się dokładnie raz, a muzyka w ogóle może ustąpić pod głosem.{" "}
-            <code>narrated.mp4</code> zostaje nietknięty i dalej jest jedynym miejscem, gdzie
-            słychać samo umieszczenie narracji.
-          </p>
-          {mixed.state === "absent" ? (
-            <p className="picture-empty">{CUE_STATE[mixed.state]}</p>
-          ) : (
-            // biome-ignore lint/a11y/useMediaCaption: napisy to decyzja odcinka z etapu 0, nie tego panelu
-            <video className="link-film" controls preload="metadata" src={film} />
-          )}
-          <p className="picture-state">
-            {mixed.approved ? "zatwierdzony" : CUE_STATE[mixed.state]} · {mixed.note}
-          </p>
+          <Block
+            hint={
+              <>
+                To ostatni plik, jaki ten proces produkuje. Powstaje z <code>episode.mp4</code> i
+                bezstratnych stemów, <strong>nie</strong> z <code>narrated.mp4</code>: dzięki temu
+                mowa koduje się dokładnie raz, a muzyka w ogóle może ustąpić pod głosem.{" "}
+                <code>narrated.mp4</code> zostaje nietknięty i dalej jest jedynym miejscem, gdzie
+                słychać samo umieszczenie narracji.
+              </>
+            }
+            title="Film ze wszystkim"
+          >
+            {mixed.state === "absent" ? (
+              <p className="picture-empty">{CUE_STATE[mixed.state]}</p>
+            ) : (
+              // biome-ignore lint/a11y/useMediaCaption: napisy to decyzja odcinka z etapu 0, nie tego panelu
+              <video className="link-film" controls preload="metadata" src={film} />
+            )}
+            <p className="picture-state">
+              {mixed.approved ? "zatwierdzony" : CUE_STATE[mixed.state]} · {mixed.note}
+            </p>
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy pełna ścieżka istnieje i czeka na przyjęcie. Tak samo
-          odmówiłby terminal.
-        </p>
-      )}
-
-      <h3>Miks</h3>
-      <p className="actions-note">
-        Ta połowa etapu <strong>niczego nie kupuje</strong>: składa obraz, mowę i stemy jednym
-        poleceniem i bez rachunku. Potrzebuje <code>ffmpeg</code> na tej maszynie, tak jak etapy 8 i
-        9. Efekt, który wychodzi poza koniec filmu, jest <strong>odmową</strong>, bo to zderzenie;
-        podkład, który kończy się przed nim, jest <strong>meldunkiem</strong>, bo to dryf klipów,
-        którego nikt niżej nie naprawi.
-      </p>
-      <div className="send">
-        <label className="field-check" htmlFor="master-regenerate">
-          <input
-            checked={regenerate}
-            id="master-regenerate"
-            onChange={changeRegenerate}
-            type="checkbox"
-          />
-          Ponowny miks gotowego filmu
-        </label>
-      </div>
-      <Action argv={mix} disabled={running} label="Zmiksuj" onRun={startRun} primary />
-
-      {placement === null ? null : (
-        <>
-          <h3>Gdzie wylądowały dźwięki</h3>
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
           <p className="actions-note">
-            Kotwica z planu nie jest sekundą filmu: klipy wróciły dłuższe, więc mikser przelicza
-            jedno na drugie i melduje przesunięcie.
+            „Zatwierdź” pojawia się, gdy pełna ścieżka istnieje i czeka na przyjęcie. Tak samo
+            odmówiłby terminal.
           </p>
-          <Placement report={placement} />
-        </>
-      )}
+        )}
+      </Block>
 
-      <RunOutput run={run} running={running} />
+      <Block
+        fold={cell.state === "ready"}
+        hint={
+          <>
+            Ta połowa etapu <strong>niczego nie kupuje</strong>: składa obraz, mowę i stemy jednym
+            poleceniem i bez rachunku. Potrzebuje <code>ffmpeg</code> na tej maszynie, tak jak etapy
+            8 i 9. Efekt, który wychodzi poza koniec filmu, jest <strong>odmową</strong>, bo to
+            zderzenie; podkład, który kończy się przed nim, jest <strong>meldunkiem</strong>, bo to
+            dryf klipów, którego nikt niżej nie naprawi. Kotwica z planu nie jest sekundą filmu:
+            klipy wróciły dłuższe, więc mikser przelicza jedno na drugie i melduje przesunięcie.
+          </>
+        }
+        title="Miks (bez płacenia)"
+      >
+        <div className="send">
+          <label className="field-check" htmlFor="master-regenerate">
+            <input
+              checked={regenerate}
+              id="master-regenerate"
+              onChange={changeRegenerate}
+              type="checkbox"
+            />
+            Ponowny miks gotowego filmu
+          </label>
+        </div>
+        <Action argv={mix} disabled={running} label="Zmiksuj" onRun={startRun} primary />
+
+        {placement === null ? null : <Placement report={placement} />}
+      </Block>
     </section>
   );
 }

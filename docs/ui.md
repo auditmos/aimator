@@ -142,6 +142,34 @@ Odmowy panelu, po dwóch pierwszych, zwijają się pod „Pokaż pozostałe powo
 zmienione wejście unieważnia zgodę na każdy artefakt z niego zrobiony, więc etap potrafi
 odmówić tuzinem zdań naraz. Zdania nie znikają, a liczba na zwinięciu mówi, ile ich jest.
 
+## Z czego składa się panel
+
+Każdy panel to kolumna **bloków**, osobnych kart z tytułem, zawsze w tej samej kolejności.
+Dzięki temu na każdym etapie wiadomo, gdzie szukać:
+
+1. **Stan**: werdykt `check`, odmowy, meldunki i dryf wejść.
+2. **To, co etap wyprodukował**: tekst, obrazy, łańcuch klipów, film albo nagrania, pod
+   nazwą tego etapu.
+3. **Decyzja**: „Sprawdź” i „Zatwierdź”, a w etapach 9 i 10 oba „tak” tego etapu
+   (skrypt i kwestie, arkusz i stemy). Gdy w bloku stoi przycisk zatwierdzenia, blok jedzie
+   z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na
+   górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania.
+4. **Generowanie (płatne)**: zwinięte, chyba że komórka jest „gotowa do generowania”.
+   Tam kupowanie jest tym, po co się przyszło; przy przeglądzie ponowny zakup jest
+   rzadszym pytaniem. Prompty z podglądu są zwinięte każdy osobno, a rachunek stoi nad nimi.
+5. **Reszta**, zwinięta: montaż i miksy (bez płacenia, otwarte, gdy etap jest gotowy),
+   publikacja z archiwum, plan wysyłki, reżyseria, poziomy i decyzje odcinka.
+
+Długie uzasadnienia zostają na stronie, ale pod „Jak to działa” w swoim bloku: są
+dokumentacją decyzji, a kto przeczytał je raz, nie powinien przedzierać się przez nie
+przy każdym przeglądzie.
+
+**Wynik komendy** stoi w pasku przy dolnej krawędzi okna, niezależnie od tego, który blok
+ją uruchomił: „Komenda w toku…”, potem „Gotowe” albo „Odmowa”, z komendą obok. Odmowa
+rozwija się sama, bo to jedyna odpowiedź, która czegoś wymaga; sukces rozwija się na
+żądanie. Wcześniej odpowiedź lądowała na końcu panelu, ekran niżej od kliknięcia, którego
+dotyczyła.
+
 ## Czego ten ekran nie robi
 
 Lista jest krótka i każda pozycja jest decyzją, a nie brakiem czasu.
@@ -227,7 +255,11 @@ dostałbyś połowę promptu, a `show` daje całość.
 
 Pod każdym przyciskiem stoi komenda, którą on uruchamia, w tej samej postaci, którą
 przyjmuje terminal. To nie ozdoba: pipeline prowadzą też agenci, więc to, co klikalne,
-musi dać się wkleić. Całą gramatykę CLI zna jeden plik (`src/ui/commands.ts`), a test
+musi dać się wkleić. Na stronie etapu komendy pokazuje przełącznik „Pokaż polecenia CLI
+pod przyciskami”, domyślnie wyłączony, bo dwanaście ramek z komendami utrudniało
+znalezienie przycisków. Wybór zapamiętuje ta przeglądarka i nic poza nią. Każdy przycisk
+dalej uruchamia dokładnie jedno `argv`, a pasek wyniku zawsze pokazuje komendę, która
+właśnie poszła. Całą gramatykę CLI zna jeden plik (`src/ui/commands.ts`), a test
 sprawdza każde zbudowane `argv` względem `--help` tą samą metodą, co test dokumentacji.
 
 „Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów**, a artefakt

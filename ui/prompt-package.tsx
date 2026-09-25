@@ -3,13 +3,13 @@ import { INTENTS } from "../src/ui/commands.js";
 import {
   Action,
   asCalls,
+  Block,
   Drift,
   Field,
   NO_FLAGS,
   PaidCall,
   Problems,
   Review,
-  RunOutput,
   SendFields,
   type SendFlags,
   useArtifactText,
@@ -113,14 +113,19 @@ function Sending(props: {
   );
 
   return (
-    <>
-      <h3>Plan wysyłki</h3>
-      <p className="actions-note">
-        Darmowe. Pokazuje dokładnie to, co poleci do modelu obrazu albo wideo na tym torze:
-        załączniki w kolejności, w jakiej żądanie poniesie bajty, adresowane po pozycji. Pakiet jest
-        jeden dla obu torów, więc plan jest pierwszym miejscem, w którym <code>hero:ewa</code>{" "}
-        zamienia się w plik. Bez wskazania artefaktu to sam plan; z nim dochodzi cały złożony tekst.
-      </p>
+    <Block
+      fold={false}
+      hint={
+        <>
+          Darmowe. Pokazuje dokładnie to, co poleci do modelu obrazu albo wideo na tym torze:
+          załączniki w kolejności, w jakiej żądanie poniesie bajty, adresowane po pozycji. Pakiet
+          jest jeden dla obu torów, więc plan jest pierwszym miejscem, w którym{" "}
+          <code>hero:ewa</code> zamienia się w plik. Bez wskazania artefaktu to sam plan; z nim
+          dochodzi cały złożony tekst.
+        </>
+      }
+      title="Plan wysyłki (darmowy)"
+    >
       <div className="send">
         <div className="field">
           <label htmlFor="plan-track">Tor</label>
@@ -168,7 +173,7 @@ function Sending(props: {
           </ol>
         </>
       )}
-    </>
+    </Block>
   );
 }
 
@@ -235,7 +240,7 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
       {status === null ? (
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
-        <>
+        <Block title="Stan">
           <dl className="verdict">
             <div>
               <dt>Stan plików</dt>
@@ -264,33 +269,45 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
             )}
           </dl>
 
-          {status.verdict === null ? null : (
-            <ul className="references">
-              {status.verdict.references.map((one) => (
-                <li key={one.id}>
-                  <code>{one.id}</code> ({one.kind}) {one.subject}
-                  {one.dependsOn.length === 0 ? null : <span> ← {one.dependsOn.join(", ")}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-
           <Drift
             paths={status.inputsChanged}
             title="Dryf wejść: te pliki zmieniły się po napisaniu pakietu"
           />
           <Problems problems={status.problems} />
-        </>
+        </Block>
       )}
 
-      <Review
-        approve={approve}
-        check={check}
-        note="„Zatwierdź” pojawia się dopiero, gdy check nie zgłasza problemów, a pakiet czeka na przyjęcie. Tak samo odmówiłby terminal."
-        onRun={startRun}
-        running={running}
-        status={status}
-      />
+      <Block title="Pakiet">
+        {status?.verdict === null || status?.verdict === undefined ? null : (
+          <ul className="references">
+            {status.verdict.references.map((one) => (
+              <li key={one.id}>
+                <code>{one.id}</code> ({one.kind}) {one.subject}
+                {one.dependsOn.length === 0 ? null : <span> ← {one.dependsOn.join(", ")}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {manifest === null ? (
+          <p className="panel-empty">Nie ma jeszcze pliku pakietu.</p>
+        ) : (
+          <details className="prompt">
+            <summary>Manifest</summary>
+            <pre className="artifact-text">{manifest}</pre>
+          </details>
+        )}
+      </Block>
+
+      <Block className="block-decision" title="Decyzja">
+        <Review
+          approve={approve}
+          check={check}
+          note="„Zatwierdź” pojawia się dopiero, gdy check nie zgłasza problemów, a pakiet czeka na przyjęcie. Tak samo odmówiłby terminal."
+          onRun={startRun}
+          running={running}
+          status={status}
+        />
+      </Block>
 
       <Sending
         episodeId={episodeId}
@@ -303,6 +320,7 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
       <PaidCall
         note="Etap 4 kupuje dokładnie jedno wywołanie tekstowe. „Generuj” niczego nie wysyła i nie czyta klucza: pokazuje cały prompt i rachunek. Dopiero „Kup” płaci, i płaci za to, co pokazał podgląd."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asCalls}
@@ -317,15 +335,6 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
           value={flags}
         />
       </PaidCall>
-
-      <RunOutput run={run} running={running} />
-
-      <h3>Manifest</h3>
-      {manifest === null ? (
-        <p className="panel-empty">Nie ma jeszcze pliku pakietu.</p>
-      ) : (
-        <pre className="artifact-text">{manifest}</pre>
-      )}
     </section>
   );
 }

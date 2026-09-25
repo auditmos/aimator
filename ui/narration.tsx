@@ -4,6 +4,7 @@ import {
   Action,
   artifactUrl,
   type Billed,
+  Block,
   Drift,
   Field,
   NO_FLAGS,
@@ -11,7 +12,6 @@ import {
   PaidCall,
   type Priced,
   Problems,
-  RunOutput,
   SendFields,
   type SendFlags,
   type Unit,
@@ -269,92 +269,107 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzone w całości</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Cały skrypt</dt>
-              <dd>{status.totalCharacters} znaków</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzone w całości</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Cały skrypt</dt>
+                <dd>{status.totalCharacters} znaków</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-          <Notices notices={status.notices} />
-          <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+            <Problems problems={status.problems} />
+            <Notices notices={status.notices} />
+            <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+          </Block>
 
-          <h3>Skrypt narracji</h3>
-          <p className="actions-note">
-            Narracja jest <strong>podnoszona, nie pisana</strong>: każde zdanie musi wystąpić co do
-            słowa w polu <code>Audio</code> ujęcia, które nazywa, a walidator to sprawdza. Jeśli
-            film ma powiedzieć coś nowego, poprawka należy do etapu 1, nie tutaj. Zatwierdzenie
-            skryptu jest osobną decyzją od zatwierdzenia nagrań i to ono otwiera zakup.
-          </p>
-          <p className="picture-state">
-            {status.script.approved ? "zatwierdzony" : LINE_STATE[status.script.state]} ·{" "}
-            {status.script.note}
-          </p>
-          {script === null ? null : <pre className="artifact-text">{script}</pre>}
-
-          {scriptAcceptable ? (
-            <Action
-              argv={approveScript}
-              disabled={running}
-              label="Zatwierdź skrypt"
-              onRun={startRun}
-              primary
-            />
-          ) : (
-            <p className="actions-note">
-              „Zatwierdź skrypt” pojawia się, gdy skrypt istnieje i czeka na przyjęcie.
+          <Block
+            hint={
+              <>
+                Narracja jest <strong>podnoszona, nie pisana</strong>: każde zdanie musi wystąpić co
+                do słowa w polu <code>Audio</code> ujęcia, które nazywa, a walidator to sprawdza.
+                Jeśli film ma powiedzieć coś nowego, poprawka należy do etapu 1, nie tutaj.
+                Zatwierdzenie skryptu jest osobną decyzją od zatwierdzenia nagrań i to ono otwiera
+                zakup.
+              </>
+            }
+            title="Skrypt narracji"
+          >
+            <p className="picture-state">
+              {status.script.approved ? "zatwierdzony" : LINE_STATE[status.script.state]} ·{" "}
+              {status.script.note}
             </p>
-          )}
+            {script === null ? null : <pre className="artifact-text">{script}</pre>}
+          </Block>
 
-          <h3>Nagrania</h3>
-          <p className="actions-note">
-            Kwestie są <strong>wspólne dla obu torów</strong>: głos czytający zdanie nie wie, nad
-            którym filmem usiądzie. Odsłuchaj i zaznacz; zaznaczenie kilku daje jedną komendę z
-            listą <code>--artifact</code>.
-          </p>
-          <ul className="reel">
-            {lines.map((item) => (
-              <Heard
-                chosen={chosen.includes(item.id)}
-                item={item}
-                key={item.id}
-                onToggle={toggle}
-                url={urlOf(item.id)}
-              />
-            ))}
-          </ul>
-
-          {linesAcceptable ? (
-            <Action
-              argv={approveLines}
-              disabled={running}
-              label="Zatwierdź kwestie"
-              onRun={startRun}
-              primary
-            />
-          ) : (
-            <p className="actions-note">
-              „Zatwierdź kwestie” pojawia się, gdy zaznaczone nagrania istnieją i czekają na
-              przyjęcie. Tak samo odmówiłby terminal.
-            </p>
-          )}
+          <Block
+            hint={
+              <>
+                Kwestie są <strong>wspólne dla obu torów</strong>: głos czytający zdanie nie wie,
+                nad którym filmem usiądzie. Odsłuchaj i zaznacz; zaznaczenie kilku daje jedną
+                komendę z listą <code>--artifact</code>.
+              </>
+            }
+            title="Nagrania"
+          >
+            <ul className="reel">
+              {lines.map((item) => (
+                <Heard
+                  chosen={chosen.includes(item.id)}
+                  item={item}
+                  key={item.id}
+                  onToggle={toggle}
+                  url={urlOf(item.id)}
+                />
+              ))}
+            </ul>
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      {/* Two yeses live in this stage, the script's and the recordings', and
+          both belong where the decision is rather than beside what they are
+          about, so the one bar that follows the page carries both. */}
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+        {scriptAcceptable ? (
+          <Action
+            argv={approveScript}
+            disabled={running}
+            label="Zatwierdź skrypt"
+            onRun={startRun}
+            primary
+          />
+        ) : null}
+        {linesAcceptable ? (
+          <Action
+            argv={approveLines}
+            disabled={running}
+            label="Zatwierdź kwestie"
+            onRun={startRun}
+            primary
+          />
+        ) : null}
+        {scriptAcceptable || linesAcceptable ? null : (
+          <p className="actions-note">
+            „Zatwierdź skrypt” pojawia się, gdy skrypt istnieje i czeka na przyjęcie; „Zatwierdź
+            kwestie”, gdy zaznaczone nagrania istnieją i czekają na przyjęcie. Tak samo odmówiłby
+            terminal.
+          </p>
+        )}
+      </Block>
 
       <PaidCall
         note="Jedno polecenie, dwa zakupy, a raport mówi który: dopóki skryptu nie ma, kupuje się jedno wywołanie tekstowe; po jego zatwierdzeniu kupuje się kwestie, które ta zgoda otworzyła. Dostawca mowy liczy ZNAKI, nie wywołania, więc rachunek podaje jedno i drugie. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asVoice}
@@ -379,58 +394,62 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
         </div>
       </PaidCall>
 
-      <h3>Reżyseria: jak narrator czyta</h3>
-      <p className="actions-note">
-        Głos to <strong>obsada</strong> i mieszka w <code>project.json</code> od etapu 0; to, jak on
-        gra, to <strong>reżyseria</strong> i mieszka w pliku, który należy do tego etapu. Nie jest
-        to kaprys układu: <code>project.json</code> jest zapisanym wejściem niemal wszystkiego w
-        katalogu roboczym, więc suwak, który ma się kręcić, unieważniałby zgody na bajty, których
-        nie dotknął o ani jeden bit. Tutaj unieważnia dokładnie te nagrania, które powstały pod
-        starym brzmieniem. Puste pole to brak decyzji, nie zero: flaga wtedy nie pada i zostaje to,
-        co ustawiono ostatnio.
-      </p>
-      <div className="send">
-        <Field
-          id="narration-stability"
-          label="stability (niżej = szerszy zakres emocji)"
-          onValue={changeStability}
-          placeholder="0.5"
-          value={delivery.stability}
-        />
-        <Field
-          id="narration-style"
-          label="style (wyżej = mocniejszy charakter)"
-          onValue={changeStyle}
-          placeholder="0"
-          value={delivery.style}
-        />
-        <Field
-          id="narration-speed"
-          label="speed (poniżej 1 zwalnia)"
-          onValue={changeSpeed}
-          placeholder="1"
-          value={delivery.speed}
-        />
-        <Field
-          id="narration-similarity"
-          label="similarity"
-          onValue={changeSimilarity}
-          placeholder="0.75"
-          value={delivery.similarity}
-        />
-        <label className="field-check" htmlFor="narration-boost">
-          <input
-            checked={delivery.speakerBoost}
-            id="narration-boost"
-            onChange={changeBoost}
-            type="checkbox"
+      <Block
+        fold={false}
+        hint={
+          <>
+            Głos to <strong>obsada</strong> i mieszka w <code>project.json</code> od etapu 0; to,
+            jak on gra, to <strong>reżyseria</strong> i mieszka w pliku, który należy do tego etapu.
+            Nie jest to kaprys układu: <code>project.json</code> jest zapisanym wejściem niemal
+            wszystkiego w katalogu roboczym, więc suwak, który ma się kręcić, unieważniałby zgody na
+            bajty, których nie dotknął o ani jeden bit. Tutaj unieważnia dokładnie te nagrania,
+            które powstały pod starym brzmieniem. Puste pole to brak decyzji, nie zero: flaga wtedy
+            nie pada i zostaje to, co ustawiono ostatnio.
+          </>
+        }
+        title="Reżyseria: jak narrator czyta"
+      >
+        <div className="send">
+          <Field
+            id="narration-stability"
+            label="stability (niżej = szerszy zakres emocji)"
+            onValue={changeStability}
+            placeholder="0.5"
+            value={delivery.stability}
           />
-          speaker-boost
-        </label>
-      </div>
-      <Action argv={direct} disabled={running} label="Zapisz reżyserię" onRun={startRun} />
-
-      <RunOutput run={run} running={running} />
+          <Field
+            id="narration-style"
+            label="style (wyżej = mocniejszy charakter)"
+            onValue={changeStyle}
+            placeholder="0"
+            value={delivery.style}
+          />
+          <Field
+            id="narration-speed"
+            label="speed (poniżej 1 zwalnia)"
+            onValue={changeSpeed}
+            placeholder="1"
+            value={delivery.speed}
+          />
+          <Field
+            id="narration-similarity"
+            label="similarity"
+            onValue={changeSimilarity}
+            placeholder="0.75"
+            value={delivery.similarity}
+          />
+          <label className="field-check" htmlFor="narration-boost">
+            <input
+              checked={delivery.speakerBoost}
+              id="narration-boost"
+              onChange={changeBoost}
+              type="checkbox"
+            />
+            speaker-boost
+          </label>
+        </div>
+        <Action argv={direct} disabled={running} label="Zapisz reżyserię" onRun={startRun} />
+      </Block>
     </section>
   );
 }
@@ -522,84 +541,90 @@ export function MixPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzony</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzony</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-          <Notices notices={status.notices} />
-          <Drift paths={narrated.inputsChanged} title="Wejścia zmieniły się po tym miksie:" />
+            <Problems problems={status.problems} />
+            <Notices notices={status.notices} />
+            <Drift paths={narrated.inputsChanged} title="Wejścia zmieniły się po tym miksie:" />
+          </Block>
 
-          <h3>Film z narracją</h3>
-          <p className="actions-note">
-            <code>episode.mp4</code> nie jest dotykany: to nowy plik, którego obraz jest kopią
-            strumieniową zatwierdzonego cięcia, klatka w klatkę. Odsłuchaj, gdzie narrator siedzi
-            wobec obrazu: kotwice pochodzą z planu, a klipy wróciły z dryfem, więc to jedyne
-            miejsce, w którym słychać, co z tego wyszło.
-          </p>
-          {narrated.state === "absent" ? (
-            <p className="picture-empty">{LINE_STATE[narrated.state]}</p>
-          ) : (
-            // biome-ignore lint/a11y/useMediaCaption: napisy to decyzja odcinka z etapu 0, nie tego panelu
-            <video className="link-film" controls preload="metadata" src={film} />
-          )}
-          <p className="picture-state">
-            {narrated.approved ? "zatwierdzony" : LINE_STATE[narrated.state]} · {narrated.note}
-          </p>
+          <Block
+            hint={
+              <>
+                <code>episode.mp4</code> nie jest dotykany: to nowy plik, którego obraz jest kopią
+                strumieniową zatwierdzonego cięcia, klatka w klatkę. Odsłuchaj, gdzie narrator
+                siedzi wobec obrazu: kotwice pochodzą z planu, a klipy wróciły z dryfem, więc to
+                jedyne miejsce, w którym słychać, co z tego wyszło.
+              </>
+            }
+            title="Film z narracją"
+          >
+            {narrated.state === "absent" ? (
+              <p className="picture-empty">{LINE_STATE[narrated.state]}</p>
+            ) : (
+              // biome-ignore lint/a11y/useMediaCaption: napisy to decyzja odcinka z etapu 0, nie tego panelu
+              <video className="link-film" controls preload="metadata" src={film} />
+            )}
+            <p className="picture-state">
+              {narrated.approved ? "zatwierdzony" : LINE_STATE[narrated.state]} · {narrated.note}
+            </p>
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy miks istnieje i czeka na przyjęcie. Tak samo odmówiłby
-          terminal.
-        </p>
-      )}
-
-      <h3>Miks</h3>
-      <p className="actions-note">
-        Ta połowa etapu <strong>niczego nie kupuje</strong>: kładzie przyjęte kwestie na
-        zatwierdzonym <code>episode.mp4</code>, jednym poleceniem i bez rachunku. Potrzebuje{" "}
-        <code>ffmpeg</code> na tej maszynie, tak jak etap 8. Kwestia, która nachodziłaby na następną
-        albo nie mieści się w filmie, jest <strong>odmową</strong>, nie przesunięciem: kotwica
-        pochodzi z planu, który zatwierdził człowiek.
-      </p>
-      <div className="send">
-        <label className="field-check" htmlFor="mix-regenerate">
-          <input
-            checked={regenerate}
-            id="mix-regenerate"
-            onChange={changeRegenerate}
-            type="checkbox"
-          />
-          Ponowny miks gotowego filmu
-        </label>
-      </div>
-      <Action argv={mix} disabled={running} label="Zmiksuj" onRun={startRun} primary />
-
-      {placement === null ? null : (
-        <>
-          <h3>Gdzie wylądowały kwestie</h3>
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
           <p className="actions-note">
-            Kotwica z planu nie jest sekundą filmu: klipy wróciły dłuższe, więc mikser przelicza
-            jedno na drugie i melduje przesunięcie.
+            „Zatwierdź” pojawia się, gdy miks istnieje i czeka na przyjęcie. Tak samo odmówiłby
+            terminal.
           </p>
-          <Placement report={placement} />
-        </>
-      )}
+        )}
+      </Block>
 
-      <RunOutput run={run} running={running} />
+      <Block
+        fold={cell.state === "ready"}
+        hint={
+          <>
+            Ta połowa etapu <strong>niczego nie kupuje</strong>: kładzie przyjęte kwestie na
+            zatwierdzonym <code>episode.mp4</code>, jednym poleceniem i bez rachunku. Potrzebuje{" "}
+            <code>ffmpeg</code> na tej maszynie, tak jak etap 8. Kwestia, która nachodziłaby na
+            następną albo nie mieści się w filmie, jest <strong>odmową</strong>, nie przesunięciem:
+            kotwica pochodzi z planu, który zatwierdził człowiek. Kotwica z planu nie jest sekundą
+            filmu: klipy wróciły dłuższe, więc mikser przelicza jedno na drugie i melduje
+            przesunięcie.
+          </>
+        }
+        title="Miks (bez płacenia)"
+      >
+        <div className="send">
+          <label className="field-check" htmlFor="mix-regenerate">
+            <input
+              checked={regenerate}
+              id="mix-regenerate"
+              onChange={changeRegenerate}
+              type="checkbox"
+            />
+            Ponowny miks gotowego filmu
+          </label>
+        </div>
+        <Action argv={mix} disabled={running} label="Zmiksuj" onRun={startRun} primary />
+
+        {placement === null ? null : <Placement report={placement} />}
+      </Block>
     </section>
   );
 }

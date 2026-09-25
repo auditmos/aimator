@@ -4,13 +4,13 @@ import {
   Action,
   artifactUrl,
   type Billed,
+  Block,
   Drift,
   Field,
   PaidCall,
   type Priced,
   Problems,
   promptsOf,
-  RunOutput,
   type Unit,
 } from "./panel";
 import type { ClipState, ClipsStatus, MediaReport, RunDone, StatusCell } from "./types";
@@ -230,45 +230,54 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzone w całości</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzone w całości</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-          <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
-
-          <h3>Łańcuch</h3>
-          <p className="actions-note">
-            Klip czeka na klatkę, od której się zaczyna, a klatka wejściowa na zatwierdzoną końcówkę
-            klipu przed nią. Pod każdym ogniwem stoi jego stan w słowach etapu, więc zablokowane
-            mówi, czyjej zgody brakuje. Zaznaczenie kilku daje jedną komendę z listą{" "}
-            <code>--artifact</code>.
-          </p>
-          <Reel chosen={chosen} items={artifacts} onToggle={toggle} urlOf={urlOf} />
+            <Problems problems={status.problems} />
+            <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+          </Block>
+          <Block
+            hint={
+              <>
+                Klip czeka na klatkę, od której się zaczyna, a klatka wejściowa na zatwierdzoną
+                końcówkę klipu przed nią. Pod każdym ogniwem stoi jego stan w słowach etapu, więc
+                zablokowane mówi, czyjej zgody brakuje. Zaznaczenie kilku daje jedną komendę z listą{" "}
+                <code>--artifact</code>.
+              </>
+            }
+            title="Łańcuch"
+          >
+            <Reel chosen={chosen} items={artifacts} onToggle={toggle} urlOf={urlOf} />
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy zaznaczone ogniwa istnieją i czekają na przyjęcie. Tak samo
-          odmówiłby terminal.
-        </p>
-      )}
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
+          <p className="actions-note">
+            „Zatwierdź” pojawia się, gdy zaznaczone ogniwa istnieją i czekają na przyjęcie. Tak samo
+            odmówiłby terminal.
+          </p>
+        )}
+      </Block>
 
       <PaidCall
         note="Dwa płatne wywołania w jednym poleceniu, liczone osobno: klatkę wejściową rysuje model obrazowy tego toru, klip renderuje jeden model wideo dla obu torów. Bez zaznaczenia etap kupuje to, na co pozwala łańcuch; zaznaczenie zablokowanego ogniwa to pytanie „dlaczego jeszcze nie”. „Generuj” niczego nie wysyła i nie czyta kluczy; dopiero „Kup” płaci."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asMedia}
@@ -302,23 +311,26 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
         </div>
       </PaidCall>
 
-      <h3>Publikacja z archiwum</h3>
-      <p className="actions-note">
-        Jedyna komenda tego ekranu, która zapisuje, nie płacąc: publikuje zaznaczone klipy jeszcze
-        raz z ich własnego archiwum, nie wysyłając niczego i nie czytając klucza. Cofa przy tym
-        ocenę, więc wymaga wskazania celu. Klatki wejściowej nie dotyczy: ta została opublikowana
-        dokładnie tak, jak narysował ją model.
-      </p>
-
-      {republishable ? (
-        <Action argv={republish} disabled={running} label="Opublikuj ponownie" onRun={startRun} />
-      ) : (
-        <p className="actions-note">
-          „Opublikuj ponownie” pojawia się, gdy zaznaczone są same klipy.
-        </p>
-      )}
-
-      <RunOutput run={run} running={running} />
+      <Block
+        fold={false}
+        hint={
+          <>
+            Jedyna komenda tego ekranu, która zapisuje, nie płacąc: publikuje zaznaczone klipy
+            jeszcze raz z ich własnego archiwum, nie wysyłając niczego i nie czytając klucza. Cofa
+            przy tym ocenę, więc wymaga wskazania celu. Klatki wejściowej nie dotyczy: ta została
+            opublikowana dokładnie tak, jak narysował ją model.
+          </>
+        }
+        title="Publikacja z archiwum (bez płacenia)"
+      >
+        {republishable ? (
+          <Action argv={republish} disabled={running} label="Opublikuj ponownie" onRun={startRun} />
+        ) : (
+          <p className="actions-note">
+            „Opublikuj ponownie” pojawia się, gdy zaznaczone są same klipy.
+          </p>
+        )}
+      </Block>
     </section>
   );
 }

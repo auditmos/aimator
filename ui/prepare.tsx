@@ -1,6 +1,6 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, Field, Problems, RunOutput } from "./panel";
+import { Action, Block, Field, Problems, RunOutput } from "./panel";
 import type { RunDone, Stage0Report, StatusCell } from "./types";
 
 /**
@@ -226,10 +226,12 @@ const SETTINGS_NOTE =
 function Episode(props: {
   readonly episodeId: string;
   readonly onRun: (argv: readonly string[]) => void;
+  /** Open while stage 0 still wants something; folded once it has its yes. */
+  readonly open: boolean;
   readonly projectId: string;
   readonly running: boolean;
 }): JSX.Element {
-  const { episodeId, onRun, projectId, running } = props;
+  const { episodeId, onRun, open, projectId, running } = props;
   const { change, settings } = useSettings();
   const set = useMemo(
     () => INTENTS.setEpisode({ ...settings, episodeId, projectId }),
@@ -237,12 +239,10 @@ function Episode(props: {
   );
 
   return (
-    <>
-      <h3>Decyzje odcinka</h3>
-      <p className="actions-note">{SETTINGS_NOTE}</p>
+    <Block fold={open} hint={SETTINGS_NOTE} title="Decyzje odcinka">
       <SettingsFields change={change} settings={settings} />
       <Action argv={set} disabled={running} label="Zapisz decyzje odcinka" onRun={onRun} />
-    </>
+    </Block>
   );
 }
 
@@ -320,7 +320,7 @@ export function NewEpisode(props: {
 }
 
 export function PreparePanel(props: PrepareProps): JSX.Element {
-  const { castHref, cell, episodeId, onRun, projectId, run, running } = props;
+  const { castHref, cell, episodeId, onRun, projectId, running } = props;
   const report = (cell?.status ?? null) as Stage0Report | null;
   const check = useMemo(() => INTENTS.checkPrepare({ projectId }), [projectId]);
   const approve = useMemo(() => INTENTS.approvePrepare({ projectId }), [projectId]);
@@ -334,47 +334,54 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
     <section aria-labelledby="prepare-title" className="panel">
       <h2 id="prepare-title">Etap 0: przygotowanie</h2>
 
-      {report === null ? (
-        <p className="panel-empty">Ten etap nie odpowiedział; powód stoi wyżej.</p>
-      ) : (
-        <>
-          <dl className="verdict">
-            <div>
-              <dt>Pliki się zgadzają</dt>
-              <dd>{report.ready ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Zatwierdzony</dt>
-              <dd>{report.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{report.nextStep}</dd>
-            </div>
-          </dl>
-          <Problems problems={report.problems} />
-        </>
-      )}
-
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={onRun} />
-
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={onRun} primary />
-      ) : (
+      <Block title="Stan">
+        {report === null ? (
+          <p className="panel-empty">Ten etap nie odpowiedział; powód stoi wyżej.</p>
+        ) : (
+          <>
+            <dl className="verdict">
+              <div>
+                <dt>Pliki się zgadzają</dt>
+                <dd>{report.ready ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Zatwierdzony</dt>
+                <dd>{report.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{report.nextStep}</dd>
+              </div>
+            </dl>
+            <Problems problems={report.problems} />
+          </>
+        )}
         <p className="actions-note">
-          „Zatwierdź” pojawia się dopiero, gdy <code>check</code> przepuszcza pliki, a nikt ich
-          jeszcze nie przyjął. Tak samo odmówiłby terminal.
+          Obsada i narrator należą do projektu, nie do odcinka, więc ustawia się je na{" "}
+          <a href={castHref}>ekranie obsady projektu</a>.
         </p>
-      )}
+      </Block>
 
-      <p className="actions-note">
-        Obsada i narrator należą do projektu, nie do odcinka, więc ustawia się je na{" "}
-        <a href={castHref}>ekranie obsady projektu</a>.
-      </p>
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={onRun} />
 
-      <Episode episodeId={episodeId} onRun={onRun} projectId={projectId} running={running} />
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={onRun} primary />
+        ) : (
+          <p className="actions-note">
+            „Zatwierdź” pojawia się dopiero, gdy <code>check</code> przepuszcza pliki, a nikt ich
+            jeszcze nie przyjął. Tak samo odmówiłby terminal.
+          </p>
+        )}
+      </Block>
 
-      <RunOutput run={run} running={running} />
+      <Episode
+        episodeId={episodeId}
+        onRun={onRun}
+        open={report?.approved !== true}
+        projectId={projectId}
+        running={running}
+      />
     </section>
   );
 }

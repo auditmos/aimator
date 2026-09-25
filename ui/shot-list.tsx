@@ -2,12 +2,12 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import {
   asCalls,
+  Block,
   Drift,
   NO_FLAGS,
   PaidCall,
   Problems,
   Review,
-  RunOutput,
   SendFields,
   type SendFlags,
   useArtifactText,
@@ -84,7 +84,7 @@ export function ShotListPanel(props: PanelProps): JSX.Element {
       {status === null ? (
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
-        <>
+        <Block title="Stan">
           <dl className="verdict">
             <div>
               <dt>Stan pliku</dt>
@@ -127,21 +127,32 @@ export function ShotListPanel(props: PanelProps): JSX.Element {
             title="Dryf wejść: te pliki zmieniły się po napisaniu listy ujęć"
           />
           <Problems problems={status.problems} />
-        </>
+        </Block>
       )}
 
-      <Review
-        approve={approve}
-        check={check}
-        note="„Zatwierdź” pojawia się dopiero, gdy check nie zgłasza problemów, a lista ujęć czeka na przyjęcie. Tak samo odmówiłby terminal."
-        onRun={startRun}
-        running={running}
-        status={status}
-      />
+      <Block title="Lista ujęć">
+        {shotList === null ? (
+          <p className="panel-empty">Nie ma jeszcze pliku listy ujęć.</p>
+        ) : (
+          <pre className="artifact-text">{shotList}</pre>
+        )}
+      </Block>
+
+      <Block className="block-decision" title="Decyzja">
+        <Review
+          approve={approve}
+          check={check}
+          note="„Zatwierdź” pojawia się dopiero, gdy check nie zgłasza problemów, a lista ujęć czeka na przyjęcie. Tak samo odmówiłby terminal."
+          onRun={startRun}
+          running={running}
+          status={status}
+        />
+      </Block>
 
       <PaidCall
         note="Etap 3 kupuje dokładnie jedno wywołanie tekstowe. „Generuj” niczego nie wysyła i nie czyta klucza: pokazuje cały prompt i rachunek. Dopiero „Kup” płaci, i płaci za to, co pokazał podgląd."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asCalls}
@@ -156,15 +167,6 @@ export function ShotListPanel(props: PanelProps): JSX.Element {
           value={flags}
         />
       </PaidCall>
-
-      <RunOutput run={run} running={running} />
-
-      <h3>Lista ujęć</h3>
-      {shotList === null ? (
-        <p className="panel-empty">Nie ma jeszcze pliku listy ujęć.</p>
-      ) : (
-        <pre className="artifact-text">{shotList}</pre>
-      )}
     </section>
   );
 }

@@ -1021,3 +1021,200 @@ h1 {
     padding-inline: 0;
   }
 }
+
+/* A panel on a stage page is a column of blocks rather than one card: where
+   the stage stands, what it produced, the decision about it, and what making
+   it again would cost, each a card a person can find by its title. */
+.stage-body .panel {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.block {
+  min-width: 0;
+  padding: 1.25rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.panel .block h3 {
+  margin: 0 0 0.75rem;
+}
+.block > :last-child {
+  margin-bottom: 0;
+}
+/* A folded block says it can be opened in shape, not in colour. */
+.block-fold > summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+.block-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.block-fold > summary::before {
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+  content: "▸";
+}
+.block-fold[open] > summary::before {
+  content: "▾";
+}
+.panel .block-fold > summary h3 {
+  margin: 0;
+}
+.block-fold:not([open]) {
+  padding-block: 0.75rem;
+}
+/* The decision stays within reach while a long gallery or reel scrolls past,
+   but only once it holds a yes to give: ticking a picture at the bottom of
+   the list and finding "Zatwierdź" a screen above it was a round trip on
+   every review, while a bar with nothing to accept only hides the page. */
+.block-decision:has(.action-primary) {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 2;
+  box-shadow: 0 -0.5rem 1.5rem light-dark(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.45));
+}
+/* One row: the title, then the buttons beside it, so the bar that follows
+   the page costs one line of the window rather than four. */
+.block-decision {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+.panel .block.block-decision > h3 {
+  margin: 0 0.5rem 0 0;
+}
+.block-decision .actions,
+.block-decision .actions-note {
+  margin: 0;
+}
+.block-decision .actions-note {
+  flex: 1 1 20rem;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--color-neutral-400);
+}
+.hint > summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.hint > summary:hover {
+  color: var(--color-neutral-50);
+}
+.hint-body {
+  margin-top: 0.5rem;
+  line-height: 1.55;
+}
+.prompt {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+.prompt > summary {
+  color: var(--color-neutral-300);
+  cursor: pointer;
+}
+.commands-toggle {
+  justify-content: flex-end;
+  margin: 0 0 0.75rem auto;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+.commands {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1.5rem;
+}
+.commands .stage-body {
+  margin-top: 0;
+}
+.commands-hidden .command {
+  display: none;
+}
+
+/* The answer to the last command, at the bottom of the window wherever the
+   click was made. */
+.dock {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  z-index: 10;
+  width: min(72rem, calc(100% - 2rem));
+  overflow: hidden;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.5rem 2rem light-dark(rgb(0 0 0 / 0.15), rgb(0 0 0 / 0.6));
+  transform: translateX(-50%);
+}
+.dock-refused {
+  border-color: light-dark(#991b1b, oklch(93.6% 0.032 17.717));
+}
+.dock-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+}
+.dock-state {
+  font-weight: 600;
+  color: var(--color-neutral-50);
+}
+.dock-done .dock-state {
+  color: var(--color-success-text);
+}
+.dock-refused .dock-state {
+  color: light-dark(#991b1b, oklch(93.6% 0.032 17.717));
+}
+.dock-running .dock-state {
+  color: var(--color-brand-ink);
+}
+.dock-command {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+.dock-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--color-neutral-300);
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.dock-button:hover {
+  color: var(--color-neutral-50);
+}
+.dock .dock-output {
+  max-height: 40vh;
+  margin: 0;
+  overflow-y: auto;
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+/* Room under the page for the dock, and the decision lifted above it. */
+main:has(.dock) {
+  padding-bottom: 7rem;
+}
+section:has(> .dock) .block-decision:has(.action-primary) {
+  bottom: 5.25rem;
+}

@@ -1,6 +1,6 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, artifactUrl, Drift, Notices, Problems, RunOutput } from "./panel";
+import { Action, artifactUrl, Block, Drift, Notices, Problems } from "./panel";
 import type { AssemblyReport, AssemblyStatus, CutState, RunDone, StatusCell } from "./types";
 
 /**
@@ -150,105 +150,117 @@ export function AssemblyPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Przyjęty w całości</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Długość</dt>
-              <dd>{cut.seconds === null ? "—" : `${cut.seconds}s`}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Przyjęty w całości</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Długość</dt>
+                <dd>{cut.seconds === null ? "—" : `${cut.seconds}s`}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-          <Notices notices={status.notices} />
-          <Drift paths={cut.inputsChanged} title="Wejścia zmieniły się po tym cięciu:" />
+            <Problems problems={status.problems} />
+            <Notices notices={status.notices} />
+            <Drift paths={cut.inputsChanged} title="Wejścia zmieniły się po tym cięciu:" />
+          </Block>
 
-          <h3>Cały odcinek</h3>
-          <p className="actions-note">
-            Ocena całości to nie powtórka ocen klipów: tamte mówią, że każde ujęcie jest dobre, ta
-            mówi, że <strong>te klipy w tej kolejności to film</strong>. Rytm przez cięcia, ciągłość
-            na szwach i rzeczywista długość istnieją wyłącznie w całości, więc obejrzyj ją w
-            całości. Film jest niemy z założenia; dźwięk dokłada etap poniżej.
-          </p>
-          {cut.state === "absent" ? (
-            <p className="picture-empty">{CUT_STATE.absent}</p>
-          ) : (
-            // biome-ignore lint/a11y/useMediaCaption: cięcie jest nieme, napisy to decyzja odcinka i etap 9
-            <video className="link-film" controls preload="metadata" src={film} />
-          )}
-          <p className="picture-state">
-            {cut.approved ? "zatwierdzony" : CUT_STATE[cut.state]} · {cut.note}
-          </p>
+          <Block
+            hint={
+              <>
+                Ocena całości to nie powtórka ocen klipów: tamte mówią, że każde ujęcie jest dobre,
+                ta mówi, że <strong>te klipy w tej kolejności to film</strong>. Rytm przez cięcia,
+                ciągłość na szwach i rzeczywista długość istnieją wyłącznie w całości, więc obejrzyj
+                ją w całości. Film jest niemy z założenia; dźwięk dokłada etap poniżej.
+              </>
+            }
+            title="Cały odcinek"
+          >
+            {cut.state === "absent" ? (
+              <p className="picture-empty">{CUT_STATE.absent}</p>
+            ) : (
+              // biome-ignore lint/a11y/useMediaCaption: cięcie jest nieme, napisy to decyzja odcinka i etap 9
+              <video className="link-film" controls preload="metadata" src={film} />
+            )}
+            <p className="picture-state">
+              {cut.approved ? "zatwierdzony" : CUT_STATE[cut.state]} · {cut.note}
+            </p>
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy cięcie istnieje i czeka na przyjęcie. Tak samo odmówiłby
-          terminal.
-        </p>
-      )}
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
+          <p className="actions-note">
+            „Zatwierdź” pojawia się, gdy cięcie istnieje i czeka na przyjęcie. Tak samo odmówiłby
+            terminal.
+          </p>
+        )}
+      </Block>
 
-      <h3>Montaż</h3>
-      <p className="actions-note">
-        Jedyny etap, który <strong>niczego nie kupuje</strong>, więc nie ma tu rachunku, nie ma
-        dwóch kroków i nie ma przycisku „Kup”: jest jeden przycisk. Nie ma też modelu ani klucza, bo
-        nic nie leci do dostawcy; potrzebny jest <code>ffmpeg</code> na tej maszynie (PATH albo{" "}
-        <code>AIMATOR_FFMPEG</code>), a gdy go nie ma, etap odmawia zamiast przekodowywać, i tę
-        odmowę zobaczysz tu słowo w słowo taką, jaką wypisałby terminal.
-      </p>
+      <Block
+        fold={cell.state === "ready"}
+        hint={
+          <>
+            Jedyny etap, który <strong>niczego nie kupuje</strong>, więc nie ma tu rachunku, nie ma
+            dwóch kroków i nie ma przycisku „Kup”: jest jeden przycisk. Nie ma też modelu ani
+            klucza, bo nic nie leci do dostawcy; potrzebny jest <code>ffmpeg</code> na tej maszynie
+            (PATH albo <code>AIMATOR_FFMPEG</code>), a gdy go nie ma, etap odmawia zamiast
+            przekodowywać, i tę odmowę zobaczysz słowo w słowo taką, jaką wypisałby terminal.
+            <br />
+            <br />
+            Plan cięcia jest wyprowadzony z <strong>zatwierdzonej listy ujęć</strong> w chwili
+            wywołania i nigdzie nie zapisany: drugi plik trzymający tę samą prawdę rozjechałby się z
+            nią przy pierwszej poprawce ręcznej. Jeśli plan jest zły, poprawka należy do etapu 3.
+            Klipy nie wracają co do sekundy, a montaż skleja to, co wróciło, i melduje różnicę,
+            nigdy nie przycina.
+          </>
+        }
+        title="Montaż (bez płacenia)"
+      >
+        <div className="send">
+          <label className="field-check" htmlFor="assembly-dry-run">
+            <input checked={dryRun} id="assembly-dry-run" onChange={changeDryRun} type="checkbox" />
+            Próba na sucho: pokaż plan cięcia, nie zapisuj niczego
+          </label>
+          <label className="field-check" htmlFor="assembly-regenerate">
+            <input
+              checked={regenerate}
+              id="assembly-regenerate"
+              onChange={changeRegenerate}
+              type="checkbox"
+            />
+            Ponowne cięcie gotowego montażu, zachowując poprzedni
+          </label>
+        </div>
 
-      <div className="send">
-        <label className="field-check" htmlFor="assembly-dry-run">
-          <input checked={dryRun} id="assembly-dry-run" onChange={changeDryRun} type="checkbox" />
-          Próba na sucho: pokaż plan cięcia, nie zapisuj niczego
-        </label>
-        <label className="field-check" htmlFor="assembly-regenerate">
-          <input
-            checked={regenerate}
-            id="assembly-regenerate"
-            onChange={changeRegenerate}
-            type="checkbox"
-          />
-          Ponowne cięcie gotowego montażu, zachowując poprzedni
-        </label>
-      </div>
+        <Action
+          argv={assemble}
+          disabled={running}
+          label={dryRun ? "Pokaż plan cięcia" : "Zmontuj"}
+          onRun={startRun}
+          primary={!dryRun}
+        />
 
-      <Action
-        argv={assemble}
-        disabled={running}
-        label={dryRun ? "Pokaż plan cięcia" : "Zmontuj"}
-        onRun={startRun}
-        primary={!dryRun}
-      />
-
-      <h3>Plan cięcia</h3>
-      <p className="actions-note">
-        Wyprowadzony z <strong>zatwierdzonej listy ujęć</strong> w chwili wywołania i nigdzie nie
-        zapisany: drugi plik trzymający tę samą prawdę rozjechałby się z nią przy pierwszej poprawce
-        ręcznej. Jeśli plan jest zły, poprawka należy do etapu 3. Klipy nie wracają co do sekundy, a
-        montaż skleja to, co wróciło, i melduje różnicę, nigdy nie przycina.
-      </p>
-      {plan === null ? (
-        <p className="actions-note">
-          Plan pokazuje „Pokaż plan cięcia”. To wywołanie jest darmowe i przy próbie na sucho nie
-          zapisuje niczego.
-        </p>
-      ) : (
-        <Cut plan={plan} />
-      )}
-
-      <RunOutput run={run} running={running} />
+        {plan === null ? (
+          <p className="actions-note">
+            Plan pokazuje „Pokaż plan cięcia”. To wywołanie jest darmowe i przy próbie na sucho nie
+            zapisuje niczego.
+          </p>
+        ) : (
+          <Cut plan={plan} />
+        )}
+      </Block>
     </section>
   );
 }

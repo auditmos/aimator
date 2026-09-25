@@ -4,12 +4,12 @@ import {
   Action,
   artifactUrl,
   asImages,
+  Block,
   Drift,
   Field,
   Gallery,
   PaidCall,
   Problems,
-  RunOutput,
 } from "./panel";
 import type { CharacterStatus, RunDone, StatusCell } from "./types";
 
@@ -119,58 +119,68 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Postać</dt>
-              <dd>
-                {status.name} ({characterId})
-              </dd>
-            </div>
-            <div>
-              <dt>Zatwierdzona w całości</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Postać</dt>
+                <dd>
+                  {status.name} ({characterId})
+                </dd>
+              </div>
+              <div>
+                <dt>Zatwierdzona w całości</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Drift
-            paths={status.inputsChanged}
-            title="Dryf wejść: te pliki zmieniły się po narysowaniu obrazów"
-          />
-          <Problems problems={status.problems} />
-
-          <h3>Obrazy</h3>
-          <p className="actions-note">
-            Zaznacz te, których dotyczy akcja. Jedno kliknięcie to jedna komenda z listą{" "}
-            <code>--artifact</code>, bo zatwierdzenie dwóch widoków to jedna decyzja, a nie dwie.
-          </p>
-          <Gallery
-            chosen={chosen}
-            idPrefix="character"
-            items={drawn}
-            onToggle={toggle}
-            urlOf={urlOf}
-          />
+            <Drift
+              paths={status.inputsChanged}
+              title="Dryf wejść: te pliki zmieniły się po narysowaniu obrazów"
+            />
+            <Problems problems={status.problems} />
+          </Block>
+          <Block
+            hint={
+              <>
+                Zaznacz te, których dotyczy akcja. Jedno kliknięcie to jedna komenda z listą{" "}
+                <code>--artifact</code>, bo zatwierdzenie dwóch widoków to jedna decyzja, a nie
+                dwie.
+              </>
+            }
+            title="Obrazy"
+          >
+            <Gallery
+              chosen={chosen}
+              idPrefix="character"
+              items={drawn}
+              onToggle={toggle}
+              urlOf={urlOf}
+            />
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy zaznaczone są obrazy, które istnieją i czekają na przyjęcie.
-          Tak samo odmówiłby terminal.
-        </p>
-      )}
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
+          <p className="actions-note">
+            „Zatwierdź” pojawia się, gdy zaznaczone są obrazy, które istnieją i czekają na
+            przyjęcie. Tak samo odmówiłby terminal.
+          </p>
+        )}
+      </Block>
 
       <PaidCall
         note="Bez zaznaczenia etap rysuje to, na co pozwalają bramki: najpierw kartę, potem osiem widoków, na końcu hero. „Generuj” niczego nie wysyła i nie czyta klucza: pokazuje każdy prompt i liczbę obrazów. Dopiero „Kup” płaci."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asImages}
@@ -196,8 +206,6 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
           </label>
         </div>
       </PaidCall>
-
-      <RunOutput run={run} running={running} />
     </section>
   );
 }

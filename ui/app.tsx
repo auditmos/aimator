@@ -15,7 +15,7 @@ import {
 } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
-import { plural } from "./panel";
+import { Commands, plural, RunDock } from "./panel";
 import { NewEpisode, NewProject, PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
@@ -488,31 +488,33 @@ function StageScreen(props: {
       </h2>
       <Variants current={cell.id} hrefOf={hrefOf} stage={stage} />
       {cell.reason === null ? null : <p className="stage-reason">{cell.reason}</p>}
-      <div className="stage-body">
-        {cell.stage === 0 ? (
-          <PreparePanel
-            castHref={castHref(projectId)}
-            cell={cell}
-            episodeId={episodeId}
-            onRun={onRun}
-            projectId={projectId}
-            run={run}
-            running={running}
-          />
-        ) : (
-          // Keyed by cell, so a tab starts with nothing ticked and nothing
-          // previewed from the tab before it.
-          <StagePanel
-            cell={cell}
-            episodeId={episodeId}
-            key={cell.id}
-            onRun={onRun}
-            projectId={projectId}
-            run={run}
-            running={running}
-          />
-        )}
-      </div>
+      <Commands>
+        <div className="stage-body">
+          {cell.stage === 0 ? (
+            <PreparePanel
+              castHref={castHref(projectId)}
+              cell={cell}
+              episodeId={episodeId}
+              onRun={onRun}
+              projectId={projectId}
+              run={run}
+              running={running}
+            />
+          ) : (
+            // Keyed by cell, so a tab starts with nothing ticked and nothing
+            // previewed from the tab before it.
+            <StagePanel
+              cell={cell}
+              episodeId={episodeId}
+              key={cell.id}
+              onRun={onRun}
+              projectId={projectId}
+              run={run}
+              running={running}
+            />
+          )}
+        </div>
+      </Commands>
       <Neighbours current={stage.stage} hrefOf={hrefOf} stages={stages} />
     </>
   );
@@ -532,8 +534,9 @@ function EpisodeView(props: {
   readonly projectId: string;
   readonly run: RunDone | null;
   readonly running: boolean;
+  readonly sent: readonly string[] | null;
 }): JSX.Element {
-  const { episodeId, onRun, place, projectId, run, running } = props;
+  const { episodeId, onRun, place, projectId, run, running, sent } = props;
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
@@ -584,17 +587,19 @@ function EpisodeView(props: {
       </h1>
       <Notices connection={connection} ladderless={ladderless} refusal={refusal} />
       {ladderless && overview ? (
-        <div className="stage-body">
-          <PreparePanel
-            castHref={castHref(projectId)}
-            cell={null}
-            episodeId={episodeId}
-            onRun={onRun}
-            projectId={projectId}
-            run={run}
-            running={running}
-          />
-        </div>
+        <Commands>
+          <div className="stage-body">
+            <PreparePanel
+              castHref={castHref(projectId)}
+              cell={null}
+              episodeId={episodeId}
+              onRun={onRun}
+              projectId={projectId}
+              run={run}
+              running={running}
+            />
+          </div>
+        </Commands>
       ) : null}
       {status !== null && overview && !ladderless ? (
         <EpisodeOverview hrefOf={hrefOf} status={status} />
@@ -611,6 +616,7 @@ function EpisodeView(props: {
           status={status}
         />
       ) : null}
+      <RunDock argv={sent} run={run} running={running} />
     </section>
   );
 }
@@ -630,8 +636,9 @@ function ProjectScreens(props: {
   readonly route: InProject;
   readonly run: RunDone | null;
   readonly running: boolean;
+  readonly sent: readonly string[] | null;
 }): JSX.Element {
-  const { listing, listingRefusal, onRun, route, run, running } = props;
+  const { listing, listingRefusal, onRun, route, run, running, sent } = props;
   const project = listing?.projects.find((one) => one.id === route.projectId) ?? null;
   const createdEpisode = useCallback(
     (episodeId: string) => {
@@ -709,6 +716,7 @@ function ProjectScreens(props: {
         projectId={project.id}
         run={run}
         running={running}
+        sent={sent}
       />
     ) : (
       <section>
@@ -745,6 +753,8 @@ export function App(): JSX.Element {
   const [listingRefusal, setListingRefusal] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [run, setRun] = useState<RunDone | null>(null);
+  /** The argv of the last command started here, which the answer does not repeat. */
+  const [sent, setSent] = useState<readonly string[] | null>(null);
 
   /**
    * The workspace's own stream, open on every screen.
@@ -783,6 +793,7 @@ export function App(): JSX.Element {
    * has to stay usable while it does.
    */
   const start = useCallback((argv: readonly string[]) => {
+    setSent(argv);
     setRun(null);
     setPending(null);
 
@@ -893,6 +904,7 @@ export function App(): JSX.Element {
             route={route}
             run={run}
             running={running}
+            sent={sent}
           />
         ) : null}
       </main>

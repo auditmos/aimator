@@ -38,6 +38,112 @@ function Command(props: { readonly argv: readonly string[] }): JSX.Element {
   return <code className="command">{commandLine(props.argv)}</code>;
 }
 
+const COMMANDS_KEY = "aimator-commands";
+
+/** Whether this viewer asked to see commands; a browser that will not say is a no. */
+function commandsWanted(): boolean {
+  try {
+    return window.localStorage.getItem(COMMANDS_KEY) === "shown";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The command under every button, shown when somebody asks for it.
+ *
+ * Every button still runs exactly one argv and every argv is still on the
+ * page: this only decides whether it stands beside the button. Twelve boxed
+ * command lines on one stage made the buttons hard to find, and whoever drives
+ * the pipeline from a terminal turns them on once and keeps them, which is why
+ * the choice is remembered in this browser and nowhere else.
+ */
+export function Commands(props: { readonly children: ReactNode }): JSX.Element {
+  const [shown, setShown] = useState(commandsWanted);
+  const change = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const wanted = event.target.checked;
+
+    setShown(wanted);
+
+    try {
+      window.localStorage.setItem(COMMANDS_KEY, wanted ? "shown" : "hidden");
+    } catch {
+      // A private window keeps the choice for this page only, which is enough.
+    }
+  }, []);
+
+  return (
+    <div className={shown ? "commands" : "commands commands-hidden"}>
+      <label className="field-check commands-toggle" htmlFor="commands-toggle">
+        <input checked={shown} id="commands-toggle" onChange={change} type="checkbox" />
+        Pokaż polecenia CLI pod przyciskami
+      </label>
+      {props.children}
+    </div>
+  );
+}
+
+/**
+ * Why a block works the way it does, folded under one line.
+ *
+ * The reasons are the documentation of a decision and stay on the page, but
+ * a person who has read them once should not have to read past them again.
+ */
+function Hint(props: { readonly children: ReactNode }): JSX.Element {
+  return (
+    <details className="hint">
+      <summary>Jak to działa</summary>
+      <div className="hint-body">{props.children}</div>
+    </details>
+  );
+}
+
+/**
+ * One part of a panel, as a card of its own.
+ *
+ * Every stage is read in the same order: where it stands, what it produced,
+ * the decision about it, and what it would cost to make again. Each of those
+ * is a block, so a panel reads as four answers rather than one wall. `fold`
+ * makes a block something a person opens: its value is whether it starts
+ * open, read once, because a block that closed itself while somebody was
+ * inside it would be the screen taking something away mid-sentence.
+ */
+export function Block(props: {
+  readonly children: ReactNode;
+  readonly className?: string;
+  readonly fold?: boolean;
+  readonly hint?: ReactNode;
+  readonly title: string;
+}): JSX.Element {
+  const { children, className, fold, hint, title } = props;
+  const [startsOpen] = useState(fold);
+  const classes = className === undefined ? "block" : `block ${className}`;
+  const body = (
+    <>
+      {hint === undefined ? null : <Hint>{hint}</Hint>}
+      {children}
+    </>
+  );
+
+  if (fold === undefined) {
+    return (
+      <section className={classes}>
+        <h3>{title}</h3>
+        {body}
+      </section>
+    );
+  }
+
+  return (
+    <details className={`${classes} block-fold`} open={startsOpen}>
+      <summary>
+        <h3>{title}</h3>
+      </summary>
+      {body}
+    </details>
+  );
+}
+
 /**
  * One action, and the command it runs standing underneath it.
  *
@@ -161,6 +267,70 @@ export function Notices(props: { readonly notices: readonly string[] }): JSX.Ele
       {notice}
     </p>
   ));
+}
+
+/**
+ * The last command of a stage page, where the eye already is.
+ *
+ * A stage page is long, and an answer printed at the foot of its panel was an
+ * answer to a click made a screen higher, out of sight. So it stands at the
+ * bottom of the window instead, whatever part of the page started it: a
+ * refusal opens itself, because it is the one answer that asks for something,
+ * and a success says so in one word and opens on request.
+ */
+export function RunDock(props: {
+  readonly argv: readonly string[] | null;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element | null {
+  const { argv, run, running } = props;
+  const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const dismiss = useCallback(() => setDismissed(run?.runId ?? null), [run]);
+
+  useEffect(() => {
+    setOpen(run !== null && !run.ok);
+  }, [run]);
+
+  if (running) {
+    return (
+      <div aria-live="polite" className="dock dock-running" role="status">
+        <div className="dock-bar">
+          <span className="dock-state">Komenda w toku…</span>
+          {argv === null ? null : <code className="dock-command">{commandLine(argv)}</code>}
+        </div>
+      </div>
+    );
+  }
+
+  if (run === null || dismissed === run.runId) {
+    return null;
+  }
+
+  return (
+    <div
+      aria-live="polite"
+      className={run.ok ? "dock dock-done" : "dock dock-refused"}
+      role={run.ok ? "status" : "alert"}
+    >
+      <div className="dock-bar">
+        <span className="dock-state">{run.ok ? "Gotowe" : "Odmowa"}</span>
+        {argv === null ? null : <code className="dock-command">{commandLine(argv)}</code>}
+        <button className="dock-button" onClick={toggle} type="button">
+          {open ? "Ukryj wynik" : "Pokaż wynik"}
+        </button>
+        <button aria-label="Zamknij wynik" className="dock-button" onClick={dismiss} type="button">
+          ×
+        </button>
+      </div>
+      {open ? (
+        <pre className={run.ok ? "run-output dock-output" : "run-output run-refused dock-output"}>
+          {run.ok ? run.data : run.error.message}
+        </pre>
+      ) : null}
+    </div>
+  );
 }
 
 /** The last command's whole answer, in the words the terminal would print. */
@@ -377,6 +547,12 @@ export function PaidCall<Report extends PaidReport>(props: {
   /** The stage's own flags, which decide what the preview argv says. */
   readonly children: ReactNode;
   readonly note: string;
+  /**
+   * Whether the block starts open. A stage waiting to be generated opens on
+   * it; one with something to review keeps buying folded, since paying again
+   * is the rarer question there.
+   */
+  readonly open: boolean;
   readonly onRun: (argv: readonly string[]) => void;
   readonly preview: readonly string[];
   readonly projectRun: RunDone | null;
@@ -395,7 +571,7 @@ export function PaidCall<Report extends PaidReport>(props: {
   /** The argv of the last command the panel started, whatever it was. */
   readonly sent: readonly string[] | null;
 }): JSX.Element {
-  const { children, note, onRun, preview, projectRun, read, running, sent } = props;
+  const { children, note, onRun, open, preview, projectRun, read, running, sent } = props;
   const [previewed, setPreviewed] = useState<Previewed | null>(null);
 
   useEffect(() => {
@@ -425,9 +601,7 @@ export function PaidCall<Report extends PaidReport>(props: {
   }, [onRun, previewed]);
 
   return (
-    <>
-      <h3>Płatne wywołanie</h3>
-      <p className="actions-note">{note}</p>
+    <Block fold={open} hint={note} title="Generowanie (płatne)">
       {children}
 
       <Action argv={preview} disabled={running} label="Generuj" onRun={onRun} />
@@ -440,7 +614,7 @@ export function PaidCall<Report extends PaidReport>(props: {
       ) : (
         <Bought onBuy={runBuy} previewed={previewed} running={running} />
       )}
-    </>
+    </Block>
   );
 }
 
@@ -484,11 +658,13 @@ function Bought(props: {
         </div>
       ) : null}
 
+      {/* Folded one by one: a stage that draws ten pictures sends ten texts,
+          and the bill above them is what decides whether to buy. */}
       {priced.prompts.map((prompt) => (
-        <div key={prompt.label}>
-          <h3>{prompt.label}</h3>
+        <details className="prompt" key={prompt.label}>
+          <summary>{prompt.label}</summary>
           <pre className="artifact-text">{prompt.text}</pre>
-        </div>
+        </details>
       ))}
     </>
   );

@@ -1,15 +1,6 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import {
-  Action,
-  artifactUrl,
-  asImages,
-  Field,
-  Gallery,
-  PaidCall,
-  Problems,
-  RunOutput,
-} from "./panel";
+import { Action, artifactUrl, asImages, Block, Field, Gallery, PaidCall, Problems } from "./panel";
 import type { ReferencesStatus, RunDone, StatusCell } from "./types";
 
 /**
@@ -95,49 +86,58 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzone w całości</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzone w całości</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-
-          <h3>Referencje</h3>
-          <p className="actions-note">
-            Pod każdą stoi jej stan w słowach etapu: referencja zależna mówi, na którą czeka, bo to
-            jest decyzja, którą trzeba podjąć wcześniej. Zaznaczenie kilku daje jedną komendę z
-            listą <code>--artifact</code>.
-          </p>
-          <Gallery
-            chosen={chosen}
-            idPrefix="reference"
-            items={status.artifacts}
-            onToggle={toggle}
-            urlOf={urlOf}
-          />
+            <Problems problems={status.problems} />
+          </Block>
+          <Block
+            hint={
+              <>
+                Pod każdą stoi jej stan w słowach etapu: referencja zależna mówi, na którą czeka, bo
+                to jest decyzja, którą trzeba podjąć wcześniej. Zaznaczenie kilku daje jedną komendę
+                z listą <code>--artifact</code>.
+              </>
+            }
+            title="Referencje"
+          >
+            <Gallery
+              chosen={chosen}
+              idPrefix="reference"
+              items={status.artifacts}
+              onToggle={toggle}
+              urlOf={urlOf}
+            />
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy zaznaczone są referencje, które istnieją i czekają na
-          przyjęcie. Tak samo odmówiłby terminal.
-        </p>
-      )}
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
+          <p className="actions-note">
+            „Zatwierdź” pojawia się, gdy zaznaczone są referencje, które istnieją i czekają na
+            przyjęcie. Tak samo odmówiłby terminal.
+          </p>
+        )}
+      </Block>
 
       <PaidCall
         note="Bez zaznaczenia etap rysuje wszystkie referencje, których zależności są już zatwierdzone na tym torze. Zaznaczenie zablokowanej to pytanie „dlaczego jeszcze nie”: podgląd odpowie zerem i powodem. „Generuj” niczego nie wysyła i nie czyta klucza; dopiero „Kup” płaci."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asImages}
@@ -163,8 +163,6 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
           </label>
         </div>
       </PaidCall>
-
-      <RunOutput run={run} running={running} />
     </section>
   );
 }

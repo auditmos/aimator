@@ -1,15 +1,6 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import {
-  Action,
-  artifactUrl,
-  asImages,
-  Field,
-  Gallery,
-  PaidCall,
-  Problems,
-  RunOutput,
-} from "./panel";
+import { Action, artifactUrl, asImages, Block, Field, Gallery, PaidCall, Problems } from "./panel";
 import type { OpeningFrameStatus, RunDone, StatusCell } from "./types";
 
 /**
@@ -83,42 +74,51 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Zatwierdzona</dt>
-              <dd>{status.approved ? "tak" : "nie"}</dd>
-            </div>
-            <div>
-              <dt>Dalej</dt>
-              <dd>{status.nextStep}</dd>
-            </div>
-          </dl>
+          <Block title="Stan">
+            <dl className="verdict">
+              <div>
+                <dt>Zatwierdzona</dt>
+                <dd>{status.approved ? "tak" : "nie"}</dd>
+              </div>
+              <div>
+                <dt>Dalej</dt>
+                <dd>{status.nextStep}</dd>
+              </div>
+            </dl>
 
-          <Problems problems={status.problems} />
-
-          <h3>Klatka otwarcia</h3>
-          <p className="actions-note">
-            Jeden artefakt, więc nie ma czego zaznaczać: <code>--artifact</code> nie pojawia się tu
-            w żadnej komendzie, nawet przy nowej płatnej próbie.
-          </p>
-          <Gallery chosen={[]} idPrefix="opening" items={[frame]} onToggle={null} urlOf={urlOf} />
+            <Problems problems={status.problems} />
+          </Block>
+          <Block
+            hint={
+              <>
+                Jeden artefakt, więc nie ma czego zaznaczać: <code>--artifact</code> nie pojawia się
+                tu w żadnej komendzie, nawet przy nowej płatnej próbie.
+              </>
+            }
+            title="Klatka otwarcia"
+          >
+            <Gallery chosen={[]} idPrefix="opening" items={[frame]} onToggle={null} urlOf={urlOf} />
+          </Block>
         </>
       )}
 
-      <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
+      <Block className="block-decision" title="Decyzja">
+        <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
-      {acceptable ? (
-        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
-      ) : (
-        <p className="actions-note">
-          „Zatwierdź” pojawia się, gdy klatka istnieje i czeka na przyjęcie. Tak samo odmówiłby
-          terminal.
-        </p>
-      )}
+        {acceptable ? (
+          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : (
+          <p className="actions-note">
+            „Zatwierdź” pojawia się, gdy klatka istnieje i czeka na przyjęcie. Tak samo odmówiłby
+            terminal.
+          </p>
+        )}
+      </Block>
 
       <PaidCall
         note="Dokładnie jedno wywołanie, i tylko wtedy, gdy referencje, które pakiet wpisał tej klatce, są zatwierdzone na tym torze. „Generuj” niczego nie wysyła i nie czyta klucza: pokazuje prompt i rachunek, który jest zerem albo jedynką. Dopiero „Kup” płaci."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asImages}
@@ -144,8 +144,6 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
           </label>
         </div>
       </PaidCall>
-
-      <RunOutput run={run} running={running} />
     </section>
   );
 }

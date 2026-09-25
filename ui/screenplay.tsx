@@ -2,12 +2,12 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import {
   asCalls,
+  Block,
   Drift,
   NO_FLAGS,
   PaidCall,
   Problems,
   Review,
-  RunOutput,
   SendFields,
   type SendFlags,
   useArtifactText,
@@ -85,7 +85,7 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
       {status === null ? (
         <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
       ) : (
-        <>
+        <Block title="Stan">
           <dl className="verdict">
             <div>
               <dt>Stan pliku</dt>
@@ -111,21 +111,32 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
             title="Dryf wejść: te pliki zmieniły się po napisaniu scenariusza"
           />
           <Problems problems={status.problems} />
-        </>
+        </Block>
       )}
 
-      <Review
-        approve={approve}
-        check={check}
-        note="„Zatwierdź” pojawia się dopiero, gdy check nie zgłasza problemów, a scenariusz czeka na przyjęcie. Tak samo odmówiłby terminal."
-        onRun={startRun}
-        running={running}
-        status={status}
-      />
+      <Block title="Scenariusz">
+        {screenplay === null ? (
+          <p className="panel-empty">Nie ma jeszcze pliku scenariusza.</p>
+        ) : (
+          <pre className="artifact-text">{screenplay}</pre>
+        )}
+      </Block>
+
+      <Block className="block-decision" title="Decyzja">
+        <Review
+          approve={approve}
+          check={check}
+          note="„Zatwierdź” pojawia się dopiero, gdy check nie zgłasza problemów, a scenariusz czeka na przyjęcie. Tak samo odmówiłby terminal."
+          onRun={startRun}
+          running={running}
+          status={status}
+        />
+      </Block>
 
       <PaidCall
         note="Etap 1 kupuje dokładnie jedno wywołanie tekstowe. „Generuj” niczego nie wysyła i nie czyta klucza: pokazuje cały prompt i rachunek. Dopiero „Kup” płaci, i płaci za to, co pokazał podgląd."
         onRun={startRun}
+        open={cell.state === "ready"}
         preview={preview}
         projectRun={run}
         read={asCalls}
@@ -140,15 +151,6 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
           value={flags}
         />
       </PaidCall>
-
-      <RunOutput run={run} running={running} />
-
-      <h3>Scenariusz</h3>
-      {screenplay === null ? (
-        <p className="panel-empty">Nie ma jeszcze pliku scenariusza.</p>
-      ) : (
-        <pre className="artifact-text">{screenplay}</pre>
-      )}
     </section>
   );
 }
