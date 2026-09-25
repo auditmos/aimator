@@ -724,12 +724,32 @@ export function Drift(props: { readonly paths: readonly string[]; readonly title
 }
 
 /**
+ * Whether a text stage's `approve` would take it, read off its own report.
+ *
+ * A file that validates and that nobody has accepted, with nothing to fix
+ * first. Drift is not something to fix first: stages 1, 3 and 4 report it
+ * among their problems, one sentence per path in `inputsChanged`, after every
+ * blocking one, and `approve` is exactly what settles it, by binding the yes
+ * to the inputs as they are now. So the problems beyond the drifted paths are
+ * the blocking ones, and counting them is how the screen tells the two apart
+ * without learning the sentences.
+ */
+export function approvable(status: TextStatus): boolean {
+  return (
+    status.status === "completed" &&
+    !status.approved &&
+    status.problems.length === status.inputsChanged.length
+  );
+}
+
+/**
  * The two commands every reviewed stage has, under the CLI's own condition.
  *
- * "Zatwierdź" appears only where `check` reports a file that validates, that
- * nobody has accepted yet, and nothing to fix first. That is the same test the
- * CLI applies before it records anything, said once here rather than three
- * times: a button the terminal would refuse teaches a person the screen lies.
+ * "Zatwierdź" appears only where `approvable` says the terminal would take it:
+ * a button the terminal would refuse teaches a person the screen lies, and one
+ * it hides while the stage's own "Dalej:" asks for it leaves them stranded.
+ * When drift is the reason it is asked for, the sentence above the button says
+ * so, because "approve again" is an odd request for something already read.
  */
 export function Review(props: {
   readonly approve: readonly string[];
@@ -740,14 +760,19 @@ export function Review(props: {
   readonly status: TextStatus | null;
 }): JSX.Element {
   const { approve, check, note, onRun, running, status } = props;
-  const acceptable =
-    status !== null &&
-    status.status === "completed" &&
-    !status.approved &&
-    status.problems.length === 0;
+  const acceptable = status !== null && approvable(status);
+  const drifted = acceptable && status.inputsChanged.length > 0;
 
   return (
     <>
+      {drifted ? (
+        <p className="actions-note decision-why">
+          Plik jest poprawny, ale po jego powstaniu zmieniło się wejście (
+          {status.inputsChanged.map((path) => path.split("/").at(-1)).join(", ")}), więc
+          wcześniejsza zgoda wygasła. Przeczytaj go jeszcze raz i jeśli nadal się zgadza, zatwierdź
+          ponownie. Nic nie zostanie wygenerowane ani kupione.
+        </p>
+      ) : null}
       <Action argv={check} disabled={running} label="Sprawdź" onRun={onRun} />
       {acceptable ? (
         <Action argv={approve} disabled={running} label="Zatwierdź" onRun={onRun} primary />

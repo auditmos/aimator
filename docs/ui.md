@@ -167,7 +167,9 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
 3. **Decyzja**: „Sprawdź” i „Zatwierdź”, a w etapach 9 i 10 oba „tak” tego etapu
    (skrypt i kwestie, arkusz i stemy). Gdy w bloku stoi przycisk zatwierdzenia, blok jedzie
    z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na
-   górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania.
+   górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania. Dryf wejść nie
+   chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
+   wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje.
 4. **Generowanie (płatne)**: zwinięte, chyba że komórka jest „gotowa do generowania”.
    Tam kupowanie jest tym, po co się przyszło; przy przeglądzie ponowny zakup jest
    rzadszym pytaniem. Prompty z podglądu są zwinięte każdy osobno, a rachunek stoi nad nimi.

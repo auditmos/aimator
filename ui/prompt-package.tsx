@@ -277,16 +277,32 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
         </Block>
       )}
 
-      <Block title="Pakiet">
+      <Block
+        hint={
+          <>
+            Pakiet to plan każdego przyszłego płatnego obrazu i klipu, wspólny dla obu torów.
+            Oceniasz, czy referencje (postacie, rekwizyty, miejsca) obejmują to, co pokazuje lista
+            ujęć, czy ich opisy się zgadzają i czy zależności mają sens: <code>R04 ← R03</code>{" "}
+            znaczy, że R04 rysuje się z R03 w załączniku. Pełny tekst, który poleci do modelu,
+            pokaże „Plan wysyłki” niżej. Zatwierdzenie niczego nie kupuje, tylko otwiera etap 5.
+          </>
+        }
+        title="Pakiet"
+      >
         {status?.verdict === null || status?.verdict === undefined ? null : (
-          <ul className="references">
-            {status.verdict.references.map((one) => (
-              <li key={one.id}>
-                <code>{one.id}</code> ({one.kind}) {one.subject}
-                {one.dependsOn.length === 0 ? null : <span> ← {one.dependsOn.join(", ")}</span>}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="references">
+              {status.verdict.references.map((one) => (
+                <li key={one.id}>
+                  <code>{one.id}</code> ({one.kind}) {one.subject}
+                  {one.dependsOn.length === 0 ? null : <span> ← {one.dependsOn.join(", ")}</span>}
+                </li>
+              ))}
+            </ul>
+            <p className="actions-note">
+              Klipy: {status.verdict.clips.map((one) => one.id).join(", ")}
+            </p>
+          </>
         )}
         {manifest === null ? (
           <p className="panel-empty">Nie ma jeszcze pliku pakietu.</p>

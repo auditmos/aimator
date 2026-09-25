@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { asImages } from "./panel";
-import type { DrawnReport } from "./types";
+import { approvable, asImages } from "./panel";
+import type { DrawnReport, TextStatus } from "./types";
 
 /**
  * How a panel reads its own stage's report, and the one thing it must not do.
@@ -77,5 +77,38 @@ describe("an image stage's reader", () => {
    */
   it("should bill what the stage counted, not what it printed", () => {
     expect(asImages(VIEWS).billed).toEqual([{ count: 2, unit: ["obraz", "obrazy", "obrazów"] }]);
+  });
+});
+
+/**
+ * When a text stage's "Zatwierdź" is offered, which has to be exactly when
+ * `approve` would take it. Drift is reported among the problems, one sentence
+ * per changed input after every blocking one, and its remedy is the approval
+ * itself, so a screen that read every problem as a refusal hid the one button
+ * the stage was asking for.
+ */
+describe("a text stage's approval", () => {
+  const DRIFTED: TextStatus = {
+    approved: false,
+    inputsChanged: ["projects/dzielna-ewa/project.json"],
+    problems: [
+      "projects/dzielna-ewa/project.json: zmienił się od czasu ułożenia pakietu, tych wejść nikt jeszcze nie przyjął; przeczytaj pakiet jeszcze raz i zatwierdź go ponownie: aimator approve dzielna-ewa 01-burza --stage prompt-package",
+    ],
+    status: "completed",
+  };
+
+  it("should offer an approval whose only problem is drift, which approve settles", () => {
+    expect(approvable(DRIFTED)).toBe(true);
+  });
+
+  it("should refuse one that also fails validation", () => {
+    expect(
+      approvable({ ...DRIFTED, problems: ["R02: brak zależności", ...DRIFTED.problems] })
+    ).toBe(false);
+  });
+
+  it("should refuse what is absent or already approved", () => {
+    expect(approvable({ ...DRIFTED, status: "absent" })).toBe(false);
+    expect(approvable({ ...DRIFTED, approved: true })).toBe(false);
   });
 });
