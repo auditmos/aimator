@@ -36,7 +36,7 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
   identyfikatora nie wpisuje się drugi raz; pod kartami `character new`. „Narrator”:
   obecny głos i `project voice`. „Sprawdzenie etapu 0”: `check --stage prepare`. Wynik
-  komendy pokazuje się w sekcji albo karcie, która ją uruchomiła, a nie na końcu strony.
+  komendy pokazuje się w pasku na dole okna, jak na każdym ekranie (patrz niżej).
   Są na poziomie projektu, bo mieszkają w `project.json` i powracają między
   odcinkami; świeży projekt ustawia je, zanim ma jakikolwiek odcinek. Lista czyta się na
   nowo przy każdej zmianie w katalogu roboczym, więc postać dopisana z terminala też się
@@ -157,7 +157,13 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    zablokowane oraz zieloną ramkę, więc po powrocie na stronę widać, co przyjęto, a
    kolejne „Zatwierdź” obejmuje tylko nowo zaznaczone. Odblokowuje je jedynie wybór, który
    z definicji dotyczy rzeczy przyjętych: „Nowa płatna próba”, a w klipach także zgoda na
-   publikację z archiwum.
+   publikację z archiwum. Nad listą stoi „Zaznacz wszystkie”, które zaznacza to, co dałoby
+   się zaznaczyć ręcznie: pozycje już istniejące, bez zablokowanych. Pomija to, czego
+   jeszcze nie ma, bo „Zatwierdź” by tego odmówiło, a dorysowanie brakujących nie wymaga
+   żadnego wyboru. Kliknięty obraz (w klipach: klatka wejściowa, bo klip ma własny pełny
+   ekran) otwiera się w podglądzie na całe okno. Strzałki przechodzą po tej samej liście,
+   Escape zamyka, a pole wyboru stoi także w podglądzie, więc decyzję podjętą przy pełnym
+   rozmiarze zaznacza się bez zamykania.
 3. **Decyzja**: „Sprawdź” i „Zatwierdź”, a w etapach 9 i 10 oba „tak” tego etapu
    (skrypt i kwestie, arkusz i stemy). Gdy w bloku stoi przycisk zatwierdzenia, blok jedzie
    z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na
@@ -172,11 +178,24 @@ Długie uzasadnienia zostają na stronie, ale pod „Jak to działa” w swoim b
 dokumentacją decyzji, a kto przeczytał je raz, nie powinien przedzierać się przez nie
 przy każdym przeglądzie.
 
-**Wynik komendy** stoi w pasku przy dolnej krawędzi okna, niezależnie od tego, który blok
-ją uruchomił: „Komenda w toku…”, potem „Gotowe” albo „Odmowa”, z komendą obok. Odmowa
+**Wynik komendy** stoi w pasku przy dolnej krawędzi okna, na **każdym** ekranie (etap,
+obsada, nowy projekt, nowy odcinek) i niezależnie od tego, który blok ją uruchomił:
+„W toku, czekam na wynik…” z kręcącym się znacznikiem, potem „✓ Gotowe” albo „✕ Odmowa”,
+z komendą obok. Pasek pojawia się **w chwili kliknięcia**, a nie dopiero wtedy, gdy
+serwer odda identyfikator: serwer zajęty przeliczaniem drabiny potrafi odpowiadać kilka
+sekund, a kliknięcie, po którym nic się nie dzieje, wygląda jak kliknięcie, które nie
+trafiło. Kliknięty przycisk zostaje w pełnym kolorze, dostaje znacznik i wielokropek
+(„Zatwierdź…”), a pozostałe przyciski komend są wyłączone do czasu odpowiedzi. Odmowa
 rozwija się sama, bo to jedyna odpowiedź, która czegoś wymaga; sukces rozwija się na
-żądanie. Wcześniej odpowiedź lądowała na końcu panelu, ekran niżej od kliknięcia, którego
-dotyczyła.
+żądanie. Odmowę samego serwera (np. żądanie bez `argv`) pasek pokazuje tak samo.
+
+„Gotowe” nie wyprzedza skutków komendy. Serwer ogłasza zakończoną komendę na strumieniu
+odcinka dopiero **za** drabiną przeczytaną po jej zakończeniu, w tej samej kolejce, a
+otwarty odcinek czyta wyniki z tego strumienia, nie ze strumienia katalogu roboczego.
+Inaczej szybkie `approve` mówiło „Gotowe” w ułamku sekundy, a przez kolejne sekundy
+ekran pokazywał stary stan z aktywnym „Zatwierdź”. Dlatego „w toku” trwa tyle, ile
+przeliczenie drabiny, czyli zwykle kilka sekund, także dla komendy, która niczego nie
+zapisała.
 
 ## Czego ten ekran nie robi
 

@@ -7,13 +7,17 @@ import {
   Block,
   Drift,
   Field,
+  Lightbox,
   PaidCall,
+  PickAll,
   PickBox,
+  type Picture,
   type Priced,
   Problems,
   pickable,
   promptsOf,
   type Unit,
+  Zoomable,
 } from "./panel";
 import type { ClipState, ClipsStatus, MediaReport, RunDone, StatusCell } from "./types";
 
@@ -97,20 +101,56 @@ function Reel(props: {
   readonly urlOf: (id: string) => string;
 }): JSX.Element {
   const { chosen, items, onToggle, unlocked, urlOf } = props;
+  const [shown, setShown] = useState<string | null>(null);
+  // Only the stills are magnified: a clip already has its own full screen.
+  const pictures = useMemo(
+    () =>
+      items
+        .filter((item) => item.kind === "entry-frame" && item.state !== "absent")
+        .map(
+          (item): Picture => ({
+            caption: item.approved ? "zatwierdzony" : LINK_STATE[item.state],
+            id: item.id,
+            url: urlOf(item.id),
+          })
+        ),
+    [items, urlOf]
+  );
+  const aside = useCallback(
+    (id: string) => {
+      const item = items.find((one) => one.id === id);
 
-  return (
-    <ul className="reel">
-      {items.map((item) => (
-        <Link
-          chosen={chosen.includes(item.id)}
-          item={item}
-          key={item.id}
+      return item === undefined ? null : (
+        <PickBox
+          approved={item.approved}
+          boxId={`clip-zoom-${id}`}
+          chosen={chosen.includes(id)}
+          id={id}
           onToggle={onToggle}
           unlocked={unlocked}
-          url={urlOf(item.id)}
         />
-      ))}
-    </ul>
+      );
+    },
+    [chosen, items, onToggle, unlocked]
+  );
+
+  return (
+    <>
+      <ul className="reel">
+        {items.map((item) => (
+          <Link
+            chosen={chosen.includes(item.id)}
+            item={item}
+            key={item.id}
+            onShow={setShown}
+            onToggle={onToggle}
+            unlocked={unlocked}
+            url={urlOf(item.id)}
+          />
+        ))}
+      </ul>
+      <Lightbox aside={aside} onShow={setShown} pictures={pictures} shown={shown} />
+    </>
   );
 }
 
@@ -123,16 +163,24 @@ function Reel(props: {
  * the CLI's text format, which is the one thing `panel.tsx` says none of these
  * files may do. So the page sizes both, and the sentence stays a sentence.
  */
-function Seen(props: { readonly item: ClipState; readonly url: string }): JSX.Element | null {
-  const { item, url } = props;
+function Seen(props: {
+  readonly item: ClipState;
+  readonly onShow: (id: string) => void;
+  readonly url: string;
+}): JSX.Element | null {
+  const { item, onShow, url } = props;
 
   if (item.state === "absent") {
     return <p className="picture-empty">{LINK_STATE[item.state]}</p>;
   }
 
   if (item.kind === "entry-frame") {
-    // biome-ignore lint/correctness/useImageSize: etap 7 nie podaje wymiarów w polu, tylko w zdaniu
-    return <img alt={item.id} className="link-still" loading="lazy" src={url} />;
+    return (
+      <Zoomable id={item.id} onShow={onShow}>
+        {/* biome-ignore lint/correctness/useImageSize: etap 7 nie podaje wymiarów w polu, tylko w zdaniu */}
+        <img alt={item.id} className="link-still" loading="lazy" src={url} />
+      </Zoomable>
+    );
   }
 
   // biome-ignore lint/a11y/useMediaCaption: klip jest niemy, napisy to decyzja odcinka i etap 9
@@ -142,11 +190,12 @@ function Seen(props: { readonly item: ClipState; readonly url: string }): JSX.El
 function Link(props: {
   readonly chosen: boolean;
   readonly item: ClipState;
+  readonly onShow: (id: string) => void;
   readonly onToggle: (id: string, wanted: boolean) => void;
   readonly unlocked: boolean;
   readonly url: string;
 }): JSX.Element {
-  const { chosen, item, onToggle, unlocked, url } = props;
+  const { chosen, item, onShow, onToggle, unlocked, url } = props;
 
   return (
     <li className={item.approved ? "link picture-approved" : "link"}>
@@ -158,7 +207,7 @@ function Link(props: {
         onToggle={onToggle}
         unlocked={unlocked}
       />
-      <Seen item={item} url={url} />
+      <Seen item={item} onShow={onShow} url={url} />
       <p className="picture-state">
         {item.approved ? "zatwierdzony" : LINK_STATE[item.state]} · {item.note}
       </p>
@@ -272,6 +321,13 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
             }
             title="Łańcuch"
           >
+            <PickAll
+              chosen={selected}
+              id="clip-all"
+              items={artifacts}
+              onChoose={setChosen}
+              unlocked={unlocked}
+            />
             <Reel
               chosen={selected}
               items={artifacts}

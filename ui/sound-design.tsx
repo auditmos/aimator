@@ -10,6 +10,7 @@ import {
   NO_FLAGS,
   Notices,
   PaidCall,
+  PickAll,
   PickBox,
   type Priced,
   Problems,
@@ -328,6 +329,13 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
             }
             title="Stemy"
           >
+            <PickAll
+              chosen={selected}
+              id="cue-all"
+              items={cues}
+              onChoose={setChosen}
+              unlocked={flags.regenerate}
+            />
             <ul className="reel">
               {cues.map((item) => (
                 <Stem

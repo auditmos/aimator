@@ -8,6 +8,7 @@ import {
   Field,
   Gallery,
   PaidCall,
+  PickAll,
   Problems,
   pickable,
 } from "./panel";
@@ -126,6 +127,13 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
             }
             title="Referencje"
           >
+            <PickAll
+              chosen={selected}
+              id="reference-all"
+              items={status.artifacts}
+              onChoose={setChosen}
+              unlocked={regenerate}
+            />
             <Gallery
               chosen={selected}
               idPrefix="reference"

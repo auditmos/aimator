@@ -9,6 +9,7 @@ import {
   Field,
   Gallery,
   PaidCall,
+  PickAll,
   Problems,
   pickable,
 } from "./panel";
@@ -157,6 +158,13 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
             }
             title="Obrazy"
           >
+            <PickAll
+              chosen={selected}
+              id="character-all"
+              items={drawn}
+              onChoose={setChosen}
+              unlocked={regenerate}
+            />
             <Gallery
               chosen={selected}
               idPrefix="character"

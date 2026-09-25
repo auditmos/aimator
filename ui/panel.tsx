@@ -6,6 +6,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react";
 import { buy, commandLine, type Preview } from "../src/ui/commands.js";
@@ -156,6 +158,49 @@ export function Block(props: {
 }
 
 /**
+ * A button that says it was pressed, and keeps saying so until the answer.
+ *
+ * Every command button on a screen is disabled while any command runs, which
+ * tells a person that something is happening but not what: the one they
+ * pressed looked exactly like the ones they did not. So the pressed one keeps
+ * its colour, turns a spinner and says "…" after its label, for exactly as long
+ * as the others are disabled; the answer itself arrives in the dock.
+ */
+function RunButton(props: {
+  readonly children: string;
+  readonly disabled: boolean;
+  readonly onClick: () => void;
+  readonly primary: boolean;
+}): JSX.Element {
+  const { children, disabled, onClick, primary } = props;
+  const [pressed, setPressed] = useState(false);
+  const press = useCallback(() => {
+    setPressed(true);
+    onClick();
+  }, [onClick]);
+
+  // Disabled means some command is running; the moment that ends, this
+  // button's part in it has ended too.
+  useEffect(() => {
+    if (!disabled) {
+      setPressed(false);
+    }
+  }, [disabled]);
+
+  const busy = pressed && disabled;
+  const classes = ["action", primary ? "action-primary" : "", busy ? "action-busy" : ""]
+    .filter((name) => name !== "")
+    .join(" ");
+
+  return (
+    <button aria-busy={busy} className={classes} disabled={disabled} onClick={press} type="button">
+      {busy ? <span aria-hidden="true" className="spinner" /> : null}
+      {busy ? `${children}…` : children}
+    </button>
+  );
+}
+
+/**
  * One action, and the command it runs standing underneath it.
  *
  * The two are one array rather than two, which is the whole point: a person
@@ -175,14 +220,9 @@ export function Action(props: {
 
   return (
     <div className="actions">
-      <button
-        className={primary ? "action action-primary" : "action"}
-        disabled={disabled}
-        onClick={start}
-        type="button"
-      >
+      <RunButton disabled={disabled} onClick={start} primary={primary}>
         {label}
-      </button>
+      </RunButton>
       <Command argv={argv} />
     </div>
   );
@@ -281,13 +321,16 @@ export function Notices(props: { readonly notices: readonly string[] }): JSX.Ele
 }
 
 /**
- * The last command of a stage page, where the eye already is.
+ * The last command, at the bottom of the window on every screen.
  *
- * A stage page is long, and an answer printed at the foot of its panel was an
- * answer to a click made a screen higher, out of sight. So it stands at the
- * bottom of the window instead, whatever part of the page started it: a
- * refusal opens itself, because it is the one answer that asks for something,
- * and a success says so in one word and opens on request.
+ * A page is often long, and an answer printed where the command was defined
+ * was an answer to a click made a screen higher, out of sight. So it stands at
+ * the bottom of the window instead, whatever part of whatever screen started
+ * it. It appears the moment a button is pressed, before the server has even
+ * said it took the command, because a click with nothing to show for it looks
+ * like a click that missed. A refusal opens itself, because it is the one
+ * answer that asks for something; a success says so in one word and opens on
+ * request.
  */
 export function RunDock(props: {
   readonly argv: readonly string[] | null;
@@ -308,7 +351,8 @@ export function RunDock(props: {
     return (
       <div aria-live="polite" className="dock dock-running" role="status">
         <div className="dock-bar">
-          <span className="dock-state">Komenda w toku…</span>
+          <span aria-hidden="true" className="spinner" />
+          <span className="dock-state">W toku, czekam na wynik…</span>
           {argv === null ? null : <code className="dock-command">{commandLine(argv)}</code>}
         </div>
       </div>
@@ -326,7 +370,7 @@ export function RunDock(props: {
       role={run.ok ? "status" : "alert"}
     >
       <div className="dock-bar">
-        <span className="dock-state">{run.ok ? "Gotowe" : "Odmowa"}</span>
+        <span className="dock-state">{run.ok ? "✓ Gotowe" : "✕ Odmowa"}</span>
         {argv === null ? null : <code className="dock-command">{commandLine(argv)}</code>}
         <button className="dock-button" onClick={toggle} type="button">
           {open ? "Ukryj wynik" : "Pokaż wynik"}
@@ -341,25 +385,6 @@ export function RunDock(props: {
         </pre>
       ) : null}
     </div>
-  );
-}
-
-/** The last command's whole answer, in the words the terminal would print. */
-export function RunOutput(props: {
-  readonly run: RunDone | null;
-  readonly running: boolean;
-}): JSX.Element {
-  const { run, running } = props;
-
-  return (
-    <>
-      {running ? <p className="run-pending">Komenda w toku…</p> : null}
-      {run === null ? null : (
-        <pre className={run.ok ? "run-output" : "run-output run-refused"}>
-          {run.ok ? run.data : run.error.message}
-        </pre>
-      )}
-    </>
   );
 }
 
@@ -657,14 +682,9 @@ function Bought(props: {
 
       {buying ? (
         <div className="actions">
-          <button
-            className="action action-primary"
-            disabled={props.running}
-            onClick={props.onBuy}
-            type="button"
-          >
+          <RunButton disabled={props.running} onClick={props.onBuy} primary>
             Kup
-          </button>
+          </RunButton>
           <Command argv={buy(send)} />
         </div>
       ) : null}
@@ -846,6 +866,224 @@ export function PickBox(props: {
 }
 
 /**
+ * One box over a whole list: "tick everything I could tick one by one".
+ *
+ * What it ticks is what a person would reach by hand while looking at the
+ * list: every item that exists, minus what the lock holds. An item not made
+ * yet is left out, because there is nothing to look at and "Zatwierdź" would
+ * rightly refuse it; drawing the missing ones needs no choice at all, since an
+ * empty choice is "whatever the gates allow". It never adds a locked item,
+ * for the reason `pickable` gives, and unticking it empties the choice.
+ */
+export function PickAll(props: {
+  readonly chosen: readonly string[];
+  readonly id: string;
+  readonly items: readonly {
+    readonly approved: boolean;
+    readonly id: string;
+    readonly state: string;
+  }[];
+  readonly onChoose: (ids: readonly string[]) => void;
+  readonly unlocked: boolean;
+}): JSX.Element | null {
+  const { chosen, id, items, onChoose, unlocked } = props;
+  const box = useRef<HTMLInputElement>(null);
+  const reachable = items
+    .filter((item) => item.state === "completed" && (unlocked || !item.approved))
+    .map((item) => item.id);
+  const ticked = reachable.filter((one) => chosen.includes(one)).length;
+  const all = reachable.length > 0 && ticked === reachable.length;
+  const toggle = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onChoose(event.target.checked ? reachable : []),
+    [onChoose, reachable]
+  );
+
+  // "Some of them" is a third state a checkbox can only be told in script.
+  useEffect(() => {
+    if (box.current !== null) {
+      box.current.indeterminate = ticked > 0 && !all;
+    }
+  }, [all, ticked]);
+
+  // Nothing made yet, or everything already accepted: a box that can do
+  // nothing is one more thing to read, so there is none.
+  if (reachable.length === 0) {
+    return null;
+  }
+
+  return (
+    <label className="field-check pick-all" htmlFor={id}>
+      <input checked={all} id={id} onChange={toggle} ref={box} type="checkbox" />
+      Zaznacz wszystkie ({ticked} z {reachable.length})
+    </label>
+  );
+}
+
+/** One picture as the magnifier shows it. */
+export interface Picture {
+  readonly caption: string;
+  readonly height?: number;
+  readonly id: string;
+  readonly url: string;
+  readonly width?: number;
+}
+
+/**
+ * One picture at the size of the window, over everything else.
+ *
+ * A native `<dialog>`, so Escape, the focus trap and returning focus to the
+ * thumbnail that opened it are the browser's rather than this file's. The
+ * arrows walk the list it was opened from, because judging ten views of one
+ * character is judging them side by side; `aside` is what the caller wants
+ * next to the picture, which for a list that picks is its box, so a verdict
+ * reached at full size can be ticked without closing anything.
+ */
+export function Lightbox(props: {
+  readonly aside?: (id: string) => ReactNode;
+  readonly onShow: (id: string | null) => void;
+  readonly pictures: readonly Picture[];
+  readonly shown: string | null;
+}): JSX.Element {
+  const { aside, onShow, pictures, shown } = props;
+  const dialog = useRef<HTMLDialogElement>(null);
+  const at = pictures.findIndex((one) => one.id === shown);
+  const picture = pictures[at];
+  const open = picture !== undefined;
+  const step = useCallback(
+    (offset: number) => {
+      const next = pictures[(at + offset + pictures.length) % pictures.length];
+
+      if (next !== undefined) {
+        onShow(next.id);
+      }
+    },
+    [at, onShow, pictures]
+  );
+  const previous = useCallback(() => step(-1), [step]);
+  const following = useCallback(() => step(1), [step]);
+  const close = useCallback(() => onShow(null), [onShow]);
+
+  useEffect(() => {
+    const element = dialog.current;
+
+    if (element === null) {
+      return;
+    }
+
+    if (open && !element.open) {
+      element.showModal();
+    }
+
+    if (!open && element.open) {
+      element.close();
+    }
+  }, [open]);
+
+  // Listened to rather than bound in JSX: a dialog is not a control, and the
+  // keys and the backdrop belong to the whole of it.
+  useEffect(() => {
+    const element = dialog.current;
+
+    if (element === null) {
+      return;
+    }
+
+    const keys = (event: KeyboardEvent): void => {
+      if (event.key === "ArrowLeft") {
+        previous();
+      }
+
+      if (event.key === "ArrowRight") {
+        following();
+      }
+    };
+    // A click that lands on the dialog itself, not on anything inside it, is
+    // a click on the dimmed backdrop around the picture.
+    const backdrop = (event: MouseEvent): void => {
+      if (event.target === element) {
+        close();
+      }
+    };
+
+    element.addEventListener("close", close);
+    element.addEventListener("keydown", keys);
+    element.addEventListener("click", backdrop);
+
+    return () => {
+      element.removeEventListener("close", close);
+      element.removeEventListener("keydown", keys);
+      element.removeEventListener("click", backdrop);
+    };
+  }, [close, following, previous]);
+
+  return (
+    <dialog aria-label="Podgląd obrazu" className="lightbox" ref={dialog}>
+      {picture === undefined ? null : (
+        <figure className="lightbox-figure">
+          <img alt={picture.id} height={picture.height} src={picture.url} width={picture.width} />
+          <figcaption className="lightbox-bar">
+            <span className="lightbox-caption">
+              <code>{picture.id}</code> · {picture.caption}
+            </span>
+            {aside?.(picture.id)}
+            {pictures.length > 1 ? (
+              <>
+                <span className="lightbox-count">
+                  {at + 1} z {pictures.length}
+                </span>
+                <button
+                  aria-label="Poprzedni obraz"
+                  className="dock-button"
+                  onClick={previous}
+                  type="button"
+                >
+                  ←
+                </button>
+                <button
+                  aria-label="Następny obraz"
+                  className="dock-button"
+                  onClick={following}
+                  type="button"
+                >
+                  →
+                </button>
+              </>
+            ) : null}
+            <button
+              aria-label="Zamknij podgląd"
+              className="dock-button"
+              onClick={close}
+              type="button"
+            >
+              ✕
+            </button>
+          </figcaption>
+        </figure>
+      )}
+    </dialog>
+  );
+}
+
+/**
+ * A thumbnail that opens the magnifier: a button, because it does something,
+ * with the picture as its whole face.
+ */
+export function Zoomable(props: {
+  readonly children: ReactNode;
+  readonly id: string;
+  readonly onShow: (id: string) => void;
+}): JSX.Element {
+  const { children, id, onShow } = props;
+  const show = useCallback(() => onShow(id), [id, onShow]);
+
+  return (
+    <button aria-label={`Powiększ ${id}`} className="zoom" onClick={show} type="button">
+      {children}
+    </button>
+  );
+}
+
+/**
  * The pictures of one stage on one track, each beside the box that picks it.
  *
  * It is here rather than in a stage's panel because three stages draw and the
@@ -865,21 +1103,60 @@ export function Gallery(props: {
   readonly urlOf: (id: string) => string;
 }): JSX.Element {
   const { chosen, idPrefix, items, onToggle, unlocked, urlOf } = props;
+  const [shown, setShown] = useState<string | null>(null);
+  const pictures = useMemo(
+    () =>
+      items.flatMap((item): Picture[] =>
+        item.verdict === null
+          ? []
+          : [
+              {
+                caption: item.approved ? "zatwierdzony" : DRAWN_STATE[item.state],
+                height: item.verdict.height,
+                id: item.id,
+                url: urlOf(item.id),
+                width: item.verdict.width,
+              },
+            ]
+      ),
+    [items, urlOf]
+  );
+  const aside = useCallback(
+    (id: string) => {
+      const item = items.find((one) => one.id === id);
 
-  return (
-    <ul className="pictures">
-      {items.map((item) => (
-        <Shown
-          chosen={chosen.includes(item.id)}
-          idPrefix={idPrefix}
-          item={item}
-          key={item.id}
+      return onToggle === null || item === undefined ? null : (
+        <PickBox
+          approved={item.approved}
+          boxId={`${idPrefix}-zoom-${id}`}
+          chosen={chosen.includes(id)}
+          id={id}
           onToggle={onToggle}
           unlocked={unlocked}
-          url={urlOf(item.id)}
         />
-      ))}
-    </ul>
+      );
+    },
+    [chosen, idPrefix, items, onToggle, unlocked]
+  );
+
+  return (
+    <>
+      <ul className="pictures">
+        {items.map((item) => (
+          <Shown
+            chosen={chosen.includes(item.id)}
+            idPrefix={idPrefix}
+            item={item}
+            key={item.id}
+            onShow={setShown}
+            onToggle={onToggle}
+            unlocked={unlocked}
+            url={urlOf(item.id)}
+          />
+        ))}
+      </ul>
+      <Lightbox aside={aside} onShow={setShown} pictures={pictures} shown={shown} />
+    </>
   );
 }
 
@@ -887,11 +1164,12 @@ function Shown(props: {
   readonly chosen: boolean;
   readonly idPrefix: string;
   readonly item: Drawn;
+  readonly onShow: (id: string) => void;
   readonly onToggle: ((id: string, wanted: boolean) => void) | null;
   readonly unlocked: boolean;
   readonly url: string;
 }): JSX.Element {
-  const { chosen, idPrefix, item, onToggle, unlocked, url } = props;
+  const { chosen, idPrefix, item, onShow, onToggle, unlocked, url } = props;
 
   return (
     <li className={item.approved ? "picture picture-approved" : "picture"}>
@@ -912,13 +1190,15 @@ function Shown(props: {
       {item.verdict === null ? (
         <p className="picture-empty">{DRAWN_STATE[item.state]}</p>
       ) : (
-        <img
-          alt={item.id}
-          height={item.verdict.height}
-          loading="lazy"
-          src={url}
-          width={item.verdict.width}
-        />
+        <Zoomable id={item.id} onShow={onShow}>
+          <img
+            alt={item.id}
+            height={item.verdict.height}
+            loading="lazy"
+            src={url}
+            width={item.verdict.width}
+          />
+        </Zoomable>
       )}
       <p className="picture-state">
         {item.approved ? "zatwierdzony" : DRAWN_STATE[item.state]} · {item.note}

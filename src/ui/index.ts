@@ -355,7 +355,12 @@ export function createUi(options: UiOptions): Hono {
       const stop = watchWorkspace(options.workspace.root, () => queue(push));
       // A finished command joins the same queue as a recomputed ladder, for
       // the same reason: two writers on one socket would interleave frames.
+      // And it goes behind a ladder read after it finished: an answer that
+      // overtook its own consequences would say "done" beside the old state,
+      // with the button it just pressed still offered. A command that wrote
+      // nothing gets its fresh ladder too, since the watcher would push none.
       const listener = (done: RunDone): void => {
+        queue(push);
         queue(async () => await stream.writeSSE({ data: JSON.stringify(done), event: "run" }));
       };
 

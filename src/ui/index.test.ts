@@ -764,6 +764,46 @@ describe("running a command", () => {
   });
 
   /**
+   * An answer beside the ladder it answered about.
+   *
+   * A command that writes changes the ladder, and the ladder is recomputed on
+   * the same stream; if the answer overtook it, the screen would say "done"
+   * for seconds while still showing the old state, "Zatwierdź" and all. So a
+   * finished command is announced only behind a freshly read ladder, which
+   * also holds for a command that wrote nothing, since nothing else would
+   * push one.
+   */
+  it("should push the ladder again before announcing a finished command", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: ["check", PROJECT, EPISODE, "--stage", "screenplay", "--json"],
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+
+    const seen: string[] = [];
+
+    // biome-ignore lint/performance/noAwaitInLoops: a stream arrives in order
+    for (let frame = await events.next(); ; frame = await events.next()) {
+      seen.push(frame.event);
+
+      if (frame.event === "run") {
+        break;
+      }
+    }
+
+    expect(seen.at(-2)).toBe("status");
+    await events.close();
+  });
+
+  /**
    * A project is created before there is any episode to stream a ladder for,
    * so its result has to arrive on the stream the start screen has open. The
    * listing follows it, because the new directory is a change the watcher sees.

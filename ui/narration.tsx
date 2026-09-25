@@ -10,6 +10,7 @@ import {
   NO_FLAGS,
   Notices,
   PaidCall,
+  PickAll,
   PickBox,
   type Priced,
   Problems,
@@ -328,6 +329,13 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
             }
             title="Nagrania"
           >
+            <PickAll
+              chosen={selected}
+              id="line-all"
+              items={lines}
+              onChoose={setChosen}
+              unlocked={flags.regenerate}
+            />
             <ul className="reel">
               {lines.map((item) => (
                 <Heard

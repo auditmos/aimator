@@ -825,8 +825,7 @@ h1 {
   border-radius: 0.25rem;
 }
 .actions-note,
-.panel-empty,
-.run-pending {
+.panel-empty {
   margin: 1rem 0 0;
   font-size: 0.875rem;
   color: var(--color-neutral-400);
@@ -887,6 +886,75 @@ h1 {
   margin: 0.5rem 0 0;
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
+}
+
+/* A thumbnail is a button that opens the magnifier, with the picture as its
+   whole face. */
+.zoom {
+  display: block;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  cursor: zoom-in;
+  background: none;
+  border: 0;
+  border-radius: 0.25rem;
+  transition: opacity 0.15s;
+}
+.zoom:hover {
+  opacity: 0.85;
+}
+.pick-all {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+
+/* One picture at the size of the window. */
+.lightbox {
+  width: min(96vw, 90rem);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  color: var(--color-neutral-50);
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.lightbox::backdrop {
+  background: rgb(0 0 0 / 0.8);
+}
+.lightbox-figure {
+  margin: 0;
+}
+.lightbox-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(100vh - 7rem);
+  object-fit: contain;
+}
+.lightbox-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border-top: 1px solid var(--color-neutral-800);
+}
+.lightbox-caption {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-300);
+}
+.lightbox-count {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+@media (prefers-reduced-motion: reduce) {
+  .zoom {
+    transition: none;
+  }
 }
 
 /* Stage 7: the chain, one link per row, because a film is read wide. */
@@ -1221,10 +1289,10 @@ h1 {
   border-radius: 0;
 }
 /* Room under the page for the dock, and the decision lifted above it. */
-main:has(.dock) {
+body:has(.dock) main {
   padding-bottom: 7rem;
 }
-section:has(> .dock) .block-decision:has(.action-primary) {
+body:has(.dock) .block-decision:has(.action-primary) {
   bottom: 5.25rem;
 }
 
@@ -1249,4 +1317,43 @@ section:has(> .dock) .block-decision:has(.action-primary) {
    carries the green. */
 .pick-locked code {
   color: var(--color-success-text);
+}
+
+/* The one button that was pressed, while its command runs: it keeps its full
+   colour among the dimmed ones and turns a spinner, so it is plain which click
+   is being waited on. */
+.action-busy:disabled,
+.action-primary.action-busy:disabled {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: progress;
+  opacity: 1;
+}
+.action-busy:disabled:not(.action-primary) {
+  color: var(--color-neutral-50);
+  border-color: var(--color-brand-ink);
+}
+.spinner {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.dock-running .spinner {
+  color: var(--color-brand-ink);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Without motion the ring stands still; the words beside it still say it. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }

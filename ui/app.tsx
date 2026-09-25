@@ -1,4 +1,4 @@
-import { type JSX, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type JSX, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AssemblyPanel } from "./assembly";
 import { ProjectCast } from "./cast";
 import { CharacterPanel } from "./character";
@@ -55,6 +55,28 @@ import type {
  */
 
 type Connection = "live" | "opening" | "stale";
+
+/**
+ * What the pending identifier holds between a click and the server's reply.
+ *
+ * No run ever carries it, so "still running" (the pending identifier against
+ * the last answer's) holds from the click on, and the real identifier replaces
+ * it the moment the server hands one back.
+ */
+const SENDING = "sending";
+
+/**
+ * Where finished commands are read from, which depends on what is open.
+ *
+ * The workspace stream is open on every screen and carries every answer. An
+ * episode's stream carries them too, each one behind the ladder it changed,
+ * so while an episode is open its stream `claim`s the answers and hands them
+ * over with `done`, and the workspace stream stays quiet about them.
+ */
+interface Runs {
+  readonly claim: (claimed: boolean) => void;
+  readonly done: (run: RunDone) => void;
+}
 
 const CONNECTION_NOTE: Record<Connection, string | null> = {
   live: null,
@@ -538,9 +560,9 @@ function EpisodeView(props: {
   readonly projectId: string;
   readonly run: RunDone | null;
   readonly running: boolean;
-  readonly sent: readonly string[] | null;
+  readonly runs: Runs;
 }): JSX.Element {
-  const { episodeId, onRun, place, projectId, run, running, sent } = props;
+  const { episodeId, onRun, place, projectId, run, running, runs } = props;
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
@@ -563,13 +585,20 @@ function EpisodeView(props: {
       setRefusal((JSON.parse(event.data) as Refusal).error.message);
       setConnection("live");
     });
-    // Finished commands are read off the workspace stream, which is open on
-    // every screen; this one carries them too, and reading both would be
-    // hearing each answer twice.
+    // While an episode is open, its answers are read here rather than off the
+    // workspace stream: this one sends each answer behind the ladder it
+    // changed, so "done" never stands beside the old state. The claim tells
+    // the workspace stream to stop delivering, or each answer would arrive
+    // twice, the first time too early.
+    runs.claim(true);
+    events.addEventListener("run", (event) => runs.done(JSON.parse(event.data) as RunDone));
     events.addEventListener("error", () => setConnection("stale"));
 
-    return () => events.close();
-  }, [episodeId, projectId]);
+    return () => {
+      runs.claim(false);
+      events.close();
+    };
+  }, [episodeId, projectId, runs]);
 
   /**
    * A refused ladder leaves stage 0 on screen, because stage 0 is where the
@@ -620,7 +649,6 @@ function EpisodeView(props: {
           status={status}
         />
       ) : null}
-      <RunDock argv={sent} run={run} running={running} />
     </section>
   );
 }
@@ -640,9 +668,9 @@ function ProjectScreens(props: {
   readonly route: InProject;
   readonly run: RunDone | null;
   readonly running: boolean;
-  readonly sent: readonly string[] | null;
+  readonly runs: Runs;
 }): JSX.Element {
-  const { listing, listingRefusal, onRun, route, run, running, sent } = props;
+  const { listing, listingRefusal, onRun, route, run, running, runs } = props;
   const project = listing?.projects.find((one) => one.id === route.projectId) ?? null;
   const createdEpisode = useCallback(
     (episodeId: string) => {
@@ -720,7 +748,7 @@ function ProjectScreens(props: {
         projectId={project.id}
         run={run}
         running={running}
-        sent={sent}
+        runs={runs}
       />
     ) : (
       <section>
@@ -757,6 +785,17 @@ export function App(): JSX.Element {
   const [listingRefusal, setListingRefusal] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [run, setRun] = useState<RunDone | null>(null);
+  /** Whether an open episode's stream is the one delivering answers. */
+  const episodeClaims = useRef<boolean>(false);
+  const runs = useMemo<Runs>(
+    () => ({
+      claim: (claimed) => {
+        episodeClaims.current = claimed;
+      },
+      done: setRun,
+    }),
+    []
+  );
   /** The argv of the last command started here, which the answer does not repeat. */
   const [sent, setSent] = useState<readonly string[] | null>(null);
 
@@ -781,7 +820,12 @@ export function App(): JSX.Element {
     });
     // A command started here finishes here, whatever else the screen is doing
     // meanwhile. An identifier this window did not start is somebody else's.
-    events.addEventListener("run", (event) => setRun(JSON.parse(event.data) as RunDone));
+    // An open episode reads its answers off its own stream instead; see Runs.
+    events.addEventListener("run", (event) => {
+      if (!episodeClaims.current) {
+        setRun(JSON.parse(event.data) as RunDone);
+      }
+    });
     events.addEventListener("error", () =>
       setListingRefusal("Serwer nie odpowiada. Uruchom go poleceniem pnpm ui.")
     );
@@ -797,24 +841,35 @@ export function App(): JSX.Element {
    * has to stay usable while it does.
    */
   const start = useCallback((argv: readonly string[]) => {
+    const refused = (message: string, name: string): void => {
+      setPending(null);
+      setRun({ error: { message, name }, ok: false, runId: "" });
+    };
+
     setSent(argv);
     setRun(null);
-    setPending(null);
+    // "W toku" from the click, not from the server's reply: a server busy
+    // re-reading the ladder can take seconds to hand back an identifier, and a
+    // click with nothing to show for it meanwhile looks like one that missed.
+    setPending(SENDING);
 
     fetch("/api/run", {
       body: JSON.stringify({ argv }),
       headers: { "content-type": "application/json" },
       method: "POST",
     })
-      .then(async (response) => (await response.json()) as { runId?: string })
-      .then((body) => setPending(body.runId ?? null))
-      .catch(() =>
-        setRun({
-          error: { message: "Serwer nie przyjął komendy.", name: "NetworkError" },
-          ok: false,
-          runId: "",
-        })
-      );
+      .then(async (response) => (await response.json()) as { runId?: string } & Partial<Refusal>)
+      .then((body) => {
+        if (body.runId === undefined) {
+          refused(
+            body.error?.message ?? "Serwer nie przyjął komendy.",
+            body.error?.name ?? "Error"
+          );
+        } else {
+          setPending(body.runId);
+        }
+      })
+      .catch(() => refused("Serwer nie przyjął komendy.", "NetworkError"));
   }, []);
   const createdProject = useCallback((projectId: string) => {
     window.location.hash = projectHref(projectId);
@@ -908,10 +963,12 @@ export function App(): JSX.Element {
             route={route}
             run={run}
             running={running}
-            sent={sent}
+            runs={runs}
           />
         ) : null}
       </main>
+      {/* One place for every answer, on every screen: see RunDock. */}
+      <RunDock argv={sent} run={run} running={running} />
     </>
   );
 }

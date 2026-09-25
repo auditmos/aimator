@@ -1,6 +1,6 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, Block, Field, Problems, RunOutput } from "./panel";
+import { Action, Block, Field, Problems } from "./panel";
 import type { RunDone, Stage0Report, StatusCell } from "./types";
 
 /**
@@ -130,7 +130,6 @@ export function NewProject(props: {
         />
       </div>
       <Action argv={argv} disabled={running} label="Załóż projekt" onRun={submit} primary />
-      <RunOutput run={run} running={running} />
     </section>
   );
 }
@@ -314,7 +313,6 @@ export function NewEpisode(props: {
       <p className="actions-note">{SETTINGS_NOTE}</p>
       <SettingsFields change={change} settings={settings} />
       <Action argv={add} disabled={running} label="Dodaj odcinek" onRun={submit} primary />
-      <RunOutput run={run} running={running} />
     </section>
   );
 }

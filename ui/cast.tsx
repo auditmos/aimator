@@ -1,6 +1,6 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, Field, RunOutput } from "./panel";
+import { Action, Field } from "./panel";
 import type { CastEntry, ProjectOverview, Refusal, RunDone } from "./types";
 
 /**
@@ -17,15 +17,12 @@ import type { CastEntry, ProjectOverview, Refusal, RunDone } from "./types";
  * stage 0 now holds. Each character is a card of its own with its own
  * actions, so adding a photograph is done on the character it belongs to
  * rather than by typing its identifier into a second form. A command's answer
- * appears in the section that started it, because an answer at the foot of a
- * long page is an answer nobody sees.
+ * appears in the dock at the bottom of the window, as on every other screen,
+ * because an answer at the foot of a long page is an answer nobody sees.
  *
  * What is shown is `project show`, asked again whenever the workspace moves;
  * nothing here reads `project.json`.
  */
-
-/** Which part of the screen started the last command, so its answer lands there. */
-type Origin = "check" | "narrator" | "new-character" | `character:${string}`;
 
 type Shown =
   | { readonly kind: "loading" }
@@ -79,15 +76,6 @@ function basisOf(entry: CastEntry): string {
   }
 
   return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
-}
-
-/** A command's answer, shown only in the section that asked for it. */
-function Answer(props: {
-  readonly here: boolean;
-  readonly run: RunDone | null;
-  readonly running: boolean;
-}): JSX.Element | null {
-  return props.here ? <RunOutput run={props.run} running={props.running} /> : null;
 }
 
 /** One member of the cast: who they are, what they are drawn from, and the two ways to decide it. */
@@ -251,14 +239,6 @@ export function ProjectCast(props: {
 }): JSX.Element {
   const { onRun, projectId, revision, run, running } = props;
   const shown = useProjectOverview(projectId, revision);
-  const [origin, setOrigin] = useState<Origin | null>(null);
-  const from = useCallback(
-    (where: Origin) => (argv: readonly string[]) => {
-      setOrigin(where);
-      onRun(argv);
-    },
-    [onRun]
-  );
   const check = useMemo(() => INTENTS.checkPrepare({ projectId }), [projectId]);
   const overview = shown.kind === "shown" ? shown.overview : null;
 
@@ -282,22 +262,10 @@ export function ProjectCast(props: {
         ) : null}
         {overview?.cast.map((entry) => (
           <div key={entry.id}>
-            <CharacterCard
-              entry={entry}
-              onRun={from(`character:${entry.id}`)}
-              projectId={projectId}
-              running={running}
-            />
-            <Answer here={origin === `character:${entry.id}`} run={run} running={running} />
+            <CharacterCard entry={entry} onRun={onRun} projectId={projectId} running={running} />
           </div>
         ))}
-        <NewCharacter
-          onRun={from("new-character")}
-          projectId={projectId}
-          run={run}
-          running={running}
-        />
-        <Answer here={origin === "new-character"} run={run} running={running} />
+        <NewCharacter onRun={onRun} projectId={projectId} run={run} running={running} />
       </section>
 
       <section aria-labelledby="cast-narrator" className="panel">
@@ -311,8 +279,7 @@ export function ProjectCast(props: {
         <p className="actions-note">
           Potrzebny tylko wtedy, gdy film ma narrację: bramkuje wyłącznie etap 9.
         </p>
-        <NarratorForm onRun={from("narrator")} projectId={projectId} running={running} />
-        <Answer here={origin === "narrator"} run={run} running={running} />
+        <NarratorForm onRun={onRun} projectId={projectId} running={running} />
       </section>
 
       <section aria-labelledby="cast-check" className="panel">
@@ -320,8 +287,7 @@ export function ProjectCast(props: {
         <p className="actions-note">
           Czy obsada, zasady w <code>project.md</code> i reszta etapu 0 już się zgadzają.
         </p>
-        <Action argv={check} disabled={running} label="Sprawdź etap 0" onRun={from("check")} />
-        <Answer here={origin === "check"} run={run} running={running} />
+        <Action argv={check} disabled={running} label="Sprawdź etap 0" onRun={onRun} />
       </section>
     </div>
   );
