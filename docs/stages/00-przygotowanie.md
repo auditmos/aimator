@@ -76,6 +76,29 @@ Pod `--json` wypisuje ten sam opis jako obiekt (`command`, `projectId`, `title`,
 `aspectRatio`, `narratorVoiceId`, `cast` z `id`, `name`, `basis` i `sources`), bez pola
 `stage`, bo nie jest raportem etapu.
 
+To samo o poziom niżej, dla jednego odcinka:
+
+```bash
+pnpm dev episode show dzielna-ewa 01-burza
+```
+
+```
+Odcinek "01-burza" (nr 1) w projekcie "dzielna-ewa"
+  Źródło: projects/dzielna-ewa/episodes/01-burza/source.md
+    skopiowane z: /Users/ktos/Filmy/01-Burza.md
+  Rodzaj źródła: law-or-idea
+  Długość: 30 s
+  Dźwięk: narration
+  Język: pl
+  Napisy: none
+  Najdłuższy klip: nierozstrzygnięte
+```
+
+Też opis, nie werdykt, i z tego samego powodu: `episode set` zapisuje decyzje, `check`
+je ocenia, a dopiero to polecenie mówi, jakie są teraz. Pod `--json` wypisuje obiekt
+(`command`, `projectId`, `episodeId`, `number`, `source` z `path` i `originPath`,
+`settings` z sześcioma decyzjami, `null` tam, gdzie nikt nie zdecydował).
+
 ## Etap 0 jako obiekt
 
 Każde polecenie tego etapu przyjmuje `--json` i wypisuje **obiekt, który zwraca moduł
@@ -90,6 +113,7 @@ pnpm dev check dzielna-ewa --stage prepare --json
   "command": "check",
   "stage": "prepare",
   "approved": false,
+  "changedSinceApproval": [],
   "created": [],
   "nextStep": "pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve dzielna-ewa",
   "problems": [],
@@ -97,6 +121,13 @@ pnpm dev check dzielna-ewa --stage prepare --json
   "reused": ["01-burza"]
 }
 ```
+
+`changedSinceApproval` to pliki przyjęte przez człowieka, których bajty zmieniły się od
+tamtej zgody. Wypełnia je tylko `check` i w praktyce może tam trafić jedynie `project.md`,
+jedyny plik etapu 0 pisany ręcznie, więc jedyny, który zmienia się poza narzędziem. Zdanie
+o tym samym zostaje w `problems`; pole jest dla czytelnika, który zdań nie parsuje, na
+przykład dla panelu etapu 0, który po nim odróżnia „zasady się zmieniły, przeczytaj je
+jeszcze raz” od „nikt ich jeszcze nie przeczytał”.
 
 `stage` brzmi `prepare` dla wszystkich siedmiu poleceń, bo wszystkie piszą jeden artefakt.
 `command` ma tu **dwa słowa**, i to nie jest niekonsekwencja wobec etapu 1: tam `stage`

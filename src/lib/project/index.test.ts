@@ -13,6 +13,7 @@ import {
   setCharacterBasis,
   setEpisodeSettings,
   setNarratorVoice,
+  showEpisode,
   showProject,
 } from "./index.js";
 
@@ -795,6 +796,23 @@ describe("approveStage0", () => {
     expect(result.ok ? result.data.problems.join(" ") : null).toContain("po akceptacji");
   });
 
+  /**
+   * The same lapse as a field, not only as a sentence: a screen has to tell
+   * "these rules changed, read them again" from "nobody has read them yet"
+   * without learning the words, the way stages 1, 3 and 4 name their drift.
+   */
+  it("should name the rules as the file that changed since the approval", async () => {
+    await readyProject();
+    const before = await checkStage0({ projectId: "demo", workspace });
+    await approve();
+    await writeFile(join(root, "projects/demo/project.md"), "# Demo\n\nCo innego.\n", "utf8");
+
+    const after = await checkStage0({ projectId: "demo", workspace });
+
+    expect(before.ok ? before.data.changedSinceApproval : null).toEqual([]);
+    expect(after.ok ? after.data.changedSinceApproval : null).toEqual(["projects/demo/project.md"]);
+  });
+
   it("should let rewritten rules be approved again", async () => {
     await readyProject();
     await approve();
@@ -1051,5 +1069,83 @@ describe("showProject", () => {
     const result = await showProject({ projectId: "nie-ma", workspace });
 
     expect(result.ok ? null : result.error.message).toContain('projekt "nie-ma" nie istnieje');
+  });
+});
+
+/**
+ * What an episode is, read back: `showProject` one level down.
+ *
+ * Its decisions could be written by `episode set` and judged by `check`, and
+ * nothing said what they currently are, so a screen editing them started
+ * from empty fields over values it could not see.
+ */
+describe("showEpisode", () => {
+  const EPISODE = "01-never-outshine-the-master";
+
+  it("should say every undecided setting as undecided, not leave it out", async () => {
+    await makeProject();
+    const source = await makeSource();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: { durationSeconds: 60 },
+      sourcePath: source,
+      workspace,
+    });
+
+    const result = await showEpisode({ episodeId: EPISODE, projectId: "demo", workspace });
+
+    expect(result.ok ? result.data : result.error.message).toEqual({
+      episodeId: EPISODE,
+      number: 1,
+      projectId: "demo",
+      settings: {
+        audio: null,
+        durationSeconds: 60,
+        language: null,
+        maxClipSeconds: null,
+        sourceNature: null,
+        subtitles: null,
+      },
+      source: {
+        originPath: source,
+        path: `projects/demo/episodes/${EPISODE}/source.md`,
+      },
+    });
+  });
+
+  it("should read the decisions as they stand after a change", async () => {
+    await makeProject();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    await setEpisodeSettings({
+      episodeId: EPISODE,
+      mode: "apply",
+      projectId: "demo",
+      settings: { maxClipSeconds: 6 },
+      workspace,
+    });
+
+    const result = await showEpisode({ episodeId: EPISODE, projectId: "demo", workspace });
+
+    expect(result.ok ? result.data.settings : result.error.message).toEqual({
+      ...FULL_SETTINGS,
+      maxClipSeconds: 6,
+    });
+  });
+
+  it("should refuse an episode the project does not have", async () => {
+    await makeProject();
+
+    const result = await showEpisode({ episodeId: "02-nie-ma", projectId: "demo", workspace });
+
+    expect(result.ok ? null : result.error.message).toContain(
+      'odcinek "02-nie-ma" nie istnieje w projekcie "demo"'
+    );
   });
 });

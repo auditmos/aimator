@@ -487,6 +487,7 @@ exports[`every command >   check <id> --stage prepare [--json] 1`] = `
   "command": "check",
   "stage": "prepare",
   "approved": true,
+  "changedSinceApproval": [],
   "created": [],
   "nextStep": "etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:\\n  aimator screenplay generate ewa <episode-id> --dry-run\\n  aimator character generate ewa <character-id> --track <gpt-image|seedream> --dry-run",
   "problems": [],
@@ -522,6 +523,19 @@ Próba na sucho: nic nie zapisano. Ustawienia odcinka "01-burza"
   ! akceptacja odcinka "01-burza" wygasła, zmiana decyzji unieważnia ją; zatwierdź ponownie przez: aimator approve ewa
   ! pliki przeszły walidację; to nie to samo co przyjęcie ich przez człowieka
 Dalej: aimator check ewa"
+`;
+
+exports[`every command >   episode show <id> <episode-id> [--json] 1`] = `
+"ok
+Odcinek "01-burza" (nr 1) w projekcie "ewa"
+  Źródło: projects/ewa/episodes/01-burza/source.md
+    skopiowane z: <scratch>/01-Burza.md
+  Rodzaj źródła: law-or-idea
+  Długość: 30 s
+  Dźwięk: narration
+  Język: pl
+  Napisy: none
+  Najdłuższy klip: 15 s"
 `;
 
 exports[`every command >   list [--json] 1`] = `

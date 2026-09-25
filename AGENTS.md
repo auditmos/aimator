@@ -175,7 +175,8 @@ src/
     │   ├── index.ts      # Public: initProject, addEpisode, setEpisodeSettings,
     │   │                 #         addCharacter, addCharacterSources, setCharacterBasis,
     │   │                 #         checkStage0, approveStage0,
-    │   │                 #         readStage0Inputs, readStage0Character, showProject
+    │   │                 #         readStage0Inputs, readStage0Character, showProject,
+    │   │                 #         showEpisode
     │   ├── schema.ts     # Internal: Zod schemas for the artifacts
     │   ├── template.ts   # Internal: the project.md scaffold
     │   └── index.test.ts # Tests through the entry

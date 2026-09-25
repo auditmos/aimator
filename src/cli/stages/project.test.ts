@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { checkStage0, showProject } from "../../lib/project/index.js";
+import { checkStage0, showEpisode, showProject } from "../../lib/project/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
 import { png } from "../../test/fixture.js";
 import { run } from "../index.js";
@@ -48,6 +48,11 @@ const EPISODE = "01-burza";
 /** How `project show` lays out one cast row: id, name, basis, in columns. */
 const EWA_FROM_PHOTOS = /ewa\s+Ewa\s+ze zdjęć \(1\)/;
 const TATA_FROM_DESCRIPTION = /tata\s+Tata\s+z opisu w project\.md/;
+
+/** How `episode show` lays out a decision: the label, then the value. */
+const DURATION_30 = /Długość:\s+30 s/;
+const AUDIO_NARRATION = /Dźwięk:\s+narration/;
+const MAX_CLIP_15 = /Najdłuższy klip:\s+15 s/;
 
 /** Every stage-0 command, in the words `--help` spells them. */
 const COMMANDS = [
@@ -284,5 +289,40 @@ describe("project show", () => {
     const result = await run(["project", "show", "nie-ma", "--workspace", root]);
 
     expect(result.ok ? null : result.error.message).toContain('projekt "nie-ma" nie istnieje');
+  });
+});
+
+/**
+ * `project show` one level down: what the episode holds, and nothing judged.
+ *
+ * Its object is `showEpisode` to the field plus the command, the shape
+ * `project show` has, because this too answers about no stage.
+ */
+describe("episode show", () => {
+  it("should print what the episode holds, as the object the module returns", async () => {
+    const printed = await object("episode", "show", PROJECT, EPISODE, "--json");
+    const shown = await showEpisode({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+    if (!shown.ok) {
+      throw shown.error;
+    }
+
+    expect(printed).toEqual({ command: "episode show", ...shown.data });
+  });
+
+  it("should name the source and every decision in the words a person sets them", async () => {
+    const text = await cli("episode", "show", PROJECT, EPISODE);
+
+    expect(text).toContain(`Odcinek "${EPISODE}"`);
+    expect(text).toContain(source);
+    expect(text).toMatch(DURATION_30);
+    expect(text).toMatch(AUDIO_NARRATION);
+    expect(text).toMatch(MAX_CLIP_15);
+  });
+
+  it("should refuse an episode the project does not have", async () => {
+    const result = await run(["episode", "show", PROJECT, "02-nie-ma", "--workspace", root]);
+
+    expect(result.ok ? null : result.error.message).toContain('odcinek "02-nie-ma" nie istnieje');
   });
 });

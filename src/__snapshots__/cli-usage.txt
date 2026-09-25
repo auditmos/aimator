@@ -18,6 +18,10 @@ Etap 0. Przygotowanie projektu i odcinka:
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
                    [--max-clip <s>] [--json]
   episode set <id> <episode-id> [te same flagi decyzji] [--json]
+  episode show <id> <episode-id> [--json]
+    Co odcinek trzyma: plik źródłowy, skąd go skopiowano, i sześć decyzji,
+    nierozstrzygnięte nazwane wprost. Opis, nie werdykt: czy to wystarcza,
+    mówi check. Niczego nie zapisuje i niczego nie wydaje.
 
 Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]

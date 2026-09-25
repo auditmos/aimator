@@ -1,5 +1,10 @@
 import type { ParseArgsConfig } from "node:util";
-import { addEpisode, setEpisodeSettings } from "../../lib/project/index.js";
+import {
+  addEpisode,
+  type EpisodeOverview,
+  setEpisodeSettings,
+  showEpisode,
+} from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import {
   answerFlag,
@@ -17,7 +22,11 @@ import {
 export const USAGE = `  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
                    [--max-clip <s>] [--json]
-  episode set <id> <episode-id> [te same flagi decyzji] [--json]`;
+  episode set <id> <episode-id> [te same flagi decyzji] [--json]
+  episode show <id> <episode-id> [--json]
+    Co odcinek trzyma: plik źródłowy, skąd go skopiowano, i sześć decyzji,
+    nierozstrzygnięte nazwane wprost. Opis, nie werdykt: czy to wystarcza,
+    mówi check. Niczego nie zapisuje i niczego nie wydaje.`;
 
 const SETTINGS_OPTIONS = {
   audio: { type: "string" },
@@ -123,8 +132,79 @@ async function runEpisodeSet(parsed: Parsed): Promise<Result<string>> {
     : result;
 }
 
+/** A decision as a person reads it, or the word for one nobody has made. */
+function decided(value: number | string | null, unit = ""): string {
+  return value === null ? "nierozstrzygnięte" : `${value}${unit}`;
+}
+
+function renderEpisode(overview: EpisodeOverview): string {
+  const { settings } = overview;
+
+  return [
+    `Odcinek "${overview.episodeId}" (nr ${overview.number}) w projekcie "${overview.projectId}"`,
+    `  Źródło: ${overview.source.path}`,
+    `    skopiowane z: ${overview.source.originPath}`,
+    `  Rodzaj źródła: ${decided(settings.sourceNature)}`,
+    `  Długość: ${decided(settings.durationSeconds, " s")}`,
+    `  Dźwięk: ${decided(settings.audio)}`,
+    `  Język: ${decided(settings.language)}`,
+    `  Napisy: ${decided(settings.subtitles)}`,
+    `  Najdłuższy klip: ${decided(settings.maxClipSeconds, " s")}`,
+  ].join("\n");
+}
+
+/**
+ * What the episode holds, read back without judging it.
+ *
+ * `project show` one level down, for the same reason it exists: `episode set`
+ * writes the decisions and `check` judges them, and nothing said what they
+ * currently were, so a screen editing them started from empty fields. Under
+ * `--json` it is `showEpisode`'s object plus the field that names the command.
+ */
+async function runEpisodeShow(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, { json: { type: "boolean" } });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const result = await showEpisode({
+    episodeId: episodeId.data,
+    projectId: projectId.data,
+    workspace: workspace.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? JSON.stringify({ command: "episode show", ...result.data }, null, 2)
+      : renderEpisode(result.data)
+  );
+}
+
 export async function runEpisode(argv: readonly string[]): Promise<Result<string>> {
   const [action] = argv;
+
+  if (action === "show") {
+    return runEpisodeShow(argv.slice(1));
+  }
 
   if (action !== "add" && action !== "set") {
     return err(new UsageError(`nieznane polecenie: episode ${action ?? ""}`.trim()));

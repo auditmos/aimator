@@ -3,6 +3,7 @@
 exports[`every stage-0 command under --json > should print the stage's report for approve 1`] = `
 {
   "approved": true,
+  "changedSinceApproval": [],
   "command": "approve",
   "created": [],
   "nextStep": "etap 0 zatwierdzony. Etapy 1 i 2 wydają pieniądze i są od siebie niezależne, więc każdy zacznij od podglądu:
@@ -21,6 +22,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for character add 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "character add",
   "created": [
     "projects/dzielna-ewa/characters/ewa/sources/ewa.png",
@@ -36,6 +38,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for character describe 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "character describe",
   "created": [],
   "nextStep": "opis wyglądu "Tata" w project.md jest jedynym wejściem etapu postaci, musi być konkretny",
@@ -52,6 +55,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for character new 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "character new",
   "created": [],
   "nextStep": "zdecyduj, skąd bierze się wygląd: aimator character add dzielna-ewa ewa --source <plik> albo aimator character describe dzielna-ewa ewa",
@@ -68,6 +72,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for check 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "check",
   "created": [],
   "nextStep": "pliki się zgadzają, ale nikt ich jeszcze nie przyjął: aimator approve dzielna-ewa",
@@ -83,6 +88,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for episode add 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "episode add",
   "created": [
     "projects/dzielna-ewa/episodes/01-burza/source.md",
@@ -100,6 +106,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for episode set 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "episode set",
   "created": [],
   "nextStep": "aimator check dzielna-ewa",
@@ -116,6 +123,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for project init 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "project init",
   "created": [
     "projects/dzielna-ewa/project.md",
@@ -135,6 +143,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 exports[`every stage-0 command under --json > should print the stage's report for project voice 1`] = `
 {
   "approved": false,
+  "changedSinceApproval": [],
   "command": "project voice",
   "created": [],
   "nextStep": "aimator check dzielna-ewa",

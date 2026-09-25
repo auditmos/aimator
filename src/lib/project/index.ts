@@ -109,6 +109,17 @@ export interface ProjectOverview {
   readonly title: string;
 }
 
+/** What an episode holds, described rather than judged: its source and six decisions. */
+export interface EpisodeOverview {
+  readonly episodeId: string;
+  readonly number: number;
+  readonly projectId: string;
+  /** Every decision, null where nobody has made it yet. */
+  readonly settings: DraftSettings;
+  /** The copy in the workspace, and the file it was copied from, as typed. */
+  readonly source: { readonly originPath: string; readonly path: string };
+}
+
 /** Everything stage 1 is allowed to read, with the digests of the bytes it read. */
 export interface Stage0Inputs {
   /** Whether a human accepted stage 0 for this project *and* this episode. */
@@ -143,6 +154,16 @@ export interface Stage0Inputs {
 export interface Stage0Report {
   /** Creative acceptance, which validation never implies on its own. */
   readonly approved: boolean;
+  /**
+   * Files a human accepted whose bytes have changed since, workspace-relative.
+   *
+   * Only `check` reads for it, and today only `project.md` can land here: it is
+   * the one stage-0 file written by hand, so the one that changes behind the
+   * tool's back. A decision changed through the CLI lapses the approval too,
+   * but that command says so itself. The sentence in `problems` stays; this is
+   * the same fact for a reader who must not parse sentences.
+   */
+  readonly changedSinceApproval: readonly string[];
   readonly created: readonly string[];
   readonly nextStep: string;
   readonly problems: readonly string[];
@@ -435,6 +456,7 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created: [],
         nextStep: `zdecyduj, skąd bierze się wygląd: aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
         problems: lapsed
@@ -512,6 +534,7 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
         nextStep: `zadeklaruj obsadę: aimator character new ${input.projectId} <postać> --name <nazwa>`,
         problems: [
@@ -603,6 +626,7 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
         nextStep:
           missingSettings(settings.data).length === 0
@@ -790,6 +814,7 @@ export async function setEpisodeSettings(input: SetSettingsInput): Promise<Resul
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created: [],
         nextStep:
           missing.length === 0
@@ -880,6 +905,7 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created,
         nextStep:
           "materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj",
@@ -926,6 +952,7 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created: [],
         nextStep:
           input.basis === "description"
@@ -974,6 +1001,7 @@ export async function setNarratorVoice(input: SetVoiceInput): Promise<Result<Sta
   return written.ok
     ? ok({
         approved: false,
+        changedSinceApproval: [],
         created: [],
         nextStep: `aimator check ${input.projectId}`,
         problems: lapsed
@@ -1128,6 +1156,50 @@ export async function showProject(input: CheckInput): Promise<Result<ProjectOver
 }
 
 /**
+ * What an episode holds: where its source came from, and its six decisions.
+ *
+ * `showProject` one level down, and a description for the same reason: every
+ * decision here could be written by `episode set` and judged by `check`, and
+ * nothing said what it currently was, so a screen editing the decisions had to
+ * start from empty fields over values it could not see. Undecided settings come
+ * back as null, and whether they are enough stays `checkStage0`'s question.
+ */
+export async function showEpisode(
+  input: CheckInput & EpisodeRef
+): Promise<Result<EpisodeOverview>> {
+  const project = await resolveProject({ ...input, mode: "dry-run" });
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const paths = episodePaths(project.data, input.episodeId);
+
+  if (!paths.ok) {
+    return paths;
+  }
+
+  const episode = await readJson(paths.data.file, episodeFileSchema);
+
+  if (!episode.ok) {
+    return err(
+      new ProjectStateError(
+        "missing-episode",
+        `odcinek "${input.episodeId}" nie istnieje w projekcie "${input.projectId}"`
+      )
+    );
+  }
+
+  return ok({
+    episodeId: input.episodeId,
+    number: episode.data.number,
+    projectId: input.projectId,
+    settings: episode.data.settings,
+    source: { originPath: episode.data.source.originPath, path: episode.data.source.path },
+  });
+}
+
+/**
  * Stage 0 counts as approved for one episode when the project *and* that
  * episode carry an explicit approval and every digest still matches. Editing
  * an artifact after the fact therefore revokes it by arithmetic, which is the
@@ -1201,6 +1273,9 @@ export async function checkStage0(input: CheckInput): Promise<Result<Stage0Repor
 
   return ok({
     approved: verdict.approved,
+    changedSinceApproval: verdict.lapsed
+      ? [toWorkspacePath(input.workspace.root, project.data.rules)]
+      : [],
     created: [],
     nextStep: verdict.approved
       ? readyNext(input.projectId, verdict.noEpisodes)
@@ -1241,6 +1316,7 @@ export async function approveStage0(input: ApproveInput): Promise<Result<Stage0R
   return written.ok
     ? ok({
         approved: true,
+        changedSinceApproval: [],
         created: [],
         nextStep: readyNext(input.projectId, verdict.noEpisodes),
         problems: [],
