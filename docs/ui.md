@@ -48,26 +48,33 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   go nie zgaduje: pamięta, jakie odcinki projekt miał w chwili wysłania komendy, i
   przechodzi do tego, który po niej pojawił się w `list`.
 - **Wczytaj odcinek** (`#/projekt/<id>/odcinki`): odcinki projektu jako lista odnośników.
-- **Widok odcinka** (`#/projekt/<id>/odcinek/<odcinek>`): drabina i panel otwartej
-  komórki, opisane niżej. Odcinka się tu nie wybiera: wybrano go po drodze i nazywa go
+- **Przegląd odcinka** (`#/projekt/<id>/odcinek/<odcinek>`): następny krok i jedenaście
+  etapów, opisane niżej. Odcinka się tu nie wybiera: wybrano go po drodze i nazywa go
   adres. Projekt albo odcinek, którego nie ma w `list`, dostaje komunikat zamiast ekranu
   zbudowanego na czymś, czego CLI i tak by odmówiło.
-- **Drabinę etapów** z `status --json`: komórka na etap, na tor od etapu 2 i na postać w
-  etapie 2, każda w jednym z pięciu stanów z etykietą tekstową, z powodem blokady w słowach
-  etapu i z meldunkami pod spodem. Kolor nigdy nie niesie znaczenia sam.
-- **Jeden „Następny krok"**, dokładnie ten, który policzył `status`: zdanie etapu w
-  całości i dwa przyciski pod nim. „Pokaż etap N" otwiera panel tej komórki, „Kopiuj”
-  wkłada zdanie do schowka takim, jakie jest, bo `nextStep` bywa gołą komendą, a bywa
-  zdaniem z komendą w środku i skracanie go tutaj byłoby redagowaniem cudzej odpowiedzi.
-  Etykieta jest etykietą: cyjanowa plakietka, którą zastąpiła, wyglądała na przycisk,
-  nie robiła nic po kliknięciu i zostawiała zdanie obok bez zastosowania.
+- **Strona etapu** (`#/projekt/<id>/odcinek/<odcinek>/etap/<komórka>`): jeden etap i nic
+  poza nim. Adres niesie identyfikator komórki z `status`, taki jak `7`, `7/seedream` albo
+  `2/ewa/gpt-image`, więc odświeżenie, „wstecz” i wklejony link lądują na tej samej
+  zakładce. Sam numer etapu otwiera komórkę, którą `status` nazwał następną, jeśli jest w
+  tym etapie, a inaczej pierwszą, która jeszcze czegoś chce.
+- **Następny krok** na przeglądzie, dokładnie ten, który policzył `status`, powiedziany
+  jako miejsce: numer i nazwa etapu, tor albo postać, stan, i przycisk „Przejdź do etapu
+  N”. Zdanie etapu (`nextStep`) jest pod nim zwinięte jako „Polecenie w terminalu” z
+  przyciskiem „Kopiuj”, który wkłada je do schowka takim, jakie jest, bo bywa gołą komendą,
+  a bywa zdaniem z komendą w środku i skracanie go tutaj byłoby redagowaniem cudzej
+  odpowiedzi.
+- **Etapy** na przeglądzie: jeden wiersz na etap, nie na komórkę, z tym, z czego etap się
+  składa („2 postacie × 2 tory”, „2 tory”, „wspólna część + 2 tory”), i ze stanem.
+  Komórki jednego etapu w tym samym stanie dają jedną etykietę; różne dają liczniki
+  („zatwierdzony 1/2”, „do przeglądu 1/2”). To arytmetyka na komórkach `status`, nie
+  werdykt: pięć stanów ma etykiety tekstowe, kolor nigdy nie niesie znaczenia sam.
 - **Panel etapu 0**: formularz sześciu decyzji tego odcinka, „Sprawdź" i „Zatwierdź",
   oraz odnośnik do obsady projektu. Założenie projektu, obsada i dodanie odcinka mają
   własne ekrany, bo pyta się o nie na innym poziomie niż o odcinek. Gdy `status` odmawia (np.
-  etap 0 jest niekompletny), panel etapu 0 stoi zamiast drabiny, bo to w nim naprawia się
-  to, o co drabina się zatrzymała. Pliki podaje się **ścieżką w polu tekstowym**; patrz
-  niżej.
-- **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
+  etap 0 jest niekompletny), panel etapu 0 stoi na przeglądzie zamiast listy etapów, bo to
+  w nim naprawia się to, o co drabina się zatrzymała. Pliki podaje się **ścieżką w polu
+  tekstowym**; patrz niżej.
+- **Panel etapu 1**: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
 - **Panel etapu 2**, pierwszy, w którym zatwierdza się **patrząc**: dziesięć obrazów
@@ -112,16 +119,28 @@ ekran, a dwa ostatnie mają po dwa, bo ich artefakty leżą na dwóch poziomach 
 
 ## Gdzie stoi panel
 
-Panel otwartej komórki stoi **obok** drabiny, nie pod nią. Okno szersze niż 64rem dzieli
-ekran na dwie kolumny i przykleja panel do góry, więc drabinę da się przewijać, a panel
-zostaje w widoku razem z przyciskiem „Zamknij panel"; węższe układa je jedno pod drugim,
-przewija do panelu i daje mu fokus, żeby klawiatura i czytnik ekranu wylądowały tam, gdzie
-wzrok. Powód jest jeden: klik, którego wynik ląduje poza ekranem, jest klikiem bez
-odpowiedzi, a przy dwudziestu wierszach tak wyglądało każde otwarcie panelu z góry
-drabiny. Otwarty wiersz mówi o tym pogrubieniem i tłem, nie samym kolorem.
+Panel ma **własną stronę**, a nie miejsce obok drabiny. Wcześniej drabina (ponad
+dwadzieścia komórek przy dwóch postaciach) i panel otwartej komórki stały w dwóch
+kolumnach, i trzeba było czytać oba naraz: długie zdanie etapu obcinała kolumna, a
+odmowy panelu spychały to, co się ocenia, poza ekran. Teraz odcinek czyta się z dwóch
+odległości. Z daleka to jedenaście wierszy. Z bliska to jeden etap:
+- u góry pasek jedenastu znaczników; każdy ma kolor najpilniejszego stanu swoich komórek,
+  a stan jest też w jego nazwie dostępnej dla czytnika;
+- pod nim nazwa etapu i zakładki jego torów, postaci albo poziomów, gdy jest ich więcej
+  niż jeden;
+- powód blokady w słowach etapu;
+- i sam panel, na całą szerokość;
+- na dole odnośniki do etapu poprzedniego i następnego.
 
-Panel etapu 0 stojący zamiast odrzuconej drabiny zajmuje całą szerokość, bo nie ma wtedy
-drabiny, obok której miałby stanąć.
+Przejście do innego etapu albo zakładki to nowa strona. Ekran wraca wtedy na górę, a
+fokus ląduje na nagłówku etapu, więc klawiatura i czytnik ekranu zaczynają tam, gdzie
+wzrok. Zakładka zaczyna czysto: nic nie jest zaznaczone i nic nie zostało z podglądu
+poprzedniej. Nagłówek panelu zostaje tylko dla czytnika ekranu, bo stronę nazywa już
+nagłówek etapu i zakładka.
+
+Odmowy panelu, po dwóch pierwszych, zwijają się pod „Pokaż pozostałe powody (N)”. Jedno
+zmienione wejście unieważnia zgodę na każdy artefakt z niego zrobiony, więc etap potrafi
+odmówić tuzinem zdań naraz. Zdania nie znikają, a liczba na zwinięciu mówi, ile ich jest.
 
 ## Czego ten ekran nie robi
 
@@ -166,7 +185,7 @@ co z tego nie wynika, opisuje osobna sekcja niżej.
 
 ## Etap 0 i ścieżka w polu tekstowym
 
-Etap 0 jest wyjątkiem od zdania „panel otwiera się z komórki drabiny", i to nie jest
+Etap 0 jest wyjątkiem od zdania „panel otwiera się ze strony etapu", i to nie jest
 odstępstwo, tylko opis tego, czym ten etap jest. Drabina odpowiada o **odcinku**, a świeży
 projekt nie ma odcinka, a świeży odcinek zwykle nie ma jeszcze kompletnego etapu 0, więc
 `status` go odrzuca. Dlatego pytania etapu 0 mają własne ekrany na swoich poziomach
@@ -346,8 +365,8 @@ Skorupa według „Portable website shell" z [manuala Auditmos](https://auditmos
 (odczytanego 2026-09-21), tak samo jak [strona wydań](strona.md): kompaktowy nagłówek z
 wordmarkiem poza kontrolkami, natywny wybór motywu System / Jasny / Ciemny pod kluczem
 `auditmos-theme`, bez stopki. Tokeny kolorów są **rozwiązane dla tego renderera** w
-`ui/styles.css`, bo nie ma tu Tailwinda; cyan tylko na wyróżnieniu „Dalej", z ciemnym
-tekstem. Oba motywy są pełnymi kompozycjami. Język interfejsu jest polski, jak komunikaty
+`ui/styles.css`, bo nie ma tu Tailwinda; cyan tylko na głównym przycisku grupy
+(„Przejdź do etapu N”, „Zatwierdź”, „Kup”), z ciemnym tekstem. Oba motywy są pełnymi kompozycjami. Język interfejsu jest polski, jak komunikaty
 CLI, które ten ekran pokazuje bez zmian.
 
 Wordmark i webfonty są serwowane wprost z `site/assets`, więc nie ma drugiej kopii, którą

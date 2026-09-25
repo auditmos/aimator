@@ -308,168 +308,7 @@ h1 {
   color: var(--color-neutral-400);
 }
 
-/* The answer, and the panel that belongs to the row somebody clicked.
-   Two columns where there is room for them: a panel under a twenty-row ladder
-   is a click whose result is off-screen, which is the one thing a click must
-   never be. Narrow windows stack and the client scrolls instead. */
-.workbench {
-  display: grid;
-  gap: 1.5rem;
-  align-items: start;
-  margin-top: 2.5rem;
-}
-.workbench-panel:focus {
-  outline: none;
-}
-@media (width >= 64rem) {
-  .workbench-split {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  /* The panel stays in view while the ladder is scrolled past it, which is
-     what makes the pair readable as one answer rather than two screens. */
-  .workbench-split .workbench-panel {
-    position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  /* The way out rides along with the panel's own scrolling: a stage-7 panel
-     is taller than the window, and a close button only reachable by scrolling
-     back to the top is a way out in name only. */
-  .workbench-split .panel-bar {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: var(--color-neutral-950);
-  }
-}
-.panel-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding-bottom: 0.5rem;
-}
-.panel-close {
-  min-height: 44px;
-  padding: 0 0.75rem;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--color-neutral-400);
-  cursor: pointer;
-  background: none;
-  border: 1px solid var(--color-neutral-800);
-  border-radius: 0.25rem;
-}
-.panel-close:hover {
-  color: var(--color-neutral-50);
-}
-.ladder-section {
-  margin-top: 2.5rem;
-}
-.next-step {
-  margin: 0 0 1.5rem;
-}
-/* A label, not a badge: the cyan pill it replaces looked like the button it
-   was standing next to and did nothing when clicked. */
-.next-label {
-  margin: 0 0 0.375rem;
-  font-size: 0.75rem;
-  color: var(--color-neutral-400);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.next-command {
-  display: block;
-  padding: 0.5rem 0.75rem;
-  color: var(--color-neutral-50);
-  overflow-wrap: anywhere;
-  background: var(--color-neutral-900);
-  border: 1px solid var(--color-neutral-800);
-  border-radius: 0.25rem;
-}
-.next-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  margin-top: 0.75rem;
-}
-.next-copied {
-  font-size: 0.8125rem;
-  color: var(--color-neutral-400);
-}
-.next-done {
-  margin: 0 0 1.5rem;
-  color: var(--color-success-text);
-}
-.ladder {
-  padding: 0;
-  margin: 0;
-  list-style: none;
-  border: 1px solid var(--color-neutral-800);
-  border-radius: 0.5rem;
-}
-.cell {
-  display: grid;
-  gap: 0.25rem 0.75rem;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--color-neutral-800);
-}
-.cell-body {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
-  gap: 0.25rem 0.75rem;
-  align-items: baseline;
-  width: 100%;
-}
-
-/* A cell with a panel is a button; one without is a row. The difference is
-   visible on hover and in the focus ring, never in colour alone. */
-.cell-button {
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  background: none;
-  border: 0;
-}
-/* The row whose panel is open, said in weight and background rather than in
-   colour alone, so a screenshot carries it too. */
-.cell-open {
-  background: var(--color-neutral-900);
-}
-.cell:first-child {
-  border-top: 0;
-}
-.cell-next {
-  box-shadow: inset 3px 0 0 var(--color-brand-accent);
-}
-.cell-stage {
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: var(--color-neutral-500);
-}
-.cell-title {
-  min-width: 0;
-  color: var(--color-neutral-50);
-}
-/* The row whose panel is open, in weight as well as background, so it carries
-   into a screenshot and into a theme that renders colour differently. */
-.cell-open .cell-title {
-  font-weight: 600;
-}
-.cell-button:hover .cell-title {
-  text-decoration: underline;
-}
-.cell-where {
-  margin-left: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--color-neutral-400);
-}
+/* The five states, each in words and in a colour, never in the colour alone. */
 .state {
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
@@ -485,23 +324,271 @@ h1 {
 .state-running {
   color: var(--color-brand-ink);
 }
-.cell-reason,
-.cell-notice {
-  margin: 0 0 0 2.75rem;
+
+/* The episode from afar: the next step as a card, then one row per stage.
+   The card is the one thing on the page with a cyan button, because it is
+   the one thing the page is for. */
+.overview {
+  margin-top: 2rem;
+}
+.next-card {
+  padding: 1.25rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-left: 3px solid var(--color-brand-accent);
+  border-radius: 0.5rem;
+}
+.next-card-done {
+  border-left-color: var(--color-success-text);
+}
+/* A label, not a badge: a cyan pill here once looked like a button and did
+   nothing when clicked. */
+.next-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.next-what {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--color-neutral-50);
+}
+.next-stage {
+  font-weight: 600;
+}
+.next-where {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-neutral-300);
+}
+.next-go {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 1rem;
+  text-decoration: none;
+}
+.next-terminal {
+  margin-top: 1rem;
   font-size: 0.875rem;
 }
-.cell-reason {
-  color: var(--color-warning-text);
+.next-terminal summary {
+  color: var(--color-neutral-400);
+  cursor: pointer;
 }
-.cell-notice {
+.next-terminal summary:hover {
+  color: var(--color-neutral-50);
+}
+.next-command {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+  color: var(--color-neutral-50);
+  overflow-wrap: anywhere;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+.next-copied {
+  font-size: 0.8125rem;
   color: var(--color-neutral-400);
 }
-.cell-reason::before {
+.overview-title {
+  margin: 2.5rem 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-neutral-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.stages {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.stage-item + .stage-item {
+  border-top: 1px solid var(--color-neutral-800);
+}
+.stage-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  min-height: 44px;
+  padding: 0.875rem 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+.stage-row:hover {
+  background: var(--color-neutral-900);
+}
+/* The stage `status` called next, marked in shape as well as in colour. */
+.stage-row-next {
+  box-shadow: inset 3px 0 0 var(--color-brand-accent);
+}
+.stage-no {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-neutral-500);
+}
+.stage-name {
+  min-width: 0;
+  color: var(--color-neutral-50);
+}
+.stage-row:hover .stage-name {
+  text-decoration: underline;
+}
+.stage-count {
+  margin-left: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+.stage-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  justify-content: flex-end;
+}
+
+/* One stage close up: a strip of eleven marks, the stage's name, its tabs,
+   and then nothing but its panel. */
+.stepper {
+  margin-top: 1.5rem;
+}
+.stepper ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 44px;
+  padding: 0.5rem 0.375rem 0.375rem;
+  color: var(--color-neutral-400);
+  text-decoration: none;
+  border-top: 3px solid var(--color-neutral-800);
+}
+.step-approved {
+  border-top-color: var(--color-success-text);
+}
+.step-blocked {
+  border-top-color: var(--color-warning-text);
+}
+.step-review,
+.step-running,
+.step-ready {
+  border-top-color: var(--color-brand-ink);
+}
+.step:hover {
+  color: var(--color-neutral-50);
+}
+.step[aria-current="page"] {
+  color: var(--color-neutral-50);
+  background: var(--color-neutral-900);
+}
+.step-no {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+.step[aria-current="page"] .step-no {
+  font-weight: 600;
+}
+.step-name {
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+.stage-title {
+  margin: 2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-neutral-50);
+}
+.stage-title:focus {
+  outline: none;
+}
+.variants ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+}
+.variant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-height: 44px;
+  padding: 0.5rem 0.875rem;
+  color: var(--color-neutral-300);
+  text-decoration: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.variant:hover {
+  color: var(--color-neutral-50);
+}
+.variant[aria-current="page"] {
+  color: var(--color-neutral-50);
+  background: var(--color-neutral-900);
+  border-color: var(--color-brand-ink);
+}
+.variant-name {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+.stage-reason {
+  margin: 1rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--color-warning-text);
+}
+.stage-reason::before {
   content: "! ";
 }
-.cell-notice::before {
-  content: "· ";
+.stage-body {
+  margin-top: 1.5rem;
 }
+.neighbours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-top: 2rem;
+  font-size: 0.9375rem;
+}
+.neighbours a {
+  color: var(--color-neutral-400);
+  text-decoration: none;
+}
+.neighbours a:hover {
+  color: var(--color-neutral-50);
+  text-decoration: underline;
+}
+.neighbour-next {
+  margin-left: auto;
+}
+
 /* The panel: one stage, its verdict, its artifact and its one yes. Every
    button carries the command it runs, so what is clickable is also pasteable. */
 .panel {
@@ -510,12 +597,6 @@ h1 {
   background: var(--color-neutral-900);
   border: 1px solid var(--color-neutral-800);
   border-radius: 0.5rem;
-}
-/* Beside the ladder the two columns start level, so the gap between them is
-   the one on the grid rather than two different top margins. */
-.workbench .ladder-section,
-.workbench .panel {
-  margin-top: 0;
 }
 .panel h2,
 .panel h3 {
@@ -811,6 +892,7 @@ h1 {
 /* Stage 7: the chain, one link per row, because a film is read wide. */
 .reel {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr));
   gap: 1rem;
   padding: 0;
   margin: 1rem 0 0;
@@ -885,11 +967,57 @@ h1 {
   color: var(--color-neutral-400);
 }
 
+/* On a stage's own page the page already says which stage and which tab this
+   is, so the panel's heading stays for a screen reader and leaves the eye. */
+.stage-body .panel {
+  margin-top: 0;
+}
+.stage-body .panel > h2:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+}
+/* A verdict's value is often a command, and a command is one long word. */
+.verdict > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.verdict dd {
+  overflow-wrap: anywhere;
+}
+/* A stage's refusals past the first two, folded: the first say what blocks,
+   the rest are usually the same sentence about the next file. */
+.problems-more {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+}
+.problems-more summary {
+  margin-bottom: 0.5rem;
+  color: var(--color-warning-text);
+  cursor: pointer;
+}
+
 @media (width <= 40rem) {
-  .cell-body {
+  .stage-row {
     grid-template-columns: 2rem minmax(0, 1fr);
   }
-  .state {
+  .stage-tally {
     grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+  /* Eleven names do not fit a phone; eleven numbers do, and the page's own
+     heading names the one that is open. */
+  .step-name {
+    display: none;
+  }
+  .step {
+    align-items: center;
+    padding-inline: 0;
   }
 }

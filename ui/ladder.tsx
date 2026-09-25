@@ -1,19 +1,22 @@
 import { type JSX, useCallback, useEffect, useState } from "react";
+import { plural, type Unit } from "./panel";
 import type { CellState, EpisodeStatus, StatusCell } from "./types.js";
 
 /**
- * The ladder of one episode, cell by cell, in the order it is climbed.
+ * The ladder of one episode, read at two distances.
  *
- * Every word here comes off the object the server handed over. The five states
- * carry a text label beside their colour, because colour alone says nothing to
- * a person who cannot see it and nothing at all in a screenshot; the reason a
- * cell is blocked is the stage's own sentence, quoted rather than summarised;
- * and the one highlighted row is the one `status` itself called next.
+ * `status` hands over one cell per stage, per character and per track: two
+ * dozen rows for an episode with two characters. Shown at once, beside an open
+ * panel, that was a wall a person had to read end to end to find the one row
+ * they came for. So the ladder is read twice instead. From afar it is eleven
+ * stages, one row each, which is the question "where is this episode"; up
+ * close it is one stage, with its tracks and characters as tabs over the one
+ * panel that is open, which is the question "what do I do here".
  *
- * A refusal and a report are different things and are drawn differently: the
- * reason a stage gives for standing still sits in the cell, while what it says
- * without refusing (a silent cut, a missing soundtrack) is a note under it.
- * The CLI prints `!` and `·` for the same distinction.
+ * Every word still comes off the object the server handed over. Grouping by
+ * stage and counting states is arithmetic over those cells, never a verdict:
+ * the five states keep their text labels beside their colour, and the reason a
+ * cell is blocked is the stage's own sentence, quoted rather than summarised.
  */
 
 const LABEL: Record<CellState, string> = {
@@ -24,12 +27,100 @@ const LABEL: Record<CellState, string> = {
   running: "w toku",
 };
 
-/** Which of the two axes this cell belongs to, when it belongs to one. */
-function where(cell: StatusCell): string | null {
-  const parts = [cell.character, cell.track].filter((part) => part !== null);
+/**
+ * What a stage is called when it is spoken of as a whole.
+ *
+ * A cell's own title names one row of it ("postać ewa", "narracja, miks"), so
+ * the name of the stage those rows share is this client's, like the headings
+ * each panel already carries.
+ */
+const STAGE_NAME: Readonly<Record<number, string>> = {
+  0: "przygotowanie",
+  1: "scenariusz",
+  2: "postacie",
+  3: "lista ujęć",
+  4: "pakiet promptów",
+  5: "referencje",
+  6: "klatka otwarcia",
+  7: "klipy",
+  8: "montaż",
+  9: "narracja",
+  10: "muzyka i efekty",
+};
 
-  return parts.length === 0 ? null : parts.join(" · ");
+export function stageName(stage: number): string {
+  return STAGE_NAME[stage] ?? `etap ${stage}`;
 }
+
+/** One stage and every cell `status` gave it, in the order it gave them. */
+interface Stage {
+  readonly cells: readonly StatusCell[];
+  readonly stage: number;
+}
+
+export function stagesOf(status: EpisodeStatus): readonly Stage[] {
+  const stages: { cells: StatusCell[]; stage: number }[] = [];
+
+  for (const cell of status.cells) {
+    const last = stages.at(-1);
+
+    if (last?.stage === cell.stage) {
+      last.cells.push(cell);
+    } else {
+      stages.push({ cells: [cell], stage: cell.stage });
+    }
+  }
+
+  return stages;
+}
+
+/**
+ * Which of a stage's cells this is, in as few words as tell them apart.
+ *
+ * Stage 2 differs by character and track, stages 5 to 8 by track, and stages 9
+ * and 10 by level: the half after the comma in the cell's own title is what
+ * separates the shared words from a track's mix.
+ */
+function variantOf(cell: StatusCell): string {
+  const level = cell.title.includes(", ") ? (cell.title.split(", ").at(-1) ?? null) : null;
+
+  return [level, cell.character, cell.track].filter((part) => part !== null).join(" · ");
+}
+
+/** The order a person should look in: what moves first, what is finished last. */
+const URGENCY: readonly CellState[] = ["running", "review", "ready", "blocked", "approved"];
+
+/** How many cells of a stage stand in each state, most pressing first. */
+function tally(cells: readonly StatusCell[]): readonly { count: number; state: CellState }[] {
+  return URGENCY.map((state) => ({
+    count: cells.filter((cell) => cell.state === state).length,
+    state,
+  })).filter((one) => one.count > 0);
+}
+
+/** The one state a stage is drawn in when it is one mark on a strip. */
+function leading(cells: readonly StatusCell[]): CellState {
+  return tally(cells)[0]?.state ?? "blocked";
+}
+
+/**
+ * The cell a stage opens on when nobody named one.
+ *
+ * The one `status` called next if it is here, else the first that still wants
+ * something, else the first: arriving on a finished track while its sibling
+ * waits for review would be sending a person to the wrong tab.
+ */
+export function defaultCell(stage: Stage, next: string | null): StatusCell | null {
+  return (
+    stage.cells.find((cell) => cell.id === next) ??
+    stage.cells.find((cell) => cell.state !== "approved") ??
+    stage.cells[0] ??
+    null
+  );
+}
+
+/** Where a stage, or one cell of it, lives in the address. */
+export type HrefOf = (place: string) => string;
 
 const COPY_NOTE: Record<Copied, string | null> = {
   done: "Skopiowane do schowka.",
@@ -40,34 +131,17 @@ const COPY_NOTE: Record<Copied, string | null> = {
 type Copied = "done" | "failed" | "idle";
 
 /**
- * The one next move, and the two things a person can actually do with it.
+ * The command `status` suggests, folded away under the plain-language step.
  *
- * It used to be a cyan badge reading "Dalej" beside a line of text, which is
- * the one shape a screen must not have: it looked like a button, did nothing
- * when clicked, and left the sentence beside it with no use. So the label
- * stops pretending and the two real uses become buttons. Opening the stage is
- * this client's own navigation rather than a command, which is why it is
- * allowed: `status` already said which cell this is, and the panel it opens
- * runs the same `run(argv)` as every other one.
- *
- * "Kopiuj" copies exactly what is on screen, which is sometimes a bare command
- * and sometimes a sentence with one inside it, because a stage's `nextStep` is
- * the stage's own words. Trimming it to what looks like a command here would
- * be the screen editing an answer it did not write.
+ * It is the terminal's spelling of the same move, kept for whoever drives the
+ * pipeline from there, and folded because a sentence of flags is not what a
+ * person reads first. "Kopiuj" copies exactly what is on screen: a stage's
+ * `nextStep` is the stage's own words, and trimming it here would be the
+ * screen editing an answer it did not write.
  */
-function Next(props: {
-  readonly cell: StatusCell | null;
-  readonly command: string;
-  /** Set only where the next cell has a panel to open. */
-  readonly onOpen: ((id: string) => void) | null;
-}): JSX.Element {
-  const { cell, command, onOpen } = props;
+function Terminal(props: { readonly command: string }): JSX.Element {
+  const { command } = props;
   const [copied, setCopied] = useState<Copied>("idle");
-  const open = useCallback(() => {
-    if (cell !== null) {
-      onOpen?.(cell.id);
-    }
-  }, [cell, onOpen]);
   const copy = useCallback(() => {
     navigator.clipboard.writeText(command).then(
       () => setCopied("done"),
@@ -76,23 +150,16 @@ function Next(props: {
   }, [command]);
 
   // A note about a command that is no longer on screen would be a lie about
-  // what is in the schowek right now.
+  // what is in the clipboard right now.
   useEffect(() => {
     setCopied("idle");
   }, [command]);
 
   return (
-    <div className="next-step">
-      <p className="next-label" id="next-label">
-        Następny krok
-      </p>
+    <details className="next-terminal">
+      <summary>Polecenie w terminalu</summary>
       <code className="next-command">{command}</code>
       <div className="next-actions">
-        {cell === null || onOpen === null ? null : (
-          <button className="action action-primary" onClick={open} type="button">
-            Pokaż etap {cell.stage}
-          </button>
-        )}
         <button className="action" onClick={copy} type="button">
           Kopiuj
         </button>
@@ -100,101 +167,230 @@ function Next(props: {
           {COPY_NOTE[copied]}
         </span>
       </div>
+    </details>
+  );
+}
+
+/** The one next move, said as a place to go rather than as a command to type. */
+function NextStep(props: { readonly hrefOf: HrefOf; readonly status: EpisodeStatus }): JSX.Element {
+  const { hrefOf, status } = props;
+
+  if (status.next === null) {
+    return (
+      <div className="next-card next-card-done">
+        <p className="next-label">Następny krok</p>
+        <p className="next-what">Odcinek zamknięty: każdy etap zatwierdzony.</p>
+      </div>
+    );
+  }
+
+  const cell = status.cells.find((one) => one.id === status.next?.cell) ?? null;
+
+  return (
+    <div className="next-card">
+      <p className="next-label">Następny krok</p>
+      {cell === null ? null : (
+        <p className="next-what">
+          <span className="next-stage">Etap {cell.stage}</span> {stageName(cell.stage)}
+          {variantOf(cell) === "" ? null : <span className="next-where">{variantOf(cell)}</span>}
+          <span className={`state state-${cell.state}`}>{LABEL[cell.state]}</span>
+        </p>
+      )}
+      {cell === null ? null : (
+        <a className="action action-primary next-go" href={hrefOf(cell.id)}>
+          Przejdź do etapu {cell.stage}
+        </a>
+      )}
+      <Terminal command={status.next.command} />
     </div>
   );
 }
 
-interface CellProps {
-  readonly cell: StatusCell;
-  readonly isNext: boolean;
-  readonly isOpen: boolean;
-  /** Set only where a panel exists; the other stages arrive one slice at a time. */
-  readonly onOpen: ((id: string) => void) | null;
-}
-
-function Cell(props: CellProps): JSX.Element {
-  const { cell, isNext, isOpen, onOpen } = props;
-  const open = useCallback(() => onOpen?.(cell.id), [cell.id, onOpen]);
-  const place = where(cell);
-  const notices = cell.status?.notices ?? [];
-  const classes = ["cell", isNext ? "cell-next" : "", isOpen ? "cell-open" : ""]
-    .filter((name) => name !== "")
-    .join(" ");
-  const body = (
-    <>
-      <span className="cell-stage">{cell.stage}</span>
-      <span className="cell-title">
-        {cell.title}
-        {place === null ? null : <span className="cell-where">{place}</span>}
-      </span>
-      <span className={`state state-${cell.state}`}>{LABEL[cell.state]}</span>
-    </>
-  );
+/**
+ * How a stage's cells stand: one label when they agree, counts when they do not.
+ *
+ * "zatwierdzony 3/3" says nothing "zatwierdzony" does not, so a count appears
+ * only where it tells the rows of one stage apart.
+ */
+function Tally(props: { readonly cells: readonly StatusCell[] }): JSX.Element {
+  const counts = tally(props.cells);
+  const agreed = counts.length === 1;
 
   return (
-    <li className={classes}>
-      {onOpen === null ? (
-        <span className="cell-body">{body}</span>
-      ) : (
-        <button
-          aria-expanded={isOpen}
-          className="cell-body cell-button"
-          onClick={open}
-          type="button"
-        >
-          {body}
-        </button>
-      )}
-      {cell.reason === null ? null : <p className="cell-reason">{cell.reason}</p>}
-      {notices.map((notice) => (
-        <p className="cell-notice" key={notice}>
-          {notice}
-        </p>
+    <span className="stage-tally">
+      {counts.map((one) => (
+        <span className={`state state-${one.state}`} key={one.state}>
+          {agreed ? LABEL[one.state] : `${LABEL[one.state]} ${one.count}/${props.cells.length}`}
+        </span>
       ))}
-    </li>
+    </span>
   );
 }
 
-export function Ladder(props: {
-  readonly onOpen: (id: string) => void;
-  readonly opened: string | null;
-  /** Which cells have a panel today. A cell without one stays a row. */
-  readonly openable: (cell: StatusCell) => boolean;
+const CHARACTERS: Unit = ["postać", "postacie", "postaci"];
+const TRACKS: Unit = ["tor", "tory", "torów"];
+
+/**
+ * What a stage's rows are, counted in their own axes.
+ *
+ * Stage 2 is characters times tracks, stages 5 to 8 are tracks, and stages 9
+ * and 10 are one shared half plus a half per track.
+ */
+function partsOf(cells: readonly StatusCell[]): string {
+  const characters = new Set(cells.flatMap((cell) => cell.character ?? [])).size;
+  const tracks = plural(new Set(cells.flatMap((cell) => cell.track ?? [])).size, TRACKS);
+
+  if (characters > 0) {
+    return `${plural(characters, CHARACTERS)} × ${tracks}`;
+  }
+
+  return cells.some((cell) => cell.track === null) ? `wspólna część + ${tracks}` : tracks;
+}
+
+/**
+ * The episode from afar: where it stands, and one row per stage.
+ *
+ * Each row is a link to that stage's own page, which is where its tracks,
+ * characters, notes and actions are. Nothing else is on this screen, so the
+ * eye reads down eleven rows and not twenty-three.
+ */
+export function EpisodeOverview(props: {
+  readonly hrefOf: HrefOf;
   readonly status: EpisodeStatus;
 }): JSX.Element {
-  const { onOpen, openable, opened, status } = props;
-  const next = status.cells.find((cell) => cell.id === status.next?.cell) ?? null;
+  const { hrefOf, status } = props;
+  const nextStage = status.cells.find((cell) => cell.id === status.next?.cell)?.stage ?? null;
 
   return (
-    <section aria-labelledby="ladder-title" className="ladder-section">
-      <div className="next">
-        {/* Named for a screen reader only: the page's own heading already says
-            which episode of which project this is, and saying it twice on
-            screen was the first thing a reader had to skip. */}
-        <h2 className="sr-only" id="ladder-title">
-          Etapy odcinka
-        </h2>
-        {status.next === null ? (
-          <p className="next-done">Odcinek zamknięty: każdy etap zatwierdzony.</p>
-        ) : (
-          <Next
-            cell={next}
-            command={status.next.command}
-            onOpen={next !== null && openable(next) ? onOpen : null}
-          />
-        )}
-      </div>
-      <ol className="ladder">
-        {status.cells.map((cell) => (
-          <Cell
-            cell={cell}
-            isNext={cell.id === status.next?.cell}
-            isOpen={cell.id === opened}
-            key={cell.id}
-            onOpen={openable(cell) ? onOpen : null}
-          />
+    <section aria-labelledby="ladder-title" className="overview">
+      <NextStep hrefOf={hrefOf} status={status} />
+      <h2 className="overview-title" id="ladder-title">
+        Etapy
+      </h2>
+      <ol className="stages">
+        {stagesOf(status).map((one) => (
+          <li className="stage-item" key={one.stage}>
+            <a
+              className={one.stage === nextStage ? "stage-row stage-row-next" : "stage-row"}
+              href={hrefOf(String(one.stage))}
+            >
+              <span className="stage-no">{one.stage}</span>
+              <span className="stage-name">
+                {stageName(one.stage)}
+                {one.cells.length === 1 ? null : (
+                  <span className="stage-count">{partsOf(one.cells)}</span>
+                )}
+              </span>
+              <Tally cells={one.cells} />
+            </a>
+          </li>
         ))}
       </ol>
     </section>
+  );
+}
+
+/**
+ * Every stage as one mark on a strip, for moving between them.
+ *
+ * Each mark is drawn in the most pressing state among its cells, with the
+ * state in its accessible name as well, since a colour alone says nothing to
+ * a screen reader or in a screenshot.
+ */
+export function StageNav(props: {
+  readonly current: number;
+  readonly hrefOf: HrefOf;
+  readonly stages: readonly Stage[];
+}): JSX.Element {
+  const { current, hrefOf, stages } = props;
+
+  return (
+    <nav aria-label="Etapy odcinka" className="stepper">
+      <ol>
+        {stages.map((one) => {
+          const state = leading(one.cells);
+
+          return (
+            <li key={one.stage}>
+              <a
+                aria-current={one.stage === current ? "page" : undefined}
+                aria-label={`Etap ${one.stage}: ${stageName(one.stage)}, ${LABEL[state]}`}
+                className={`step step-${state}`}
+                href={hrefOf(String(one.stage))}
+                title={`${stageName(one.stage)}: ${LABEL[state]}`}
+              >
+                <span className="step-no">{one.stage}</span>
+                <span className="step-name">{stageName(one.stage)}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * The tracks, characters or levels of one stage, as tabs over one panel.
+ *
+ * A stage with one cell has nothing to choose between and shows nothing.
+ */
+export function Variants(props: {
+  readonly current: string;
+  readonly hrefOf: HrefOf;
+  readonly stage: Stage;
+}): JSX.Element | null {
+  const { current, hrefOf, stage } = props;
+
+  if (stage.cells.length < 2) {
+    return null;
+  }
+
+  return (
+    <nav aria-label={`Części etapu ${stage.stage}`} className="variants">
+      <ul>
+        {stage.cells.map((cell) => (
+          <li key={cell.id}>
+            <a
+              aria-current={cell.id === current ? "page" : undefined}
+              className="variant"
+              href={hrefOf(cell.id)}
+            >
+              <span className="variant-name">{variantOf(cell)}</span>
+              <span className={`state state-${cell.state}`}>{LABEL[cell.state]}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** The stages either side of this one, named, for reading the episode in order. */
+export function Neighbours(props: {
+  readonly current: number;
+  readonly hrefOf: HrefOf;
+  readonly stages: readonly Stage[];
+}): JSX.Element {
+  const { current, hrefOf, stages } = props;
+  const at = stages.findIndex((one) => one.stage === current);
+  const before = at > 0 ? stages[at - 1] : undefined;
+  const after = at >= 0 ? stages[at + 1] : undefined;
+
+  return (
+    <nav aria-label="Sąsiednie etapy" className="neighbours">
+      {before === undefined ? (
+        <span />
+      ) : (
+        <a href={hrefOf(String(before.stage))}>
+          ← Etap {before.stage}: {stageName(before.stage)}
+        </a>
+      )}
+      {after === undefined ? null : (
+        <a className="neighbour-next" href={hrefOf(String(after.stage))}>
+          Etap {after.stage}: {stageName(after.stage)} →
+        </a>
+      )}
+    </nav>
   );
 }

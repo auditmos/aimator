@@ -1,17 +1,18 @@
-import {
-  type JSX,
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type JSX, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { AssemblyPanel } from "./assembly";
 import { ProjectCast } from "./cast";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
-import { Ladder } from "./ladder";
+import {
+  defaultCell,
+  EpisodeOverview,
+  type HrefOf,
+  Neighbours,
+  StageNav,
+  stageName,
+  stagesOf,
+  Variants,
+} from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { plural } from "./panel";
@@ -76,7 +77,17 @@ type Route =
   | { readonly kind: "cast"; readonly projectId: string }
   | { readonly kind: "new-episode"; readonly projectId: string }
   | { readonly kind: "episodes"; readonly projectId: string }
-  | { readonly kind: "episode"; readonly episodeId: string; readonly projectId: string };
+  | {
+      readonly episodeId: string;
+      readonly kind: "episode";
+      /**
+       * Which stage, or which one cell of it, is open: `7`, `7/seedream`,
+       * `2/ewa/gpt-image`. The cell id `status` gives, so nothing translates
+       * it. Absent on the episode's overview.
+       */
+      readonly place: string | null;
+      readonly projectId: string;
+    };
 
 /** Every screen that is about one project, which is every screen past the start. */
 type InProject = Extract<Route, { readonly projectId: string }>;
@@ -105,6 +116,13 @@ function episodeHref(projectId: string, episodeId: string): string {
   return `${projectHref(projectId)}/odcinek/${encodeURIComponent(episodeId)}`;
 }
 
+/** One stage of an episode, or one cell of it, each segment of the cell id escaped. */
+function stageHref(projectId: string, episodeId: string, place: string): string {
+  const path = place.split("/").map(encodeURIComponent).join("/");
+
+  return `${episodeHref(projectId, episodeId)}/etap/${path}`;
+}
+
 const LEADING_HASH = /^#/;
 
 /** A segment as it was meant, or nothing when somebody typed a broken escape. */
@@ -121,7 +139,9 @@ function segment(raw: string | undefined): string | null {
 }
 
 function routeOf(hash: string): Route {
-  const [, first, second, third, fourth] = hash.replace(LEADING_HASH, "").split("/");
+  const [, first, second, third, fourth, fifth, ...rest] = hash
+    .replace(LEADING_HASH, "")
+    .split("/");
 
   if (first === "nowy") {
     return { kind: "new" };
@@ -151,9 +171,16 @@ function routeOf(hash: string): Route {
 
   const episodeId = third === "odcinek" ? segment(fourth) : null;
 
-  return episodeId === null
-    ? { kind: "project", projectId }
-    : { episodeId, kind: "episode", projectId };
+  if (episodeId === null) {
+    return { kind: "project", projectId };
+  }
+
+  const parts = fifth === "etap" ? rest.map(segment) : [];
+  // A broken escape anywhere in the cell id is no cell at all, and the
+  // episode's overview is the honest place to land.
+  const place = parts.length === 0 || parts.includes(null) ? null : parts.join("/");
+
+  return { episodeId, kind: "episode", place, projectId };
 }
 
 function useRoute(): Route {
@@ -168,19 +195,6 @@ function useRoute(): Route {
   }, []);
 
   return routeOf(hash);
-}
-
-/**
- * Which cells can be opened today.
- *
- * One stage, one slice: the rest are driven from the terminal until theirs
- * arrives. A row nobody can open says so by being a row, which is more honest
- * than a panel apologising for being empty.
- */
-const PANELLED = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-
-function openable(cell: StatusCell): boolean {
-  return PANELLED.has(cell.stage);
 }
 
 interface PanelProps {
@@ -198,7 +212,7 @@ interface PanelProps {
  * One `if` per stage rather than a lookup table, because a panel is a
  * component with its own props and a table of them would be a type that means
  * nothing. Stage 0 is not here: it is the one panel that has to exist before
- * there is a cell to open.
+ * there is a cell to open, so the episode screen places it itself.
  */
 function StagePanel(props: PanelProps): JSX.Element | null {
   if (props.cell.stage === 1) {
@@ -291,114 +305,6 @@ function Notices(props: {
         </p>
       )}
     </>
-  );
-}
-
-/**
- * A panel that opened somewhere a person is not looking has not opened.
- *
- * The two-column layout answers this for a wide window: the panel stands
- * beside the row that was clicked and is in view already, so `nearest` moves
- * nothing. A narrow window stacks, and there the panel lands below the whole
- * ladder: a click whose result is off-screen. The panel takes focus either
- * way, because a keyboard and a screen reader are in exactly the position a
- * scrolled-past panel leaves the eye in.
- */
-function useReveal(props: {
-  readonly opened: string | null;
-  readonly panel: RefObject<HTMLDivElement | null>;
-  readonly showing: boolean;
-}): void {
-  const { opened, panel, showing } = props;
-
-  useEffect(() => {
-    // A stage-0 panel standing in for a refused ladder opened itself; there
-    // was no click, so nothing has moved and nothing should be moved to.
-    if (!showing || opened === null) {
-      return;
-    }
-
-    const wide = window.matchMedia("(min-width: 64rem)").matches;
-
-    panel.current?.scrollIntoView({ behavior: "smooth", block: wide ? "nearest" : "start" });
-    panel.current?.focus({ preventScroll: true });
-  }, [opened, panel, showing]);
-}
-
-/**
- * The ladder and the panel of the row somebody opened, side by side.
- *
- * They are one component because they are one answer: a click on a row and
- * the thing that click produced. A wide window puts the two in columns and
- * keeps the panel in view while the ladder scrolls; a narrow one stacks them
- * and the client scrolls to the panel instead.
- *
- * Stage 0 is the exception that shapes the rest: when the ladder is refused it
- * is the one panel left to fix things from, so the grid drops to one column
- * rather than leaving an empty half beside a form.
- */
-function Workbench(props: {
-  readonly cell: StatusCell | null;
-  readonly episodeId: string;
-  readonly onClose: () => void;
-  readonly onOpen: (id: string) => void;
-  readonly onRun: (argv: readonly string[]) => void;
-  readonly opened: string | null;
-  readonly preparing: boolean;
-  readonly projectId: string;
-  readonly run: RunDone | null;
-  readonly running: boolean;
-  readonly status: EpisodeStatus | null;
-}): JSX.Element {
-  const { cell, episodeId, onClose, onOpen, onRun, opened, preparing, status } = props;
-  const { projectId, run, running } = props;
-  const panelRef = useRef<HTMLDivElement>(null);
-  const showing = preparing || cell !== null;
-
-  useReveal({ opened, panel: panelRef, showing });
-
-  return (
-    <div className={status !== null && showing ? "workbench workbench-split" : "workbench"}>
-      {status === null ? null : (
-        <div className="workbench-ladder">
-          <Ladder onOpen={onOpen} openable={openable} opened={opened} status={status} />
-        </div>
-      )}
-      {showing ? (
-        // `tabIndex` because opening a cell moves focus here: the panel is the
-        // answer to that click, and a keyboard has to land in it.
-        <div className="workbench-panel" ref={panelRef} tabIndex={-1}>
-          {opened === null ? null : (
-            <div className="panel-bar">
-              <button className="panel-close" onClick={onClose} type="button">
-                Zamknij panel
-              </button>
-            </div>
-          )}
-          {preparing ? (
-            <PreparePanel
-              castHref={castHref(projectId)}
-              cell={cell}
-              episodeId={episodeId}
-              onRun={onRun}
-              projectId={projectId}
-              run={run}
-              running={running}
-            />
-          ) : null}
-          {cell === null ? null : (
-            <StagePanel
-              cell={cell}
-              episodeId={episodeId}
-              onRun={onRun}
-              projectId={projectId}
-              run={run}
-              running={running}
-            />
-          )}
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -527,25 +433,114 @@ function OpenEpisode(props: { readonly project: ListedProject }): JSX.Element {
 }
 
 /**
- * One episode: its ladder, and the panel open beside it.
+ * One stage of the episode, and only that stage.
  *
- * This is the screen that used to be the whole application, now reached from
- * a project rather than landed on. The episode is chosen on the way in and
- * the address names it, so nothing here chooses it again.
+ * It replaced a ladder of two dozen rows with a panel beside it, which asked a
+ * person to read both at once. Here the strip at the top says where the
+ * episode stands in eleven marks, the tabs under it choose a track or a
+ * character when the stage has more than one, and the panel below is the whole
+ * rest of the page. The address names the cell, so a reload, the back button
+ * and a pasted link all land on the same tab.
+ */
+function StageScreen(props: {
+  readonly episodeId: string;
+  readonly hrefOf: HrefOf;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly place: string;
+  readonly projectId: string;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+  readonly status: EpisodeStatus;
+}): JSX.Element {
+  const { episodeId, hrefOf, onRun, place, projectId, run, running, status } = props;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const stages = stagesOf(status);
+  const number = Number(place.split("/")[0]);
+  const stage = stages.find((one) => one.stage === number) ?? null;
+  // The panel renders the cell the ladder is carrying right now, so a finished
+  // command refreshes what the panel says without the panel asking anything.
+  const cell =
+    stage === null
+      ? null
+      : (stage.cells.find((one) => one.id === place) ??
+        defaultCell(stage, status.next?.cell ?? null));
+
+  // A new stage is a new page: the reader starts at its top, and a keyboard
+  // and a screen reader start at its heading rather than on the link clicked.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    heading.current?.focus({ preventScroll: true });
+  }, [place]);
+
+  if (stage === null || cell === null) {
+    return (
+      <p className="refusal" role="alert">
+        Odcinek {episodeId} nie ma etapu {place}.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <StageNav current={stage.stage} hrefOf={hrefOf} stages={stages} />
+      <h2 className="stage-title" id="stage-title" ref={heading} tabIndex={-1}>
+        Etap {stage.stage}: {stageName(stage.stage)}
+      </h2>
+      <Variants current={cell.id} hrefOf={hrefOf} stage={stage} />
+      {cell.reason === null ? null : <p className="stage-reason">{cell.reason}</p>}
+      <div className="stage-body">
+        {cell.stage === 0 ? (
+          <PreparePanel
+            castHref={castHref(projectId)}
+            cell={cell}
+            episodeId={episodeId}
+            onRun={onRun}
+            projectId={projectId}
+            run={run}
+            running={running}
+          />
+        ) : (
+          // Keyed by cell, so a tab starts with nothing ticked and nothing
+          // previewed from the tab before it.
+          <StagePanel
+            cell={cell}
+            episodeId={episodeId}
+            key={cell.id}
+            onRun={onRun}
+            projectId={projectId}
+            run={run}
+            running={running}
+          />
+        )}
+      </div>
+      <Neighbours current={stage.stage} hrefOf={hrefOf} stages={stages} />
+    </>
+  );
+}
+
+/**
+ * One episode, at the distance the address asks for.
+ *
+ * Without a stage it is the overview: the next step and eleven rows. With one
+ * it is that stage's page. Both read one stream, opened once per episode, so
+ * moving between stages re-asks nothing and loses no ladder.
  */
 function EpisodeView(props: {
   readonly episodeId: string;
   readonly onRun: (argv: readonly string[]) => void;
-  readonly onRunCleared: () => void;
+  readonly place: string | null;
   readonly projectId: string;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { episodeId, onRun, onRunCleared, projectId, run, running } = props;
+  const { episodeId, onRun, place, projectId, run, running } = props;
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
-  const [opened, setOpened] = useState<string | null>(null);
+  const hrefOf = useCallback(
+    (to: string) => stageHref(projectId, episodeId, to),
+    [episodeId, projectId]
+  );
 
   useEffect(() => {
     const events = new EventSource(
@@ -570,61 +565,52 @@ function EpisodeView(props: {
   }, [episodeId, projectId]);
 
   /**
-   * Opening a cell forgets the last command, **both halves of it**.
-   *
-   * `run` alone is half a fact. What "w toku" is derived from is the pair: an
-   * identifier this window is waiting for, and the answer that has not come
-   * back under it yet. Clearing the answer and keeping the identifier made
-   * every finished command look like one still in flight, which disabled every
-   * button in the panel just opened, and there is no way out of that: starting
-   * a command is what clears it, and the buttons that start one are the
-   * disabled ones. Two states, one fact, cleared together, by the one owner of
-   * both.
-   *
-   * Nothing is lost while a real command is running: the result arrives on the
-   * stream whatever is open, and the cell itself says "w toku" off the stage's
-   * own lock file, which is the only progress this server claims to know.
-   */
-  const openCell = useCallback(
-    (id: string) => {
-      onRunCleared();
-      setOpened((current) => (current === id ? null : id));
-    },
-    [onRunCleared]
-  );
-  const close = useCallback(() => setOpened(null), []);
-
-  // The panel renders the cell the ladder is carrying right now, so a finished
-  // command refreshes what the panel says without the panel asking anything.
-  const panel = status?.cells.find((cell) => cell.id === opened && openable(cell)) ?? null;
-  /**
    * A refused ladder leaves stage 0 on screen, because stage 0 is where the
    * things a ladder is refused over (a missing file, a broken decision) are
    * put right.
    */
   const ladderless = refusal !== null;
-  const preparing = panel?.stage === 0 || ladderless;
+  const overview = place === null;
 
   return (
     <section aria-labelledby="episode-title">
-      <Back href={episodesHref(projectId)} label="Odcinki" />
+      {overview ? (
+        <Back href={episodesHref(projectId)} label="Odcinki" />
+      ) : (
+        <Back href={episodeHref(projectId, episodeId)} label={`Przegląd odcinka ${episodeId}`} />
+      )}
       <h1 id="episode-title">
         <span className="title-context">{projectId} /</span> {episodeId}
       </h1>
       <Notices connection={connection} ladderless={ladderless} refusal={refusal} />
-      <Workbench
-        cell={panel}
-        episodeId={episodeId}
-        onClose={close}
-        onOpen={openCell}
-        onRun={onRun}
-        opened={opened}
-        preparing={preparing}
-        projectId={projectId}
-        run={run}
-        running={running}
-        status={status}
-      />
+      {ladderless && overview ? (
+        <div className="stage-body">
+          <PreparePanel
+            castHref={castHref(projectId)}
+            cell={null}
+            episodeId={episodeId}
+            onRun={onRun}
+            projectId={projectId}
+            run={run}
+            running={running}
+          />
+        </div>
+      ) : null}
+      {status !== null && overview && !ladderless ? (
+        <EpisodeOverview hrefOf={hrefOf} status={status} />
+      ) : null}
+      {status !== null && place !== null ? (
+        <StageScreen
+          episodeId={episodeId}
+          hrefOf={hrefOf}
+          onRun={onRun}
+          place={place}
+          projectId={projectId}
+          run={run}
+          running={running}
+          status={status}
+        />
+      ) : null}
     </section>
   );
 }
@@ -641,12 +627,11 @@ function ProjectScreens(props: {
   readonly listing: WorkspaceListing | null;
   readonly listingRefusal: string | null;
   readonly onRun: (argv: readonly string[]) => void;
-  readonly onRunCleared: () => void;
   readonly route: InProject;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { listing, listingRefusal, onRun, onRunCleared, route, run, running } = props;
+  const { listing, listingRefusal, onRun, route, run, running } = props;
   const project = listing?.projects.find((one) => one.id === route.projectId) ?? null;
   const createdEpisode = useCallback(
     (episodeId: string) => {
@@ -720,7 +705,7 @@ function ProjectScreens(props: {
         episodeId={route.episodeId}
         key={route.episodeId}
         onRun={onRun}
-        onRunCleared={onRunCleared}
+        place={route.place}
         projectId={project.id}
         run={run}
         running={running}
@@ -816,10 +801,6 @@ export function App(): JSX.Element {
         })
       );
   }, []);
-  const clearRun = useCallback(() => {
-    setRun(null);
-    setPending(null);
-  }, []);
   const createdProject = useCallback((projectId: string) => {
     window.location.hash = projectHref(projectId);
   }, []);
@@ -830,6 +811,12 @@ export function App(): JSX.Element {
    * Leaving that screen forgets it, so the next one does not open with a
    * result nobody on it asked for. It is adjusted while rendering rather than
    * in an effect, so no frame ever shows the old answer on the new screen.
+   *
+   * Both halves go together, the answer and the identifier waiting for it,
+   * because "w toku" is derived from the pair: clearing the answer alone made
+   * a finished command look like one still in flight and disabled every button
+   * on the stage just opened. A stage and each of its tabs is a screen of its
+   * own, so moving between them clears it too.
    */
   const routeKey = JSON.stringify(route);
   const [shownRoute, setShownRoute] = useState(routeKey);
@@ -903,7 +890,6 @@ export function App(): JSX.Element {
             listing={listing}
             listingRefusal={listingRefusal}
             onRun={start}
-            onRunCleared={clearRun}
             route={route}
             run={run}
             running={running}

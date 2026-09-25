@@ -99,13 +99,49 @@ export function Field(props: {
   );
 }
 
-/** What a stage refuses over, in the stage's own sentences. */
-export function Problems(props: { readonly problems: readonly string[] }): JSX.Element[] {
-  return props.problems.map((problem) => (
+/** How many refusals stand open before the rest fold away. */
+const PROBLEMS_SHOWN = 2;
+
+function problemLines(problems: readonly string[]): JSX.Element[] {
+  return problems.map((problem) => (
     <p className="problem" key={problem}>
       {problem}
     </p>
   ));
+}
+
+/**
+ * What a stage refuses over, in the stage's own sentences.
+ *
+ * Every sentence stays on the page, but past the first two they fold: one
+ * changed input lapses the consent of every artifact drawn from it, so a
+ * stage can refuse over a dozen files in one breath, and a dozen warnings
+ * above the gallery push the thing being judged off the screen. The count is
+ * on the fold, so nothing is hidden without saying how much.
+ */
+export function Problems(props: { readonly problems: readonly string[] }): JSX.Element | null {
+  const { problems } = props;
+
+  if (problems.length === 0) {
+    return null;
+  }
+
+  // One more than the fold would hide is not worth a fold.
+  if (problems.length <= PROBLEMS_SHOWN + 1) {
+    return <div className="problems">{problemLines(problems)}</div>;
+  }
+
+  const rest = problems.slice(PROBLEMS_SHOWN);
+
+  return (
+    <div className="problems">
+      {problemLines(problems.slice(0, PROBLEMS_SHOWN))}
+      <details className="problems-more">
+        <summary>Pokaż pozostałe powody ({rest.length})</summary>
+        {problemLines(rest)}
+      </details>
+    </div>
+  );
 }
 
 /**
