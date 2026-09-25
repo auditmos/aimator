@@ -1,4 +1,4 @@
-import { type JSX, useMemo, useState } from "react";
+import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import { Action, Field, Problems, RunOutput } from "./panel";
 import type { RunDone, Stage0Report, StatusCell } from "./types";
@@ -6,11 +6,11 @@ import type { RunDone, Stage0Report, StatusCell } from "./types";
 /**
  * Stage 0, which is the one stage a person writes rather than buys.
  *
- * It is also the only panel that has to exist **before** there is anything to
- * show: a workspace with no project in it has no ladder, so the first form
- * here stands on its own and every other one appears once a project does. That
- * is not a special case bolted on, it is what stage 0 is: the place an empty
- * directory becomes a series.
+ * It is also the only panel that has to exist **before** there is a ladder: a
+ * project with no episode has nothing for `status` to answer about, so this
+ * panel stands on its own until the first episode is added. Creating the
+ * project itself is one step earlier still and has a screen of its own,
+ * `NewProject`, because it is asked before there is a project to be in.
  *
  * The file field is a **path**, typed or pasted out of Finder, and it travels
  * to `--source` exactly as it was written. The PRD refused an upload for one
@@ -25,11 +25,11 @@ import type { RunDone, Stage0Report, StatusCell } from "./types";
  */
 
 interface PrepareProps {
-  /** The ladder's stage-0 cell, or nothing at all in an empty workspace. */
+  /** The ladder's stage-0 cell, or nothing at all in a project with no episode. */
   readonly cell: StatusCell | null;
   readonly episodeId: string | null;
   readonly onRun: (argv: readonly string[]) => void;
-  readonly projectId: string | null;
+  readonly projectId: string;
   readonly run: RunDone | null;
   readonly running: boolean;
 }
@@ -53,24 +53,53 @@ const EMPTY: Settings = {
   subtitles: "",
 };
 
-/** The project a workspace does not have yet, which is where everything starts. */
-function NewProject(props: {
+/**
+ * The project a workspace does not have yet, which is where everything starts.
+ *
+ * It is a screen of its own rather than a form inside stage 0's panel, because
+ * that panel answers about a project and this one is asked before there is
+ * one. What it hands back is the identifier it created, and only once the CLI
+ * has said yes: the screen then moves into that project, and a refusal stays
+ * here, under the form, in the terminal's words.
+ */
+export function NewProject(props: {
+  readonly onCreated: (projectId: string) => void;
   readonly onRun: (argv: readonly string[]) => void;
+  readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
+  const { onCreated, onRun, run, running } = props;
   const [projectId, setProjectId] = useState("");
   const [title, setTitle] = useState("");
   const [aspectRatio, setAspectRatio] = useState("");
+  /**
+   * The identifier that was actually sent, not the one in the field now.
+   *
+   * Somebody may edit the field while the command runs, and the project that
+   * exists afterwards is the one the argv named.
+   */
+  const [submitted, setSubmitted] = useState<string | null>(null);
   const argv = useMemo(
     () => INTENTS.initProject({ aspectRatio, projectId, title }),
     [aspectRatio, projectId, title]
   );
+  const submit = useCallback(
+    (one: readonly string[]) => {
+      setSubmitted(projectId);
+      onRun(one);
+    },
+    [onRun, projectId]
+  );
+
+  useEffect(() => {
+    if (submitted !== null && !running && run?.ok === true) {
+      onCreated(submitted);
+    }
+  }, [onCreated, run, running, submitted]);
 
   return (
-    // Addressable, because the picker's "+ Nowy projekt" opens the whole
-    // stage-0 panel and this is the form it meant.
-    <div id="prepare-new-project">
-      <h3>Nowy projekt</h3>
+    <section aria-labelledby="new-project-title" className="panel">
+      <h2 id="new-project-title">Nowy projekt</h2>
       <p className="actions-note">
         Zakłada katalog serii i szkielet <code>project.md</code>. Zasady wspólne uzupełnia się potem
         w tym pliku ręcznie: to jedyny artefakt tego narzędzia pisany przez człowieka.
@@ -98,8 +127,9 @@ function NewProject(props: {
           value={aspectRatio}
         />
       </div>
-      <Action argv={argv} disabled={props.running} label="Załóż projekt" onRun={props.onRun} />
-    </div>
+      <Action argv={argv} disabled={running} label="Załóż projekt" onRun={submit} primary />
+      <RunOutput run={run} running={running} />
+    </section>
   );
 }
 
@@ -308,14 +338,8 @@ function Episode(props: {
 export function PreparePanel(props: PrepareProps): JSX.Element {
   const { cell, episodeId, onRun, projectId, run, running } = props;
   const report = (cell?.status ?? null) as Stage0Report | null;
-  const check = useMemo(
-    () => (projectId === null ? null : INTENTS.checkPrepare({ projectId })),
-    [projectId]
-  );
-  const approve = useMemo(
-    () => (projectId === null ? null : INTENTS.approvePrepare({ projectId })),
-    [projectId]
-  );
+  const check = useMemo(() => INTENTS.checkPrepare({ projectId }), [projectId]);
+  const approve = useMemo(() => INTENTS.approvePrepare({ projectId }), [projectId]);
   // The same condition the CLI records under. `problems` is deliberately not
   // part of it: stage 0 reports "no episode yet" and "the rules changed after
   // the last yes" without refusing, and both are things a person answers by
@@ -326,59 +350,45 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
     <section aria-labelledby="prepare-title" className="panel">
       <h2 id="prepare-title">Etap 0: przygotowanie</h2>
 
-      {projectId === null ? (
+      {report === null ? (
         <p className="panel-empty">
-          W katalogu roboczym nie ma jeszcze projektu. Zacznij od założenia go; reszta etapu 0
-          pojawi się razem z nim.
+          Bez odcinka nie ma drabiny, która oceniłaby ten etap. Dopisz obsadę i dodaj pierwszy
+          odcinek poniżej.
         </p>
       ) : (
         <>
-          {report === null ? (
-            <p className="panel-empty">Ten etap nie odpowiedział; drabina pokazuje powód.</p>
-          ) : (
-            <>
-              <dl className="verdict">
-                <div>
-                  <dt>Pliki się zgadzają</dt>
-                  <dd>{report.ready ? "tak" : "nie"}</dd>
-                </div>
-                <div>
-                  <dt>Zatwierdzony</dt>
-                  <dd>{report.approved ? "tak" : "nie"}</dd>
-                </div>
-                <div>
-                  <dt>Dalej</dt>
-                  <dd>{report.nextStep}</dd>
-                </div>
-              </dl>
-              <Problems problems={report.problems} />
-            </>
-          )}
-
-          {check === null ? null : (
-            <Action argv={check} disabled={running} label="Sprawdź" onRun={onRun} />
-          )}
-
-          {acceptable && approve !== null ? (
-            <Action argv={approve} disabled={running} label="Zatwierdź" onRun={onRun} primary />
-          ) : (
-            <p className="actions-note">
-              „Zatwierdź” pojawia się dopiero, gdy <code>check</code> przepuszcza pliki, a nikt ich
-              jeszcze nie przyjął. Tak samo odmówiłby terminal.
-            </p>
-          )}
+          <dl className="verdict">
+            <div>
+              <dt>Pliki się zgadzają</dt>
+              <dd>{report.ready ? "tak" : "nie"}</dd>
+            </div>
+            <div>
+              <dt>Zatwierdzony</dt>
+              <dd>{report.approved ? "tak" : "nie"}</dd>
+            </div>
+            <div>
+              <dt>Dalej</dt>
+              <dd>{report.nextStep}</dd>
+            </div>
+          </dl>
+          <Problems problems={report.problems} />
         </>
       )}
 
-      <NewProject onRun={onRun} running={running} />
+      <Action argv={check} disabled={running} label="Sprawdź" onRun={onRun} />
 
-      {projectId === null ? null : (
-        <>
-          <Cast onRun={onRun} projectId={projectId} running={running} />
-          <Narrator onRun={onRun} projectId={projectId} running={running} />
-          <Episode episodeId={episodeId} onRun={onRun} projectId={projectId} running={running} />
-        </>
+      {acceptable ? (
+        <Action argv={approve} disabled={running} label="Zatwierdź" onRun={onRun} primary />
+      ) : (
+        <p className="actions-note">
+          „Zatwierdź” pojawia się dopiero, gdy <code>check</code> przepuszcza pliki, a nikt ich
+          jeszcze nie przyjął. Tak samo odmówiłby terminal.
+        </p>
       )}
+
+      <Cast onRun={onRun} projectId={projectId} running={running} />
+      <Narrator onRun={onRun} projectId={projectId} running={running} />
+      <Episode episodeId={episodeId} onRun={onRun} projectId={projectId} running={running} />
 
       <RunOutput run={run} running={running} />
     </section>

@@ -1,7 +1,8 @@
 # Lokalne UI nad CLI
 
-`pnpm ui` uruchamia serwer pod `http://127.0.0.1:4317` i otwiera w przeglądarce jeden
-ekran: co jest w katalogu roboczym i gdzie stoi wybrany odcinek. To narzędzie dla jednej
+`pnpm ui` uruchamia serwer pod `http://127.0.0.1:4317`. Ekran otwiera się na dwóch
+wyborach, „Nowy projekt” i „Wczytaj projekt”, i dopiero wybrany projekt pokazuje swoje
+odcinki i drabinę etapów. To narzędzie dla jednej
 osoby na jednym Macu, bez uwierzytelniania i bez dostępu zdalnego; nasłuch tylko na pętli
 zwrotnej jest tu całym modelem bezpieczeństwa, a nie ustawieniem, które kiedyś się poszerzy.
 
@@ -18,12 +19,19 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 
 ## Co ten ekran pokazuje
 
-- **Wybór projektu i odcinka** z `list --json`, pod nagłówkiem mówiącym, czym te dwie
-  listy są, i z dwoma przyciskami obok: „+ Nowy projekt" i „+ Nowy odcinek". Oba otwierają
-  panel etapu 0 i przewijają go do właściwego formularza. To jedyna droga do projektu,
-  którego jeszcze nie ma: drabina odpowiada o odcinku, a takiego projektu żadna drabina nie
-  opisuje, więc bez tych przycisków etap 0 dawał się otworzyć tylko z wiersza drabiny, o
-  czym nikt nie mógł wiedzieć.
+- **Ekran startowy** z dwoma wyborami i niczym więcej: „Nowy projekt” i „Wczytaj
+  projekt”. To jedyne dwa pytania, na które ktoś wchodzący tu umie odpowiedzieć; odcinek,
+  drabina i panel etapu dotyczą projektu, więc czekają, aż jakiś jest. Gdzie stoi ekran,
+  zapisuje adres (`#/nowy`, `#/wczytaj`, `#/projekt/<id>`), więc odświeżenie zostaje w
+  miejscu, a przycisk „wstecz” przeglądarki cofa. Wordmark w nagłówku wraca na start.
+- **Nowy projekt**: sam formularz `project init` (identyfikator, tytuł, proporcje). Gdy
+  CLI powie „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod formularzem,
+  słowo w słowo.
+- **Wczytaj projekt**: projekty z `list --json` jako lista odnośników z liczbą odcinków.
+  Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
+- **Widok projektu**: wybór odcinka i obok niego „+ Nowy odcinek”, który otwiera panel
+  etapu 0 przewinięty do formularza odcinka. Projektu się tu już nie wybiera: wybrano go
+  po drodze i nazywa go adres.
 - **Drabinę etapów** z `status --json`: komórka na etap, na tor od etapu 2 i na postać w
   etapie 2, każda w jednym z pięciu stanów z etykietą tekstową, z powodem blokady w słowach
   etapu i z meldunkami pod spodem. Kolor nigdy nie niesie znaczenia sam.
@@ -33,9 +41,10 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   zdaniem z komendą w środku i skracanie go tutaj byłoby redagowaniem cudzej odpowiedzi.
   Etykieta jest etykietą: cyjanowa plakietka, którą zastąpiła, wyglądała na przycisk,
   nie robiła nic po kliknięciu i zostawiała zdanie obok bez zastosowania.
-- **Panel etapu 0**, jedyny, który istnieje **zanim** jest co pokazywać: formularze
-  założenia projektu, obsady, narratora, odcinka i jego sześciu decyzji, plus „Sprawdź"
-  i „Zatwierdź". Pliki podaje się **ścieżką w polu tekstowym**; patrz niżej.
+- **Panel etapu 0**, jedyny, który istnieje **zanim** jest drabina: formularze obsady,
+  narratora, odcinka i jego sześciu decyzji, plus „Sprawdź" i „Zatwierdź". Założenie
+  projektu jest krok wcześniej, na własnym ekranie. Pliki podaje się **ścieżką w polu
+  tekstowym**; patrz niżej.
 - **Panel etapu 1** po kliknięciu komórki: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,
   treść `screenplay.md` do przeczytania, przycisk „Sprawdź" i przycisk „Zatwierdź".
@@ -89,7 +98,7 @@ wzrok. Powód jest jeden: klik, którego wynik ląduje poza ekranem, jest klikie
 odpowiedzi, a przy dwudziestu wierszach tak wyglądało każde otwarcie panelu z góry
 drabiny. Otwarty wiersz mówi o tym pogrubieniem i tłem, nie samym kolorem.
 
-Panel etapu 0 otwarty w katalogu bez projektu zajmuje całą szerokość, bo nie ma wtedy
+Panel etapu 0 otwarty w projekcie bez odcinka zajmuje całą szerokość, bo nie ma wtedy
 drabiny, obok której miałby stanąć.
 
 ## Czego ten ekran nie robi
@@ -136,9 +145,9 @@ co z tego nie wynika, opisuje osobna sekcja niżej.
 ## Etap 0 i ścieżka w polu tekstowym
 
 Etap 0 jest wyjątkiem od zdania „panel otwiera się z komórki drabiny", i to nie jest
-odstępstwo, tylko opis tego, czym ten etap jest. Drabina odpowiada o **odcinku**, a pusty
-katalog roboczy nie ma projektu, świeży projekt nie ma odcinka. Panel etapu 0 pokazuje się
-więc także wtedy, gdy drabiny nie ma, i to on doprowadza pusty katalog do zatwierdzonego
+odstępstwo, tylko opis tego, czym ten etap jest. Drabina odpowiada o **odcinku**, a świeży
+projekt nie ma odcinka. Panel etapu 0 pokazuje się więc także wtedy, gdy drabiny nie ma,
+i to on, razem z ekranem „Nowy projekt”, doprowadza pusty katalog do zatwierdzonego
 etapu 0: załóż projekt, uzupełnij `project.md` w edytorze, dopisz obsadę, dodaj odcinek,
 ustaw decyzje, „Sprawdź", „Zatwierdź".
 
@@ -240,7 +249,10 @@ przeczytania, zanim ktoś kliknie drugi raz.
 ## Uruchamianie komendy i artefakty
 
 Uruchomienie odpowiada **natychmiast identyfikatorem przebiegu**; wynik `run` przychodzi
-później zdarzeniem `run` na tym samym strumieniu, na którym przychodzi drabina. Etap 7
+później zdarzeniem `run` na strumieniu katalogu roboczego (`/api/events`), otwartym na
+każdym ekranie, bo projekt zakłada się, zanim istnieje odcinek, którego strumień mógłby
+tę odpowiedź przynieść. Ten sam strumień niesie listę projektów (`list`), przeliczaną po
+każdej zmianie na dysku; strumień odcinka niesie drabinę. Etap 7
 odpytuje dostawcę minutami, a ekran ma przez ten czas pozostać używalny. Serwer **nie
 czyta przekazanego `argv`**: co jest legalną komendą, rozstrzyga CLI, odmawiając.
 
@@ -309,7 +321,7 @@ schowaniem odpowiedzi, którą ktoś właśnie czytał.
 Skorupa według „Portable website shell" z [manuala Auditmos](https://auditmos.com/design.md)
 (odczytanego 2026-09-21), tak samo jak [strona wydań](strona.md): kompaktowy nagłówek z
 wordmarkiem poza kontrolkami, natywny wybór motywu System / Jasny / Ciemny pod kluczem
-`auditmos-theme`, kompaktowa stopka. Tokeny kolorów są **rozwiązane dla tego renderera** w
+`auditmos-theme`, bez stopki. Tokeny kolorów są **rozwiązane dla tego renderera** w
 `ui/styles.css`, bo nie ma tu Tailwinda; cyan tylko na wyróżnieniu „Dalej", z ciemnym
 tekstem. Oba motywy są pełnymi kompozycjami. Język interfejsu jest polski, jak komunikaty
 CLI, które ten ekran pokazuje bez zmian.
@@ -334,7 +346,8 @@ Serwer jest testowany przez `app.request()` na tym samym fixture, którego używ
 otwierania portu: żądanie stanu zwraca to samo, co `status --json`, żądanie listy to samo, co
 `list --json`, odmowa zostaje odmową z tym samym komunikatem, strumień zdarzeń wypycha
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
-jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem. Słownik
+jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem, także
+na strumieniu katalogu roboczego, gdy żaden odcinek nie jest otwarty. Słownik
 komend jest sprawdzany względem `--help`, a zakup osobno: że jest tą samą wysyłką bez próby
 na sucho i że bez ukończonej próby nie daje się zbudować. Ścieżka z formularza etapu 0 ma
 własny test przez `app.request()`: po uruchomieniu komendy `episode.json` zapisuje dokładnie

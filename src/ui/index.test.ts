@@ -251,6 +251,19 @@ describe("the UI server", () => {
     await events.close();
   });
 
+  it("should open the workspace stream with the listing as it is right now", async () => {
+    const response = await createUi({ workspace }).request("/api/events");
+
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+
+    const events = new Events(response.body as ReadableStream<Uint8Array>);
+    const first = await events.next();
+
+    expect(first.event).toBe("listing");
+    expect(JSON.parse(first.data)).toEqual(JSON.parse(await cli("list", "--json")));
+    await events.close();
+  });
+
   /**
    * The deadline here is not the contract's.
    *
@@ -717,6 +730,38 @@ describe("running a command", () => {
       data: await cli("check", PROJECT, EPISODE, "--stage", "screenplay", "--json"),
       ok: true,
       runId,
+    });
+    await events.close();
+  });
+
+  /**
+   * A project is created before there is any episode to stream a ladder for,
+   * so its result has to arrive on the stream the start screen has open. The
+   * listing follows it, because the new directory is a change the watcher sees.
+   */
+  it("should deliver a run on the workspace stream when no episode is open", async () => {
+    const app = createUi({ workspace });
+    const stream = await app.request("/api/events");
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const argv = INTENTS.initProject({
+      aspectRatio: "16:9",
+      projectId: "druga-seria",
+      title: "Druga",
+    });
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({ argv }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const finished = await events.nextOf("run");
+
+    expect(JSON.parse(finished.data)).toMatchObject({ ok: true, runId });
+    expect(JSON.parse(await cli("list", "--json"))).toMatchObject({
+      projects: expect.arrayContaining([expect.objectContaining({ id: "druga-seria" })]),
     });
     await events.close();
   });

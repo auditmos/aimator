@@ -13,7 +13,8 @@ import { ClipsPanel } from "./clips";
 import { Ladder } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
-import { PreparePanel } from "./prepare";
+import { plural } from "./panel";
+import { NewProject, PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ScreenplayPanel } from "./screenplay";
@@ -30,11 +31,18 @@ import type {
 } from "./types";
 
 /**
- * One screen: what is in the workspace, and where one episode stands.
+ * The screen, and the order a person meets it in.
  *
- * Both answers are commands. The picker is `list`, the ladder is `status`, and
- * the stream is the same `status` asked again whenever the workspace moves, so
- * a window open here and an agent working in a terminal cannot drift apart.
+ * It opens on exactly two choices, a new project or an existing one, because
+ * those are the only two questions anybody arriving here can answer. Everything
+ * else (the episode, the ladder, a stage's panel) is about a project, so it
+ * waits until there is one. The earlier screen opened on all of it at once and
+ * read as a dashboard nobody had asked for yet.
+ *
+ * Every answer is still a command. The listing is `list`, the ladder is
+ * `status`, and both arrive on streams that re-ask whenever the workspace
+ * moves, so a window open here and an agent working in a terminal cannot drift
+ * apart.
  *
  * The one state this client owns is **whether what it shows is current**. An
  * event stream that drops does not make the last ladder wrong, only old, so it
@@ -51,6 +59,62 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
   opening: "Czytam stan odcinka…",
   stale: "Brak połączenia z serwerem. Poniżej ostatni znany stan, nieaktualny.",
 };
+
+/**
+ * Where the screen is, written in the address.
+ *
+ * In the hash rather than in state, so that a reload lands where it was, the
+ * browser's back button goes back, and an address can be pasted. The bare
+ * address is the start screen, which is the whole of what a person asked to
+ * see when they open this tool.
+ */
+type Route =
+  | { readonly kind: "home" }
+  | { readonly kind: "new" }
+  | { readonly kind: "open" }
+  | { readonly kind: "project"; readonly projectId: string };
+
+const HOME = "#/";
+const NEW = "#/nowy";
+const OPEN = "#/wczytaj";
+
+function projectHref(projectId: string): string {
+  return `#/projekt/${encodeURIComponent(projectId)}`;
+}
+
+const LEADING_HASH = /^#/;
+
+function routeOf(hash: string): Route {
+  const [, first, second] = hash.replace(LEADING_HASH, "").split("/");
+
+  if (first === "nowy") {
+    return { kind: "new" };
+  }
+
+  if (first === "wczytaj") {
+    return { kind: "open" };
+  }
+
+  if (first === "projekt" && second !== undefined && second !== "") {
+    return { kind: "project", projectId: decodeURIComponent(second) };
+  }
+
+  return { kind: "home" };
+}
+
+function useRoute(): Route {
+  const [hash, setHash] = useState(() => window.location.hash);
+
+  useEffect(() => {
+    const follow = (): void => setHash(window.location.hash);
+
+    window.addEventListener("hashchange", follow);
+
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
+
+  return routeOf(hash);
+}
 
 /**
  * Which cells can be opened today.
@@ -144,23 +208,23 @@ function StagePanel(props: PanelProps): JSX.Element | null {
 }
 
 /**
- * What the screen says about itself: the connection, a refusal, an empty tree.
+ * What the project screen says about itself: the connection, a refusal, a
+ * project with nothing in it yet.
  *
  * All three are the same kind of statement and none of them is a result, which
  * is why they sit together and above everything that is one. § 9 of the design
  * manual is the rule they follow: a lost stream leaves the last ladder on
- * screen and says it is old, and an empty workspace says so plainly rather
- * than looking like a tool that failed to load.
+ * screen and says it is old, and an empty project says so plainly rather than
+ * looking like a tool that failed to load.
  */
 function Notices(props: {
   readonly connection: Connection;
   /** Suppressed where stage 0 is the whole screen: there is no ladder to be stale. */
   readonly ladderless: boolean;
-  readonly listing: WorkspaceListing | null;
-  readonly project: ListedProject | null;
+  readonly project: ListedProject;
   readonly refusal: string | null;
 }): JSX.Element {
-  const { connection, ladderless, listing, project, refusal } = props;
+  const { connection, ladderless, project, refusal } = props;
   const note = CONNECTION_NOTE[connection];
 
   return (
@@ -175,10 +239,7 @@ function Notices(props: {
           {refusal}
         </p>
       )}
-      {listing !== null && listing.projects.length === 0 ? (
-        <p className="empty">Katalog roboczy nie ma jeszcze żadnego projektu.</p>
-      ) : null}
-      {project !== null && project.episodes.length === 0 ? (
+      {project.episodes.length === 0 ? (
         <p className="empty">Projekt {project.id} nie ma jeszcze odcinka.</p>
       ) : null}
     </>
@@ -206,8 +267,9 @@ function useReveal(props: {
   const { anchor, opened, panel, showing } = props;
 
   useEffect(() => {
-    // A stage-0 panel standing in for an empty workspace opened itself; there
-    // was no click, so nothing has moved and nothing should be moved to.
+    // A stage-0 panel standing in for a project with no episode opened
+    // itself; there was no click, so nothing has moved and nothing should be
+    // moved to.
     if (!showing || (opened === null && anchor === null)) {
       return;
     }
@@ -247,7 +309,7 @@ function Workbench(props: {
   readonly onRun: (argv: readonly string[]) => void;
   readonly opened: string | null;
   readonly preparing: boolean;
-  readonly projectId: string | null;
+  readonly projectId: string;
   readonly run: RunDone | null;
   readonly running: boolean;
   readonly status: EpisodeStatus | null;
@@ -256,7 +318,6 @@ function Workbench(props: {
   const { projectId, run, running } = props;
   const panelRef = useRef<HTMLDivElement>(null);
   const showing = preparing || cell !== null;
-  const stage = cell === null || projectId === null || episodeId === null ? null : cell;
 
   useReveal({ anchor, opened, panel: panelRef, showing });
 
@@ -288,9 +349,9 @@ function Workbench(props: {
               running={running}
             />
           ) : null}
-          {stage === null || projectId === null || episodeId === null ? null : (
+          {cell === null || episodeId === null ? null : (
             <StagePanel
-              cell={stage}
+              cell={cell}
               episodeId={episodeId}
               onRun={onRun}
               projectId={projectId}
@@ -305,168 +366,178 @@ function Workbench(props: {
 }
 
 /**
- * What this screen is looking at, and the two ways into something that is not
- * in the workspace yet.
+ * The start screen: two choices and nothing else.
  *
- * Two dropdowns alone answered only half the question. They say which project
- * and which episode are being shown, and they have no word at all for "I want
- * a new one", which left the only road into stage 0 running through a row of
- * a ladder that an empty workspace does not have. The buttons are that road,
- * and they are buttons rather than an entry in the lists because starting
- * something new is not one of the things you can pick.
+ * They are links rather than buttons because each one goes somewhere, and a
+ * place is what the address bar, the back button and a middle click are for.
  */
-function Picker(props: {
-  readonly episodeId: string | null;
-  readonly onEpisode: (event: ChangeEvent<HTMLSelectElement>) => void;
-  readonly onNewEpisode: () => void;
-  readonly onNewProject: () => void;
-  readonly onProject: (event: ChangeEvent<HTMLSelectElement>) => void;
-  readonly project: ListedProject | null;
-  readonly projectId: string | null;
-  /** Null until `list` has answered; empty once it has and found nothing. */
-  readonly projects: readonly ListedProject[] | null;
-}): JSX.Element {
-  const { episodeId, onEpisode, onNewEpisode, onNewProject, onProject, project, projectId } = props;
-  const projects = props.projects ?? [];
-
+function Home(): JSX.Element {
   return (
-    <section aria-labelledby="picker-title" className="picker-section">
-      <h2 className="picker-title" id="picker-title">
-        Nad czym pracujesz
-      </h2>
-      <div className="picker">
-        <div className="field">
-          <label htmlFor="project">Projekt</label>
-          <select
-            disabled={projects.length === 0}
-            id="project"
-            onChange={onProject}
-            value={projectId ?? ""}
-          >
-            {projects.map((one) => (
-              <option key={one.id} value={one.id}>
-                {one.id}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="episode">Odcinek</label>
-          <select
-            disabled={project === null || project.episodes.length === 0}
-            id="episode"
-            onChange={onEpisode}
-            value={episodeId ?? ""}
-          >
-            {project?.episodes.map((one) => (
-              <option key={one} value={one}>
-                {one}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div className="picker-actions">
-        <button className="action" onClick={onNewProject} type="button">
-          + Nowy projekt
-        </button>
-        <button
-          className="action"
-          disabled={projectId === null}
-          onClick={onNewEpisode}
-          type="button"
-        >
-          + Nowy odcinek
-        </button>
-        <p className="picker-note">
-          Oba otwierają etap 0: to tam pusty katalog staje się serią, a projekt bez odcinka dostaje
-          pierwszy.
-        </p>
-      </div>
+    <section aria-labelledby="home-title" className="home">
+      <h1 className="sr-only" id="home-title">
+        aimator
+      </h1>
+      <nav aria-label="Od czego zacząć" className="home-choices">
+        <a className="choice" href={NEW}>
+          Nowy projekt
+        </a>
+        <a className="choice" href={OPEN}>
+          Wczytaj projekt
+        </a>
+      </nav>
     </section>
   );
 }
 
-export function App(): JSX.Element {
-  const [listing, setListing] = useState<WorkspaceListing | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [episodeId, setEpisodeId] = useState<string | null>(null);
+/** The way back, one level up, said where the eye starts reading. */
+function Back(props: { readonly href: string; readonly label: string }): JSX.Element {
+  return (
+    <a className="back" href={props.href}>
+      ← {props.label}
+    </a>
+  );
+}
+
+/**
+ * The projects in the workspace, each one a way in.
+ *
+ * A list of links rather than a dropdown, because a dropdown hides the answer
+ * behind a click and this screen has nothing else to show. An empty workspace
+ * says so and offers the other choice, rather than a list that is simply blank.
+ */
+function OpenProject(props: {
+  readonly listing: WorkspaceListing | null;
+  readonly refusal: string | null;
+}): JSX.Element {
+  const { listing, refusal } = props;
+
+  return (
+    <section aria-labelledby="open-title">
+      <Back href={HOME} label="Start" />
+      <h1 id="open-title">Wczytaj projekt</h1>
+      {refusal === null ? null : (
+        <p className="refusal" role="alert">
+          {refusal}
+        </p>
+      )}
+      {listing === null && refusal === null ? (
+        <p className="empty">Czytam katalog roboczy…</p>
+      ) : null}
+      {listing !== null && listing.projects.length === 0 ? (
+        <p className="empty">
+          Katalog roboczy nie ma jeszcze żadnego projektu. <a href={NEW}>Załóż nowy.</a>
+        </p>
+      ) : null}
+      {listing === null || listing.projects.length === 0 ? null : (
+        <ul className="project-list">
+          {listing.projects.map((one) => (
+            <li key={one.id}>
+              <a className="project-link" href={projectHref(one.id)}>
+                <span className="project-id">{one.id}</span>
+                <span className="project-meta">
+                  {plural(one.episodes.length, ["odcinek", "odcinki", "odcinków"])}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Which episode of the open project is being shown, and the way to a new one.
+ *
+ * The project is no longer chosen here: it was chosen on the way in, and the
+ * address says which one it is. What is left is the episode, and "+ Nowy
+ * odcinek" beside it, which opens stage 0 at the episode form.
+ */
+function EpisodePicker(props: {
+  readonly episodeId: string | null;
+  readonly onEpisode: (event: ChangeEvent<HTMLSelectElement>) => void;
+  readonly onNewEpisode: () => void;
+  readonly project: ListedProject;
+}): JSX.Element {
+  const { episodeId, onEpisode, onNewEpisode, project } = props;
+
+  return (
+    <div className="picker">
+      <div className="field">
+        <label htmlFor="episode">Odcinek</label>
+        <select
+          disabled={project.episodes.length === 0}
+          id="episode"
+          onChange={onEpisode}
+          value={episodeId ?? ""}
+        >
+          {project.episodes.map((one) => (
+            <option key={one} value={one}>
+              {one}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button className="action" onClick={onNewEpisode} type="button">
+        + Nowy odcinek
+      </button>
+    </div>
+  );
+}
+
+/** The episode on screen: the one picked, if this project has it, else its first. */
+function shownEpisode(project: ListedProject | null, picked: string | null): string | null {
+  if (project === null) {
+    return null;
+  }
+
+  return picked !== null && project.episodes.includes(picked)
+    ? picked
+    : (project.episodes[0] ?? null);
+}
+
+/**
+ * One project: its episodes, the ladder of the chosen one, and the panel open
+ * beside it.
+ *
+ * This is the screen that used to be the whole application. It is unchanged in
+ * what it answers; what changed is that it is now reached, rather than being
+ * where everybody lands.
+ */
+function ProjectView(props: {
+  readonly listing: WorkspaceListing | null;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly onRunCleared: () => void;
+  readonly projectId: string;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { listing, onRun, onRunCleared, projectId, run, running } = props;
+  const project = listing?.projects.find((one) => one.id === projectId) ?? null;
+  /**
+   * The episode somebody picked, which is a preference rather than a fact.
+   *
+   * What is shown is derived from it and from the listing, so an episode that
+   * is not in this project (a stale pick, a project just created) falls back
+   * to the first one in the same render rather than one effect later, which
+   * would have opened a stream for an episode the project does not have.
+   */
+  const [picked, setPicked] = useState<string | null>(null);
+  const episodeId = shownEpisode(project, picked);
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
   const [opened, setOpened] = useState<string | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
-  const [run, setRun] = useState<RunDone | null>(null);
   /**
    * Which part of the open panel a person was asking for, when they asked for
-   * a part of it. "Nowy projekt" and "Nowy odcinek" open the same stage-0
-   * panel, so what tells them apart is where the panel is scrolled to; a
-   * panel opened from the ladder has no such part and leaves this null.
+   * a part of it. "+ Nowy odcinek" opens the stage-0 panel scrolled to the
+   * episode form; a panel opened from the ladder has no such part and leaves
+   * this null.
    */
   const [anchor, setAnchor] = useState<string | null>(null);
 
-  /**
-   * The workspace's own contents, re-read whenever a command finishes.
-   *
-   * Stage 0 is why: a project and an episode are things this screen can
-   * create, and a picker that only read once would not show what the person
-   * just made. Every other command leaves the listing exactly as it was, so
-   * re-reading it costs one directory walk and never lies.
-   */
   useEffect(() => {
-    let cancelled = false;
-
-    const read = async (): Promise<void> => {
-      const response = await fetch("/api/projects");
-      const body = (await response.json()) as Refusal | WorkspaceListing;
-
-      if (cancelled) {
-        return;
-      }
-
-      if ("error" in body) {
-        setRefusal(body.error.message);
-
-        return;
-      }
-
-      setListing(body);
-    };
-
-    read().catch(() => {
-      if (!cancelled) {
-        setRefusal("Serwer nie odpowiada. Uruchom go poleceniem pnpm ui.");
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [run]);
-
-  /** The first thing anybody could be looking at, when nothing is chosen yet. */
-  useEffect(() => {
-    if (listing === null) {
-      return;
-    }
-
-    const chosen = listing.projects.find((one) => one.id === projectId) ?? listing.projects[0];
-
-    if (chosen === undefined) {
-      return;
-    }
-
-    if (projectId === null) {
-      setProjectId(chosen.id);
-    }
-
-    if (episodeId === null || !chosen.episodes.includes(episodeId)) {
-      setEpisodeId(chosen.episodes[0] ?? null);
-    }
-  }, [episodeId, listing, projectId]);
-
-  useEffect(() => {
-    if (projectId === null || episodeId === null) {
+    if (episodeId === null) {
       setStatus(null);
 
       return;
@@ -476,7 +547,9 @@ export function App(): JSX.Element {
     setRefusal(null);
     setConnection("opening");
 
-    const events = new EventSource(`/api/events/${projectId}/${episodeId}`);
+    const events = new EventSource(
+      `/api/events/${encodeURIComponent(projectId)}/${encodeURIComponent(episodeId)}`
+    );
 
     events.addEventListener("status", (event) => {
       setStatus(JSON.parse(event.data) as EpisodeStatus);
@@ -487,13 +560,154 @@ export function App(): JSX.Element {
       setRefusal((JSON.parse(event.data) as Refusal).error.message);
       setConnection("live");
     });
-    // A command started here finishes here, whatever else the screen is doing
-    // meanwhile. An identifier this window did not start is somebody else's.
-    events.addEventListener("run", (event) => setRun(JSON.parse(event.data) as RunDone));
+    // Finished commands are read off the workspace stream, which is open on
+    // every screen; this one carries them too, and reading both would be
+    // hearing each answer twice.
     events.addEventListener("error", () => setConnection("stale"));
 
     return () => events.close();
   }, [episodeId, projectId]);
+
+  /**
+   * Opening a cell forgets the last command, **both halves of it**.
+   *
+   * `run` alone is half a fact. What "w toku" is derived from is the pair: an
+   * identifier this window is waiting for, and the answer that has not come
+   * back under it yet. Clearing the answer and keeping the identifier made
+   * every finished command look like one still in flight, which disabled every
+   * button in the panel just opened, and there is no way out of that: starting
+   * a command is what clears it, and the buttons that start one are the
+   * disabled ones. Two states, one fact, cleared together, by the one owner of
+   * both.
+   *
+   * Nothing is lost while a real command is running: the result arrives on the
+   * stream whatever is open, and the cell itself says "w toku" off the stage's
+   * own lock file, which is the only progress this server claims to know.
+   */
+  const openCell = useCallback(
+    (id: string) => {
+      onRunCleared();
+      setAnchor(null);
+      setOpened((current) => (current === id ? null : id));
+    },
+    [onRunCleared]
+  );
+  const close = useCallback(() => {
+    setAnchor(null);
+    setOpened(null);
+  }, []);
+  /**
+   * Stage 0 at its episode form, reached from beside the episode picker
+   * rather than from the ladder, where nobody would think to look for it.
+   */
+  const newEpisode = useCallback(() => {
+    onRunCleared();
+    setAnchor("prepare-episode");
+    setOpened(status?.cells.find((cell) => cell.stage === 0)?.id ?? null);
+  }, [onRunCleared, status]);
+  const chooseEpisode = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => setPicked(event.target.value),
+    []
+  );
+
+  if (listing === null) {
+    return <p className="empty">Czytam katalog roboczy…</p>;
+  }
+
+  if (project === null) {
+    return (
+      <section aria-labelledby="project-title">
+        <Back href={OPEN} label="Projekty" />
+        <h1 id="project-title">{projectId}</h1>
+        <p className="refusal" role="alert">
+          W katalogu roboczym nie ma projektu {projectId}.
+        </p>
+      </section>
+    );
+  }
+
+  // The panel renders the cell the ladder is carrying right now, so a finished
+  // command refreshes what the panel says without the panel asking anything.
+  const panel = status?.cells.find((cell) => cell.id === opened && openable(cell)) ?? null;
+  /**
+   * Stage 0 is reachable even when there is no ladder to open it from.
+   *
+   * That is not a convenience: a fresh project has no episode, and `status`
+   * answers about an episode. Stage 0 is what makes the rest exist, so it is
+   * the one panel that cannot be behind the thing it produces.
+   */
+  const ladderless = project.episodes.length === 0 || refusal !== null;
+  const preparing = panel?.stage === 0 || ladderless;
+
+  return (
+    <section aria-labelledby="project-title">
+      <Back href={OPEN} label="Projekty" />
+      <h1 id="project-title">{project.id}</h1>
+      <EpisodePicker
+        episodeId={episodeId}
+        onEpisode={chooseEpisode}
+        onNewEpisode={newEpisode}
+        project={project}
+      />
+      <Notices
+        connection={connection}
+        ladderless={ladderless}
+        project={project}
+        refusal={refusal}
+      />
+      <Workbench
+        anchor={anchor}
+        cell={panel}
+        episodeId={episodeId}
+        onClose={close}
+        onOpen={openCell}
+        onRun={onRun}
+        opened={opened}
+        preparing={preparing}
+        projectId={project.id}
+        run={run}
+        running={running}
+        status={status}
+      />
+    </section>
+  );
+}
+
+export function App(): JSX.Element {
+  const route = useRoute();
+  const [listing, setListing] = useState<WorkspaceListing | null>(null);
+  const [listingRefusal, setListingRefusal] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [run, setRun] = useState<RunDone | null>(null);
+
+  /**
+   * The workspace's own stream, open on every screen.
+   *
+   * It carries the listing, re-read whenever something under the workspace
+   * moves, so a project created here or by an agent in a terminal shows up
+   * without a reload. And it carries every finished command, which is the
+   * reason it exists at all: a project is created before there is an episode
+   * whose stream could have delivered the answer.
+   */
+  useEffect(() => {
+    const events = new EventSource("/api/events");
+
+    events.addEventListener("listing", (event) => {
+      setListing(JSON.parse(event.data) as WorkspaceListing);
+      setListingRefusal(null);
+    });
+    events.addEventListener("refusal", (event) => {
+      setListingRefusal((JSON.parse(event.data) as Refusal).error.message);
+    });
+    // A command started here finishes here, whatever else the screen is doing
+    // meanwhile. An identifier this window did not start is somebody else's.
+    events.addEventListener("run", (event) => setRun(JSON.parse(event.data) as RunDone));
+    events.addEventListener("error", () =>
+      setListingRefusal("Serwer nie odpowiada. Uruchom go poleceniem pnpm ui.")
+    );
+
+    return () => events.close();
+  }, []);
 
   /**
    * One click, one command, and nothing waited for.
@@ -521,54 +735,30 @@ export function App(): JSX.Element {
         })
       );
   }, []);
-
-  /**
-   * Opening a cell forgets the last command, **both halves of it**.
-   *
-   * `run` alone is half a fact. What "w toku" is derived from is the pair: an
-   * identifier this window is waiting for, and the answer that has not come
-   * back under it yet. Clearing the answer and keeping the identifier made
-   * every finished command look like one still in flight, which disabled every
-   * button in the panel just opened, and there is no way out of that: starting
-   * a command is what clears it, and the buttons that start one are the
-   * disabled ones. Two states, one fact, cleared together.
-   *
-   * Nothing is lost while a real command is running: the result arrives on the
-   * stream whatever is open, and the cell itself says "w toku" off the stage's
-   * own lock file, which is the only progress this server claims to know.
-   */
-  const openCell = useCallback((id: string) => {
+  const clearRun = useCallback(() => {
     setRun(null);
     setPending(null);
-    setAnchor(null);
-    setOpened((current) => (current === id ? null : id));
   }, []);
-  const close = useCallback(() => {
-    setAnchor(null);
-    setOpened(null);
+  const created = useCallback((projectId: string) => {
+    window.location.hash = projectHref(projectId);
   }, []);
-  /**
-   * Stage 0 reached from the picker rather than from the ladder.
-   *
-   * A workspace that already holds a project has a ladder, and the only way
-   * into "a project that does not exist yet" was to know that stage 0's row
-   * opens the form. That is a road nobody finds. Both buttons open the same
-   * panel, because it is one stage; what differs is which of its forms the
-   * panel is scrolled to.
-   */
-  const openPrepare = useCallback(
-    (part: string) => {
-      setRun(null);
-      setPending(null);
-      setAnchor(part);
-      setOpened(status?.cells.find((cell) => cell.stage === 0)?.id ?? null);
-    },
-    [status]
-  );
-  const newProject = useCallback(() => openPrepare("prepare-new-project"), [openPrepare]);
-  const newEpisode = useCallback(() => openPrepare("prepare-episode"), [openPrepare]);
 
-  const project = listing?.projects.find((one) => one.id === projectId) ?? null;
+  /**
+   * A command's answer belongs to the screen that started it.
+   *
+   * Leaving that screen forgets it, so the next one does not open with a
+   * result nobody on it asked for. It is adjusted while rendering rather than
+   * in an effect, so no frame ever shows the old answer on the new screen.
+   */
+  const routeKey = route.kind === "project" ? `project:${route.projectId}` : route.kind;
+  const [shownRoute, setShownRoute] = useState(routeKey);
+
+  if (shownRoute !== routeKey) {
+    setShownRoute(routeKey);
+    setRun(null);
+    setPending(null);
+  }
+
   /**
    * Still running, derived rather than remembered.
    *
@@ -579,35 +769,6 @@ export function App(): JSX.Element {
    * identifier the result carries is the proof, so the two are compared.
    */
   const running = pending !== null && run?.runId !== pending;
-  // The panel renders the cell the ladder is carrying right now, so a finished
-  // command refreshes what the panel says without the panel asking anything.
-  const panel = status?.cells.find((cell) => cell.id === opened && openable(cell)) ?? null;
-  /**
-   * Stage 0 is reachable even when there is no ladder to open it from.
-   *
-   * That is not a convenience: an empty workspace has no project, a fresh
-   * project has no episode, and `status` answers about an episode. Stage 0 is
-   * what makes the rest exist, so it is the one panel that cannot be behind
-   * the thing it produces.
-   */
-  const ladderless =
-    listing !== null && (project === null || project.episodes.length === 0 || refusal !== null);
-  const preparing = panel?.stage === 0 || ladderless;
-
-  /** Choosing a project chooses its first episode: no empty in-between. */
-  const chooseProject = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => {
-      const chosen = listing?.projects.find((one) => one.id === event.target.value);
-
-      setProjectId(event.target.value);
-      setEpisodeId(chosen?.episodes[0] ?? null);
-    },
-    [listing]
-  );
-  const chooseEpisode = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => setEpisodeId(event.target.value),
-    []
-  );
 
   return (
     <>
@@ -616,7 +777,7 @@ export function App(): JSX.Element {
       </a>
       <header className="app-header">
         <div className="header-inner wrap">
-          <div className="brand">
+          <a aria-label="aimator: start" className="brand" href={HOME}>
             <img
               alt="Auditmos"
               className="logo logo-dark"
@@ -632,59 +793,33 @@ export function App(): JSX.Element {
               width="738"
             />
             <span className="product">aimator</span>
-          </div>
+          </a>
           <ThemeSelect />
         </div>
       </header>
       <main className="wrap" id="main">
-        <h1>Drabina etapów</h1>
-        <p className="intro">
-          Stan jednego odcinka, etap po etapie, prosto z komend <code>list</code> i{" "}
-          <code>status</code>. Odświeża się sam, gdy coś w katalogu roboczym się zmieni.
-        </p>
-        <Picker
-          episodeId={episodeId}
-          onEpisode={chooseEpisode}
-          onNewEpisode={newEpisode}
-          onNewProject={newProject}
-          onProject={chooseProject}
-          project={project}
-          projectId={projectId}
-          projects={listing?.projects ?? null}
-        />
-        <Notices
-          connection={connection}
-          ladderless={ladderless}
-          listing={listing}
-          project={project}
-          refusal={refusal}
-        />
-        <Workbench
-          anchor={anchor}
-          cell={panel}
-          episodeId={episodeId}
-          onClose={close}
-          onOpen={openCell}
-          onRun={start}
-          opened={opened}
-          preparing={preparing}
-          // The project the listing actually holds, never the one this client
-          // last remembered: a panel aimed at a directory nobody has any more
-          // would spell commands the CLI can only refuse.
-          projectId={project?.id ?? null}
-          run={run}
-          running={running}
-          status={status}
-        />
+        {route.kind === "home" ? <Home /> : null}
+        {route.kind === "new" ? (
+          <>
+            <Back href={HOME} label="Start" />
+            <NewProject onCreated={created} onRun={start} run={run} running={running} />
+          </>
+        ) : null}
+        {route.kind === "open" ? <OpenProject listing={listing} refusal={listingRefusal} /> : null}
+        {route.kind === "project" ? (
+          // Keyed by project, so moving between two of them starts the second
+          // with nothing left over from the first: no open panel, no pick.
+          <ProjectView
+            key={route.projectId}
+            listing={listing}
+            onRun={start}
+            onRunCleared={clearRun}
+            projectId={route.projectId}
+            run={run}
+            running={running}
+          />
+        ) : null}
       </main>
-      <footer className="app-footer">
-        <div className="wrap">
-          <p>Auditmos OÜ · Reg 17025406 · VAT EE102758111</p>
-          <p className="workspace">
-            Katalog roboczy: <code>{listing?.workspace ?? "…"}</code>
-          </p>
-        </div>
-      </footer>
     </>
   );
 }

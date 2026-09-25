@@ -159,41 +159,92 @@ h1 {
   font-weight: 600;
   color: var(--color-neutral-50);
 }
-.intro {
-  max-width: 48rem;
-  margin: 0.5rem 0 2rem;
-  color: var(--color-neutral-400);
-}
 
-/* Controls first: this is a tool, so the picker sits above the answer. It
-   says what it is, because two unlabelled dropdowns do not tell a person that
-   this is where they choose what to work on, and the two buttons under them
-   are the only visible way into a project that does not exist yet. */
-.picker-title {
-  margin: 0 0 0.5rem;
+/* The start screen: two choices, centred in the room the page has, and
+   nothing competing with them. Large enough to be the obvious target, equal
+   in weight because neither is the default. */
+.home {
+  display: grid;
+  place-items: center;
+  min-height: 55vh;
+}
+.home-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1.25rem;
+  width: min(100%, 36rem);
+}
+.choice {
+  display: grid;
+  place-items: center;
+  min-height: 9rem;
+  padding: 1.5rem;
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.375rem;
   font-weight: 600;
   color: var(--color-neutral-50);
+  text-decoration: none;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
 }
-.picker-actions {
+.choice:hover {
+  border-color: var(--color-brand-ink);
+}
+.brand {
+  text-decoration: none;
+}
+.back {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-neutral-400);
+  text-decoration: none;
+}
+.back:hover {
+  color: var(--color-neutral-50);
+}
+.project-list {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 36rem;
+  padding: 0;
+  margin: 1.5rem 0 0;
+  list-style: none;
+}
+.project-link {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  margin-top: 0.75rem;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  color: var(--color-neutral-50);
+  text-decoration: none;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
 }
-.picker-note {
-  flex-basis: 100%;
-  margin: 0;
+.project-link:hover {
+  border-color: var(--color-brand-ink);
+}
+.project-id {
+  font-family: var(--font-mono);
+}
+.project-meta {
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
 }
+
+/* Inside a project, the episode is the one thing left to choose, and the way
+   to a new one stands beside it. */
 .picker {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
+  align-items: flex-end;
   padding: 1rem;
+  margin-top: 1.5rem;
   background: var(--color-neutral-900);
   border: 1px solid var(--color-neutral-800);
   border-radius: 0.5rem;
@@ -761,19 +812,6 @@ h1 {
   color: var(--color-neutral-400);
 }
 
-.app-footer {
-  padding-block: 1.5rem;
-  font-size: 0.75rem;
-  color: var(--color-neutral-400);
-  border-top: 1px solid var(--color-neutral-800);
-}
-.app-footer p {
-  margin: 0;
-}
-.workspace code {
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
-}
 @media (width <= 40rem) {
   .cell-body {
     grid-template-columns: 2rem minmax(0, 1fr);

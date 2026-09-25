@@ -314,7 +314,7 @@ files do:
 ui/                    # The client: browser files where the browser files go
 ├── index.html         # Vite's entry, served in middleware mode by src/ui/serve.ts
 ├── main.tsx           # The one place the browser and the application meet
-├── app.tsx            # One screen: what is in the workspace, where one episode stands
+├── app.tsx            # Start (new or existing project), then one project and its ladder
 ├── ladder.tsx         # The ladder of one episode, cell by cell, as status wrote it
 ├── panel.tsx          # What every stage panel repeats, in one place
 ├── panel.test.ts      # The readers: a stage's report as a bill and as a prompt

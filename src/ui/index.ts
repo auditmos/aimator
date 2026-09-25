@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { open } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { run } from "../cli/index.js";
 import { parseRange } from "../lib/byte-range.js";
@@ -292,28 +292,26 @@ export function createUi(options: UiOptions): Hono {
   );
 
   /**
-   * The same ladder, pushed again whenever the workspace moves.
+   * One command's answer, pushed again whenever the workspace moves.
    *
    * Two windows on one workspace is the ordinary case here, because the agent
    * in the terminal and the person in the browser are working on one episode,
    * so a screen that only answered when asked would be wrong for as long as it
-   * took somebody to reload it. What travels is the whole ladder rather than a
-   * description of what changed: the server has no idea what changed, and that
-   * is deliberate.
+   * took somebody to reload it. What travels is the whole answer (the ladder,
+   * the listing) rather than a description of what changed: the server has no
+   * idea what changed, and that is deliberate.
    *
    * A refusal travels too, under its own event name, because "the project is
    * gone" is a state the screen has to show rather than a reason to hang up.
    */
-  app.get("/api/events/:projectId/:episodeId", (c) => {
-    const argv = ["status", c.req.param("projectId"), c.req.param("episodeId")];
-
-    return streamSSE(c, async (stream) => {
+  const live = (c: Context, argv: readonly string[], event: string): Response =>
+    streamSSE(c, async (stream) => {
       const push = async (): Promise<void> => {
         const result = await ask(argv);
 
         await stream.writeSSE(
           result.ok
-            ? { data: result.data, event: "status" }
+            ? { data: result.data, event }
             : {
                 data: JSON.stringify({
                   error: { message: result.error.message, name: result.error.name },
@@ -364,7 +362,23 @@ export function createUi(options: UiOptions): Hono {
         });
       });
     });
-  });
+
+  /**
+   * What is in the workspace, pushed again whenever it moves.
+   *
+   * The ladder's stream answers about an episode, and the screen spends its
+   * first moments with none: choosing a project, or creating one. A command
+   * started there still has to finish somewhere, and before this stream
+   * existed "Załóż projekt" waited for an answer that had no socket to arrive
+   * on. So this one carries every finished run too, and the listing with it,
+   * which is also what lets a project an agent made in a terminal appear in
+   * the picker without anyone reloading.
+   */
+  app.get("/api/events", (c) => live(c, ["list"], "listing"));
+
+  app.get("/api/events/:projectId/:episodeId", (c) =>
+    live(c, ["status", c.req.param("projectId"), c.req.param("episodeId")], "status")
+  );
 
   /**
    * A command, started and let go of.

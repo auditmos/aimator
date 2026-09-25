@@ -153,7 +153,7 @@ export function RunOutput(props: {
  * paid stage has to put on screen correctly, and the stages that draw six
  * images need the third form that a stage buying one call never reaches.
  */
-function plural(count: number, forms: readonly [string, string, string]): string {
+export function plural(count: number, forms: readonly [string, string, string]): string {
   const tens = count % 100;
   const ones = count % 10;
 
