@@ -141,19 +141,50 @@ function CharacterCard(props: {
   );
 }
 
-/** A character the project has not named yet. */
+/**
+ * A character the project has not named yet.
+ *
+ * The fields empty themselves once the CLI has said yes, because the name
+ * they still held was then a character that already exists, and sending it
+ * again is only a refusal waiting to happen. A refusal leaves them as typed,
+ * so the mistake can be corrected rather than retyped. Only this form's own
+ * command counts: `submitted` is set here and cleared by the first answer, so
+ * a "Sprawdź" run afterwards cannot empty a form nobody sent.
+ */
 function NewCharacter(props: {
   readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
+  readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { onRun, projectId, running } = props;
+  const { onRun, projectId, run, running } = props;
   const [characterId, setCharacterId] = useState("");
   const [name, setName] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   const add = useMemo(
     () => INTENTS.addCharacter({ characterId, name, projectId }),
     [characterId, name, projectId]
   );
+  const submit = useCallback(
+    (argv: readonly string[]) => {
+      setSubmitted(true);
+      onRun(argv);
+    },
+    [onRun]
+  );
+
+  useEffect(() => {
+    if (!submitted || running || run === null) {
+      return;
+    }
+
+    if (run.ok) {
+      setCharacterId("");
+      setName("");
+    }
+
+    setSubmitted(false);
+  }, [run, running, submitted]);
 
   return (
     <div className="cast-new">
@@ -174,7 +205,7 @@ function NewCharacter(props: {
           value={name}
         />
       </div>
-      <Action argv={add} disabled={running} label="Dopisz postać" onRun={onRun} />
+      <Action argv={add} disabled={running} label="Dopisz postać" onRun={submit} />
     </div>
   );
 }
@@ -260,7 +291,12 @@ export function ProjectCast(props: {
             <Answer here={origin === `character:${entry.id}`} run={run} running={running} />
           </div>
         ))}
-        <NewCharacter onRun={from("new-character")} projectId={projectId} running={running} />
+        <NewCharacter
+          onRun={from("new-character")}
+          projectId={projectId}
+          run={run}
+          running={running}
+        />
         <Answer here={origin === "new-character"} run={run} running={running} />
       </section>
 
