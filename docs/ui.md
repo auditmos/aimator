@@ -38,9 +38,14 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   odcinka. Ten `check` czyta kilka plików projektu, a nie całą drabinę, więc w odróżnieniu
   od znaku odcinka czyta się na nowo przy każdej zmianie w katalogu roboczym.
 - **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
-  odcinek” albo „Wczytaj odcinek”, pod nimi ten sam znak etapu 0, a dopóki etap 0 czegoś
-  chce, słowa samego `check`: lista braków z odmowy albo zdanie, że nikt jeszcze nie
-  powiedział „tak”. Pod nimi, ciszej, odnośnik „Obsada i narrator”.
+  odcinek” albo „Wczytaj odcinek”, pod nimi ten sam znak etapu 0, a pod znakiem: gdy
+  etap 0 jest niekompletny, słowa samego `check`, czyli listę braków z odmowy; gdy pliki
+  się zgadzają, a nikt ich nie przyjął, zwinięte „Przeczytaj zasady (project.md)” i
+  przycisk „Zatwierdź etap 0” (`approve <id> --stage prepare`). Etap 0 należy do
+  projektu, więc projekt bez odcinka też da się tu zatwierdzić, a nie tylko z terminala;
+  zatwierdzenie przyjmuje projekt i każdy jego odcinek naraz, jak w terminalu, i ekran to
+  mówi. Gdy `project.md` zmienił się po akceptacji, zasady są rozwinięte, a zdanie nad
+  przyciskiem mówi, że zgoda wygasła. Pod nimi, ciszej, odnośnik „Obsada i narrator”.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc

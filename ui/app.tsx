@@ -18,7 +18,7 @@ import {
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { Commands, plural, RunDock, SettledStage } from "./panel";
-import { NewEpisode, NewProject, PreparePanel } from "./prepare";
+import { NewEpisode, NewProject, PreparePanel, ProjectApproval } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ScreenplayPanel } from "./screenplay";
@@ -452,25 +452,32 @@ function usePrepareReadiness(
  * the stage knows how to make.
  */
 function PrepareStanding(props: {
+  readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
   readonly revision: unknown;
+  readonly running: boolean;
 }): JSX.Element {
-  const { projectId, revision } = props;
+  const { onRun, projectId, revision, running } = props;
   const answer = usePrepareReadiness([projectId], revision).get(projectId) ?? "loading";
-  let words: string | null = null;
-
-  if (answer !== "loading") {
-    if ("error" in answer) {
-      words = answer.error.message;
-    } else if (!answer.approved) {
-      words = answer.nextStep;
-    }
-  }
+  // The same condition the CLI records under, and the episode panel shows its
+  // button under: files that hold together, and nobody's yes on them yet.
+  const acceptable =
+    answer !== "loading" && !("error" in answer) && answer.ready && !answer.approved;
+  const words = answer !== "loading" && "error" in answer ? answer.error.message : null;
 
   return (
     <div className="prepare-standing">
       <PrepareReadiness answer={answer} />
       {words === null ? null : <p className="prepare-words">{words}</p>}
+      {acceptable ? (
+        <ProjectApproval
+          onRun={onRun}
+          projectId={projectId}
+          report={answer}
+          revision={revision}
+          running={running}
+        />
+      ) : null}
     </div>
   );
 }
@@ -905,7 +912,12 @@ function ProjectScreens(props: {
         load={{ href: episodesHref(project.id), label: "Wczytaj odcinek" }}
         make={{ href: newEpisodeHref(project.id), label: "Nowy odcinek" }}
       >
-        <PrepareStanding projectId={project.id} revision={listing} />
+        <PrepareStanding
+          onRun={onRun}
+          projectId={project.id}
+          revision={listing}
+          running={running}
+        />
         {/* Quieter than the two choices: the cast is set once and revisited
             rarely, while an episode is what a visit is for. */}
         <p className="home-aside">

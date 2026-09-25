@@ -437,6 +437,50 @@ export function NewEpisode(props: {
   );
 }
 
+/**
+ * Stage 0's yes, said where the project is.
+ *
+ * Stage 0 belongs to the project, and a project with no episode yet has no
+ * episode panel to say it in, which left a fresh series approvable only from
+ * a terminal. The caller shows this under the CLI's own condition, files that
+ * hold together and nobody's yes on them; what this adds is the one thing a
+ * yes needs, the rules to read, folded above the button rather than a screen
+ * away. It approves what `approve <id>` does, the project with every episode
+ * it has, and says so.
+ */
+export function ProjectApproval(props: {
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly report: Stage0Report;
+  readonly revision: unknown;
+  readonly running: boolean;
+}): JSX.Element {
+  const { onRun, projectId, report, revision, running } = props;
+  const rules = useArtifactText({ artifact: "rules", projectId, stage: "prepare" }, revision);
+  const approve = useMemo(() => INTENTS.approvePrepare({ projectId }), [projectId]);
+  const lapsed = report.changedSinceApproval;
+
+  return (
+    <div className="project-approval">
+      <details className="project-rules" open={lapsed.length > 0}>
+        <summary>Przeczytaj zasady (project.md)</summary>
+        {rules === null ? (
+          <p className="panel-empty">Nie ma jeszcze pliku project.md.</p>
+        ) : (
+          <pre className="artifact-text">{rules}</pre>
+        )}
+      </details>
+      <p className="actions-note decision-why">
+        {lapsed.length > 0
+          ? `Po akceptacji zmienił się ${lapsed.map((path) => path.split("/").at(-1)).join(", ")}, więc wcześniejsza zgoda wygasła. Przeczytaj zasady jeszcze raz i jeśli nadal się zgadzają, zatwierdź ponownie.`
+          : "Pliki się zgadzają i czekają na przeczytanie. Zatwierdzenie przyjmuje zasady projektu i decyzje każdego jego odcinka naraz, tak jak approve w terminalu."}{" "}
+        Nic nie zostanie wygenerowane ani kupione.
+      </p>
+      <Action argv={approve} disabled={running} label="Zatwierdź etap 0" onRun={onRun} primary />
+    </div>
+  );
+}
+
 export function PreparePanel(props: PrepareProps): JSX.Element {
   const { castHref, cell, episodeId, onRun, projectId, run, running } = props;
   const report = (cell?.status ?? null) as Stage0Report | null;
