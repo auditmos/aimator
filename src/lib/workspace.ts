@@ -16,6 +16,11 @@ const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const ARTIFACT_ID = /^[A-Z]\d{2,}$/;
 /** One path segment that cannot escape the directory it is joined onto. */
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+/**
+ * A file's own name as somebody saved it: anything but a separator or a NUL.
+ * Wider than `SAFE_SEGMENT` because `character add` keeps the original name.
+ */
+const SOURCE_NAME = /^[^/\\\0]+$/;
 const EPISODE_SOURCE = /^(\d{1,3})[-_](.+)\.md$/;
 const COMBINING_MARKS = /\p{M}+/gu;
 const NON_SLUG = /[^a-z0-9]+/g;
@@ -566,6 +571,19 @@ export function characterPaths(project: ProjectPaths, characterId: string): Resu
   const root = join(project.characters, characterId);
 
   return ok({ root, sources: join(root, "sources") });
+}
+
+/**
+ * One photograph a character is drawn from, under the name `character add`
+ * copied it with: the original file's own, so it may hold spaces and any
+ * letter. What it may never hold is a separator or a name that means a
+ * directory, because then it would not be a name at all but a path, and a
+ * caller asking for one photograph could walk out of `sources/`.
+ */
+export function characterSource(paths: CharacterPaths, fileName: string): Result<string> {
+  return SOURCE_NAME.test(fileName) && fileName !== "." && fileName !== ".."
+    ? ok(join(paths.sources, fileName))
+    : err(new IdentifierError(fileName, `invalid photograph name "${fileName}"`));
 }
 
 /**

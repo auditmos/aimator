@@ -1,5 +1,6 @@
 import {
   characterPaths,
+  characterSource,
   characterTrackPaths,
   characterViewImage,
   clipFrame,
@@ -334,6 +335,38 @@ function underCharacter(project: ProjectPaths, request: ArtifactRequest): Locate
   return view.ok ? { contentType: PNG, path: view.data } : null;
 }
 
+/** What a photograph is, by the extension it arrived with. */
+const PHOTO_TYPES: Readonly<Record<string, string>> = {
+  gif: "image/gif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: PNG,
+  webp: "image/webp",
+};
+
+/**
+ * Stage 0's photographs: one character, one file, under the name it was
+ * copied with.
+ *
+ * Unlike every other artifact here its name is not this pipeline's word but
+ * the original file's, so the layout module is what refuses a name that is a
+ * path. The type comes from the extension because nothing else decided it;
+ * one a browser cannot show is not served at all, and the card says the path
+ * instead of drawing a broken picture.
+ */
+function underCast(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const character = characterPaths(project, request.characterId);
+
+  if (!character.ok) {
+    return null;
+  }
+
+  const path = characterSource(character.data, request.artifact);
+  const type = PHOTO_TYPES[request.artifact.split(".").at(-1)?.toLowerCase() ?? ""];
+
+  return path.ok && type !== undefined ? { contentType: type, path: path.data } : null;
+}
+
 /** The file a tuple names, or nothing at all. There is no third answer. */
 export function locateArtifact(
   workspace: Workspace,
@@ -349,6 +382,10 @@ export function locateArtifact(
   // series shares, and the only file of this pipeline a person writes by hand.
   if (request.stage === "prepare" && request.artifact === RULES) {
     return { contentType: MARKDOWN, path: project.data.rules };
+  }
+
+  if (request.stage === "prepare" && request.characterId !== "") {
+    return underCast(project.data, request);
   }
 
   if (request.stage === "character") {

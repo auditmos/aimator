@@ -4,6 +4,7 @@ import {
   assemblyRunPaths,
   audioRunPaths,
   characterPaths,
+  characterSource,
   characterTrackPaths,
   characterViewImage,
   clipFrame,
@@ -109,6 +110,41 @@ describe("characterPaths", () => {
 
   it("should reject a character id that could escape the project", () => {
     expect(project.ok ? characterPaths(project.data, "../..").ok : null).toBe(false);
+  });
+});
+
+/**
+ * One photograph, named as `character add` copied it: the file's own name,
+ * spaces and Polish letters included, and never anything that is a path.
+ */
+describe("characterSource", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const character = project.ok ? characterPaths(project.data, "ewa") : null;
+  const source = (name: string): string | null => {
+    if (character === null || !character.ok) {
+      return null;
+    }
+
+    const result = characterSource(character.data, name);
+
+    return result.ok ? result.data : null;
+  };
+
+  it("should put a photograph in the character's sources under its own name", () => {
+    expect(source("Ewa w ogrodzie.JPG")).toBe(
+      "/srv/aimator/projects/demo/characters/ewa/sources/Ewa w ogrodzie.JPG"
+    );
+  });
+
+  it("should refuse a name that is a path, or one that names a directory", () => {
+    expect(["../project.json", "a/b.png", "a\\b.png", "..", ".", ""].map(source)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
   });
 });
 

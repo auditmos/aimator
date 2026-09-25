@@ -11,6 +11,7 @@ import {
   makeSoundDesign,
   makeUpstream,
   PROJECT,
+  png,
   VOICE,
 } from "../test/fixture.js";
 import { INTENTS } from "./commands.js";
@@ -428,6 +429,50 @@ describe("the artifact resolver", () => {
    * Stage 0's two texts, which a person approves by reading: the rules under
    * no episode, because they belong to the series, and the source under one.
    */
+  /**
+   * A cast member's photographs, under the names `character add` kept, so the
+   * cast screen can show the face it is about to draw from. In a workspace of
+   * its own, because adding a photograph lapses the shared fixture's yes.
+   */
+  it("should serve a character's photograph by its own name, and nothing beside it", async () => {
+    const elsewhere = await mkdtemp(join(tmpdir(), "aimator-ui-cast-"));
+    const photo = join(scratch, "Ewa w ogrodzie.png");
+    const cast = resolveWorkspace(elsewhere);
+
+    if (!cast.ok) {
+      throw cast.error;
+    }
+
+    await writeFile(photo, png(8, 8));
+
+    // In order, each on the one before: a character needs its project, and a
+    // photograph needs its character.
+    const at = ["--workspace", elsewhere];
+
+    await run(["project", "init", "obsada", "--title", "Obsada", ...at]);
+    await run(["character", "new", "obsada", "ewa", "--name", "Ewa", ...at]);
+    await run(["character", "add", "obsada", "ewa", "--source", photo, ...at]);
+
+    const app = createUi({ workspace: cast.data });
+    const shown = await app.request(
+      `/api/artifact/obsada/prepare/${encodeURIComponent("Ewa w ogrodzie.png")}?character=ewa`
+    );
+    const bytes = Buffer.from(await shown.arrayBuffer());
+    const refused = await Promise.all(
+      [
+        `/api/artifact/obsada/prepare/${encodeURIComponent("../../project.json")}?character=ewa`,
+        `/api/artifact/obsada/prepare/${encodeURIComponent("Ewa w ogrodzie.png")}`,
+        `/api/artifact/obsada/prepare/${encodeURIComponent("Ewa w ogrodzie.png")}?character=${encodeURIComponent("..")}`,
+      ].map(async (path) => (await app.request(path)).status)
+    );
+
+    await rm(elsewhere, { force: true, recursive: true });
+
+    expect(shown.headers.get("content-type")).toBe("image/png");
+    expect(bytes.equals(png(8, 8))).toBe(true);
+    expect(refused).toEqual([404, 404, 404]);
+  });
+
   it("should serve the project's rules and the episode's source as markdown", async () => {
     const app = createUi({ workspace });
     const rules = await app.request(`/api/artifact/${PROJECT}/prepare/rules`);

@@ -709,16 +709,37 @@ h1 {
 .cast-undecided {
   color: var(--color-warning-text);
 }
-.cast-sources {
+/* The photographs a character is drawn from: small squares, each opening on
+   the whole window, with the file's own name under it. */
+.cast-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.75rem;
   padding: 0;
-  margin: 0.5rem 0 0;
-  font-size: 0.8125rem;
+  margin: 0.75rem 0 0;
   list-style: none;
 }
-.cast-sources code {
-  font-size: 0.8125rem;
+.cast-photos li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.cast-photos img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: center top;
+  background: var(--color-neutral-900);
+  border-radius: 0.25rem;
+}
+.cast-photos code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.75rem;
   color: var(--color-neutral-400);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .cast-new {
   padding-top: 1rem;

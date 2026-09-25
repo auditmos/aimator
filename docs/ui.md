@@ -44,7 +44,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
-  identyfikatora nie wpisuje się drugi raz; pod kartami `character new`. „Narrator”:
+  identyfikatora nie wpisuje się drugi raz; pod kartami `character new`. Zdjęcia stoją na
+  karcie jako miniatury, a nie ścieżki, bo podstawa ze zdjęć to decyzja o twarzy; każde
+  otwiera się na całe okno jak obraz w galeriach etapów. Resolver podaje je pod
+  `prepare/<nazwa pliku>?character=<id>`, pod nazwą, z jaką skopiował je `character add`;
+  nazwę, która jest ścieżką, odrzuca `workspace.ts`, a plik, którego przeglądarka nie
+  pokaże (inny niż PNG, JPEG, WebP i GIF), dostaje 404 i na karcie zostaje jego nazwa. „Narrator”:
   obecny głos i `project voice`. „Sprawdzenie etapu 0”: `check --stage prepare`. Wynik
   komendy pokazuje się w pasku na dole okna, jak na każdym ekranie (patrz niżej). Pole,
   którego komenda się udała (nowa postać, ścieżka zdjęcia, głos narratora), się opróżnia,

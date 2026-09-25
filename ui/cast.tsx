@@ -1,6 +1,6 @@
 import { type JSX, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
-import { Action, Field, useOwnRun } from "./panel";
+import { Action, artifactUrl, Field, Lightbox, type Picture, useOwnRun, Zoomable } from "./panel";
 import type { CastEntry, ProjectOverview, Refusal, RunDone } from "./types";
 
 /**
@@ -78,6 +78,49 @@ function basisOf(entry: CastEntry): string {
   return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
 }
 
+/**
+ * The photographs a character is drawn from, as pictures rather than paths.
+ *
+ * A basis of photographs is a decision about a face, and a list of file names
+ * asks a person to approve a face they cannot see. Each is served by the
+ * resolver under the name `character add` kept, opens on the whole window
+ * like every other picture here, and keeps its name underneath, which is also
+ * what stands in for a photograph the browser cannot show.
+ */
+function Photos(props: { readonly entry: CastEntry; readonly projectId: string }): JSX.Element {
+  const { entry, projectId } = props;
+  const [shown, setShown] = useState<string | null>(null);
+  const pictures = useMemo<readonly Picture[]>(
+    () =>
+      entry.sources.map((path) => {
+        const name = path.split("/").at(-1) ?? path;
+
+        return {
+          caption: entry.name,
+          id: name,
+          url: artifactUrl({ artifact: name, characterId: entry.id, projectId, stage: "prepare" }),
+        };
+      }),
+    [entry, projectId]
+  );
+
+  return (
+    <>
+      <ul className="cast-photos">
+        {pictures.map((picture) => (
+          <li key={picture.id}>
+            <Zoomable id={picture.id} onShow={setShown}>
+              <img alt={picture.id} height={112} loading="lazy" src={picture.url} width={112} />
+            </Zoomable>
+            <code title={picture.id}>{picture.id}</code>
+          </li>
+        ))}
+      </ul>
+      <Lightbox onShow={setShown} pictures={pictures} shown={shown} />
+    </>
+  );
+}
+
 /** One member of the cast: who they are, what they are drawn from, and the two ways to decide it. */
 function CharacterCard(props: {
   readonly entry: CastEntry;
@@ -109,15 +152,7 @@ function CharacterCard(props: {
           {basisOf(entry)}
         </span>
       </header>
-      {entry.sources.length === 0 ? null : (
-        <ul className="cast-sources">
-          {entry.sources.map((path) => (
-            <li key={path}>
-              <code>{path}</code>
-            </li>
-          ))}
-        </ul>
-      )}
+      {entry.sources.length === 0 ? null : <Photos entry={entry} projectId={projectId} />}
       <div className="send">
         <Field
           id={`photo-${entry.id}`}
