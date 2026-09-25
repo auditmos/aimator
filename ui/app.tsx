@@ -15,7 +15,7 @@ import {
 } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
-import { Commands, plural, RunDock } from "./panel";
+import { Commands, plural, RunDock, SettledStage } from "./panel";
 import { NewEpisode, NewProject, PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
@@ -490,29 +490,33 @@ function StageScreen(props: {
       {cell.reason === null ? null : <p className="stage-reason">{cell.reason}</p>}
       <Commands>
         <div className="stage-body">
-          {cell.stage === 0 ? (
-            <PreparePanel
-              castHref={castHref(projectId)}
-              cell={cell}
-              episodeId={episodeId}
-              onRun={onRun}
-              projectId={projectId}
-              run={run}
-              running={running}
-            />
-          ) : (
-            // Keyed by cell, so a tab starts with nothing ticked and nothing
-            // previewed from the tab before it.
-            <StagePanel
-              cell={cell}
-              episodeId={episodeId}
-              key={cell.id}
-              onRun={onRun}
-              projectId={projectId}
-              run={run}
-              running={running}
-            />
-          )}
+          {/* An approved stage opens with every block folded: it is visited
+              to look something up, and its titles are the table of contents. */}
+          <SettledStage settled={cell.state === "approved"}>
+            {cell.stage === 0 ? (
+              <PreparePanel
+                castHref={castHref(projectId)}
+                cell={cell}
+                episodeId={episodeId}
+                onRun={onRun}
+                projectId={projectId}
+                run={run}
+                running={running}
+              />
+            ) : (
+              // Keyed by cell, so a tab starts with nothing ticked and nothing
+              // previewed from the tab before it.
+              <StagePanel
+                cell={cell}
+                episodeId={episodeId}
+                key={cell.id}
+                onRun={onRun}
+                projectId={projectId}
+                run={run}
+                running={running}
+              />
+            )}
+          </SettledStage>
         </div>
       </Commands>
       <Neighbours current={stage.stage} hrefOf={hrefOf} stages={stages} />

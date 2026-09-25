@@ -1,8 +1,10 @@
 import {
   type ChangeEvent,
+  createContext,
   type JSX,
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useState,
 } from "react";
@@ -99,14 +101,34 @@ function Hint(props: { readonly children: ReactNode }): JSX.Element {
 }
 
 /**
- * One part of a panel, as a card of its own.
+ * Whether the stage on screen already has its yes.
+ *
+ * A settled stage is visited to look something up, not to work on it, so its
+ * blocks start folded and the page reads as a list of titles. It is a context
+ * rather than a prop because every block of every panel asks the same
+ * question about the same cell, and threading it through thirteen panels
+ * would be thirteen copies of one fact.
+ */
+const Settled = createContext(false);
+
+export function SettledStage(props: {
+  readonly children: ReactNode;
+  readonly settled: boolean;
+}): JSX.Element {
+  return <Settled.Provider value={props.settled}>{props.children}</Settled.Provider>;
+}
+
+/**
+ * One part of a panel, as a card of its own that folds.
  *
  * Every stage is read in the same order: where it stands, what it produced,
  * the decision about it, and what it would cost to make again. Each of those
- * is a block, so a panel reads as four answers rather than one wall. `fold`
- * makes a block something a person opens: its value is whether it starts
- * open, read once, because a block that closed itself while somebody was
- * inside it would be the screen taking something away mid-sentence.
+ * is a block, so a panel reads as four answers rather than one wall, and each
+ * folds under its title. `fold` is whether it starts open, for the blocks that
+ * are the rarer question (buying again, the settings); every block starts
+ * folded on a stage that is already approved. It is read once: a block that
+ * closed itself while somebody was inside it would be the screen taking
+ * something away mid-sentence.
  */
 export function Block(props: {
   readonly children: ReactNode;
@@ -115,31 +137,20 @@ export function Block(props: {
   readonly hint?: ReactNode;
   readonly title: string;
 }): JSX.Element {
-  const { children, className, fold, hint, title } = props;
-  const [startsOpen] = useState(fold);
+  const { children, className, fold = true, hint, title } = props;
+  const settled = useContext(Settled);
+  const [startsOpen] = useState(fold && !settled);
   const classes = className === undefined ? "block" : `block ${className}`;
-  const body = (
-    <>
-      {hint === undefined ? null : <Hint>{hint}</Hint>}
-      {children}
-    </>
-  );
-
-  if (fold === undefined) {
-    return (
-      <section className={classes}>
-        <h3>{title}</h3>
-        {body}
-      </section>
-    );
-  }
 
   return (
-    <details className={`${classes} block-fold`} open={startsOpen}>
+    <details className={classes} open={startsOpen}>
       <summary>
         <h3>{title}</h3>
       </summary>
-      {body}
+      <div className="block-body">
+        {hint === undefined ? null : <Hint>{hint}</Hint>}
+        {children}
+      </div>
     </details>
   );
 }

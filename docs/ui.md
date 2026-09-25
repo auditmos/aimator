@@ -145,7 +145,11 @@ odmówić tuzinem zdań naraz. Zdania nie znikają, a liczba na zwinięciu mówi
 ## Z czego składa się panel
 
 Każdy panel to kolumna **bloków**, osobnych kart z tytułem, zawsze w tej samej kolejności.
-Dzięki temu na każdym etapie wiadomo, gdzie szukać:
+Każdy blok zwija się pod swoim tytułem. Na etapie (albo zakładce), który jest już
+**zatwierdzony**, wszystkie startują zwinięte: taki etap otwiera się, żeby coś sprawdzić,
+nie żeby nad nim pracować, więc tytuły bloków służą za spis treści. Stan otwarcia czyta
+się raz, przy wejściu na stronę, bo blok zamykający się komuś pod ręką zabierałby coś w
+pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szukać:
 
 1. **Stan**: werdykt `check`, odmowy, meldunki i dryf wejść.
 2. **To, co etap wyprodukował**: tekst, obrazy, łańcuch klipów, film albo nagrania, pod
