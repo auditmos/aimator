@@ -131,21 +131,41 @@ export function SettledStage(props: {
  * folded on a stage that is already approved. It is read once: a block that
  * closed itself while somebody was inside it would be the screen taking
  * something away mid-sentence.
+ *
+ * `reveal` is the one way in from outside, and it only ever opens: each time
+ * it grows, the block unfolds and scrolls into view, because a button
+ * elsewhere on the page has just sent somebody here.
  */
 export function Block(props: {
   readonly children: ReactNode;
   readonly className?: string;
   readonly fold?: boolean;
   readonly hint?: ReactNode;
+  readonly reveal?: number;
   readonly title: string;
 }): JSX.Element {
-  const { children, className, fold = true, hint, title } = props;
+  const { children, className, fold = true, hint, reveal = 0, title } = props;
   const settled = useContext(Settled);
   const [startsOpen] = useState(fold && !settled);
+  const details = useRef<HTMLDetailsElement>(null);
   const classes = className === undefined ? "block" : `block ${className}`;
 
+  useEffect(() => {
+    const element = details.current;
+
+    if (reveal === 0 || element === null) {
+      return;
+    }
+
+    element.open = true;
+    element.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [reveal]);
+
   return (
-    <details className={classes} open={startsOpen}>
+    <details className={classes} open={startsOpen} ref={details}>
       <summary>
         <h3>{title}</h3>
       </summary>
@@ -657,11 +677,24 @@ export function PaidCall<Report extends PaidReport>(props: {
    * magnitude and are therefore two numbers rather than one.
    */
   readonly read: (report: Report) => Priced;
+  /** Grows when "Narysuj ponownie" sends somebody here; see `useRedraw`. */
+  readonly reveal?: number;
   readonly running: boolean;
   /** The argv of the last command the panel started, whatever it was. */
   readonly sent: readonly string[] | null;
 }): JSX.Element {
-  const { children, note, onRun, open, preview, projectRun, read, running, sent } = props;
+  const {
+    children,
+    note,
+    onRun,
+    open,
+    preview,
+    projectRun,
+    read,
+    reveal = 0,
+    running,
+    sent,
+  } = props;
   const [previewed, setPreviewed] = useState<Previewed | null>(null);
 
   useEffect(() => {
@@ -691,7 +724,7 @@ export function PaidCall<Report extends PaidReport>(props: {
   }, [onRun, previewed]);
 
   return (
-    <Block fold={open} hint={note} title="Generowanie (płatne)">
+    <Block fold={open} hint={note} reveal={reveal} title="Generowanie (płatne)">
       {children}
 
       <Action argv={preview} disabled={running} label="Generuj" onRun={onRun} />
@@ -705,6 +738,57 @@ export function PaidCall<Report extends PaidReport>(props: {
         <Bought onBuy={runBuy} previewed={previewed} running={running} />
       )}
     </Block>
+  );
+}
+
+/**
+ * "Not this one, again": the way out of a picture nobody is going to accept.
+ *
+ * There is no reject in this pipeline, because a refusal is not a decision
+ * worth storing: an unapproved picture simply waits, and what a person does
+ * about it is draw it again. That used to live behind a checkbox inside the
+ * folded paid block, which is exactly where nobody looks while judging, so the
+ * decision block carries the way in. It does not spend: it turns on a new
+ * paid attempt, opens the paid block where the bill will stand, and runs the
+ * free preview, so the one click that costs money is still "Kup" under a bill
+ * somebody has read.
+ */
+export function useRedraw(
+  onRun: (argv: readonly string[]) => void,
+  onRegenerate: (wanted: boolean) => void
+): { readonly redraw: (argv: readonly string[]) => void; readonly reveal: number } {
+  const [reveal, setReveal] = useState(0);
+  const redraw = useCallback(
+    (argv: readonly string[]) => {
+      onRegenerate(true);
+      setReveal((count) => count + 1);
+      onRun(argv);
+    },
+    [onRegenerate, onRun]
+  );
+
+  return { redraw, reveal };
+}
+
+/** The button `useRedraw` answers, with what it costs said beside it. */
+export function Redraw(props: {
+  readonly argv: readonly string[];
+  readonly count: number;
+  readonly onRedraw: (argv: readonly string[]) => void;
+  readonly running: boolean;
+}): JSX.Element {
+  const { argv, count, onRedraw, running } = props;
+
+  return (
+    <>
+      <Action
+        argv={argv}
+        disabled={running}
+        label={count > 1 ? `Narysuj ponownie (${count})` : "Narysuj ponownie"}
+        onRun={onRedraw}
+      />
+      <p className="actions-note">Najpierw darmowy podgląd; płacisz dopiero przyciskiem „Kup”.</p>
+    </>
   );
 }
 
@@ -723,10 +807,26 @@ function Bought(props: {
 }): JSX.Element {
   const { priced, problems, send } = props.previewed;
   const buying = priced.billed.some((line) => line.count > 0);
+  const bill = useRef<HTMLParagraphElement>(null);
+  const purchase = useRef<HTMLDivElement>(null);
+
+  // A fresh bill and its "Kup" are the things to read next, and they often land
+  // below the fold or under the dock; they are brought up only when "Kup" (or
+  // the bill, when nothing can be bought) is not already in sight.
+  useEffect(() => {
+    const element = purchase.current ?? bill.current;
+
+    if (element !== null && element.getBoundingClientRect().bottom > window.innerHeight - 180) {
+      bill.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "center",
+      });
+    }
+  }, [send.runId]);
 
   return (
     <>
-      <p className="bill">
+      <p className="bill" ref={bill}>
         Do kupienia: {priced.billed.map((line) => plural(line.count, line.unit)).join(", ")}
       </p>
 
@@ -735,7 +835,7 @@ function Bought(props: {
       <Problems problems={problems} />
 
       {buying ? (
-        <div className="actions">
+        <div className="actions" ref={purchase}>
           <RunButton disabled={props.running} onClick={props.onBuy} primary>
             Kup
           </RunButton>

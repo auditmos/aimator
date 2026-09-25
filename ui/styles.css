@@ -256,6 +256,26 @@ h1 {
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
 }
+/* Where an episode stands, as one mark beside its name: a filled check when
+   every stage is approved, a ring filling up with the share that is otherwise.
+   The word stands beside the mark, so it is never the colour alone. */
+.readiness {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  white-space: nowrap;
+}
+.readiness-icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+.readiness-done {
+  color: var(--color-success-text);
+}
+.readiness-work {
+  color: var(--color-warning-text);
+}
 
 .field {
   display: flex;

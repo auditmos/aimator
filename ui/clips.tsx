@@ -16,8 +16,10 @@ import {
   Problems,
   pickable,
   promptsOf,
+  Redraw,
   Said,
   type Unit,
+  useRedraw,
   Zoomable,
 } from "./panel";
 import type { ClipState, ClipsStatus, MediaReport, RunDone, StatusCell } from "./types";
@@ -246,6 +248,11 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
     () => INTENTS.previewClips({ ...scope, imageModel, regenerate, videoModel }),
     [imageModel, regenerate, scope, videoModel]
   );
+  /** The same preview with a new paid attempt on, whatever the checkbox says now. */
+  const again = useMemo(
+    () => INTENTS.previewClips({ ...scope, imageModel, regenerate: true, videoModel }),
+    [imageModel, scope, videoModel]
+  );
   const startRun = useCallback(
     (argv: readonly string[]) => {
       setSent(argv);
@@ -253,6 +260,7 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
     },
     [onRun]
   );
+  const { redraw, reveal } = useRedraw(startRun, setRegenerate);
   const toggle = useCallback((id: string, wanted: boolean) => {
     setChosen((current) => (wanted ? [...current, id] : current.filter((one) => one !== id)));
   }, []);
@@ -279,6 +287,9 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   const picked = artifacts.filter((one) => selected.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
+  // Only what exists can be made again; a link nobody rendered yet needs no
+  // "again", and the preview would only answer zero.
+  const redrawable = picked.length > 0 && picked.every((one) => one.state === "completed");
   // A republication rewrites a record out of its own archive, and an entry
   // frame has none to rewrite: it was published exactly as the image model
   // drew it. The CLI refuses the mixed case with a sentence; the button simply
@@ -347,10 +358,12 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
 
         {acceptable ? (
           <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : null}
+        {redrawable ? (
+          <Redraw argv={again} count={picked.length} onRedraw={redraw} running={running} />
         ) : (
           <p className="actions-note">
-            „Zatwierdź” pojawia się, gdy zaznaczone ogniwa istnieją i czekają na przyjęcie. Tak samo
-            odmówiłby terminal.
+            Zaznacz ogniwa, żeby je zatwierdzić albo zrobić ponownie. Tak samo odmówiłby terminal.
           </p>
         )}
       </Block>
@@ -362,6 +375,7 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
         preview={preview}
         projectRun={run}
         read={asMedia}
+        reveal={reveal}
         running={running}
         sent={sent}
       >

@@ -9,7 +9,9 @@ import {
   Gallery,
   PaidCall,
   Problems,
+  Redraw,
   Said,
+  useRedraw,
 } from "./panel";
 import type { OpeningFrameStatus, RunDone, StatusCell } from "./types";
 
@@ -52,6 +54,11 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
     () => INTENTS.previewOpeningFrame({ ...scope, model, regenerate }),
     [model, regenerate, scope]
   );
+  /** The same preview with a new paid attempt on, whatever the checkbox says now. */
+  const again = useMemo(
+    () => INTENTS.previewOpeningFrame({ ...scope, model, regenerate: true }),
+    [model, scope]
+  );
   const startRun = useCallback(
     (argv: readonly string[]) => {
       setSent(argv);
@@ -59,6 +66,7 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
     },
     [onRun]
   );
+  const { redraw, reveal } = useRedraw(startRun, setRegenerate);
   const changeRegenerate = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
     []
@@ -73,6 +81,9 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
 
   const frame = status?.artifact ?? null;
   const acceptable = frame !== null && frame.state === "completed" && !frame.approved;
+  // An accepted frame is drawn again from the paid block on purpose, since
+  // doing so lapses the yes; one still waiting is one click away.
+  const redrawable = acceptable;
 
   return (
     <section aria-labelledby="opening-title" className="panel">
@@ -126,10 +137,13 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
 
         {acceptable ? (
           <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : null}
+        {redrawable ? (
+          <Redraw argv={again} count={1} onRedraw={redraw} running={running} />
         ) : (
           <p className="actions-note">
-            „Zatwierdź” pojawia się, gdy klatka istnieje i czeka na przyjęcie. Tak samo odmówiłby
-            terminal.
+            „Zatwierdź” i „Narysuj ponownie” pojawiają się, gdy klatka istnieje i czeka na
+            przyjęcie. Tak samo odmówiłby terminal.
           </p>
         )}
       </Block>
@@ -141,6 +155,7 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
         preview={preview}
         projectRun={run}
         read={asImages}
+        reveal={reveal}
         running={running}
         sent={sent}
       >

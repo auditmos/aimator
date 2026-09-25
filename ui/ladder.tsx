@@ -394,3 +394,64 @@ export function Neighbours(props: {
     </nav>
   );
 }
+
+/**
+ * The whole episode as one mark: finished, or still wanting work.
+ *
+ * Finished means every stage is approved, read off the same `status` the
+ * ladder is drawn from, cell by cell; a stage with one track approved and the
+ * other waiting is not finished, because the film it feeds is not. The number
+ * beside the unfinished mark counts stages rather than cells, since stages are
+ * what the strip above an episode shows.
+ */
+export function Readiness(props: {
+  readonly status: EpisodeStatus | "loading" | "refused";
+}): JSX.Element {
+  const { status } = props;
+
+  if (status === "loading") {
+    return <span className="readiness readiness-loading">sprawdzam…</span>;
+  }
+
+  if (status === "refused") {
+    return <span className="readiness readiness-unknown">stan nieznany</span>;
+  }
+
+  const stages = stagesOf(status);
+  const done = stages.filter((one) => one.cells.every((cell) => cell.state === "approved")).length;
+  const finished = stages.length > 0 && done === stages.length;
+
+  return finished ? (
+    <span className="readiness readiness-done">
+      <svg aria-hidden="true" className="readiness-icon" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" fill="currentColor" r="8" />
+        <path
+          d="M4.5 8.2 7 10.6l4.6-5"
+          fill="none"
+          stroke="var(--color-neutral-950)"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+      gotowy
+    </span>
+  ) : (
+    <span className="readiness readiness-work">
+      <svg aria-hidden="true" className="readiness-icon" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" fill="none" r="7" stroke="currentColor" strokeWidth="1.5" />
+        {done === 0 ? null : <path d={wedge(done / stages.length)} fill="currentColor" />}
+      </svg>
+      wymaga pracy · {done} z {stages.length} etapów
+    </span>
+  );
+}
+
+/** A slice of a 4.5-unit disc from twelve o'clock, clockwise, `share` of the way round. */
+function wedge(share: number): string {
+  const angle = share * 2 * Math.PI;
+  const x = 8 + 4.5 * Math.sin(angle);
+  const y = 8 - 4.5 * Math.cos(angle);
+
+  return `M8 8 L8 3.5 A4.5 4.5 0 ${share > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z`;
+}

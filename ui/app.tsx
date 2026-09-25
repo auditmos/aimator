@@ -8,6 +8,7 @@ import {
   EpisodeOverview,
   type HrefOf,
   Neighbours,
+  Readiness,
   StageNav,
   stageName,
   stagesOf,
@@ -379,7 +380,11 @@ function Back(props: { readonly href: string; readonly label: string }): JSX.Ele
  * click and the screen it stands on has nothing else to show.
  */
 function PickList(props: {
-  readonly items: readonly { readonly href: string; readonly id: string; readonly meta?: string }[];
+  readonly items: readonly {
+    readonly href: string;
+    readonly id: string;
+    readonly meta?: ReactNode;
+  }[];
 }): JSX.Element {
   return (
     <ul className="pick-list">
@@ -432,9 +437,55 @@ function OpenProject(props: {
   );
 }
 
-/** The episodes of one project, the same list one level down. */
+/**
+ * Where each episode of a project stands, as `status` says, asked once.
+ *
+ * Once rather than on every workspace change: one `status` is seconds of
+ * work, a project can hold several episodes, and this screen is a doorway
+ * somebody passes through rather than one they watch. Each answer arrives on
+ * its own, so a slow episode never holds back a quick one.
+ */
+function useReadiness(
+  projectId: string,
+  episodes: readonly string[]
+): ReadonlyMap<string, EpisodeStatus | "refused"> {
+  const [known, setKnown] = useState<ReadonlyMap<string, EpisodeStatus | "refused">>(new Map());
+  const key = episodes.join("\n");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setKnown(new Map());
+
+    for (const episodeId of key === "" ? [] : key.split("\n")) {
+      fetch(`/api/status/${encodeURIComponent(projectId)}/${encodeURIComponent(episodeId)}`)
+        .then(async (response) => (await response.json()) as EpisodeStatus | Refusal)
+        .then((body) => {
+          if (!cancelled) {
+            setKnown((current) =>
+              new Map(current).set(episodeId, "error" in body ? "refused" : body)
+            );
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setKnown((current) => new Map(current).set(episodeId, "refused"));
+          }
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [key, projectId]);
+
+  return known;
+}
+
+/** The episodes of one project, the same list one level down, each with where it stands. */
 function OpenEpisode(props: { readonly project: ListedProject }): JSX.Element {
   const { project } = props;
+  const readiness = useReadiness(project.id, project.episodes);
 
   return (
     <section aria-labelledby="episodes-title">
@@ -447,7 +498,11 @@ function OpenEpisode(props: { readonly project: ListedProject }): JSX.Element {
         </p>
       ) : (
         <PickList
-          items={project.episodes.map((one) => ({ href: episodeHref(project.id, one), id: one }))}
+          items={project.episodes.map((one) => ({
+            href: episodeHref(project.id, one),
+            id: one,
+            meta: <Readiness status={readiness.get(one) ?? "loading"} />,
+          }))}
         />
       )}
     </section>

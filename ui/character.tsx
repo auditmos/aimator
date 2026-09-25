@@ -12,7 +12,9 @@ import {
   PickAll,
   Problems,
   pickable,
+  Redraw,
   Said,
+  useRedraw,
 } from "./panel";
 import type { CharacterStatus, RunDone, StatusCell } from "./types";
 
@@ -74,6 +76,11 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
     () => INTENTS.previewCharacter({ ...scope, model, regenerate }),
     [model, regenerate, scope]
   );
+  /** The same preview with a new paid attempt on, whatever the checkbox says now. */
+  const again = useMemo(
+    () => INTENTS.previewCharacter({ ...scope, model, regenerate: true }),
+    [model, scope]
+  );
   const startRun = useCallback(
     (argv: readonly string[]) => {
       setSent(argv);
@@ -81,6 +88,7 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
     },
     [onRun]
   );
+  const { redraw, reveal } = useRedraw(startRun, setRegenerate);
   const toggle = useCallback((artifact: string, wanted: boolean) => {
     setChosen((current) =>
       wanted ? [...current, artifact] : current.filter((one) => one !== artifact)
@@ -114,6 +122,9 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
   const picked = drawn.filter((one) => selected.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
+  // Only what exists can be drawn again; a view nobody drew yet needs no
+  // "again", and the preview would only answer zero.
+  const redrawable = picked.length > 0 && picked.every((one) => one.state === "completed");
 
   return (
     <section aria-labelledby="character-title" className="panel">
@@ -185,10 +196,13 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
 
         {acceptable ? (
           <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+        ) : null}
+        {redrawable ? (
+          <Redraw argv={again} count={picked.length} onRedraw={redraw} running={running} />
         ) : (
           <p className="actions-note">
-            „Zatwierdź” pojawia się, gdy zaznaczone są obrazy, które istnieją i czekają na
-            przyjęcie. Tak samo odmówiłby terminal.
+            Zaznacz obrazy, żeby je zatwierdzić albo narysować ponownie. Tak samo odmówiłby
+            terminal.
           </p>
         )}
       </Block>
@@ -200,6 +214,7 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
         preview={preview}
         projectRun={run}
         read={asImages}
+        reveal={reveal}
         running={running}
         sent={sent}
       >

@@ -48,6 +48,10 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   go nie zgaduje: pamięta, jakie odcinki projekt miał w chwili wysłania komendy, i
   przechodzi do tego, który po niej pojawił się w `list`.
 - **Wczytaj odcinek** (`#/projekt/<id>/odcinki`): odcinki projektu jako lista odnośników.
+  Przy każdym stoi znak z jego `status`: zielone „gotowy”, gdy każdy etap jest zatwierdzony
+  na każdym torze, albo pierścień wypełniony w części z napisem „wymaga pracy · N z 11
+  etapów”. Stan czyta się raz, przy wejściu na listę, bo jeden `status` to kilka sekund
+  pracy, a ta lista jest przejściem, nie ekranem do obserwowania.
 - **Przegląd odcinka** (`#/projekt/<id>/odcinek/<odcinek>`): następny krok i jedenaście
   etapów, opisane niżej. Odcinka się tu nie wybiera: wybrano go po drodze i nazywa go
   adres. Projekt albo odcinek, którego nie ma w `list`, dostaje komunikat zamiast ekranu
@@ -169,7 +173,12 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na
    górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania. Dryf wejść nie
    chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
-   wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje.
+   wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje. W etapach, które
+   rysują (2, 5, 6 i 7), obok stoi „Narysuj ponownie”, bo odrzucenia nie ma: obraz, którego
+   nikt nie przyjął, po prostu czeka, a jedynym ruchem jest nowa próba. Przycisk niczego nie
+   kupuje. Włącza „Nową płatną próbę” zaznaczonych pozycji, rozwija blok generowania,
+   przewija do niego i uruchamia darmowy podgląd, więc płaci się dalej wyłącznie
+   przyciskiem „Kup” pod przeczytanym rachunkiem.
 4. **Generowanie (płatne)**: zwinięte, chyba że komórka jest „gotowa do generowania”.
    Tam kupowanie jest tym, po co się przyszło; przy przeglądzie ponowny zakup jest
    rzadszym pytaniem. Prompty z podglądu są zwinięte każdy osobno, a rachunek stoi nad nimi.
