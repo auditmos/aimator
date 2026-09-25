@@ -31,11 +31,15 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   liczbą odcinków. Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
 - **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
   odcinek” albo „Wczytaj odcinek”, a pod nimi, ciszej, odnośnik „Obsada i narrator”.
-- **Obsada i narrator** (`#/projekt/<id>/obsada`): `character new`, `character add`,
-  `character describe` i `project voice`, plus „Sprawdź etap 0”. Są na poziomie projektu,
-  bo mieszkają w `project.json` i powracają między odcinkami; świeży projekt ustawia je,
-  zanim ma jakikolwiek odcinek. Obecnej obsady ten ekran nie wypisuje, bo nie wypisuje jej
-  żadna komenda CLI.
+- **Obsada i narrator** (`#/projekt/<id>/obsada`): u góry to, co projekt trzyma teraz,
+  z `project show --json` (narrator, proporcje, każda postać z podstawą), a pod tym
+  `character new`, `character add`, `character describe` i `project voice`, plus „Sprawdź
+  etap 0”. Są na poziomie projektu, bo mieszkają w `project.json` i powracają między
+  odcinkami; świeży projekt ustawia je, zanim ma jakikolwiek odcinek. Lista czyta się na
+  nowo przy każdej zmianie w katalogu roboczym, więc postać dopisana z terminala też się
+  na niej pojawia. Serwer odpowiada nią pod `/api/project/<id>` i nie czyta
+  `project.json` sam: to ta sama zasada, dla której listę projektów dostała komenda
+  `list`.
 - **Nowy odcinek** (`#/projekt/<id>/nowy-odcinek`): ścieżka do pliku źródłowego i sześć
   decyzji, czyli `episode add`. Identyfikator odcinka czyta z nazwy pliku CLI, więc ekran
   go nie zgaduje: pamięta, jakie odcinki projekt miał w chwili wysłania komendy, i
@@ -361,7 +365,8 @@ adres, który już jest.
 
 Serwer jest testowany przez `app.request()` na tym samym fixture, którego używają etapy, bez
 otwierania portu: żądanie stanu zwraca to samo, co `status --json`, żądanie listy to samo, co
-`list --json`, odmowa zostaje odmową z tym samym komunikatem, strumień zdarzeń wypycha
+`list --json`, żądanie projektu to samo, co `project show --json`, odmowa zostaje odmową
+z tym samym komunikatem, strumień zdarzeń wypycha
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
 jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem, także
 na strumieniu katalogu roboczego, gdy żaden odcinek nie jest otwarty. Słownik

@@ -258,6 +258,13 @@ export function createUi(options: UiOptions): Hono {
 
   app.get("/api/projects", async () => await answer(["list"]));
 
+  // What one project holds, for the cast screen: `project show`, and nothing
+  // this server read out of `project.json` on its own.
+  app.get(
+    "/api/project/:projectId",
+    async (c) => await answer(["project", "show", c.req.param("projectId")])
+  );
+
   /**
    * An artifact, read-only, addressed by what it is rather than where it is.
    *

@@ -546,6 +546,25 @@ export interface ListedProject {
   readonly id: string;
 }
 
+/** One member of the cast, as `project show --json` prints it. */
+export interface CastEntry {
+  readonly basis: "description" | "photographs" | null;
+  readonly id: string;
+  readonly name: string;
+  /** Workspace-relative paths of the photographs this character is drawn from. */
+  readonly sources: readonly string[];
+}
+
+/** What one project holds, as `project show --json` prints it: a description, not a verdict. */
+export interface ProjectOverview {
+  readonly aspectRatio: string | null;
+  readonly cast: readonly CastEntry[];
+  readonly command: "project show";
+  readonly narratorVoiceId: string | null;
+  readonly projectId: string;
+  readonly title: string;
+}
+
 export interface WorkspaceListing {
   readonly command: "list";
   readonly projects: readonly ListedProject[];

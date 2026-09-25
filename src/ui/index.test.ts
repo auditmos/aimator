@@ -224,6 +224,15 @@ describe("the UI server", () => {
     expect(await response.json()).toEqual(JSON.parse(await cli("list", "--json")));
   });
 
+  it("should answer the cast screen with exactly what project show --json prints", async () => {
+    const response = await createUi({ workspace }).request(`/api/project/${PROJECT}`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      JSON.parse(await cli("project", "show", PROJECT, "--json"))
+    );
+  });
+
   it("should hand a refusal over in the words the terminal would print", async () => {
     const response = await createUi({ workspace }).request("/api/status/nie-ma/01-burza");
     const refused = await run(["status", "nie-ma", "01-burza", "--json", "--workspace", root]);

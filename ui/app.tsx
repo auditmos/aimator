@@ -700,7 +700,13 @@ function ProjectScreens(props: {
       <section aria-labelledby="cast-title">
         <Back href={projectHref(project.id)} label={project.id} />
         <h1 id="cast-title">Obsada i narrator</h1>
-        <ProjectCast onRun={onRun} projectId={project.id} run={run} running={running} />
+        <ProjectCast
+          onRun={onRun}
+          projectId={project.id}
+          revision={listing}
+          run={run}
+          running={running}
+        />
       </section>
     );
   }
