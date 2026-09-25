@@ -233,6 +233,33 @@ describe("the UI server", () => {
     );
   });
 
+  it("should answer stage 4's review with exactly what prompt-package show --json prints", async () => {
+    const ui = createUi({ workspace });
+    const plan = await ui.request(`/api/send-plan/${PROJECT}/${EPISODE}?track=${TRACK}`);
+    const one = await ui.request(
+      `/api/send-plan/${PROJECT}/${EPISODE}?track=${TRACK}&artifact=R01`
+    );
+
+    expect(await plan.json()).toEqual(
+      JSON.parse(await cli("prompt-package", "show", PROJECT, EPISODE, "--track", TRACK, "--json"))
+    );
+    expect(await one.json()).toEqual(
+      JSON.parse(
+        await cli(
+          "prompt-package",
+          "show",
+          PROJECT,
+          EPISODE,
+          "--track",
+          TRACK,
+          "--artifact",
+          "R01",
+          "--json"
+        )
+      )
+    );
+  });
+
   it("should hand a refusal over in the words the terminal would print", async () => {
     const response = await createUi({ workspace }).request("/api/status/nie-ma/01-burza");
     const refused = await run(["status", "nie-ma", "01-burza", "--json", "--workspace", root]);

@@ -274,11 +274,20 @@ wysyłający, per tor. Panel numeruje więc listę sam, `Image N = <id> — <rol
 pyta o obiekt zamiast czytać zdanie: liczba i kolejność to dokładnie to, co trzeba
 zobaczyć, zanim cokolwiek poleci.
 
-Bez wskazania artefaktu to sam plan: co pakiet planuje na tym torze, ile referencji niesie
-każde przyszłe wywołanie, w jakim są stanie i co je blokuje. Ze wskazanym artefaktem
-dochodzi **cały złożony tekst**, czyli plik z `prompts/` razem z tym, co dokleja do niego
-etap wysyłający. Dlatego resolver artefaktów nie serwuje `prompts/**`: stamtąd
-dostałbyś połowę promptu, a `show` daje całość.
+Tak też się go przegląda, bo zatwierdza się tu plan, a nie graf identyfikatorów. Wybierasz
+tor i jedno przyszłe wywołanie (referencję, klatkę otwarcia, klatkę wejściową albo klip).
+Panel pokazuje jego załączniki jako obrazy, podpisane `Image N` w kolejności wysyłki,
+a pod nimi **cały złożony tekst**, czyli plik z `prompts/` razem z tym, co dokleja do niego
+etap wysyłający. Dlatego resolver artefaktów nie serwuje `prompts/**`: stamtąd dostałbyś
+połowę promptu, a `show --artifact` daje całość. Obraz załącznika to ten sam adres, pod
+którym pokazuje go panel etapu, który go narysował. `end:Cnn` nie ma własnego adresu, więc
+stoi tam klip Cnn zatrzymany na ostatniej klatce. Załącznika, którego jeszcze nie ma, nie
+widać, a jego stan mówi, który etap go dorysuje.
+
+Plan przychodzi zwykłym GET-em (`/api/send-plan/<projekt>/<odcinek>?track=&artifact=`),
+a nie przez pasek komend. Jest darmowy, niczego nie zapisuje i jest pytany przy każdym
+kliknięciu w inne wywołanie, więc „Gotowe” w pasku za samo patrzenie byłoby szumem. Jak
+drabina, jest pytany ponownie, gdy katalog roboczy się zmieni.
 
 ## Przyciski, czyli komendy
 

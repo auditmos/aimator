@@ -293,6 +293,29 @@ export function createUi(options: UiOptions): Hono {
       : await serve(located, c.req.header("range"));
   });
 
+  /**
+   * Stage 4's review: every future paid call on one track, and, for one of
+   * them, the whole prompt it would send.
+   *
+   * A read, like `project show`, rather than a run: it is free, it writes
+   * nothing, and it is asked every time a person turns to another row of the
+   * plan, so announcing each answer as a finished command would put "Gotowe"
+   * in the dock for somebody who only looked.
+   */
+  app.get("/api/send-plan/:projectId/:episodeId", async (c) => {
+    const artifact = c.req.query("artifact") ?? "";
+
+    return await answer([
+      "prompt-package",
+      "show",
+      c.req.param("projectId"),
+      c.req.param("episodeId"),
+      "--track",
+      c.req.query("track") ?? "",
+      ...(artifact === "" ? [] : ["--artifact", artifact]),
+    ]);
+  });
+
   app.get(
     "/api/status/:projectId/:episodeId",
     async (c) => await answer(["status", c.req.param("projectId"), c.req.param("episodeId")])

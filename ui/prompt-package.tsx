@@ -1,35 +1,47 @@
-import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
-import { INTENTS } from "../src/ui/commands.js";
+import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
+import { commandLine, INTENTS } from "../src/ui/commands.js";
 import {
-  Action,
+  artifactUrl,
   asCalls,
   Block,
   Drift,
-  Field,
+  Lightbox,
   NO_FLAGS,
   PaidCall,
+  type Picture,
   Problems,
   Review,
   SendFields,
   type SendFlags,
   useArtifactText,
+  Zoomable,
 } from "./panel";
-import type { PlannedArtifact, PromptPackageStatus, RunDone, SendPlan, StatusCell } from "./types";
+import type {
+  PlannedArtifact,
+  PromptPackageStatus,
+  Refusal,
+  RunDone,
+  SendPlan,
+  StatusCell,
+} from "./types";
 
 /**
- * Stage 4: the package both tracks read, and the free preview of a send.
+ * Stage 4: the package both tracks read, reviewed as what it will send.
  *
- * This is the first panel that asks which **track** it is talking about, and
- * the reason is the stage's own shape rather than a screen's. The package
- * names no track: it carries `hero:ewa` and `R01`, and what file those become
- * is decided at the sender, per track. `prompt-package show` is where that
- * resolution first happens, so it is where rule 8 first becomes visible: a
- * prompt is text **plus ordered attachments addressed by position**, and this
- * is the only place a person can read that order before anything is sent.
+ * What a person approves here is a plan for every future paid picture and
+ * clip: which images each one carries, in which order, and the text around
+ * them. A graph of ids is not something anybody can judge, so the panel shows
+ * the plan the way the sender will compose it, one call at a time: the
+ * attachments as pictures, numbered `Image N` in the order the request carries
+ * them, beside the whole prompt that addresses them by that number. That is
+ * rule 8 on screen, and `prompt-package show` is the only place it becomes
+ * visible before anything is sent.
  *
- * The panel numbers the attachments itself, `Image N = <id> — <rola>`, which
- * is why `show` asks for the object rather than the sentence. Everything else
- * here is the arrangement the three text stages share.
+ * It asks for a **track** although the package names none, because what
+ * `hero:ewa` and `R01` become is decided at the sender, per track. The plan is
+ * read, never run: it is free and writes nothing, so it arrives over a plain
+ * GET and is asked again whenever the ladder moves, rather than passing
+ * through the dock like a command somebody chose to execute.
  */
 
 interface PanelProps {
@@ -52,128 +64,355 @@ const STATE: Record<PlannedArtifact["attachments"][number]["state"], string> = {
   pending: "czeka na ocenę",
 };
 
-/** One future paid call: what it is, what it carries, and what stops it. */
-function Planned(props: { readonly artifact: PlannedArtifact }): JSX.Element {
-  const { artifact } = props;
+/** What each kind of future call is, in the words of the ladder. */
+const KIND: Record<string, string> = {
+  clip: "klip",
+  "entry-frame": "klatka wejściowa",
+  opening: "klatka otwarcia",
+  reference: "referencja",
+};
+
+/** The two shapes of attachment id whose file the sender picks per track. */
+const HERO = /^hero:(.+)$/;
+const REFERENCE = /^R\d+$/;
+const END = /^end:/;
+
+type Read<T> =
+  | { readonly kind: "loading" }
+  | { readonly kind: "refused"; readonly message: string }
+  | { readonly kind: "shown"; readonly value: T };
+
+/**
+ * One `prompt-package show`, asked again whenever `revision` changes.
+ *
+ * A failed read keeps nothing stale on screen for a different question: the
+ * answer is tied to the URL that asked it, so switching tracks never shows
+ * the other track's plan under this one's name while the new one loads.
+ */
+function useSendPlan(url: string, revision: object | null): Read<SendPlan> {
+  const [read, setRead] = useState<{ readonly url: string; readonly read: Read<SendPlan> }>({
+    read: { kind: "loading" },
+    url,
+  });
+
+  useEffect(() => {
+    // Nothing to read against before the ladder has answered once.
+    if (revision === null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(url)
+      .then(async (response) => (await response.json()) as SendPlan | Refusal)
+      .then((body) => {
+        if (!cancelled) {
+          setRead({
+            read:
+              "error" in body
+                ? { kind: "refused", message: body.error.message }
+                : { kind: "shown", value: body },
+            url,
+          });
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [revision, url]);
+
+  return read.url === url ? read.read : { kind: "loading" };
+}
+
+/**
+ * Where an attachment's bytes are served, or nothing.
+ *
+ * The ids are the ones `--artifact` already takes at each stage that draws
+ * them, so this is the same address the stage's own panel shows the picture
+ * under. `end:Cnn` has none: its file is whatever the video provider returned,
+ * and the resolver deliberately refuses to guess an extension.
+ */
+function attachmentUrl(
+  id: string,
+  axes: { readonly episodeId: string; readonly projectId: string; readonly track: string },
+  sha256: string | null
+): string | null {
+  const { episodeId, projectId, track } = axes;
+  const hero = HERO.exec(id);
+  const url = ((): string | null => {
+    if (hero?.[1] !== undefined) {
+      return artifactUrl({
+        artifact: "hero",
+        characterId: hero[1],
+        projectId,
+        stage: "character",
+        track,
+      });
+    }
+    if (id === "opening-frame") {
+      return artifactUrl({ artifact: id, episodeId, projectId, stage: "opening-frame", track });
+    }
+    if (id.startsWith("entry:")) {
+      return artifactUrl({ artifact: id, episodeId, projectId, stage: "clips", track });
+    }
+
+    return REFERENCE.test(id)
+      ? artifactUrl({ artifact: id, episodeId, projectId, stage: "references", track })
+      : null;
+  })();
+
+  // The digest is the cache key: a redrawn picture is a new address.
+  return url === null ? null : `${url}&v=${sha256 ?? "none"}`;
+}
+
+/**
+ * `end:Cnn`, shown as the clip it is the last frame of, stopped at its end.
+ *
+ * The frame itself has no address the resolver will build (see
+ * `attachmentUrl`), but the clip it was cut from does, and a media fragment
+ * past the clip's length lands on its last frame, which is the picture the
+ * next entry frame is told to reproduce.
+ */
+function EndOf(props: {
+  readonly axes: { readonly episodeId: string; readonly projectId: string; readonly track: string };
+  readonly id: string;
+  readonly seconds: number | null;
+}): JSX.Element {
+  const { axes, id, seconds } = props;
+  const clip = id.replace(END, "");
+
+  if (seconds === null || clip === id) {
+    return <p className="picture-empty">ostatnia klatka poprzedniego klipu</p>;
+  }
+
+  const url = artifactUrl({ artifact: clip, ...axes, stage: "clips" });
+
+  return <video className="attached-video" muted preload="auto" src={`${url}#t=${seconds}`} />;
+}
+
+/** One call of the plan: its attachments as pictures, then the whole prompt. */
+function Call(props: {
+  readonly artifact: PlannedArtifact;
+  readonly episodeId: string;
+  readonly projectId: string;
+  readonly revision: object | null;
+  readonly clipSeconds: ReadonlyMap<string, number>;
+  readonly subject: string | null;
+  readonly track: string;
+}): JSX.Element {
+  const { artifact, clipSeconds, episodeId, projectId, revision, subject, track } = props;
+  const [shown, setShown] = useState<string | null>(null);
+  const query = new URLSearchParams({ artifact: artifact.name, track });
+  const whole = useSendPlan(
+    `/api/send-plan/${projectId}/${episodeId}?${query.toString()}`,
+    revision
+  );
+  const text =
+    whole.kind === "shown"
+      ? (whole.value.artifacts.find((one) => one.name === artifact.name)?.text ?? null)
+      : null;
+  const attached = useMemo(
+    () =>
+      artifact.attachments.map((one, index) => ({
+        ...one,
+        label: `Image ${index + 1}`,
+        url: attachmentUrl(one.id, { episodeId, projectId, track }, one.sha256),
+      })),
+    [artifact, episodeId, projectId, track]
+  );
+  const pictures = useMemo(
+    () =>
+      attached.flatMap((one): Picture[] =>
+        one.url === null
+          ? []
+          : [
+              {
+                caption: `${one.label} · ${one.role} · ${STATE[one.state]}`,
+                id: one.id,
+                url: one.url,
+              },
+            ]
+      ),
+    [attached]
+  );
+  const argv = INTENTS.showSendPlan({ artifact: artifact.name, episodeId, projectId, track });
 
   return (
-    <li className="planned">
-      <p className="planned-name">
-        <code>{artifact.name}</code> ({artifact.kind})
+    <div className="call">
+      <p className="call-name">
+        <code>{artifact.name}</code> {KIND[artifact.kind] ?? artifact.kind}
         {artifact.seconds === null ? null : <span> · {artifact.seconds} s</span>}
+        {subject === null ? null : <span> · {subject}</span>}
         <span
           className={artifact.blockers.length === 0 ? "state state-ready" : "state state-blocked"}
         >
-          {artifact.blockers.length === 0 ? "gotowy" : "zablokowany"}
+          {artifact.blockers.length === 0 ? "gotowy do wysłania" : "zablokowany"}
         </span>
       </p>
-      <ol className="attachments">
-        {artifact.attachments.map((attachment, index) => (
-          <li key={attachment.id}>
-            <code>
-              Image {index + 1} = {attachment.id}
-            </code>{" "}
-            — {attachment.role}
-            <span className="attachment-state">
-              {STATE[attachment.state]} · <code>{attachment.path}</code>
-            </span>
+      <Problems problems={artifact.blockers} />
+
+      <h4 className="call-heading">Załączniki, w kolejności wysyłki</h4>
+      <ol className="attached">
+        {attached.map((one) => (
+          <li
+            className={one.state === "approved" ? "attached-one" : "attached-one attached-open"}
+            key={one.id}
+          >
+            <p className="attached-label">
+              <strong>{one.label}</strong> = <code>{one.id}</code>
+            </p>
+            {one.url === null ? (
+              <EndOf
+                axes={{ episodeId, projectId, track }}
+                id={one.id}
+                seconds={clipSeconds.get(one.id.replace(END, "")) ?? null}
+              />
+            ) : (
+              <Zoomable id={one.id} onShow={setShown}>
+                {/* biome-ignore lint/correctness/useImageSize: plan wysyłki nie podaje wymiarów załącznika */}
+                <img alt={one.id} loading="lazy" src={one.url} />
+              </Zoomable>
+            )}
+            <p className="picture-state">
+              {STATE[one.state]} · {one.role}
+            </p>
           </li>
         ))}
       </ol>
-      <Problems problems={artifact.blockers} />
-      {artifact.text === null ? null : <pre className="artifact-text">{artifact.text}</pre>}
-    </li>
+      <Lightbox onShow={setShown} pictures={pictures} shown={shown} />
+
+      <h4 className="call-heading">Prompt, dokładnie tak, jak poleci</h4>
+      {whole.kind === "refused" ? (
+        <p className="refusal" role="alert">
+          {whole.message}
+        </p>
+      ) : null}
+      {text === null ? (
+        <p className="panel-empty">
+          {whole.kind === "loading" ? "Składam prompt…" : "Bez tekstu."}
+        </p>
+      ) : (
+        <pre className="artifact-text call-text">{text}</pre>
+      )}
+      <code className="command">{commandLine(argv)}</code>
+    </div>
   );
 }
 
 /**
- * The send plan of one track, read whole and for free.
+ * The plan of one track, one call at a time.
  *
- * It runs a command like every other button here, so its answer arrives on the
- * same stream: what is on screen is what the last `show` returned, and the
- * argv under the button is the one a person could paste.
+ * The calls are listed in the order the pipeline buys them, grouped by what
+ * they are, and one is open at a time: twenty-two prompts of thirteen
+ * thousand characters each are a document nobody reads, while one of them
+ * beside its pictures is a decision somebody can make.
  */
-function Sending(props: {
+function PlanReview(props: {
   readonly episodeId: string;
-  readonly onRun: (argv: readonly string[]) => void;
-  readonly plan: SendPlan | null;
   readonly projectId: string;
-  readonly running: boolean;
+  readonly revision: object | null;
+  readonly subjects: ReadonlyMap<string, string>;
 }): JSX.Element {
-  const { episodeId, onRun, plan, projectId, running } = props;
+  const { episodeId, projectId, revision, subjects } = props;
   const [track, setTrack] = useState<string>(TRACKS[0]);
-  const [artifact, setArtifact] = useState("");
-  const argv = useMemo(
-    () => INTENTS.showSendPlan({ artifact, episodeId, projectId, track }),
-    [artifact, episodeId, projectId, track]
+  const [chosen, setChosen] = useState<string | null>(null);
+  const plan = useSendPlan(
+    `/api/send-plan/${projectId}/${episodeId}?${new URLSearchParams({ track }).toString()}`,
+    revision
   );
-  const chooseTrack = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => setTrack(event.target.value),
-    []
+  const artifacts = plan.kind === "shown" ? plan.value.artifacts : [];
+  const open = artifacts.find((one) => one.name === chosen) ?? artifacts[0];
+  /** How long each clip is planned to run, which is where its last frame sits. */
+  const clipSeconds = useMemo(
+    () =>
+      new Map(
+        artifacts.flatMap((one) => (one.seconds === null ? [] : [[one.name, one.seconds] as const]))
+      ),
+    [artifacts]
   );
+  const groups = useMemo(
+    () =>
+      [
+        ["Referencje", artifacts.filter((one) => one.kind === "reference")],
+        ["Kadry i klipy", artifacts.filter((one) => one.kind !== "reference")],
+      ] as const,
+    [artifacts]
+  );
+  const pick = useCallback((name: string) => () => setChosen(name), []);
+  const pickTrack = useCallback((one: string) => () => setTrack(one), []);
 
   return (
-    <Block
-      fold={false}
-      hint={
-        <>
-          Darmowe. Pokazuje dokładnie to, co poleci do modelu obrazu albo wideo na tym torze:
-          załączniki w kolejności, w jakiej żądanie poniesie bajty, adresowane po pozycji. Pakiet
-          jest jeden dla obu torów, więc plan jest pierwszym miejscem, w którym{" "}
-          <code>hero:ewa</code> zamienia się w plik. Bez wskazania artefaktu to sam plan; z nim
-          dochodzi cały złożony tekst.
-        </>
-      }
-      title="Plan wysyłki (darmowy)"
-    >
-      <div className="send">
-        <div className="field">
-          <label htmlFor="plan-track">Tor</label>
-          <select id="plan-track" onChange={chooseTrack} value={track}>
-            {TRACKS.map((one) => (
-              <option key={one} value={one}>
-                {one}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Field
-          id="plan-artifact"
-          label="Artefakt"
-          onValue={setArtifact}
-          placeholder="opening-frame"
-          value={artifact}
-        />
+    <div className="plan-review">
+      <div className="plan-row">
+        <span className="plan-row-label">Tor</span>
+        {TRACKS.map((one) => (
+          <button
+            aria-pressed={one === track}
+            className="plan-chip"
+            key={one}
+            onClick={pickTrack(one)}
+            type="button"
+          >
+            {one}
+          </button>
+        ))}
       </div>
-      <Action argv={argv} disabled={running} label="Pokaż plan wysyłki" onRun={onRun} />
 
-      {plan === null ? null : (
+      {plan.kind === "loading" ? <p className="panel-empty">Czytam plan wysyłki…</p> : null}
+      {plan.kind === "refused" ? (
+        <p className="refusal" role="alert">
+          {plan.message}
+        </p>
+      ) : null}
+      {plan.kind === "shown" ? (
         <>
-          <dl className="verdict">
-            <div>
-              <dt>Tor</dt>
-              <dd>{plan.track}</dd>
-            </div>
-            <div>
-              <dt>Kadr</dt>
-              <dd>
-                {plan.size} ({plan.aspectRatio})
-              </dd>
-            </div>
-            <div>
-              <dt>Limit referencji</dt>
-              <dd>{plan.limit}</dd>
-            </div>
-          </dl>
-          <Problems problems={plan.problems} />
-          <ol className="plan">
-            {plan.artifacts.map((one) => (
-              <Planned artifact={one} key={one.name} />
-            ))}
-          </ol>
+          <p className="actions-note">
+            Kadr {plan.value.size} ({plan.value.aspectRatio}), najwyżej {plan.value.limit}{" "}
+            załączników na wywołanie.
+          </p>
+          {plan.value.problems.length === 0 ? null : (
+            <details className="prompt">
+              <summary>Co jeszcze blokuje wysyłkę ({plan.value.problems.length})</summary>
+              <Problems problems={plan.value.problems} />
+            </details>
+          )}
+          {groups.map(([label, members]) =>
+            members.length === 0 ? null : (
+              <div className="plan-row" key={label}>
+                <span className="plan-row-label">{label}</span>
+                {members.map((one) => (
+                  <button
+                    aria-pressed={one.name === open?.name}
+                    className={
+                      one.blockers.length === 0 ? "plan-chip" : "plan-chip plan-chip-blocked"
+                    }
+                    key={one.name}
+                    onClick={pick(one.name)}
+                    type="button"
+                  >
+                    {one.name}
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+          {open === undefined ? null : (
+            <Call
+              artifact={open}
+              clipSeconds={clipSeconds}
+              episodeId={episodeId}
+              key={`${track}-${open.name}`}
+              projectId={projectId}
+              revision={revision}
+              subject={subjects.get(open.name) ?? null}
+              track={track}
+            />
+          )}
         </>
-      )}
-    </Block>
+      ) : null}
+    </div>
   );
 }
 
@@ -185,7 +424,6 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
     cell.state
   );
   const [flags, setFlags] = useState<SendFlags>(NO_FLAGS);
-  const [plan, setPlan] = useState<SendPlan | null>(null);
   const check = useMemo(
     () => INTENTS.checkPromptPackage({ episodeId, projectId }),
     [episodeId, projectId]
@@ -213,23 +451,13 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
     },
     [onRun]
   );
+  /** What the manifest says each reference is, beside the call that draws it. */
+  const subjects = useMemo(
+    () => new Map((status?.verdict?.references ?? []).map((one) => [one.id, one.subject])),
+    [status]
+  );
 
   useEffect(() => setSent(null), [episodeId, projectId]);
-
-  /** The plan on screen is the one the last `show` answered with, or none. */
-  useEffect(() => {
-    if (sent === null || !(sent.includes("show") && run?.ok === true)) {
-      setPlan(null);
-
-      return;
-    }
-
-    try {
-      setPlan(JSON.parse(run.data) as SendPlan);
-    } catch {
-      setPlan(null);
-    }
-  }, [run, sent]);
 
   return (
     <section aria-labelledby="package-title" className="panel">
@@ -281,34 +509,29 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
         hint={
           <>
             Pakiet to plan każdego przyszłego płatnego obrazu i klipu, wspólny dla obu torów.
-            Oceniasz, czy referencje (postacie, rekwizyty, miejsca) obejmują to, co pokazuje lista
-            ujęć, czy ich opisy się zgadzają i czy zależności mają sens: <code>R04 ← R03</code>{" "}
-            znaczy, że R04 rysuje się z R03 w załączniku. Pełny tekst, który poleci do modelu,
-            pokaże „Plan wysyłki” niżej. Zatwierdzenie niczego nie kupuje, tylko otwiera etap 5.
+            Wybierz wywołanie i sprawdź dwie rzeczy: czy załączniki to właściwe obrazy we właściwej
+            kolejności, i czy prompt, który odwołuje się do nich jako <code>Image 1</code>,{" "}
+            <code>Image 2</code>…, opisuje to, co ma powstać. Klip dostaje tylko swoją klatkę
+            wejściową, więc referencje do klipu ocenia się przy jego <code>entry:</code>. Załącznik,
+            którego jeszcze nie ma, powstanie w etapie 5 lub później. Nic tu nie płaci, a
+            zatwierdzenie tylko otwiera etap 5.
           </>
         }
-        title="Pakiet"
+        title="Pakiet: co poleci do modelu"
       >
-        {status?.verdict === null || status?.verdict === undefined ? null : (
-          <>
-            <ul className="references">
-              {status.verdict.references.map((one) => (
-                <li key={one.id}>
-                  <code>{one.id}</code> ({one.kind}) {one.subject}
-                  {one.dependsOn.length === 0 ? null : <span> ← {one.dependsOn.join(", ")}</span>}
-                </li>
-              ))}
-            </ul>
-            <p className="actions-note">
-              Klipy: {status.verdict.clips.map((one) => one.id).join(", ")}
-            </p>
-          </>
-        )}
-        {manifest === null ? (
-          <p className="panel-empty">Nie ma jeszcze pliku pakietu.</p>
+        {status?.status === "completed" ? (
+          <PlanReview
+            episodeId={episodeId}
+            projectId={projectId}
+            revision={cell.status}
+            subjects={subjects}
+          />
         ) : (
+          <p className="panel-empty">Nie ma jeszcze pakietu do przejrzenia.</p>
+        )}
+        {manifest === null ? null : (
           <details className="prompt">
-            <summary>Manifest</summary>
+            <summary>Manifest (surowy plik)</summary>
             <pre className="artifact-text">{manifest}</pre>
           </details>
         )}
@@ -324,14 +547,6 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
           status={status}
         />
       </Block>
-
-      <Sending
-        episodeId={episodeId}
-        onRun={startRun}
-        plan={plan}
-        projectId={projectId}
-        running={running}
-      />
 
       <PaidCall
         note="Etap 4 kupuje dokładnie jedno wywołanie tekstowe. „Generuj” niczego nie wysyła i nie czyta klucza: pokazuje cały prompt i rachunek. Dopiero „Kup” płaci, i płaci za to, co pokazał podgląd."

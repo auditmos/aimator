@@ -991,48 +991,104 @@ h1 {
   border-radius: 0.25rem;
 }
 
-/* Stage 4: the graph the package describes, and the send plan of one track. */
-.references,
-.plan {
-  padding: 0;
-  margin: 1rem 0 0;
-  list-style: none;
+/* Stage 4: the plan of one track, one future paid call at a time. */
+.plan-review {
+  margin-top: 1rem;
 }
-.references li {
-  padding: 0.25rem 0;
-  font-size: 0.875rem;
-  color: var(--color-neutral-300);
-}
-.planned {
-  padding: 0.75rem 1rem;
-  margin-top: 0.75rem;
-  background: var(--color-neutral-900);
-  border: 1px solid var(--color-neutral-800);
-  border-radius: 0.5rem;
-}
-.planned-name {
+.plan-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
-  margin: 0;
-  font-size: 0.9375rem;
-  color: var(--color-neutral-50);
+  margin-top: 0.75rem;
 }
-/* Rule 8 on screen: the attachments of one call, addressed by position. */
-.attachments {
-  padding-left: 1.25rem;
-  margin: 0.5rem 0 0;
-  font-size: 0.875rem;
-  color: var(--color-neutral-300);
-}
-.attachments li {
-  padding: 0.125rem 0;
-}
-.attachment-state {
-  display: block;
+.plan-row-label {
+  min-width: 7.5rem;
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
+}
+.plan-chip {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-neutral-300);
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.plan-chip:hover {
+  color: var(--color-neutral-50);
+}
+.plan-chip[aria-pressed="true"] {
+  color: var(--color-neutral-50);
+  background: var(--color-neutral-900);
+  border-color: var(--color-brand-ink);
+}
+.plan-chip-blocked {
+  border-style: dashed;
+}
+.call {
+  padding: 1rem;
+  margin-top: 1rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.call-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-neutral-50);
+}
+.call-heading {
+  margin: 1.25rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-neutral-300);
+}
+/* Rule 8 on screen: the attachments of one call, addressed by position. */
+.attached {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  list-style: none;
+}
+.attached-one {
+  padding: 0.5rem;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.375rem;
+}
+.attached-open {
+  border-color: var(--color-warning-text);
+}
+.attached-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-50);
+}
+.attached-one img,
+.attached-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: var(--color-neutral-900);
+  border-radius: 0.25rem;
+}
+.call-text {
+  max-height: 36rem;
+  margin-top: 0.5rem;
+  white-space: pre-wrap;
 }
 
 /* On a stage's own page the page already says which stage and which tab this
