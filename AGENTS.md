@@ -321,7 +321,8 @@ ui/                    # The client: browser files where the browser files go
 ├── theme.tsx          # System, Light or Dark, the way the design manual specifies it
 ├── types.ts           # What the server hands over, which is what the CLI already prints
 ├── styles.css         # The portable website shell, one room over from site/
-├── prepare.tsx        # Etap 0
+├── prepare.tsx        # Etap 0: new project, new episode, the episode's stage-0 panel
+├── cast.tsx           # Etap 0 at the project level: the cast and the narrator
 ├── screenplay.tsx     # Etap 1
 ├── character.tsx      # Etap 0's cast and etap 2's images: one panel
 ├── shot-list.tsx      # Etap 3

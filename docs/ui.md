@@ -31,10 +31,13 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   liczbą odcinków. Pusty katalog roboczy mówi o tym i odsyła do nowego projektu.
 - **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
   odcinek” albo „Wczytaj odcinek”, a pod nimi, ciszej, odnośnik „Obsada i narrator”.
-- **Obsada i narrator** (`#/projekt/<id>/obsada`): u góry to, co projekt trzyma teraz,
-  z `project show --json` (narrator, proporcje, każda postać z podstawą), a pod tym
-  `character new`, `character add`, `character describe` i `project voice`, plus „Sprawdź
-  etap 0”. Są na poziomie projektu, bo mieszkają w `project.json` i powracają między
+- **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
+  pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
+  zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
+  identyfikatora nie wpisuje się drugi raz; pod kartami `character new`. „Narrator”:
+  obecny głos i `project voice`. „Sprawdzenie etapu 0”: `check --stage prepare`. Wynik
+  komendy pokazuje się w sekcji albo karcie, która ją uruchomiła, a nie na końcu strony.
+  Są na poziomie projektu, bo mieszkają w `project.json` i powracają między
   odcinkami; świeży projekt ustawia je, zanim ma jakikolwiek odcinek. Lista czyta się na
   nowo przy każdej zmianie w katalogu roboczym, więc postać dopisana z terminala też się
   na niej pojawia. Serwer odpowiada nią pod `/api/project/<id>` i nie czyta

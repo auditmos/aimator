@@ -547,39 +547,63 @@ h1 {
   font-size: 0.875rem;
   color: var(--color-neutral-50);
 }
-/* The cast as the project records it: id, name, where they are drawn from.
-   An undecided basis is the one row that needs attention, said in the warning
-   colour and in words, never in the colour alone. */
-.cast-list {
+/* The cast screen: three sections, each a panel of its own, and each
+   character a card inside the first, carrying its own actions. An undecided
+   basis is the one thing that needs attention, said in the warning colour and
+   in words, never in the colour alone. */
+.sections {
   display: grid;
-  gap: 0.25rem;
-  padding: 0;
-  margin: 0 0 1.5rem;
-  list-style: none;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
 }
-.cast-list li {
-  display: grid;
-  grid-template-columns: minmax(6rem, max-content) minmax(6rem, max-content) 1fr;
-  gap: 1rem;
-  align-items: baseline;
-  padding: 0.5rem 0.75rem;
+.sections > .panel {
+  margin-top: 0;
+}
+.cast-card {
+  padding: 1rem;
+  margin-top: 1rem;
   background: var(--color-neutral-950);
   border: 1px solid var(--color-neutral-800);
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
+}
+.cast-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+}
+.panel .cast-card-head h3 {
+  margin: 0;
 }
 .cast-id {
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--color-neutral-400);
 }
-.cast-name {
-  color: var(--color-neutral-50);
-}
 .cast-basis {
+  margin-left: auto;
   font-size: 0.875rem;
 }
 .cast-undecided {
   color: var(--color-warning-text);
+}
+.cast-sources {
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  list-style: none;
+}
+.cast-sources code {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+  overflow-wrap: anywhere;
+}
+.cast-new {
+  padding-top: 1rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--color-neutral-800);
+}
+.panel .cast-new h3 {
+  margin-top: 0;
 }
 .drift {
   padding: 0.75rem 1rem;
@@ -644,6 +668,20 @@ h1 {
   background: var(--color-neutral-950);
   border: 1px solid var(--color-neutral-800);
   border-radius: 0.25rem;
+}
+/* Inside a character card the card is already the box, so the field sheds its
+   own, and a path is as wide as the card rather than cut off at twelve
+   characters. After the base rules, which these three override. */
+.cast-card .send {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.cast-card .field {
+  flex: 1;
+}
+.cast-card .field input[type="text"] {
+  width: 100%;
 }
 .field-check {
   display: flex;

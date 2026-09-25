@@ -8,13 +8,14 @@ import {
   useState,
 } from "react";
 import { AssemblyPanel } from "./assembly";
+import { ProjectCast } from "./cast";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
 import { Ladder } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { plural } from "./panel";
-import { NewEpisode, NewProject, PreparePanel, ProjectCast } from "./prepare";
+import { NewEpisode, NewProject, PreparePanel } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ScreenplayPanel } from "./screenplay";

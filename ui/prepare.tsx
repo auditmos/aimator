@@ -1,21 +1,14 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import { Action, Field, Problems, RunOutput } from "./panel";
-import type {
-  CastEntry,
-  ProjectOverview,
-  Refusal,
-  RunDone,
-  Stage0Report,
-  StatusCell,
-} from "./types";
+import type { RunDone, Stage0Report, StatusCell } from "./types";
 
 /**
  * Stage 0, which is the one stage a person writes rather than buys.
  *
  * Its questions are asked at three levels, and each is answered where it
  * belongs rather than all in one panel: `NewProject` before there is a
- * project, `ProjectCast` for what recurs across the project's episodes, and
+ * project, `ProjectCast` (in `cast.tsx`) for what recurs across episodes, and
  * `NewEpisode` before there is an episode. What is left in the panel is what
  * belongs to an episode that exists: its decisions, and the verdict.
  *
@@ -139,99 +132,6 @@ export function NewProject(props: {
       <Action argv={argv} disabled={running} label="Załóż projekt" onRun={submit} primary />
       <RunOutput run={run} running={running} />
     </section>
-  );
-}
-
-/** The cast, one entry at a time, each with a basis of its own. */
-function Cast(props: {
-  readonly onRun: (argv: readonly string[]) => void;
-  readonly projectId: string;
-  readonly running: boolean;
-}): JSX.Element {
-  const { onRun, projectId, running } = props;
-  const [characterId, setCharacterId] = useState("");
-  const [name, setName] = useState("");
-  const [photo, setPhoto] = useState("");
-  const add = useMemo(
-    () => INTENTS.addCharacter({ characterId, name, projectId }),
-    [characterId, name, projectId]
-  );
-  const sources = useMemo(
-    () => INTENTS.addCharacterSources({ characterId, projectId, sources: [photo] }),
-    [characterId, photo, projectId]
-  );
-  const describe = useMemo(
-    () => INTENTS.describeCharacter({ characterId, projectId }),
-    [characterId, projectId]
-  );
-
-  return (
-    <>
-      <h2>Obsada</h2>
-      <p className="actions-note">
-        Obsada jest decyzją, nie wnioskiem: wymień każdą powracającą postać. Twarz widziana raz to
-        referencja etapu 5, nie postać. Każda ma własną podstawę, zdjęcia albo opis w{" "}
-        <code>project.md</code>, bo pusty katalog na zdjęcia nie odróżnia „świadomie bez zdjęć” od
-        „jeszcze nie dodałem”.
-      </p>
-      <div className="send">
-        <Field
-          id="prepare-character"
-          label="Identyfikator postaci"
-          onValue={setCharacterId}
-          placeholder="ewa"
-          value={characterId}
-        />
-        <Field id="prepare-name" label="Nazwa" onValue={setName} placeholder="Ewa" value={name} />
-      </div>
-      <Action argv={add} disabled={running} label="Dopisz postać" onRun={onRun} />
-
-      <div className="send">
-        <Field
-          id="prepare-photo"
-          label="Ścieżka do zdjęcia"
-          onValue={setPhoto}
-          placeholder="/Users/ktos/Zdjecia/ewa.png"
-          value={photo}
-        />
-      </div>
-      <Action argv={sources} disabled={running} label="Dodaj zdjęcie" onRun={onRun} />
-      <Action argv={describe} disabled={running} label="Buduj z opisu" onRun={onRun} />
-    </>
-  );
-}
-
-/** Who reads the series, which is casting and recurs between episodes. */
-function Narrator(props: {
-  readonly onRun: (argv: readonly string[]) => void;
-  readonly projectId: string;
-  readonly running: boolean;
-}): JSX.Element {
-  const [voiceId, setVoiceId] = useState("");
-  const argv = useMemo(
-    () => INTENTS.castNarrator({ projectId: props.projectId, voiceId }),
-    [props.projectId, voiceId]
-  );
-
-  return (
-    <>
-      <h2>Narrator</h2>
-      <p className="actions-note">
-        Głos jest obsadą, nie konfiguracją: powraca między odcinkami, więc mieszka w{" "}
-        <code>project.json</code> obok postaci. Bramkuje wyłącznie etap 9; film bez narracji nigdy
-        nie musi tej decyzji podejmować.
-      </p>
-      <div className="send">
-        <Field
-          id="prepare-voice"
-          label="Identyfikator głosu"
-          onValue={setVoiceId}
-          placeholder="21m00Tcm4TlvDq8ikWAM"
-          value={voiceId}
-        />
-      </div>
-      <Action argv={argv} disabled={props.running} label="Obsadź narratora" onRun={props.onRun} />
-    </>
   );
 }
 
@@ -476,147 +376,5 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
 
       <RunOutput run={run} running={running} />
     </section>
-  );
-}
-
-/**
- * The cast and the narrator, which belong to the project rather than to any
- * episode of it.
- *
- * Both recur between episodes, which is exactly why they live in
- * `project.json`, so they are set where the project is and not inside one
- * episode's stage-0 panel, where a fresh project could not reach them before
- * it had an episode. "Sprawdź" is here because stage 0's verdict is about the
- * project too, and it is the one way to hear whether the cast now holds.
- */
-export function ProjectCast(props: {
-  readonly onRun: (argv: readonly string[]) => void;
-  readonly projectId: string;
-  /**
-   * Changes whenever the workspace does. The workspace stream pushes a fresh
-   * listing on every change under it, so a character added here, or by an
-   * agent in a terminal, is re-read without this screen knowing which file
-   * moved.
-   */
-  readonly revision: object | null;
-  readonly run: RunDone | null;
-  readonly running: boolean;
-}): JSX.Element {
-  const { onRun, projectId, revision, run, running } = props;
-  const check = useMemo(() => INTENTS.checkPrepare({ projectId }), [projectId]);
-  const shown = useProjectOverview(projectId, revision);
-
-  return (
-    <div className="panel">
-      <CurrentCast shown={shown} />
-      <Cast onRun={onRun} projectId={projectId} running={running} />
-      <Narrator onRun={onRun} projectId={projectId} running={running} />
-      <Action argv={check} disabled={running} label="Sprawdź etap 0" onRun={onRun} />
-      <RunOutput run={run} running={running} />
-    </div>
-  );
-}
-
-type Shown =
-  | { readonly kind: "loading" }
-  | { readonly kind: "refused"; readonly message: string }
-  | { readonly kind: "shown"; readonly overview: ProjectOverview };
-
-/**
- * `project show`, asked again whenever the workspace moves.
- *
- * A failed read keeps the last answer rather than blanking it, for the reason
- * the ladder does: an old answer is still the answer somebody was reading.
- */
-function useProjectOverview(projectId: string, revision: object | null): Shown {
-  const [shown, setShown] = useState<Shown>({ kind: "loading" });
-
-  useEffect(() => {
-    // Nothing to read against before the workspace has answered once.
-    if (revision === null) {
-      return;
-    }
-
-    let cancelled = false;
-
-    fetch(`/api/project/${encodeURIComponent(projectId)}`)
-      .then(async (response) => (await response.json()) as ProjectOverview | Refusal)
-      .then((body) => {
-        if (cancelled) {
-          return;
-        }
-
-        setShown(
-          "error" in body
-            ? { kind: "refused", message: body.error.message }
-            : { kind: "shown", overview: body }
-        );
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, revision]);
-
-  return shown;
-}
-
-/** Where one character is drawn from, in the words `project show` uses. */
-function basisOf(entry: CastEntry): string {
-  if (entry.basis === "photographs") {
-    return `ze zdjęć (${entry.sources.length})`;
-  }
-
-  return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
-}
-
-/** Who is cast and who narrates, as the project records it right now. */
-function CurrentCast(props: { readonly shown: Shown }): JSX.Element {
-  const { shown } = props;
-
-  if (shown.kind === "loading") {
-    return <p className="panel-empty">Czytam projekt…</p>;
-  }
-
-  if (shown.kind === "refused") {
-    return (
-      <p className="refusal" role="alert">
-        {shown.message}
-      </p>
-    );
-  }
-
-  const { overview } = shown;
-
-  return (
-    <>
-      <h2>Obecnie</h2>
-      <dl className="verdict">
-        <div>
-          <dt>Narrator</dt>
-          <dd>{overview.narratorVoiceId ?? "nieobsadzony"}</dd>
-        </div>
-        <div>
-          <dt>Proporcje</dt>
-          <dd>{overview.aspectRatio ?? "nierozstrzygnięte"}</dd>
-        </div>
-      </dl>
-      {overview.cast.length === 0 ? (
-        <p className="panel-empty">Obsada jest pusta: nikt jeszcze nie został wymieniony.</p>
-      ) : (
-        <ul className="cast-list">
-          {overview.cast.map((entry) => (
-            <li key={entry.id}>
-              <span className="cast-id">{entry.id}</span>
-              <span className="cast-name">{entry.name}</span>
-              <span className={entry.basis === null ? "cast-basis cast-undecided" : "cast-basis"}>
-                {basisOf(entry)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
   );
 }
