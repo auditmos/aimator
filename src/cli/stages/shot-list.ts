@@ -12,6 +12,7 @@ import {
   type Approval,
   asJson,
   type EpisodeScope,
+  instructionOf,
   MODEL_ID,
   maxOutputTokensOf,
   modeOf,
@@ -25,7 +26,8 @@ import {
 /** Stage 3: the shot list, shared by both tracks and named by neither. */
 export const USAGE = `Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
-                                       [--dry-run] [--json] [--regenerate]`;
+                                       [--dry-run] [--json]
+                                       [--regenerate [--instruction <uwaga>]]`;
 
 /** Which stage this file answers for, in the word `--stage` takes. */
 const STAGE = "shot-list";
@@ -134,6 +136,7 @@ export async function runShotList(argv: readonly string[]): Promise<Result<strin
   }
 
   const parsed = parse(argv.slice(1), {
+    instruction: { type: "string" },
     json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
@@ -142,6 +145,12 @@ export async function runShotList(argv: readonly string[]): Promise<Result<strin
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const instruction = instructionOf(parsed.data);
+
+  if (!instruction.ok) {
+    return instruction;
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -174,6 +183,7 @@ export async function runShotList(argv: readonly string[]): Promise<Result<strin
     apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     maxOutputTokens: tokens.data,
     mode,
     model: model.data,

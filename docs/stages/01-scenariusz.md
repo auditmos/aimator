@@ -24,7 +24,8 @@ pnpm dev check dzielna-ewa 01-burza --stage screenplay
 pnpm dev approve dzielna-ewa 01-burza --stage screenplay --note "rytm się zgadza"
 ```
 
-Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>`, `--json`, `--regenerate`.
+Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>`, `--json`, `--regenerate`,
+`--instruction <uwaga>` (tylko razem z `--regenerate`).
 
 ## Dwa kroki i rachunek
 
@@ -105,6 +106,31 @@ Siedem sekcji w ustalonej kolejności, żadnej pustej. Nagłówki
 suma czasów **dokładnie** równa `durationSeconds`. W każdej scenie dokładnie jedno
 niepuste pole `Action`, `Audio`, `Text` i `End state`. Przy `subtitles: none` każde pole
 `Text` musi brzmieć `none`; przy zamówionych napisach co najmniej jedno nie może.
+
+## Poprawka z uwagą
+
+Samo `--regenerate` kupuje nową próbę z tym samym promptem, więc poprawka jednej sceny to
+generacja w ciemno, która może po drodze zmienić to, co było dobre. Z uwagą jest inaczej:
+
+```bash
+pnpm dev screenplay generate dzielna-ewa 01-burza --regenerate \
+  --instruction "Skróć dialog w S03, resztę zostaw." --dry-run
+```
+
+Żądanie niesie oryginalny prompt etapu, opublikowany `screenplay.md` dosłownie i uwagę
+dosłownie, w bloku między `----- BEGIN NOTE -----` a `----- END NOTE -----`. Zadanie jest po
+angielsku i każe zmienić tylko to, czego dotyczy uwaga, a resztę zwrócić bez zmian; uwaga
+zostaje w języku, w którym ją napisano, bo jest materiałem, nie instrukcją. `--dry-run`
+pokazuje dokładnie ten tekst i `płatnych wywołań do wykonania: 1`: to nadal nowa płatna
+próba.
+
+Rekord dostaje pole `instruction`, a poprzednia wersja, zachowana w `previous/screenplay.md`
+tej próby, jest jej wejściem ze ścieżką i sha256. To wejście leży w archiwum i nigdy się nie
+zmienia, więc `check` nie zgłasza go jako zmienionego, a `approve` go nie gubi. Wynik
+przechodzi tę samą walidację co każdy inny i czeka na zgodę człowieka jak każdy inny.
+`--instruction` bez `--regenerate` to błąd użycia, a bez opublikowanej wersji nie ma czego
+poprawiać. Tak samo działa w etapach [3](03-lista-ujec.md), [4](04-pakiet-promptow.md),
+[9](09-narracja.md) i [10](10-muzyka-i-efekty.md).
 
 ## Wznowienie przerwanej próby
 

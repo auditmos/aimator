@@ -21,6 +21,7 @@ import {
   type Approval,
   answerFlag,
   asJson,
+  instructionOf,
   maxOutputTokensOf,
   modeOf,
   numberFlag,
@@ -50,7 +51,7 @@ export const USAGE = `Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks pe
   sound-design generate <id> <episode-id> [--model <id>] [--music-model <id>]
                         [--effects-model <id>] [--max-output-tokens <n>]
                         [--artifact cues|M01[,E02]] [--dry-run] [--json]
-                        [--regenerate]
+                        [--regenerate [--instruction <uwaga>]]
     Pisze arkusz cue z zatwierdzonej listy ujęć, a potem kupuje to, co arkusz
     autoryzuje: podkład z /v1/music i efekty z /v1/sound-generation (klucz
     ELEVENLABS_API_KEY, ten sam co mowa, to czwarte i piąte miejsce wywołania
@@ -64,6 +65,7 @@ export const USAGE = `Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks pe
     ElevenLabs wycenia muzykę i efekty ZA MINUTĘ dźwięku i nalicza przy
     GENERACJI, więc podgląd podaje wywołania I sekundy, a --regenerate to druga
     pełna opłata.
+    --instruction poprawia sam arkusz cue, więc idzie wyłącznie z --artifact cues.
   sound-design levels <id> [--music-db <n>] [--effects-db <n>] [--duck-db <n>]
                       [--duck-release <ms>] [--dry-run] [--json]
     Jak głośno siedzi podkład i jak mocno ustępuje pod mową. Mieszka
@@ -94,6 +96,7 @@ async function runSoundDesignGenerate(argv: readonly string[]): Promise<Result<s
   const parsed = parse(argv, {
     artifact: { type: "string" },
     "effects-model": { type: "string" },
+    instruction: { type: "string" },
     json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
@@ -103,6 +106,21 @@ async function runSoundDesignGenerate(argv: readonly string[]): Promise<Result<s
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const artifacts = referenceIdsOf(parsed.data);
+  const instruction = instructionOf(parsed.data);
+
+  if (!instruction.ok) {
+    return instruction;
+  }
+
+  // A note is read by a text model, and here only the cue sheet is written by
+  // one: a bed or an effect is bought from the sheet's own lines, never a note.
+  if (instruction.data !== null && artifacts.join(",") !== "cues") {
+    return err(
+      new UsageError("--instruction poprawia arkusz cue, więc ma jednego adresata: --artifact cues")
+    );
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -126,11 +144,12 @@ async function runSoundDesignGenerate(argv: readonly string[]): Promise<Result<s
   const { "effects-model": effects, model, "music-model": music } = parsed.data.values;
   const mode = modeOf(parsed.data);
   const result = await generateSoundDesign({
-    artifacts: referenceIdsOf(parsed.data),
+    artifacts,
     audioKey: mode === "dry-run" ? null : (env.ELEVENLABS_API_KEY ?? null),
     effectsModel: typeof effects === "string" ? effects : (env.AIMATOR_EFFECTS_MODEL ?? null),
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     maxOutputTokens: maxOutputTokens.data,
     mode,
     model: typeof model === "string" ? model : (env.AIMATOR_SOUND_MODEL ?? null),

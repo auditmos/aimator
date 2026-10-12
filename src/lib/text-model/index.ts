@@ -13,5 +13,12 @@
  * This module brings the sequence, and knows nothing about any of them.
  */
 
-export { type Publication, type Published, runTextStage, type TextStage } from "./attempt.js";
+export {
+  type Publication,
+  type Published,
+  runTextStage,
+  type TextStage,
+  textPrompt,
+} from "./attempt.js";
 export type { ResponseFormat } from "./client.js";
+export type { Replaced } from "./revision.js";

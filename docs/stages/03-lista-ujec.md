@@ -23,7 +23,12 @@ pnpm dev approve dzielna-ewa 01-burza --stage shot-list --note "plan trzyma się
 ```
 
 Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 24 000), `--json`,
-`--regenerate`.
+`--regenerate`, `--instruction <uwaga>` (tylko razem z `--regenerate`).
+
+`--regenerate --instruction "Wydłuż U02, resztę zostaw."` poprawia opublikowany
+`shot-list.md` zamiast pisać nowy: model dostaje ten sam prompt, poprzednią wersję i uwagę
+dosłownie, a poprzednia wersja z `previous/shot-list.md` staje się wejściem próby. Szczegóły
+na stronie [etapu 1](01-scenariusz.md#poprawka-z-uwagą); to nadal nowa płatna próba.
 
 ## Etap 3 jako obiekt
 

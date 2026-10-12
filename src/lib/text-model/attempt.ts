@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   applyWrites,
+  driftableInputs,
   emptyStage,
   modelProducer,
   newRecord,
@@ -13,13 +14,14 @@ import {
   type StageFile,
   type StageName,
   serialize,
+  sha256Of,
   stageFileSchema,
   toWorkspacePath,
   writeNew,
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import type { EpisodePaths, RunPaths, Workspace } from "../workspace.js";
-import { runPaths } from "../workspace.js";
+import { archivedBy, previousFile, runPaths } from "../workspace.js";
 import {
   buildRequest,
   callModel,
@@ -29,6 +31,7 @@ import {
   readOutputText,
   refusedWithoutCharge,
 } from "./client.js";
+import { type Replaced, revisionPrompt } from "./revision.js";
 
 /**
  * Internal to the text-model module: one billed text call, start to finish.
@@ -54,6 +57,12 @@ interface TextCall {
   readonly fetch: typeof fetch;
   /** A schema the provider enforces, or `null` for a plain Markdown answer. */
   readonly format: ResponseFormat | null;
+  /**
+   * A person's note on the published version, or `null`. Only with
+   * `regenerate`: the attempt then corrects the version it replaces instead of
+   * redrawing it, and that version becomes one of its inputs.
+   */
+  readonly instruction: string | null;
   readonly maxOutputTokens: number;
   readonly model: string;
   /** The only road to a second charge. Nothing here retries on its own. */
@@ -109,16 +118,17 @@ export interface TextStage<T> {
    */
   readonly key?: string;
   readonly lock: string;
-  /**
-   * Copies the results this attempt is about to replace into `previous/`.
-   * Called only under `--regenerate`, which is the only way to reach a paid
-   * call with a finished result already on disk.
-   */
-  readonly preserve: (archive: RunPaths) => Promise<void>;
   readonly prompt: string;
   readonly promptVersion: number;
   /** Turns the paid text into artifacts, or says why it may not be published. */
   readonly publish: (input: Publication) => Promise<Result<Published<T>>>;
+  /**
+   * The files this attempt would replace, as they stand, named relative to the
+   * episode. Read only under `--regenerate`, which is the only way to reach a
+   * paid call with a finished result already on disk; this module keeps them
+   * in `previous/`, and under `--instruction` they are what gets corrected.
+   */
+  readonly replaced: () => Promise<readonly Replaced[]>;
   /** The primary artifact, named when a finished one already exists. */
   readonly result: string;
   readonly stagePath: string;
@@ -201,6 +211,14 @@ export async function runTextStage<T>(
 }
 
 async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<TextAttempt<T>>> {
+  // Before anything else: a note must never ride on a resume or a republication,
+  // which would publish an answer that was never shown it.
+  if (call.instruction !== null && !call.regenerate) {
+    return err(
+      stage.blocked(["--instruction poprawia opublikowany wynik, więc działa tylko z --regenerate"])
+    );
+  }
+
   const previousStage = await readJson(stage.stagePath, stageFileSchema);
   const record = previousStage.ok
     ? previousStage.data.artifacts[stage.key ?? stage.artifact]
@@ -220,11 +238,28 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
 
   const runId = newRunId();
   const archive = runPaths(call.episode, runId);
+  // Read before anything is written: under `--instruction` these are both
+  // what the request quotes and what this attempt records as an input.
+  const replaced = call.regenerate ? await stage.replaced() : [];
+  const revised = revision(stage, replaced, call.instruction);
+
+  if (!revised.ok) {
+    return revised;
+  }
+
+  const kept = keptFiles(call.workspace, archive, replaced);
+
+  if (!kept.ok) {
+    return kept;
+  }
+
+  // The previous version is an input only of an attempt that was shown it.
+  const inputs = call.instruction === null ? stage.inputs : [...stage.inputs, ...kept.data.inputs];
   const request = buildRequest({
     format: call.format,
     maxOutputTokens: call.maxOutputTokens,
     model: call.model,
-    prompt: stage.prompt,
+    prompt: revised.data,
   });
   const producer = modelProducer({
     endpoint: ENDPOINT,
@@ -232,22 +267,36 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
     promptVersion: stage.promptVersion,
   });
 
-  const prepared = await prepare(archive, call, stage, { request: serialize(request), runId });
+  const prepared = await prepare(archive, call, stage, {
+    inputs,
+    prompt: revised.data,
+    request: serialize(request),
+    runId,
+  });
 
   if (!prepared.ok) {
     return prepared;
   }
 
-  // The previous result is kept only when a regeneration replaces it.
-  if (call.regenerate) {
-    await stage.preserve(archive);
+  // The previous result is kept only when a regeneration replaces it, and it
+  // is kept once: referenced from here, never copied anywhere else.
+  for (const file of kept.data.writes) {
+    // biome-ignore lint/performance/noAwaitInLoops: a handful of small files
+    await writeNew(file.to, file.text);
   }
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
   // then visibly an attempt that may already have been billed.
   await writeRecord(
     stage,
-    newRecord({ inputs: stage.inputs, outputs: [], producer, runId, status: "submitted" })
+    newRecord({
+      inputs,
+      instruction: call.instruction,
+      outputs: [],
+      producer,
+      runId,
+      status: "submitted",
+    })
   );
 
   const transport = await callModel({ apiKey: call.apiKey, fetch: call.fetch, request });
@@ -271,9 +320,91 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
   return await publish(call, stage, {
     archive,
     body: transport.data.body,
+    inputs,
+    instruction: call.instruction,
     producer,
     runId,
   });
+}
+
+/** The prompt this attempt sends: the stage's own, or a correction of `replaced`. */
+function revision<T>(
+  stage: TextStage<T>,
+  replaced: readonly Replaced[],
+  instruction: string | null
+): Result<string> {
+  if (instruction === null) {
+    return ok(stage.prompt);
+  }
+
+  return replaced.length === 0
+    ? err(stage.blocked(nothingToRevise(stage.what)))
+    : ok(revisionPrompt(stage.prompt, replaced, instruction));
+}
+
+function nothingToRevise(what: string): readonly string[] {
+  return [
+    `nie ma opublikowanej wersji (${what}), którą --instruction mógłby poprawić; pierwszą kupuje generate bez tej flagi`,
+  ];
+}
+
+/**
+ * The text a paid call would send, for a preview that sends nothing.
+ *
+ * Under `--instruction` it is the correction of the version on disk, read the
+ * way the paid call reads it, so a preview cannot show one request while the
+ * purchase sends another. A missing version is a problem to report rather than
+ * an error, because a dry run is where a person finds out what stands in the way.
+ */
+export async function textPrompt<T>(
+  stage: TextStage<T>,
+  instruction: string | null
+): Promise<{ readonly problems: readonly string[]; readonly prompt: string }> {
+  const replaced = instruction === null ? [] : await stage.replaced();
+  const revised = revision(stage, replaced, instruction);
+
+  return revised.ok
+    ? { problems: [], prompt: revised.data }
+    : { problems: nothingToRevise(stage.what), prompt: stage.prompt };
+}
+
+/** Where each replaced file lands in `previous/`, and what it is as an input. */
+function keptFiles(
+  workspace: Workspace,
+  archive: RunPaths,
+  replaced: readonly Replaced[]
+): Result<{
+  readonly inputs: readonly RecordedFile[];
+  readonly writes: readonly { readonly text: string; readonly to: string }[];
+}> {
+  const inputs: RecordedFile[] = [];
+  const writes: { text: string; to: string }[] = [];
+
+  for (const file of replaced) {
+    const to = previousFile(archive, file.name);
+
+    if (!to.ok) {
+      return to;
+    }
+
+    writes.push({ text: file.text, to: to.data });
+    inputs.push({
+      path: toWorkspacePath(workspace.root, to.data),
+      sha256: sha256Of(Buffer.from(file.text)),
+    });
+  }
+
+  return ok({ inputs, writes });
+}
+
+/**
+ * The inputs a saved attempt is published against: the stage's as they stand,
+ * plus the version it corrected, which lives in its own `previous/`. That one
+ * is part of the archive, never rewritten, so it cannot drift and is not
+ * compared against anything.
+ */
+function archivedInputs(record: StageFile["artifacts"][string]): readonly RecordedFile[] {
+  return record.inputs.filter((entry) => archivedBy(record.runId, entry.path));
 }
 
 /**
@@ -313,7 +444,7 @@ async function republish<T>(
     );
   }
 
-  const changed = record.inputs.filter(
+  const changed = driftableInputs(record).filter(
     (entry) => !stage.inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
   );
 
@@ -329,6 +460,8 @@ async function republish<T>(
   return await publish(call, stage, {
     archive,
     body: response.data.bytes.toString("utf8"),
+    inputs: [...stage.inputs, ...archivedInputs(record)],
+    instruction: record.instruction,
     producer: record.producer,
     runId: record.runId,
   });
@@ -383,7 +516,7 @@ async function resume<T>(
 
   // The saved answer was written for the inputs recorded beside it. Publishing
   // it against changed inputs would attach a result to a question nobody asked.
-  const changed = record.inputs.filter(
+  const changed = driftableInputs(record).filter(
     (entry) => !stage.inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
   );
 
@@ -399,6 +532,8 @@ async function resume<T>(
   return await publish(call, stage, {
     archive,
     body: response.data.bytes.toString("utf8"),
+    inputs: [...stage.inputs, ...archivedInputs(record)],
+    instruction: record.instruction,
     producer: record.producer,
     runId: record.runId,
   });
@@ -408,9 +543,14 @@ async function prepare<T>(
   archive: RunPaths,
   call: TextCall,
   stage: TextStage<T>,
-  data: { readonly request: string; readonly runId: string }
+  data: {
+    readonly inputs: readonly RecordedFile[];
+    readonly prompt: string;
+    readonly request: string;
+    readonly runId: string;
+  }
 ): Promise<Result<true>> {
-  const written = await writeNew(archive.prompt, stage.prompt);
+  const written = await writeNew(archive.prompt, data.prompt);
 
   if (!written.ok) {
     return written;
@@ -429,7 +569,8 @@ async function prepare<T>(
     serialize({
       artifact: stage.key ?? stage.artifact,
       endpoint: ENDPOINT,
-      inputs: stage.inputs,
+      inputs: data.inputs,
+      instruction: call.instruction,
       maxOutputTokens: call.maxOutputTokens,
       model: call.model,
       promptVersion: stage.promptVersion,
@@ -451,6 +592,8 @@ async function publish<T>(
   data: {
     readonly archive: RunPaths;
     readonly body: string;
+    readonly inputs: readonly RecordedFile[];
+    readonly instruction: string | null;
     readonly producer: StageFile["artifacts"][string]["producer"];
     readonly runId: string;
   }
@@ -474,7 +617,8 @@ async function publish<T>(
   await writeRecord(
     stage,
     newRecord({
-      inputs: stage.inputs,
+      inputs: data.inputs,
+      instruction: data.instruction,
       jobId: parsed.data.jobId,
       outputs: published.data.outputs,
       producer: data.producer,

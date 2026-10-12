@@ -37,6 +37,8 @@ import {
  * nobody approved.
  */
 
+/** Where a corrected script is kept, as an input of the attempt that corrected it. */
+const PREVIOUS_SCRIPT = /\/runs\/[^/]+\/previous\/narration\.md$/;
 const VOICE = "21m00Tcm4TlvDq8ikWAM";
 
 let root = "";
@@ -332,7 +334,8 @@ interface Calls {
    * what is said either side, and which seed was asked for.
    */
   readonly spoken: { characters: number; sent: Record<string, unknown>; text: string }[];
-  readonly text: number[];
+  /** Every text request, as the prompt it carried. */
+  readonly text: string[];
 }
 
 /**
@@ -344,7 +347,7 @@ interface Calls {
 function transport(options: { readonly script?: string; readonly seconds?: number } = {}): Calls {
   const { script: lifted = answerScript(), seconds = 1 } = options;
   const spoken: { characters: number; sent: Record<string, unknown>; text: string }[] = [];
-  const text: number[] = [];
+  const text: string[] = [];
 
   return {
     fetch: ((url: string | URL, init?: RequestInit) => {
@@ -364,7 +367,7 @@ function transport(options: { readonly script?: string; readonly seconds?: numbe
         );
       }
 
-      text.push(1);
+      text.push((JSON.parse(String(init?.body ?? "{}")) as { input?: string }).input ?? "");
 
       return Promise.resolve(
         Response.json({
@@ -468,6 +471,39 @@ describe("generateNarration", () => {
       [...NARRATION.U01].length + [...NARRATION.U04].length
     );
     expect(calls.spoken).toHaveLength(0);
+  });
+
+  it("should correct the published script under --instruction, previewed as it is sent", async () => {
+    const note = "N02 ma brzmieć ciszej, słów nie zmieniaj.";
+    const calls = transport();
+    const project = projectPaths(workspace, PROJECT);
+    const episode = project.ok ? episodePaths(project.data, EPISODE) : null;
+    const paths = episode?.ok ? episode.data : null;
+
+    await generate(calls);
+    const published = await readFile(paths?.narrationScript ?? "", "utf8");
+    const named = { artifacts: ["script"], instruction: note, regenerate: true };
+    const preview = await generate(calls, { ...named, mode: "dry-run" });
+    const result = await generate(calls, named);
+    const stage = JSON.parse(await readFile(paths?.soundtrackStage ?? "", "utf8")) as {
+      readonly artifacts: {
+        readonly script: {
+          readonly inputs: readonly { readonly path: string }[];
+          readonly instruction: string;
+        };
+      };
+    };
+    const sent = calls.text[1] ?? "";
+
+    expect(result.ok).toBe(true);
+    expect(calls.text).toHaveLength(2);
+    expect(preview.ok ? preview.data.prompt : null).toBe(sent);
+    expect(sent).toContain(`----- BEGIN narration.md -----\n${published}`);
+    expect(sent).toContain(`----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`);
+    expect(stage.artifacts.script.instruction).toBe(note);
+    expect(stage.artifacts.script.inputs.map((entry) => entry.path)).toContainEqual(
+      expect.stringMatching(PREVIOUS_SCRIPT)
+    );
   });
 
   it("should refuse to spend without a narrator anybody cast", async () => {

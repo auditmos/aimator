@@ -12,6 +12,7 @@ import {
   type Approval,
   asJson,
   type EpisodeScope,
+  instructionOf,
   MODEL_ID,
   maxOutputTokensOf,
   modeOf,
@@ -25,7 +26,8 @@ import {
 /** Stage 1: the screenplay, the first command that spends money. */
 export const USAGE = `Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
-                                        [--dry-run] [--json] [--regenerate]`;
+                                        [--dry-run] [--json]
+                                        [--regenerate [--instruction <uwaga>]]`;
 
 /**
  * `--dry-run` prints the prompt itself, not a byte count. The whole point of
@@ -108,6 +110,7 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
   }
 
   const parsed = parse(argv.slice(1), {
+    instruction: { type: "string" },
     json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
@@ -116,6 +119,12 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const instruction = instructionOf(parsed.data);
+
+  if (!instruction.ok) {
+    return instruction;
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -148,6 +157,7 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
     apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     maxOutputTokens: tokens.data,
     mode,
     model: model.data,

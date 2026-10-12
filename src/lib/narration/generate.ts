@@ -14,11 +14,13 @@ import { checkShotList } from "../shot-list/index.js";
 import {
   type Publication,
   type Published,
+  type Replaced,
   runTextStage,
   type TextStage,
+  textPrompt,
 } from "../text-model/index.js";
 import { contextCharacters, runVoiceStage, type SpeechContext } from "../voice-model/index.js";
-import { narrationAudio, previousFile, type RunPaths, type Workspace } from "../workspace.js";
+import { narrationAudio, type Workspace } from "../workspace.js";
 import { readDirection } from "./delivery.js";
 import {
   missingSound,
@@ -100,6 +102,8 @@ interface GenerateInput {
   readonly artifacts: readonly string[];
   readonly episodeId: string;
   readonly fetch: typeof fetch;
+  /** A note correcting the published version; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly maxOutputTokens: number;
   readonly mode: WriteMode;
   /** The text model that lifts the script. */
@@ -172,7 +176,25 @@ export async function generateNarration(input: GenerateInput): Promise<Result<Na
   const planned = outcomes(input, stage9.data, script, approved);
 
   if (input.mode === "dry-run") {
-    return ok(preview(input, stage9.data, planned, problems, record !== undefined, approved));
+    const { prompt } = stage9.data;
+    const lifting = record === undefined || (input.regenerate && input.artifacts.includes(SCRIPT));
+    // The script's request is previewed as the paid call would send it, which
+    // under `--instruction` is the correction of the script on disk.
+    const sent =
+      prompt === null || !lifting
+        ? { problems: [], prompt }
+        : await textPrompt(textStage(input, stage9.data, prompt), input.instruction ?? null);
+
+    return ok(
+      preview(
+        input,
+        { ...stage9.data, prompt: sent.prompt },
+        planned,
+        [...problems, ...sent.problems],
+        record !== undefined,
+        approved
+      )
+    );
   }
 
   if (problems.length > 0) {
@@ -335,6 +357,7 @@ async function lift(input: GenerateInput, stage9: Stage9Inputs): Promise<Result<
       episode: stage9.paths.episode,
       fetch: input.fetch,
       format: null,
+      instruction: input.instruction ?? null,
       maxOutputTokens: input.maxOutputTokens,
       model: input.model ?? "",
       regenerate: input.regenerate,
@@ -394,23 +417,20 @@ function textStage(
     // where those are two different words.
     key: SCRIPT,
     lock: episode.narrationLock,
-    preserve: (archive) => preserve(episode.narrationScript, archive),
     prompt,
     promptVersion: PROMPT_VERSION,
     publish: (publication) => publishScript(input, stage9, publication),
+    replaced: () => replaced(episode.narrationScript),
     result: episode.narrationScript,
     stagePath: episode.soundtrackStage,
     what: "skrypt narracji",
   };
 }
 
-async function preserve(from: string, archive: RunPaths): Promise<void> {
+async function replaced(from: string): Promise<readonly Replaced[]> {
   const previous = await readDigest(from);
-  const to = previousFile(archive, "narration.md");
 
-  if (previous.ok && to.ok) {
-    await writeNew(to.data, previous.data.bytes.toString("utf8"));
-  }
+  return previous.ok ? [{ name: "narration.md", text: previous.data.bytes.toString("utf8") }] : [];
 }
 
 async function publishScript(

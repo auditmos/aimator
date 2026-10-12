@@ -837,3 +837,59 @@ describe("a flag whose value is a negative number", () => {
     expect(result.text).toContain("-22");
   });
 });
+
+/**
+ * `--instruction` corrects a version that already exists, which is a second
+ * charge, so it rides on `--regenerate` and never stands in for it. On its own
+ * it is a usage error, refused before anything is read or sent.
+ */
+describe("--instruction", () => {
+  it.each([
+    ["screenplay", "generate"],
+    ["shot-list", "generate"],
+    ["prompt-package", "generate"],
+    ["narration", "generate", "--artifact", "script"],
+    ["sound-design", "generate", "--artifact", "cues"],
+  ])("should refuse %s %s without --regenerate and send nothing", async (...command) => {
+    const sent = vi.spyOn(globalThis, "fetch");
+    const result = await run([
+      ...command,
+      "demo",
+      "01",
+      "--instruction",
+      "Skróć S03.",
+      "--model",
+      "gpt-6-astra",
+      "--workspace",
+      root,
+    ]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(result.ok ? null : result.error.message).toContain("--regenerate");
+    expect(sent).not.toHaveBeenCalled();
+    sent.mockRestore();
+  });
+
+  it.each([
+    ["narration", "N01", "script"],
+    ["sound-design", "M01", "cues"],
+  ])(
+    "should refuse %s with a note addressed to %s, which no text model writes",
+    async (stage, id, text) => {
+      const result = await cli(
+        stage,
+        "generate",
+        "demo",
+        "01",
+        "--artifact",
+        id,
+        "--regenerate",
+        "--instruction",
+        "Ciszej."
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.text).toContain(`--artifact ${text}`);
+    }
+  );
+});

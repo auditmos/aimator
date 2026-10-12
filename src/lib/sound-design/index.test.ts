@@ -53,6 +53,9 @@ import {
  * approves stage 4's prompts.
  */
 
+/** Where a corrected cue sheet is kept, as an input of the attempt that corrected it. */
+const PREVIOUS_SHEET = /\/runs\/[^/]+\/previous\/sound-design\.md$/;
+
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
@@ -351,7 +354,8 @@ interface Calls {
   /** Every audio request, in order: which endpoint, what was asked for, how long. */
   readonly bought: { endpoint: string; seconds: number; sent: Record<string, unknown> }[];
   readonly fetch: typeof fetch;
-  readonly text: number[];
+  /** Every text request, as the prompt it carried. */
+  readonly text: string[];
 }
 
 /**
@@ -365,7 +369,7 @@ interface Calls {
 function transport(options: { readonly sheet?: string; readonly seconds?: number } = {}): Calls {
   const { sheet: written = sheet(), seconds } = options;
   const bought: { endpoint: string; seconds: number; sent: Record<string, unknown> }[] = [];
-  const text: number[] = [];
+  const text: string[] = [];
 
   return {
     bought,
@@ -389,7 +393,7 @@ function transport(options: { readonly sheet?: string; readonly seconds?: number
         );
       }
 
-      text.push(1);
+      text.push((JSON.parse(String(init?.body ?? "{}")) as { input?: string }).input ?? "");
 
       return Promise.resolve(
         Response.json({
@@ -585,6 +589,39 @@ describe("generateSoundDesign", () => {
     const preview = await generate(transport(), { mode: "dry-run" });
 
     expect(preview.ok ? preview.data.notices.join(" ") : "").toContain("GENERACJI");
+  });
+
+  it("should correct the published cue sheet under --instruction, previewed as it is sent", async () => {
+    const note = "M01 ma zacząć się dopiero w U02.";
+    const calls = transport();
+    const project = projectPaths(workspace, PROJECT);
+    const episode = project.ok ? episodePaths(project.data, EPISODE) : null;
+    const paths = episode?.ok ? episode.data : null;
+
+    await generate(calls);
+    const published = await readFile(paths?.soundDesign ?? "", "utf8");
+    const named = { artifacts: ["cues"], instruction: note, regenerate: true };
+    const preview = await generate(calls, { ...named, mode: "dry-run" });
+    const result = await generate(calls, named);
+    const stage = JSON.parse(await readFile(paths?.soundDesignStage ?? "", "utf8")) as {
+      readonly artifacts: {
+        readonly cues: {
+          readonly inputs: readonly { readonly path: string }[];
+          readonly instruction: string;
+        };
+      };
+    };
+    const sent = calls.text[1] ?? "";
+
+    expect(result.ok).toBe(true);
+    expect(calls.text).toHaveLength(2);
+    expect(preview.ok ? preview.data.prompt : null).toBe(sent);
+    expect(sent).toContain(`----- BEGIN sound-design.md -----\n${published}`);
+    expect(sent).toContain(`----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`);
+    expect(stage.artifacts.cues.instruction).toBe(note);
+    expect(stage.artifacts.cues.inputs.map((entry) => entry.path)).toContainEqual(
+      expect.stringMatching(PREVIOUS_SHEET)
+    );
   });
 
   it("should write the cue sheet in one paid text call and buy nothing yet", async () => {

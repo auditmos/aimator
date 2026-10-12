@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -411,6 +412,159 @@ describe("generateScreenplay", () => {
     await generate();
 
     expect(await readdir(episodeDir())).not.toContain("screenplay.lock");
+  });
+});
+
+/**
+ * `--regenerate --instruction`: a correction of what was published, not a
+ * second draft in the dark.
+ *
+ * Assumptions this block encodes: the note is a non-empty string in whatever
+ * language its author wrote; the previous version is `screenplay.md` as it
+ * stands on disk; the request carries the original prompt, that file and the
+ * note, with the note quoted verbatim between markers. Not tested here: the
+ * CLI refusal of `--instruction` without `--regenerate`, which is the CLI's.
+ */
+describe("generateScreenplay --instruction", () => {
+  const NOTE = "Skróć dialog w S03, resztę zostaw bez zmian.";
+
+  it("should preview the original prompt, the published screenplay and the note verbatim", async () => {
+    await generate();
+    const published = await readFile(join(episodeDir(), "screenplay.md"), "utf8");
+    const plain = await generate({ mode: "dry-run", regenerate: true });
+    const result = await generate({ instruction: NOTE, mode: "dry-run", regenerate: true });
+    const prompt = result.ok ? (result.data.prompt ?? "") : "";
+
+    expect(prompt).toContain(plain.ok ? (plain.data.prompt ?? "-") : "-");
+    expect(prompt).toContain("# Revision:");
+    expect(prompt).toContain(`----- BEGIN screenplay.md -----\n${published}`);
+    expect(prompt).toContain(`----- BEGIN NOTE -----\n${NOTE}\n----- END NOTE -----`);
+    expect(result.ok ? result.data.paidCalls : null).toBe(1);
+    expect(calls).toBe(1);
+  });
+
+  it("should record the note and the corrected version by digest, copied nowhere else", async () => {
+    await generate();
+    const published = await readFile(join(episodeDir(), "screenplay.md"), "utf8");
+    const result = await generate({
+      fetch: respondWith(completion(draft([15, 15]))),
+      instruction: NOTE,
+      regenerate: true,
+    });
+    const runId = result.ok ? (result.data.runId ?? "") : "";
+    const record = (await readStage()).artifacts.screenplay as unknown as {
+      readonly inputs: readonly { readonly path: string; readonly sha256: string }[];
+      readonly instruction: string | null;
+    };
+    const previous = `projects/${PROJECT}/episodes/${EPISODE}/runs/${runId}/previous/screenplay.md`;
+    const kept = record.inputs.filter((entry) => entry.path.endsWith("screenplay.md"));
+
+    expect(record.instruction).toBe(NOTE);
+    expect(record.inputs).toHaveLength(5);
+    expect(kept).toEqual([
+      { path: previous, sha256: createHash("sha256").update(published).digest("hex") },
+    ]);
+    expect(await readFile(join(root, previous), "utf8")).toBe(published);
+    expect((await readdir(join(episodeDir(), "runs", runId))).sort()).toEqual([
+      "previous",
+      "prompt.md",
+      "request.json",
+      "response.json",
+      "run.json",
+      "transport.json",
+      "validation.json",
+    ]);
+  });
+
+  it("should leave the note out of a plain regeneration's record", async () => {
+    await generate();
+    await generate({ regenerate: true });
+    const record = (await readStage()).artifacts.screenplay as unknown as {
+      readonly inputs: readonly unknown[];
+      readonly instruction: string | null;
+    };
+
+    expect(record.instruction).toBeNull();
+    expect(record.inputs).toHaveLength(4);
+  });
+
+  it("should refuse a note without --regenerate, sending nothing", async () => {
+    await generate();
+    const result = await generate({ instruction: NOTE });
+
+    expect(result.ok ? null : result.error.message).toContain("--regenerate");
+    expect(calls).toBe(1);
+  });
+
+  it("should refuse to correct a screenplay that was never published", async () => {
+    const preview = await generate({ instruction: NOTE, mode: "dry-run", regenerate: true });
+    const result = await generate({ instruction: NOTE, regenerate: true });
+
+    expect(preview.ok ? preview.data.paidCalls : null).toBe(0);
+    expect(preview.ok ? preview.data.problems.join(" ") : "").toContain("--instruction");
+    expect(result.ok ? null : result.error.message).toContain("--instruction");
+    expect(calls).toBe(0);
+  });
+
+  it("should not publish a correction the validator refuses", async () => {
+    await generate();
+    const published = await readFile(join(episodeDir(), "screenplay.md"), "utf8");
+    const result = await generate({
+      fetch: respondWith(completion(draft([10, 10]))),
+      instruction: NOTE,
+      regenerate: true,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(await readFile(join(episodeDir(), "screenplay.md"), "utf8")).toBe(published);
+  });
+
+  it("should not read the corrected version as a changed input, before or after approval", async () => {
+    const scope = { episodeId: EPISODE, projectId: PROJECT, workspace };
+
+    await generate();
+    await generate({
+      fetch: respondWith(completion(draft([15, 15]))),
+      instruction: NOTE,
+      regenerate: true,
+    });
+    const before = await checkScreenplay(scope);
+    await approveScreenplay({ ...scope, mode: "apply", note: null, reviewer: "test" });
+    const after = await checkScreenplay(scope);
+    const record = (await readStage()).artifacts.screenplay;
+
+    expect(before.ok ? before.data.problems : null).toEqual([]);
+    expect(after.ok ? after.data.approved : null).toBe(true);
+    expect(record.inputs.filter((entry) => entry.path.includes("/previous/"))).toHaveLength(1);
+  });
+
+  it("should finish a saved correction for free, keeping its note and its corrected version", async () => {
+    await generate();
+    const failed = await generate({
+      fetch: respondWith(completion(draft([10, 10]))),
+      instruction: NOTE,
+      regenerate: true,
+    });
+    const runId = (await readStage()).artifacts.screenplay as unknown as { readonly runId: string };
+    await writeFile(
+      join(episodeDir(), "runs", runId.runId, "response.json"),
+      completion(draft([15, 15])),
+      "utf8"
+    );
+
+    const result = await generate();
+    const record = (await readStage()).artifacts.screenplay as unknown as {
+      readonly inputs: readonly { readonly path: string }[];
+      readonly instruction: string | null;
+      readonly status: string;
+    };
+
+    expect(failed.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(calls).toBe(2);
+    expect(record.status).toBe("completed");
+    expect(record.instruction).toBe(NOTE);
+    expect(record.inputs.filter((entry) => entry.path.includes("/previous/"))).toHaveLength(1);
   });
 });
 

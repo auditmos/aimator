@@ -1,6 +1,7 @@
 import {
   applyWrites,
   approveAll,
+  driftableInputs,
   isApproved,
   type RecordedFile,
   readDigest,
@@ -146,7 +147,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
       stage: stage.data,
       status: {
         approved: false,
-        inputsChanged: changedInputs(record.inputs, stage0.data.inputs),
+        inputsChanged: changedInputs(driftableInputs(record), stage0.data.inputs),
         problems: blocking,
         status: "submitted",
         verdict: null,
@@ -168,7 +169,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
   // Drift is reported beside the blocking problems and revokes the approval
   // just as loudly, but it is not one of them. The screenplay is intact; it
   // is unread for these inputs, and `approve` is what reads it.
-  const inputsChanged = changedInputs(record.inputs, stage0.data.inputs);
+  const inputsChanged = changedInputs(driftableInputs(record), stage0.data.inputs);
   const lapsed = inputsChanged.map(
     (path) =>
       `${path}: zmienił się od czasu generacji scenariusza, tych wejść nikt jeszcze nie przyjął; przeczytaj scenariusz jeszcze raz i zatwierdź go ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`

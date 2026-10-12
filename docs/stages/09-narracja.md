@@ -25,7 +25,14 @@ pnpm dev approve dzielna-ewa 01-burza --stage soundtrack --track gpt-image
 ```
 
 Dodatkowe flagi: `--model <id>`, `--voice-model <id>`, `--max-output-tokens <n>`,
-`--artifact script|N01[,N02]`, `--regenerate`, `--json`.
+`--artifact script|N01[,N02]`, `--regenerate`, `--instruction <uwaga>`, `--json`.
+
+`--regenerate --artifact script --instruction "<uwaga>"` poprawia opublikowany
+`narration.md` zamiast podnosić go od nowa, a poprzednia wersja z `previous/narration.md`
+staje się wejściem próby. Uwaga ma jednego adresata, skrypt: kwestię kupuje się z jego
+własnych słów, więc `--instruction` przy `--artifact N01` to błąd użycia. Poprawiony skrypt
+przechodzi ten sam walidator „podnoszone, nie pisane". Szczegóły na stronie
+[etapu 1](01-scenariusz.md#poprawka-z-uwagą).
 
 ## `--json`, czyli obiekt na dwóch poziomach
 

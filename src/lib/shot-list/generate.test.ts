@@ -24,6 +24,9 @@ const API_KEY = "sk-test-0123456789";
 const EPISODE = "01-burza";
 const PROJECT = "ewa";
 
+/** Where a corrected plan is kept, as an input of the attempt that corrected it. */
+const PREVIOUS_PLAN = /\/runs\/[^/]+\/previous\/shot-list\.md$/;
+
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
@@ -389,6 +392,35 @@ describe("generateShotList", () => {
     );
 
     expect(previous.flat()).toContain("shot-list.md");
+  });
+
+  it("should correct the published plan under --instruction, previewed as it is sent", async () => {
+    const note = "Wydłuż U02, resztę zostaw.";
+    let sent = "";
+    const capture = ((_url: string, init: RequestInit) => {
+      calls += 1;
+      sent = (JSON.parse(String(init.body)) as { input: string }).input;
+      return Promise.resolve(new Response(completion(plan()), { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    await makeUpstream();
+    await generate();
+    const published = await readFile(join(episodeDir(), "shot-list.md"), "utf8");
+    const preview = await generate({ instruction: note, mode: "dry-run", regenerate: true });
+    const result = await generate({ fetch: capture, instruction: note, regenerate: true });
+    const record = (await readStage()).artifacts["shot-list"] as unknown as {
+      readonly inputs: readonly { readonly path: string }[];
+      readonly instruction: string | null;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(preview.ok ? preview.data.prompt : null).toBe(sent);
+    expect(sent).toContain(`----- BEGIN shot-list.md -----\n${published}`);
+    expect(sent).toContain(`----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`);
+    expect(record.instruction).toBe(note);
+    expect(record.inputs.map((entry) => entry.path)).toContainEqual(
+      expect.stringMatching(PREVIOUS_PLAN)
+    );
   });
 
   it("should not publish a plan that fails validation", async () => {

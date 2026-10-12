@@ -13,10 +13,12 @@ import { err, ok, type Result } from "../result.js";
 import {
   type Publication,
   type Published,
+  type Replaced,
   runTextStage,
   type TextStage,
+  textPrompt,
 } from "../text-model/index.js";
-import { previousFile, type RunPaths, type Workspace } from "../workspace.js";
+import type { Workspace } from "../workspace.js";
 import { readStage3Inputs, type Stage3Inputs } from "./plan.js";
 import { PROMPT_VERSION } from "./prompt.js";
 import { type ShotList, validateShotList } from "./validate.js";
@@ -58,6 +60,8 @@ interface GenerateInput {
   readonly apiKey: string | null;
   readonly episodeId: string;
   readonly fetch: typeof fetch;
+  /** A note correcting the published version; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly maxOutputTokens: number;
   readonly mode: WriteMode;
   readonly model: string | null;
@@ -111,17 +115,24 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
   const problems = blockers(input, stage3.data);
 
   if (input.mode === "dry-run") {
+    const { prompt } = stage3.data;
+    const sent =
+      prompt === null
+        ? { problems: [], prompt: null }
+        : await textPrompt(stage(input, stage3.data, prompt), input.instruction ?? null);
+    const blocked = [...problems, ...sent.problems];
+
     return ok({
       approved: stage3.data.gate.length === 0,
       created: [],
       nextStep:
-        problems.length === 0
+        blocked.length === 0
           ? `aimator shot-list generate ${input.projectId} ${input.episodeId}`
           : "usuń powyższe przeszkody przed płatnym wywołaniem",
-      paidCalls: problems.length === 0 ? 1 : 0,
-      problems,
-      prompt: stage3.data.prompt,
-      ready: problems.length === 0,
+      paidCalls: blocked.length === 0 ? 1 : 0,
+      problems: blocked,
+      prompt: sent.prompt,
+      ready: blocked.length === 0,
       runId: null,
       verdict: null,
     });
@@ -144,6 +155,7 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
       episode: stage3.data.paths.episode,
       fetch: input.fetch,
       format: null,
+      instruction: input.instruction ?? null,
       maxOutputTokens: input.maxOutputTokens,
       model: input.model ?? "",
       regenerate: input.regenerate,
@@ -183,24 +195,21 @@ function stage(input: GenerateInput, stage3: Stage3Inputs, prompt: string): Text
     blocked: (problems) => new Stage3BlockedError(problems),
     inputs: stage3.inputs,
     lock: episode.shotListLock,
-    preserve: (archive) => preserve(episode.shotList, archive),
     prompt,
     promptVersion: PROMPT_VERSION,
     publish: (publication) => publish(input, stage3, publication),
+    replaced: () => replaced(episode.shotList),
     result: episode.shotList,
     stagePath: episode.shotListStage,
     what: "lista ujęć",
   };
 }
 
-/** Keeps the shot list a regeneration is about to replace. */
-async function preserve(from: string, archive: RunPaths): Promise<void> {
+/** The shot list a regeneration is about to replace. */
+async function replaced(from: string): Promise<readonly Replaced[]> {
   const previous = await readDigest(from);
-  const to = previousFile(archive, "shot-list.md");
 
-  if (previous.ok && to.ok) {
-    await writeNew(to.data, previous.data.bytes.toString("utf8"));
-  }
+  return previous.ok ? [{ name: "shot-list.md", text: previous.data.bytes.toString("utf8") }] : [];
 }
 
 async function publish(

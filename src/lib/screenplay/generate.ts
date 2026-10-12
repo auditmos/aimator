@@ -14,17 +14,12 @@ import { err, ok, type Result } from "../result.js";
 import {
   type Publication,
   type Published,
+  type Replaced,
   runTextStage,
   type TextStage,
+  textPrompt,
 } from "../text-model/index.js";
-import {
-  type EpisodePaths,
-  episodePaths,
-  previousFile,
-  projectPaths,
-  type RunPaths,
-  type Workspace,
-} from "../workspace.js";
+import { type EpisodePaths, episodePaths, projectPaths, type Workspace } from "../workspace.js";
 import { buildPrompt, PROMPT_VERSION } from "./prompt.js";
 import { minimumScenes, type ScreenplayVerdict, validateScreenplay } from "./validate.js";
 
@@ -66,6 +61,8 @@ interface GenerateInput {
   readonly apiKey: string | null;
   readonly episodeId: string;
   readonly fetch: typeof fetch;
+  /** A note correcting the published screenplay; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly maxOutputTokens: number;
   readonly mode: WriteMode;
   readonly model: string | null;
@@ -148,18 +145,24 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
   const required = minimumScenes(stage0.data.settings.durationSeconds);
 
   if (input.mode === "dry-run") {
+    const sent = await textPrompt(
+      stage(input, paths.data, stage0.data, prompt),
+      input.instruction ?? null
+    );
+    const blocked = [...problems, ...sent.problems];
+
     return ok({
       approved: stage0.data.approved,
       created: [],
       minimumScenes: required,
       nextStep:
-        problems.length === 0
+        blocked.length === 0
           ? `aimator screenplay generate ${input.projectId} ${input.episodeId}`
           : "usuń powyższe przeszkody przed płatnym wywołaniem",
-      paidCalls: problems.length === 0 ? 1 : 0,
-      problems,
-      prompt,
-      ready: problems.length === 0,
+      paidCalls: blocked.length === 0 ? 1 : 0,
+      problems: blocked,
+      prompt: sent.prompt,
+      ready: blocked.length === 0,
       runId: null,
       verdict: null,
     });
@@ -175,6 +178,7 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
       episode: paths.data,
       fetch: input.fetch,
       format: null,
+      instruction: input.instruction ?? null,
       maxOutputTokens: input.maxOutputTokens,
       model: input.model ?? "",
       regenerate: input.regenerate,
@@ -218,24 +222,21 @@ function stage(
     blocked: (problems) => new Stage1BlockedError(problems),
     inputs: stage0.inputs,
     lock: paths.screenplayLock,
-    preserve: (archive) => preserve(paths, archive),
     prompt,
     promptVersion: PROMPT_VERSION,
     publish: (publication) => publish(input, paths, stage0, publication),
+    replaced: () => replaced(paths),
     result: paths.screenplay,
     stagePath: paths.screenplayStage,
     what: "scenariusz",
   };
 }
 
-/** Keeps the screenplay a regeneration is about to replace. */
-async function preserve(paths: EpisodePaths, archive: RunPaths): Promise<void> {
+/** The screenplay a regeneration is about to replace. */
+async function replaced(paths: EpisodePaths): Promise<readonly Replaced[]> {
   const previous = await readDigest(paths.screenplay);
-  const to = previousFile(archive, "screenplay.md");
 
-  if (previous.ok && to.ok) {
-    await writeNew(to.data, previous.data.bytes.toString("utf8"));
-  }
+  return previous.ok ? [{ name: "screenplay.md", text: previous.data.bytes.toString("utf8") }] : [];
 }
 
 async function publish(

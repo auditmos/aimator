@@ -15,6 +15,7 @@ import { newRunId, nowIso } from "./store.js";
 export {
   approveAll,
   approveArtifacts,
+  driftableInputs,
   isApproved,
   verifyOutputs,
   withInputs,
@@ -52,6 +53,7 @@ const TOOL = "aimator";
 
 interface NewRecordInput {
   readonly inputs: readonly RecordedFile[];
+  readonly instruction?: string | null;
   readonly jobId?: string | null;
   readonly outputs: readonly RecordedFile[];
   readonly producer: Producer;
@@ -116,6 +118,7 @@ export function modelProducer(input: {
 export function newRecord(input: NewRecordInput): ArtifactRecord {
   return {
     inputs: [...input.inputs],
+    instruction: input.instruction ?? null,
     jobId: input.jobId ?? null,
     needsReview: [],
     outputs: [...input.outputs],

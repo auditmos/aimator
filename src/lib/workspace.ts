@@ -951,6 +951,18 @@ export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
 }
 
 /**
+ * Whether a recorded path lies inside the archive of run `runId`.
+ *
+ * An attempt that corrects the version it replaces records that version as an
+ * input, and the version lives in the attempt's own archive, which is never
+ * rewritten. Reviews ask this to tell such an input from one that can drift,
+ * and they ask here because which directory holds a run is this module's.
+ */
+export function archivedBy(runId: string, recorded: string): boolean {
+  return `/${recorded}`.includes(`/runs/${runId}/`);
+}
+
+/**
  * A file inside a run's `previous/`, named as the artifact itself is named.
  *
  * A stage preserving its own result knows the names it uses; it does not get to

@@ -17,11 +17,12 @@ import { err, ok, type Result } from "../result.js";
 import {
   type Publication,
   type Published,
+  type Replaced,
   runTextStage,
   type TextStage,
+  textPrompt,
 } from "../text-model/index.js";
 import {
-  previousFile,
   promptFile,
   promptPaths,
   type RunPaths,
@@ -70,6 +71,8 @@ interface GenerateInput {
   readonly apiKey: string | null;
   readonly episodeId: string;
   readonly fetch: typeof fetch;
+  /** A note correcting the published package; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly maxOutputTokens: number;
   readonly mode: WriteMode;
   readonly model: string | null;
@@ -131,17 +134,25 @@ export async function generatePromptPackage(
   const problems = blockers(input, stage4.data);
 
   if (input.mode === "dry-run") {
+    const { prompt } = stage4.data;
+    const previous = await previousOutputs(stage4.data.paths.episode.promptPackageStage);
+    const sent =
+      prompt === null
+        ? { problems: [], prompt: null }
+        : await textPrompt(stage(input, stage4.data, prompt, previous), input.instruction ?? null);
+    const blocked = [...problems, ...sent.problems];
+
     return ok({
       approved: stage4.data.gate.length === 0,
       created: [],
       nextStep:
-        problems.length === 0
+        blocked.length === 0
           ? `aimator prompt-package generate ${input.projectId} ${input.episodeId}`
           : "usuń powyższe przeszkody przed płatnym wywołaniem",
-      paidCalls: problems.length === 0 ? 1 : 0,
-      problems,
-      prompt: stage4.data.prompt,
-      ready: problems.length === 0,
+      paidCalls: blocked.length === 0 ? 1 : 0,
+      problems: blocked,
+      prompt: sent.prompt,
+      ready: blocked.length === 0,
       runId: null,
       verdict: null,
     });
@@ -168,6 +179,7 @@ export async function generatePromptPackage(
       episode: stage4.data.paths.episode,
       fetch: input.fetch,
       format: PACKAGE_FORMAT,
+      instruction: input.instruction ?? null,
       maxOutputTokens: input.maxOutputTokens,
       model: input.model ?? "",
       regenerate: input.regenerate,
@@ -208,10 +220,10 @@ function stage(
     blocked: (problems) => new Stage4BlockedError(problems),
     inputs: stage4.inputs,
     lock: episode.promptPackageLock,
-    preserve: (archive) => preserve(input, stage4, archive, previous),
     prompt,
     promptVersion: PROMPT_VERSION,
     publish: (publication) => publish(input, stage4, publication, previous),
+    replaced: () => replaced(input, stage4, previous),
     result: episode.promptPackage,
     stagePath: episode.promptPackageStage,
     what: "pakiet promptów",
@@ -226,31 +238,32 @@ async function previousOutputs(stagePath: string): Promise<readonly RecordedFile
 }
 
 /**
- * Keeps every file a regeneration is about to replace.
+ * Every file a regeneration is about to replace.
  *
  * What to keep comes from the previous record rather than from a directory
  * walk: the record is this stage's own statement of what it published, so a
  * file it never wrote is never swept into an archive as though it had been.
  */
-async function preserve(
+async function replaced(
   input: GenerateInput,
   stage4: Stage4Inputs,
-  archive: RunPaths,
   previous: readonly RecordedFile[]
-): Promise<void> {
+): Promise<readonly Replaced[]> {
   const prefix = `${toWorkspacePath(input.workspace.root, stage4.paths.episode.root)}/`;
+  const files: Replaced[] = [];
 
   for (const output of previous) {
     const name = output.path.startsWith(prefix) ? output.path.slice(prefix.length) : null;
-    const to = name === null ? null : previousFile(archive, name);
 
     // biome-ignore lint/performance/noAwaitInLoops: one small file at a time
     const bytes = await readDigest(workspacePath(input.workspace, output.path));
 
-    if (to?.ok && bytes.ok) {
-      await writeNew(to.data, bytes.data.bytes.toString("utf8"));
+    if (name !== null && bytes.ok) {
+      files.push({ name, text: bytes.data.bytes.toString("utf8") });
     }
   }
+
+  return files;
 }
 
 /** Where one rendered prompt file belongs. */

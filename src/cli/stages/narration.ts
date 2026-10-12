@@ -21,6 +21,7 @@ import {
   type Approval,
   answerFlag,
   asJson,
+  instructionOf,
   maxOutputTokensOf,
   modeOf,
   numberFlag,
@@ -48,13 +49,14 @@ const STAGE = "soundtrack";
 export const USAGE = `Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
   narration generate <id> <episode-id> [--model <id>] [--voice-model <id>]
                      [--max-output-tokens <n>] [--artifact script|N01[,N02]]
-                     [--dry-run] [--json] [--regenerate]
+                     [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
     Podnosi narrację z zatwierdzonej listy ujęć i kupuje ją głosem z project.json.
     Narracji nie pisze: każde zdanie musi wystąpić dosłownie w polu Audio swojego
     ujęcia, a walidator to sprawdza, jeśli film ma powiedzieć coś nowego,
     poprawka należy do etapu 1. Skrypt i nagrania są WSPÓLNE dla obu torów, bo
     głos czytający zdanie nie wie, nad którym filmem usiądzie.
     ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
+    --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.
   narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]
                       [--similarity <0-1>] [--speaker-boost] [--dry-run] [--json]
     Jak narrator serii CZYTA. Bez tej decyzji każde wywołanie szło na domyślnych
@@ -85,6 +87,7 @@ export const USAGE = `Etap 9. Dźwięk (płatny; słowa wspólne, miks per tor):
 async function runNarrationGenerate(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
     artifact: { type: "string" },
+    instruction: { type: "string" },
     json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
@@ -94,6 +97,21 @@ async function runNarrationGenerate(argv: readonly string[]): Promise<Result<str
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const artifacts = referenceIdsOf(parsed.data);
+  const instruction = instructionOf(parsed.data);
+
+  if (!instruction.ok) {
+    return instruction;
+  }
+
+  // A note is read by a text model, and here only the script is written by
+  // one: a recording is bought from the script's own words, never from a note.
+  if (instruction.data !== null && artifacts.join(",") !== "script") {
+    return err(
+      new UsageError("--instruction poprawia skrypt, więc ma jednego adresata: --artifact script")
+    );
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -117,9 +135,10 @@ async function runNarrationGenerate(argv: readonly string[]): Promise<Result<str
   const { model, "voice-model": voiceModel } = parsed.data.values;
   const mode = modeOf(parsed.data);
   const result = await generateNarration({
-    artifacts: referenceIdsOf(parsed.data),
+    artifacts,
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     maxOutputTokens: maxOutputTokens.data,
     mode,
     model: typeof model === "string" ? model : (env.AIMATOR_NARRATION_MODEL ?? null),

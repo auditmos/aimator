@@ -96,6 +96,7 @@ Jeden kształt dla wszystkich etapów. Klucz `artifacts` pozwala objąć zbiór 
       "runId": "20260917T170233Z-a1b2c3d4",
       "status": "completed",
       "jobId": null,
+      "instruction": null,
       "producedAt": "2026-09-17T17:02:33.412Z",
       "producer": {
         "kind": "manual",
@@ -186,6 +187,15 @@ Obowiązują we wszystkich etapach.
   milcząco płacić drugi raz.
 - **Nic nie ponawia się automatycznie.** Nową płatną próbę zaczyna wyłącznie jawne
   `--regenerate`, zachowując poprzedni wynik.
+- **Poprawka z uwagą poprawia, a nie losuje od nowa.** `--regenerate --instruction "<uwaga>"`
+  wysyła oryginalny prompt etapu, poprzednią opublikowaną wersję i uwagę człowieka. Zadanie
+  jest po angielsku, a uwaga jedzie dosłownie w oznaczonym bloku i nie jest tłumaczona, bo
+  jest materiałem. Rekord zapisuje `instruction` (albo `null`), a poprzednia wersja,
+  zachowana w `previous/` tej próby, staje się jej wejściem, ścieżką i sha256; kopia poza
+  `previous/` nie powstaje. Takie wejście leży w archiwum próby i nigdy się nie zmienia,
+  więc nie jest porównywane z bieżącymi wejściami etapu, a ponowne zatwierdzenie go nie
+  gubi. Walidacja wyniku jest ta sama: nic nie przechodzi dlatego, że jest poprawką.
+  Działa w etapach tekstowych: 1, 3, 4, 9 (`--artifact script`) i 10 (`--artifact cues`).
 - **Każde polecenie zapisujące ma `--dry-run`**: pełna walidacja, bez sieci, sekretów
   i zapisów.
 - **Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy**, nigdy

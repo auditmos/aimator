@@ -48,7 +48,11 @@ zatwierdzone widoki. Etap 3 czeka na zatwierdzony scenariusz i nie zależy od
 etapu 2. Etap 4 czeka na zatwierdzoną listę ujęć i na zatwierdzony hero.png
 każdej postaci, którą lista ujęć stawia w kadrze, na obu torach naraz, bo
 pakiet jest jeden dla obu. Nic nie ponawia się samo; nową płatną próbę zaczyna
-wyłącznie --regenerate, zachowując poprzedni wynik.`;
+wyłącznie --regenerate, zachowując poprzedni wynik. W etapach tekstowych (1, 3,
+4, 9 i 10) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
+zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę
+dosłownie, i ma zmienić tylko to, czego uwaga dotyczy. To nadal nowa płatna
+próba.`;
 
 /**
  * One text, assembled from the fragments the stages own.

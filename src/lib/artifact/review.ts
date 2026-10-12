@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { Workspace } from "../workspace.js";
+import { archivedBy, type Workspace } from "../workspace.js";
 import type { RecordedFile, StageFile } from "./schema.js";
 import { nowIso, readDigest } from "./store.js";
 
@@ -153,8 +153,23 @@ export function withInputs(
     return stage;
   }
 
+  // The version an attempt corrected is not one of the inputs "as they stand
+  // now": it is a fact about the attempt, kept in its own archive, so a
+  // re-binding carries it over rather than forgetting what was corrected.
+  const kept = artifact.inputs.filter((entry) => archivedBy(artifact.runId, entry.path));
+
   return {
     ...stage,
-    artifacts: { ...stage.artifacts, [key]: { ...artifact, inputs: [...inputs] } },
+    artifacts: { ...stage.artifacts, [key]: { ...artifact, inputs: [...inputs, ...kept] } },
   };
+}
+
+/**
+ * The inputs of a record that can drift: every one except the version an
+ * attempt corrected under `--instruction`. That one lives in the attempt's own
+ * archive and is never rewritten, and it is not among the inputs a stage reads
+ * today, so comparing it against them would report a change nobody made.
+ */
+export function driftableInputs(record: StageFile["artifacts"][string]): readonly RecordedFile[] {
+  return record.inputs.filter((entry) => !archivedBy(record.runId, entry.path));
 }

@@ -77,6 +77,13 @@ const producerSchema = z.strictObject({
 const artifactRecordSchema = z.strictObject({
   inputs: z.array(recordedFileSchema),
   /**
+   * A person's note this attempt corrected the previous version by, verbatim,
+   * or `null` for an attempt that was not a correction. The version it
+   * corrected is then one of `inputs`, in the run's own `previous/`. Defaults
+   * to `null` because every record older than the field was exactly that.
+   */
+  instruction: z.string().nullable().default(null),
+  /**
    * The paid-call lifecycle, written *before* the POST. Its default is
    * `completed` rather than inferred: a record with no network behind it is
    * finished the moment it is written, so an older file that predates this

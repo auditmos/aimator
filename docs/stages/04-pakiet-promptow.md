@@ -23,7 +23,14 @@ pnpm dev approve dzielna-ewa 01-burza --stage prompt-package --note "graf się z
 ```
 
 Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 32 000), `--json`,
-`--regenerate`, `--republish` (publikuje zapisaną odpowiedź, nic nie wysyła).
+`--regenerate`, `--instruction <uwaga>` (tylko razem z `--regenerate`), `--republish`
+(publikuje zapisaną odpowiedź, nic nie wysyła).
+
+`--regenerate --instruction "W R01 zostaw noc."` poprawia opublikowany pakiet zamiast
+planować od nowa. Poprzednia wersja to wszystkie pliki, które pakiet opublikował,
+`prompt-package.json` i całe `prompts/**`, każdy w swoim oznaczonym bloku; model i tak
+odpowiada jednym obiektem JSON, którego wymaga zadanie. Szczegóły na stronie
+[etapu 1](01-scenariusz.md#poprawka-z-uwagą); to nadal nowa płatna próba.
 
 ## Etap 4 jako obiekt
 

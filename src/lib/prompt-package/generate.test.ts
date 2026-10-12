@@ -32,6 +32,9 @@ const EPISODE = "01-burza";
 const PROJECT = "ewa";
 const CAST = ["ewa", "tata"] as const;
 
+/** Where a corrected package is kept, as inputs of the attempt that corrected it. */
+const PREVIOUS_FILE = /\/runs\/[^/]+\/previous\//;
+
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
@@ -638,6 +641,43 @@ describe("generatePromptPackage", () => {
     );
 
     expect(kept.flat()).toContain("prompt-package.json");
+  });
+
+  it("should correct the published package under --instruction, previewed as it is sent", async () => {
+    const note = "W R01 zostaw noc, nie zmieniaj światła.";
+    let sent = "";
+    const capture = ((_url: string, init: RequestInit) => {
+      calls += 1;
+      sent = (JSON.parse(String(init.body)) as { input: string }).input;
+      return Promise.resolve(new Response(completion(answer()), { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    await makeUpstream();
+    await generate();
+    const manifest = await readFile(join(episodeDir(), "prompt-package.json"), "utf8");
+    const preview = await generate({ instruction: note, mode: "dry-run", regenerate: true });
+    const result = await generate({ fetch: capture, instruction: note, regenerate: true });
+    const stage = JSON.parse(
+      await readFile(join(episodeDir(), "prompt-package.stage.json"), "utf8")
+    ) as {
+      readonly artifacts: {
+        readonly "prompt-package": {
+          readonly inputs: readonly { readonly path: string }[];
+          readonly instruction: string;
+        };
+      };
+    };
+    const record = stage.artifacts["prompt-package"];
+
+    expect(result.ok).toBe(true);
+    expect(preview.ok ? preview.data.prompt : null).toBe(sent);
+    expect(sent).toContain(`----- BEGIN prompt-package.json -----\n${manifest}`);
+    expect(sent).toContain("----- BEGIN prompts/references/R01.md -----");
+    expect(sent).toContain(`----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`);
+    expect(record.instruction).toBe(note);
+    expect(record.inputs.filter((entry) => PREVIOUS_FILE.test(entry.path)).length).toBeGreaterThan(
+      1
+    );
   });
 
   it("should remove a prompt file the new package no longer plans", async () => {

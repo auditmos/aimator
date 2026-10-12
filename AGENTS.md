@@ -152,9 +152,10 @@ src/
     ├── workspace.ts  # Single-file form: the ONLY module that knows the layout
     ├── workspace.test.ts
     ├── text-model/    # Folder form: one billed text call, shared by stages 1, 3 and 4
-    │   ├── index.ts       # Public: runTextStage and what a stage brings to it
+    │   ├── index.ts       # Public: runTextStage, textPrompt and what a stage brings to it
     │   ├── client.ts      # Internal: transport, redaction, refusal classification
-    │   └── attempt.ts     # Internal: lock, submitted, archive, resume, publish
+    │   ├── attempt.ts     # Internal: lock, submitted, archive, resume, publish
+    │   └── revision.ts    # Internal: --instruction, a correction of the published version
     ├── image-model/   # Folder form: one billed image call, shared by stages 2 and 5
     │   ├── index.ts       # Public: runImageStage, attach, frameSize, referenceLimit,
     │   │                  #         validateImage, readImageResponse

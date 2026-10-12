@@ -25,7 +25,14 @@ pnpm dev approve dzielna-ewa 01-burza --stage sound-design --track gpt-image
 ```
 
 Dodatkowe flagi: `--model <id>`, `--music-model <id>`, `--effects-model <id>`,
-`--max-output-tokens <n>`, `--artifact cues|M01[,E02]`, `--regenerate`, `--json`.
+`--max-output-tokens <n>`, `--artifact cues|M01[,E02]`, `--regenerate`, `--instruction <uwaga>`,
+`--json`.
+
+`--regenerate --artifact cues --instruction "<uwaga>"` poprawia opublikowany
+`sound-design.md` zamiast pisać arkusz od nowa, a poprzednia wersja z
+`previous/sound-design.md` staje się wejściem próby. Uwaga ma jednego adresata, arkusz:
+podkład i efekt kupuje się z jego własnych wierszy, więc `--instruction` przy
+`--artifact M01` to błąd użycia. Szczegóły na stronie [etapu 1](01-scenariusz.md#poprawka-z-uwagą).
 
 ## `--json`, czyli obiekt na dwóch poziomach
 

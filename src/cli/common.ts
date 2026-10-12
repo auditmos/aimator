@@ -255,6 +255,34 @@ export function maxOutputTokensOf(
     : err(new UsageError("--max-output-tokens: liczba całkowita od 256 do 100000"));
 }
 
+/**
+ * `--instruction`: a person's note on the published version, or `null`.
+ *
+ * The note corrects a version that already exists, and correcting it is a new
+ * paid attempt like any other, so it rides on `--regenerate` rather than
+ * implying one: a flag that quietly bought a second result would be the one
+ * road to a charge nobody wrote down.
+ */
+export function instructionOf(parsed: Parsed): Result<string | null> {
+  const flag = parsed.values.instruction;
+
+  if (typeof flag !== "string") {
+    return ok(null);
+  }
+
+  if (flag.trim() === "") {
+    return err(new UsageError("--instruction: uwaga nie może być pusta"));
+  }
+
+  return parsed.values.regenerate === true
+    ? ok(flag)
+    : err(
+        new UsageError(
+          "--instruction poprawia opublikowaną wersję, a to nowa płatna próba: wymaga --regenerate"
+        )
+      );
+}
+
 /** An optional number flag. Absent means "leave this one as it was". */
 export function numberFlag(parsed: Parsed, name: string): Result<number | null> {
   const raw = parsed.values[name];

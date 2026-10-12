@@ -13,6 +13,7 @@ import {
   type Approval,
   asJson,
   type EpisodeScope,
+  instructionOf,
   MODEL_ID,
   maxOutputTokensOf,
   modeOf,
@@ -28,7 +29,7 @@ import {
 export const USAGE = `Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
   prompt-package generate <id> <episode-id> [--model <id>]
                           [--max-output-tokens <n>] [--dry-run] [--json]
-                          [--regenerate]
+                          [--regenerate [--instruction <uwaga>]]
                           [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
   prompt-package show <id> <episode-id> --track <tor> [--json]
                       [--artifact R02|opening-frame|C03|entry:C03,...]
@@ -274,6 +275,7 @@ export async function runPromptPackage(argv: readonly string[]): Promise<Result<
   }
 
   const parsed = parse(argv.slice(1), {
+    instruction: { type: "string" },
     json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
@@ -283,6 +285,12 @@ export async function runPromptPackage(argv: readonly string[]): Promise<Result<
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const instruction = instructionOf(parsed.data);
+
+  if (!instruction.ok) {
+    return instruction;
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -323,6 +331,7 @@ export async function runPromptPackage(argv: readonly string[]): Promise<Result<
     apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     maxOutputTokens: tokens.data,
     mode,
     model: model.data,
