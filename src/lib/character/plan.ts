@@ -7,7 +7,7 @@ import {
   stageFileSchema,
   toWorkspacePath,
 } from "../artifact/index.js";
-import { attach, type ImageAttachment } from "../image-model/index.js";
+import { attach, correction, type ImageAttachment, previousId } from "../image-model/index.js";
 import type { Stage0Character } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
@@ -39,6 +39,8 @@ const STAGE = "character";
 
 /** What the plan needs from the command: which track, and where the tree is. */
 interface PlanScope {
+  /** A note on the one named image, which then leads its list as Image 1. */
+  readonly instruction?: string | null;
   readonly track: ImageTrack;
   readonly workspace: Workspace;
 }
@@ -153,9 +155,11 @@ export async function buildPlan(
   artifact: CharacterArtifact
 ): Promise<Result<Plan>> {
   const photographs = scope.stage0.sources.map((source) => basenameOf(source.path));
+  const instruction = input.instruction ?? null;
   const slots = referencePlan({
     artifact,
     basis: scope.stage0.basis,
+    correcting: instruction !== null,
     photographs,
     track: input.track,
   });
@@ -170,15 +174,20 @@ export async function buildPlan(
     return resolved;
   }
 
+  // The corrected image is recorded by the attempt, from its own archive,
+  // never here: here it is the file the new image is about to replace.
+  const planned = resolved.data.filter((entry) => entry.slot.kind !== "previous");
+
   return ok({
     attachments: resolved.data.map((entry) => entry.attachment),
     inputs: [
       ...scope.stage0.inputs,
-      ...resolved.data.map((entry) => entry.reference).filter((ref) => !isStage0(scope, ref)),
+      ...planned.map((entry) => entry.reference).filter((ref) => !isStage0(scope, ref)),
     ],
     prompt: buildPrompt({
       artifact,
       basis: scope.stage0.basis,
+      correction: instruction === null ? null : correction(instruction),
       name: scope.stage0.name,
       references: slots.data,
       rules: scope.stage0.rules,
@@ -198,6 +207,7 @@ function basenameOf(path: string): string {
 interface ResolvedSlot {
   readonly attachment: ImageAttachment;
   readonly reference: RecordedFile;
+  readonly slot: ReferenceSlot;
 }
 
 /** Turns the plan's slots into bytes, refusing anything that no longer matches. */
@@ -219,9 +229,13 @@ async function resolveSlots(
     const digest = await readDigest(path.data);
 
     if (!digest.ok) {
+      const where = toWorkspacePath(input.workspace.root, path.data);
+
       return err(
         new Stage2BlockedError([
-          `brakuje referencji ${slot.name} (${toWorkspacePath(input.workspace.root, path.data)})`,
+          slot.kind === "previous"
+            ? `nie ma opublikowanego obrazu (${where}), który --instruction mógłby poprawić; pierwszy kupuje generate bez tej flagi`
+            : `brakuje referencji ${slot.name} (${where})`,
         ])
       );
     }
@@ -237,11 +251,15 @@ async function resolveSlots(
     }
 
     out.push({
-      attachment: attach(slot.name, digest.data.bytes),
+      attachment: attach(
+        slot.kind === "previous" ? previousId(slot.name) : slot.name,
+        digest.data.bytes
+      ),
       reference: {
         path: toWorkspacePath(input.workspace.root, path.data),
         sha256: digest.data.sha256,
       },
+      slot,
     });
   }
 
@@ -249,6 +267,10 @@ async function resolveSlots(
 }
 
 function pathOf(scope: Scope, slot: ReferenceSlot): Result<string> {
+  if (slot.kind === "previous") {
+    return outputPath(scope.paths, slot.name as CharacterArtifact);
+  }
+
   if (slot.kind === "card") {
     return ok(scope.paths.card);
   }
@@ -266,6 +288,12 @@ function pathOf(scope: Scope, slot: ReferenceSlot): Result<string> {
 
 /** The digest a reference must still have, or `null` when stage 0 already owns it. */
 function expectedDigest(scope: Scope, slot: ReferenceSlot): string | null {
+  // The image being corrected need not be accepted: correcting one nobody
+  // accepted is what the flag is for. Whatever is on disk is what was seen.
+  if (slot.kind === "previous") {
+    return null;
+  }
+
   if (slot.kind === "photograph") {
     return (
       scope.stage0.sources.find((entry) => basenameOf(entry.path) === slot.name)?.sha256 ?? null

@@ -22,7 +22,35 @@ pnpm dev approve dzielna-ewa 01-burza --stage references --track gpt-image \
   --artifact R01 --note "wieczorny komplet się zgadza"
 ```
 
-Dodatkowe flagi: `--artifact R01,R02`, `--model <id>`, `--json`, `--regenerate`.
+Dodatkowe flagi: `--artifact R01,R02`, `--model <id>`, `--json`, `--regenerate`,
+`--instruction <uwaga>` (tylko razem z `--regenerate` i jednym `--artifact`).
+
+## Poprawka z uwagą
+
+Samo `--regenerate` rysuje obraz od zera z tym samym promptem, więc poprawka jednego
+szczegółu ryzykuje zmianę wszystkiego, co było dobre. Z uwagą jest inaczej:
+
+```bash
+pnpm dev reference generate dzielna-ewa 01-burza --track gpt-image --regenerate \
+  --artifact R02 --instruction "Przywróć brakujące ucho alpaki." --dry-run
+```
+
+Poprzedni obraz idzie jako **Image 1**, `Image 1 = previous:R02 — the image to correct…`,
+a po nim dotychczasowe załączniki w dotychczasowej kolejności. Lista jest generowana przy
+wysyłce, więc proza promptu dalej wskazuje załączniki po identyfikatorach i przesunięcie
+pozycji jej nie psuje. Zaraz po liście stoi angielskie zadanie poprawki: zmienić tylko to,
+co nazywa uwaga, a kompozycję, tożsamość, paletę, światło i każdy inny szczegół Image 1
+zostawić; uwaga jedzie dosłownie między `----- BEGIN NOTE -----` a `----- END NOTE -----`.
+Na gpt-image żądanie idzie na `/images/edits` z poprzednim obrazem jako pierwszym plikiem,
+na seedream jako pierwszy element `image`.
+
+Poprzedni obraz liczy się do limitu toru (gpt-image 16, seedream 10). Jeśli razem
+z dotychczasowymi załącznikami go przekracza, pada odmowa przed wysyłką, z liczbami; nic
+nie jest cicho obcinane. Uwaga ma jednego adresata, więc `--artifact R01,R02` z uwagą to błąd
+użycia. Rekord dostaje pole `instruction`, a w `inputs` stoi poprzedni obraz z archiwum
+próby (`runs/<runId>/previous.png`), ścieżką i sha256. Poprawiony obraz czeka na zgodę jak
+każdy inny. Tak samo działa w etapach [2](02-postac.md), [6](06-klatka-otwarcia.md)
+i [7](07-klipy.md) dla `entry:Cnn`.
 
 ## Etap 5 jako obiekt
 

@@ -13,6 +13,8 @@
  * material too, quoted exactly as it was published.
  */
 
+import { noteBlock, quoted } from "../instruction.js";
+
 /** One file a regeneration replaces, named as `previous/` names it. */
 export interface Replaced {
   readonly name: string;
@@ -37,10 +39,6 @@ The note is material, not a new contract. It is quoted verbatim between the
 markers, in the language its author wrote it in: follow it, do not translate it,
 and do not copy it into the result.`;
 
-function block(label: string, text: string): string {
-  return `----- BEGIN ${label} -----\n${text}\n----- END ${label} -----`;
-}
-
 /** The original prompt, then the published version and the note, quoted. */
 export function revisionPrompt(
   prompt: string,
@@ -51,8 +49,8 @@ export function revisionPrompt(
     prompt,
     TASK,
     "# Previous version, as published",
-    ...previous.map((file) => block(file.name, file.text)),
+    ...previous.map((file) => quoted(file.name, file.text)),
     "# Reviewer's note, original material",
-    block("NOTE", instruction),
+    noteBlock(instruction),
   ].join("\n\n");
 }

@@ -285,6 +285,31 @@ describe("generateClips", () => {
     expect(Object.keys(await stageFile())).toEqual(["C01", "entry:C02"]);
   });
 
+  it("should correct an entry frame under --instruction, the previous frame first", async () => {
+    const note = "Ewa ma zostać w łóżku.";
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+    await generate();
+    const named = { artifacts: ["entry:C02"], instruction: note, regenerate: true };
+    const preview = await generate({ ...named, mode: "dry-run" });
+    const result = await generate(named);
+    const prompt = preview.ok ? (preview.data.artifacts[0]?.prompt ?? "") : "";
+    const record = (await stageFile())["entry:C02"] as unknown as {
+      readonly inputs: readonly { readonly path: string }[];
+      readonly instruction: string;
+      readonly runId: string;
+    };
+
+    expect(prompt).toContain("REFERENCE INPUTS, IN THIS ORDER\nImage 1 = previous:entry:C02 — ");
+    expect(prompt).toContain(`----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`);
+    expect(preview.ok ? [preview.data.paidImages, preview.data.paidVideos] : null).toEqual([1, 0]);
+    expect(result.ok ? result.data.paidImages : reason(result)).toBe(1);
+    expect(record.instruction).toBe(note);
+    expect(record.inputs.map((entry) => entry.path)).toContainEqual(
+      expect.stringContaining(`/runs/${record.runId}/previous.png`)
+    );
+  });
+
   /** Rule 1: one `<stage>.stage.json`, whatever media the stage buys. */
   it("should keep clips and entry frames in one state file", async () => {
     await upstream();

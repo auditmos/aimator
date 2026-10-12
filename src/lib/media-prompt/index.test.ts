@@ -347,6 +347,42 @@ describe("readSendPlan", () => {
     expect(gpt.blockers.join("\n")).not.toContain("przyjmuje najwyżej");
   });
 
+  it("should refuse, with the numbers, a correction that pushes seedream past its limit", async () => {
+    await upstream({ extraReferences: 5 });
+    const plain = artifact(await plan("seedream", ["entry:C02"]), "entry:C02");
+    const corrected = await readSendPlan({
+      episodeId: EPISODE,
+      instruction: "Ewa ma mieć zamknięte oczy.",
+      projectId: PROJECT,
+      targets: ["entry:C02"],
+      track: "seedream",
+      workspace,
+    });
+    const entry = corrected.ok ? artifact(corrected.data, "entry:C02") : null;
+
+    expect(plain.attachments).toHaveLength(10);
+    expect(plain.blockers.join("\n")).not.toContain("najwyżej");
+    expect(entry?.attachments[0]?.id).toBe("previous:entry:C02");
+    expect(entry?.attachments).toHaveLength(11);
+    expect(entry?.blockers.join("\n")).toContain(
+      "11 załączników (poprawiany obraz i 10 referencji), a tor seedream przyjmuje najwyżej 10"
+    );
+  });
+
+  it("should give one note one addressee", async () => {
+    await upstream();
+    const result = await readSendPlan({
+      episodeId: EPISODE,
+      instruction: "Ciemniej.",
+      projectId: PROJECT,
+      targets: ["R01", "R02"],
+      track: "gpt-image",
+      workspace,
+    });
+
+    expect(result.ok ? null : result.error.message).toContain("jednego adresata");
+  });
+
   it("should report an unapproved package as a plan-level obstacle", async () => {
     await upstream({ approvePackage: false });
     const sent = await plan();

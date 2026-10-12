@@ -20,7 +20,13 @@ pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track seedream \
   --note "pozycja alpaki bez ucisku ucha"
 ```
 
-Dodatkowe flagi: `--model <id>`, `--json`, `--regenerate`.
+Dodatkowe flagi: `--model <id>`, `--json`, `--regenerate`, `--instruction <uwaga>` (tylko
+razem z `--regenerate`).
+
+`--regenerate --instruction "Zostaw noc, przyciemnij lampę."` poprawia opublikowaną klatkę
+zamiast rysować ją od zera: idzie ona jako `Image 1 = previous:opening-frame`, przed
+dotychczasowymi załącznikami. `--artifact` nadal nie jest wymagane, bo adresat jest jeden
+z konstrukcji. Szczegóły na stronie [etapu 5](05-referencje.md#poprawka-z-uwagą).
 
 ## Etap 6 jako obiekt
 

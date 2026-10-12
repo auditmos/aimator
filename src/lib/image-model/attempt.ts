@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   applyWrites,
+  driftableInputs,
   emptyStage,
   modelProducer,
   newRecord,
@@ -20,6 +21,7 @@ import {
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import {
+  archivedBy,
   type ImageRunPaths,
   type ImageTrack,
   imageRunPaths,
@@ -60,6 +62,12 @@ import { type ImageVerdict, readImageResponse, validateImage } from "./validate.
 interface ImageCall {
   readonly apiKey: string;
   readonly fetch: typeof fetch;
+  /**
+   * A person's note on the published image, or `null`. Only with `regenerate`:
+   * the attempt then corrects that image, which the stage has already put first
+   * in `attachments`, and records it, from this run's archive, as an input.
+   */
+  readonly instruction: string | null;
   readonly model: string;
   /** The only road to a second charge. Nothing here retries on its own. */
   readonly regenerate: boolean;
@@ -148,6 +156,16 @@ export async function runImageStage(
   call: ImageCall,
   artifact: ImageArtifact
 ): Promise<Result<ImageAttempt>> {
+  // A note must never ride on a resume, which would publish an image that was
+  // never shown it.
+  if (call.instruction !== null && !call.regenerate) {
+    return err(
+      artifact.blocked([
+        "--instruction poprawia opublikowany obraz, więc działa tylko z --regenerate",
+      ])
+    );
+  }
+
   const stage = await readStage(artifact.stagePath, artifact.stage);
   const record = stage.artifacts[artifact.key];
 
@@ -204,7 +222,8 @@ async function resume(
 
   // The saved answer was drawn for the inputs recorded beside it. Publishing it
   // against changed inputs would attach a result to a question nobody asked.
-  const changed = record.inputs.filter(
+  // The image a note corrected lives in that attempt's own archive and cannot.
+  const changed = driftableInputs(record).filter(
     (entry) =>
       !artifact.inputs.some((now) => now.path === entry.path && now.sha256 === entry.sha256)
   );
@@ -226,6 +245,11 @@ async function resume(
 
   return await publish(call, artifact, stage, {
     bytes: bytes.data.bytes,
+    inputs: [
+      ...artifact.inputs,
+      ...record.inputs.filter((entry) => archivedBy(record.runId, entry.path)),
+    ],
+    instruction: record.instruction,
     jobId: bytes.data.jobId,
     producer: record.producer,
     resumed: true,
@@ -254,19 +278,44 @@ async function attempt(
     model: call.model,
     promptVersion: artifact.promptVersion,
   });
-  const prepared = await prepare(run, artifact, { request, runId });
+  // Read before anything is written: the published image is what a
+  // regeneration keeps, and under `--instruction` what it corrects.
+  const previous = call.regenerate ? await readDigest(artifact.target) : null;
+
+  if (call.instruction !== null && !previous?.ok) {
+    return err(
+      artifact.blocked([
+        `${artifact.key}: nie ma opublikowanego obrazu, który --instruction mógłby poprawić`,
+      ])
+    );
+  }
+
+  // The corrected image is an input only of an attempt that was shown it, and
+  // it is recorded where this run keeps it, never where the new image will go.
+  const inputs =
+    call.instruction !== null && previous?.ok
+      ? [
+          ...artifact.inputs,
+          {
+            path: toWorkspacePath(call.workspace.root, run.previousImage),
+            sha256: previous.data.sha256,
+          },
+        ]
+      : artifact.inputs;
+  const prepared = await prepare(run, artifact, {
+    inputs,
+    instruction: call.instruction,
+    request,
+    runId,
+  });
 
   if (!prepared.ok) {
     return prepared;
   }
 
   // The previous result is kept only when a regeneration replaces it.
-  if (call.regenerate) {
-    const previous = await readDigest(artifact.target);
-
-    if (previous.ok) {
-      await writeNewBytes(run.previousImage, previous.data.bytes);
-    }
+  if (previous?.ok) {
+    await writeNewBytes(run.previousImage, previous.data.bytes);
   }
 
   // Submitted lands on disk before the POST. An attempt that dies mid-call is
@@ -276,7 +325,8 @@ async function attempt(
     stage,
     artifact.key,
     newRecord({
-      inputs: artifact.inputs,
+      inputs,
+      instruction: call.instruction,
       outputs: [],
       producer,
       runId,
@@ -312,6 +362,8 @@ async function attempt(
 
   return await publish(call, artifact, submitted, {
     bytes: bytes.data.bytes,
+    inputs,
+    instruction: call.instruction,
     jobId: bytes.data.jobId,
     producer,
     resumed: false,
@@ -360,7 +412,12 @@ async function imageBytes(
 async function prepare(
   run: ImageRunPaths,
   artifact: ImageArtifact,
-  data: { readonly request: ImageRequest; readonly runId: string }
+  data: {
+    readonly inputs: readonly RecordedFile[];
+    readonly instruction: string | null;
+    readonly request: ImageRequest;
+    readonly runId: string;
+  }
 ): Promise<Result<true>> {
   const prompt = await writeNew(run.prompt, data.request.prompt);
 
@@ -380,7 +437,8 @@ async function prepare(
     serialize({
       artifact: artifact.key,
       endpoint: data.request.endpoint,
-      inputs: artifact.inputs,
+      inputs: data.inputs,
+      instruction: data.instruction,
       model: data.request.model,
       promptVersion: artifact.promptVersion,
       runId: data.runId,
@@ -399,6 +457,8 @@ async function publish(
   stage: StageFile,
   data: {
     readonly bytes: Buffer;
+    readonly inputs: readonly RecordedFile[];
+    readonly instruction: string | null;
     readonly jobId: string | null;
     readonly producer: ReturnType<typeof modelProducer>;
     readonly resumed: boolean;
@@ -448,7 +508,8 @@ async function publish(
     stage,
     artifact.key,
     newRecord({
-      inputs: artifact.inputs,
+      inputs: data.inputs,
+      instruction: data.instruction,
       jobId: data.jobId,
       outputs,
       producer: data.producer,

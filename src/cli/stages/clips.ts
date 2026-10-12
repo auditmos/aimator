@@ -21,6 +21,7 @@ import {
   parse,
   referenceIdsOf,
   requirePositional,
+  singleInstructionOf,
   trackOf,
   UsageError,
   workspaceOf,
@@ -30,7 +31,7 @@ import {
 export const USAGE = `Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
   clip generate <id> <episode-id> --track <gpt-image|seedream>
                [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
-               [--dry-run] [--json] [--regenerate]
+               [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
     i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL).
@@ -167,6 +168,7 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
     "image-model": { type: "string" },
+    instruction: { type: "string" },
     json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -177,6 +179,12 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const instruction = singleInstructionOf(parsed.data, referenceIdsOf(parsed.data));
+
+  if (!instruction.ok) {
+    return instruction;
   }
 
   // `--model` is accepted by the parser only so it can be refused with a
@@ -227,6 +235,7 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
     fetch,
     imageKey: mode === "dry-run" ? null : (keyFor(track.data) ?? null),
     imageModel: imageModel.data,
+    instruction: instruction.data,
     mode,
     mux: ffmpeg(env.AIMATOR_FFMPEG ?? "ffmpeg"),
     projectId: projectId.data,

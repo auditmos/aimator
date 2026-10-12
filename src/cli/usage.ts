@@ -52,7 +52,10 @@ wyłącznie --regenerate, zachowując poprzedni wynik. W etapach tekstowych (1, 
 4, 9 i 10) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
 zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę
 dosłownie, i ma zmienić tylko to, czego uwaga dotyczy. To nadal nowa płatna
-próba.`;
+próba. W etapach obrazowych (2, 5, 6 i 7 dla entry:Cnn) poprzedni obraz idzie
+jako Image 1 = previous:<id>, przed dotychczasowymi załącznikami, a model
+poprawia tylko to, co nazywa uwaga. Uwaga ma jednego adresata: kilka
+artefaktów z jedną uwagą to błąd użycia.`;
 
 /**
  * One text, assembled from the fragments the stages own.

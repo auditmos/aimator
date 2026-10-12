@@ -25,7 +25,13 @@ pnpm dev check dzielna-ewa ewa --stage character --track gpt-image
 ```
 
 Dodatkowe flagi: `--artifact card|hero|<widok>,...`, `--model <id>`, `--json`,
-`--regenerate`.
+`--regenerate`, `--instruction <uwaga>` (tylko razem z `--regenerate` i jednym `--artifact`).
+
+`--regenerate --artifact card --instruction "Przywróć brakującą rękę."` poprawia
+opublikowany obraz zamiast rysować go od zera: idzie on jako `Image 1: previous:card`, przed
+zdjęciami, kartą i widokami, a model zmienia tylko to, co nazywa uwaga. Poprzedni obraz liczy
+się do limitu toru, więc hero na seedream, które już niesie dziesięć obrazów, z uwagą jest
+odmową z liczbami. Szczegóły na stronie [etapu 5](05-referencje.md#poprawka-z-uwagą).
 
 Nazwy widoków: `front`, `slight-left`, `slight-right`, `three-quarter-left`,
 `three-quarter-right`, `profile-left`, `profile-right`, `rear`.

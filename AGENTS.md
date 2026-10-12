@@ -158,11 +158,13 @@ src/
     │   └── revision.ts    # Internal: --instruction, a correction of the published version
     ├── image-model/   # Folder form: one billed image call, shared by stages 2 and 5
     │   ├── index.ts       # Public: runImageStage, attach, frameSize, referenceLimit,
-    │   │                  #         validateImage, readImageResponse
+    │   │                  #         validateImage, readImageResponse, correction,
+    │   │                  #         previousId, PREVIOUS_ROLE
     │   ├── track.ts       # Internal: what a track accepts: the frame, the limit
     │   ├── client.ts      # Internal: both endpoints, redaction, the 24 h download
     │   ├── validate.ts    # Internal: the PNG and response verdicts, pure and offline
-    │   └── attempt.ts     # Internal: submitted, archive, resume, publish
+    │   ├── attempt.ts     # Internal: submitted, archive, resume, publish
+    │   └── correction.ts  # Internal: --instruction, the image to correct as Image 1
     ├── media-prompt/  # Folder form: the prompt a model receives: text + attachments
     │   ├── index.ts       # Public: readSendPlan, what a future paid call carries
     │   ├── prompt.ts      # Internal: the blocks around a published direction
@@ -305,6 +307,7 @@ src/
     │   └── index.test.ts  # Wiring/gate/bill/refusal, through the entry
     ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
     ├── muxer.test.ts
+    ├── instruction.ts # Single-file form: the marked block a person's note travels in
     ├── timeline.ts   # Single-file form: the plan's clock as one film's, stages 9 and 10
     ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
     │                 #                   page's worker and the local screen

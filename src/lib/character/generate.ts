@@ -93,6 +93,8 @@ interface GenerateCharacterInput {
   readonly artifacts: readonly CharacterArtifact[];
   readonly characterId: string;
   readonly fetch: typeof fetch;
+  /** A note correcting the one named image; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly mode: WriteMode;
   readonly model: string | null;
   readonly projectId: string;
@@ -185,6 +187,16 @@ export async function generateCharacter(
       new Stage2BlockedError([
         `--regenerate wymaga jawnego celu: --artifact ${CHARACTER_ARTIFACTS.join("|")}`,
         "nowa płatna próba zawsze dotyczy konkretnego obrazu",
+      ])
+    );
+  }
+
+  // A note is about one image. Sent to several, it would ask each of them to
+  // change something only one of them was looked at for.
+  if ((input.instruction ?? null) !== null && input.artifacts.length > 1) {
+    return err(
+      new Stage2BlockedError([
+        `--instruction ma jednego adresata, wskaż dokładnie jeden przez --artifact (wskazano: ${input.artifacts.join(", ")})`,
       ])
     );
   }
@@ -426,6 +438,7 @@ async function runOne(
     {
       apiKey: input.apiKey ?? "",
       fetch: input.fetch,
+      instruction: input.instruction ?? null,
       model: input.model ?? "",
       regenerate: input.regenerate,
       runs: scope.paths.runs,

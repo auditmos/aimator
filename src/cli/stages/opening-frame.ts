@@ -12,6 +12,7 @@ import {
   type Approval,
   asJson,
   imageModelOf,
+  instructionOf,
   keyFor,
   modeOf,
   type Parsed,
@@ -26,7 +27,8 @@ import {
 /** Stage 6: the first frame of the film, one artifact per track. */
 export const USAGE = `Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
   opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
-                         [--model <id>] [--dry-run] [--json] [--regenerate]
+                         [--model <id>] [--dry-run] [--json]
+                         [--regenerate [--instruction <uwaga>]]
     Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
     każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
     --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.`;
@@ -105,6 +107,7 @@ export async function runOpeningFrame(argv: readonly string[]): Promise<Result<s
 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
+    instruction: { type: "string" },
     json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -113,6 +116,12 @@ export async function runOpeningFrame(argv: readonly string[]): Promise<Result<s
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const instruction = instructionOf(parsed.data);
+
+  if (!instruction.ok) {
+    return instruction;
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -146,6 +155,7 @@ export async function runOpeningFrame(argv: readonly string[]): Promise<Result<s
     artifacts: referenceIdsOf(parsed.data),
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     mode,
     model: model.data,
     projectId: projectId.data,

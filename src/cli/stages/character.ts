@@ -25,6 +25,7 @@ import {
   parse,
   requireFlag,
   requirePositional,
+  singleInstructionOf,
   trackOf,
   UsageError,
   workspaceOf,
@@ -47,7 +48,7 @@ export const CAST_USAGE = `  character new <id> <character-id> --name <nazwa> [-
 export const USAGE = `Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
   character generate <id> <character-id> --track <gpt-image|seedream>
                      [--artifact card|hero|<widok>,...] [--model <id>]
-                     [--dry-run] [--json] [--regenerate]`;
+                     [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]`;
 
 /** Which stage this file answers for, in the word `--stage` takes. */
 const STAGE = "character";
@@ -159,6 +160,7 @@ const CHARACTER_OPTIONS = {
   describe: { json: { type: "boolean" } },
   generate: {
     artifact: { type: "string" },
+    instruction: { type: "string" },
     json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -229,6 +231,12 @@ async function runCharacterGenerate(parsed: Parsed): Promise<Result<string>> {
     return artifacts;
   }
 
+  const instruction = singleInstructionOf(parsed, artifacts.data);
+
+  if (!instruction.ok) {
+    return instruction;
+  }
+
   const model = imageModelOf(parsed, track.data);
 
   if (!model.ok) {
@@ -242,6 +250,7 @@ async function runCharacterGenerate(parsed: Parsed): Promise<Result<string>> {
     artifacts: artifacts.data,
     characterId: scope.data.characterId,
     fetch,
+    instruction: instruction.data,
     mode,
     model: model.data,
     projectId: scope.data.projectId,

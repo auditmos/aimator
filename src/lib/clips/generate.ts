@@ -106,6 +106,8 @@ interface GenerateInput {
   readonly fetch: typeof fetch;
   readonly imageKey: string | null;
   readonly imageModel: string | null;
+  /** A note correcting the one named image; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly mode: WriteMode;
   /**
    * The local engine, injected the way `fetch` is: a video model that hands
@@ -669,6 +671,7 @@ async function runEntryFrame(
     {
       apiKey: input.imageKey ?? "",
       fetch: input.fetch,
+      instruction: input.instruction ?? null,
       model: input.imageModel ?? "",
       regenerate: input.regenerate,
       runs: stage7.paths.track.runs,

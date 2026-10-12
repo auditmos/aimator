@@ -419,6 +419,50 @@ describe("generateCharacter provenance", () => {
   });
 });
 
+describe("generateCharacter --instruction", () => {
+  const NOTE = "Przywróć brakującą rękę, resztę zostaw.";
+
+  it("should correct the card, sending it as Image 1 to the edits endpoint", async () => {
+    await makeStage0();
+    await generate();
+    const named = { artifacts: ["card"] as const, instruction: NOTE, regenerate: true };
+    const preview = await generate({ ...named, apiKey: null, mode: "dry-run" });
+    const call = recorder();
+    const result = await generate({ ...named, fetch: call.fetch });
+    const prompt = preview.ok ? (preview.data.artifacts[0]?.prompt ?? "") : "";
+    const form = call.calls[0]?.body as FormData;
+    const [first] = form.getAll("image[]") as File[];
+    const record = (await readStageFile()).artifacts.card;
+
+    expect(prompt).toContain(
+      "REFERENCE INPUTS, IN THIS ORDER\nImage 1: previous:card, the image to correct"
+    );
+    expect(prompt).toContain(`----- BEGIN NOTE -----\n${NOTE}\n----- END NOTE -----`);
+    expect(preview.ok ? preview.data.paidCalls : null).toBe(1);
+    expect(result.ok).toBe(true);
+    expect(call.calls[0]?.url).toContain("/images/edits");
+    expect(Buffer.from(await (first as File).arrayBuffer())).toEqual(CARD);
+    expect(record.instruction).toBe(NOTE);
+    expect(record.inputs.map((entry: { path: string }) => entry.path)).toContainEqual(
+      `projects/${PROJECT}/characters/${CHARACTER}/gpt-image/runs/${record.runId}/previous.png`
+    );
+  });
+
+  it("should refuse one note addressed to several images", async () => {
+    await makeStage0();
+    const call = recorder();
+    const result = await generate({
+      artifacts: ["front", "rear"],
+      fetch: call.fetch,
+      instruction: NOTE,
+      regenerate: true,
+    });
+
+    expect(call.calls).toHaveLength(0);
+    expect(result.ok ? null : result.error.message).toContain("jednego adresata");
+  });
+});
+
 describe("generateCharacter resume", () => {
   /**
    * An answer that reached disk is bought and paid for. Re-deriving a result

@@ -32,6 +32,9 @@ import { approveReferences, checkReferences, generateReferences } from "./index.
  * things under test is the refusal to spend before anybody has accepted it.
  */
 
+/** Where a corrected image is kept, as an input of the attempt that corrected it. */
+const PREVIOUS_IMAGE = /\/runs\/[^/]+\/previous\.png$/;
+
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
@@ -519,5 +522,133 @@ describe("checkReferences and approveReferences", () => {
 
     expect(stage.artifacts.R01.review.status).toBe("approved");
     expect(stage.artifacts.R02.review.status).toBe("pending");
+  });
+});
+
+/**
+ * `--regenerate --instruction`: the image a person has seen, corrected rather
+ * than redrawn.
+ *
+ * Assumptions this block encodes: the note has exactly one addressee; the
+ * previous image is the published `R02.png` on this track; it travels as
+ * Image 1, id `previous:R02`, ahead of every attachment the package assigned,
+ * in their order; the note is quoted verbatim between markers. Not tested
+ * here: the CLI's refusal of `--instruction` without `--regenerate`.
+ */
+describe("generateReferences --instruction", () => {
+  const NOTE = "Przywróć brakujące ucho alpaki, resztę zostaw.";
+
+  it("should preview the previous image as Image 1, then the package's own attachments", async () => {
+    await upstream();
+    await approvePackage();
+    await generate({ artifacts: ["R02"] });
+    const plain = await generate({ artifacts: ["R02"], mode: "dry-run", regenerate: true });
+    const result = await generate({
+      artifacts: ["R02"],
+      instruction: NOTE,
+      mode: "dry-run",
+      regenerate: true,
+    });
+    const prompt = result.ok ? (result.data.artifacts[0]?.prompt ?? "") : "";
+    const before = plain.ok ? (plain.data.artifacts[0]?.prompt ?? "") : "";
+
+    expect(prompt).toContain("REFERENCE INPUTS, IN THIS ORDER\nImage 1 = previous:R02 — ");
+    expect(prompt).toContain("\nImage 2 = hero:ewa — ");
+    expect(before).toContain("\nImage 1 = hero:ewa — ");
+    expect(prompt).toContain(`----- BEGIN NOTE -----\n${NOTE}\n----- END NOTE -----`);
+    expect(result.ok ? result.data.paidCalls : null).toBe(1);
+  });
+});
+
+describe("generateReferences --instruction, paid", () => {
+  const NOTE = "Zostaw noc, nie zmieniaj światła.";
+
+  it("should edit on gpt-image with the previous image as the first file, recorded from the archive", async () => {
+    await upstream();
+    await approvePackage();
+    await generate({ artifacts: ["R02"] });
+    const published = await readFile(join(trackDir(), "references", "R02.png"));
+    const call = recorder();
+    const result = await generate({
+      artifacts: ["R02"],
+      fetch: call.fetch,
+      instruction: NOTE,
+      regenerate: true,
+    });
+    const form = call.calls[0]?.body as FormData;
+    const [first] = form.getAll("image[]") as File[];
+    const record = (await readStageFile()).artifacts.R02;
+    const kept = record.inputs.filter((entry: { path: string }) => PREVIOUS_IMAGE.test(entry.path));
+
+    expect(result.ok).toBe(true);
+    expect(call.calls).toHaveLength(1);
+    expect(call.calls[0]?.url).toContain("/images/edits");
+    expect(first?.name).toBe("previous:R02");
+    expect(Buffer.from(await (first as File).arrayBuffer())).toEqual(published);
+    expect(record.instruction).toBe(NOTE);
+    expect(kept).toEqual([{ path: expect.any(String), sha256: sha256Of(published) }]);
+    expect(await readFile(join(root, kept[0].path))).toEqual(published);
+    expect(record.review.status).toBe("pending");
+  });
+
+  it("should put the previous image first in seedream's image array", async () => {
+    await upstream();
+    await approvePackage();
+    const seedream = { model: "dola-seedream-5-0-pro-260628", track: "seedream" as const };
+    await generate({ ...seedream, artifacts: ["R02"] });
+    const published = await readFile(join(trackDir("seedream"), "references", "R02.png"));
+    const call = recorder();
+    await generate({
+      ...seedream,
+      artifacts: ["R02"],
+      fetch: call.fetch,
+      instruction: NOTE,
+      regenerate: true,
+    });
+    const body = call.calls[0]?.body as { image: readonly string[] };
+
+    expect(body.image[0]).toBe(`data:image/png;base64,${published.toString("base64")}`);
+    expect(body.image).toHaveLength(2);
+  });
+
+  it("should refuse one note addressed to several references", async () => {
+    await upstream();
+    await approvePackage();
+    const call = recorder();
+    const result = await generate({
+      artifacts: ["R01", "R02"],
+      fetch: call.fetch,
+      instruction: NOTE,
+      regenerate: true,
+    });
+
+    expect(result.ok ? null : result.error.message).toContain("jednego adresata");
+    expect(call.calls).toHaveLength(0);
+  });
+});
+
+describe("checkReferences after a correction", () => {
+  it("should read the corrected image as unchanged, and keep it through an approval", async () => {
+    await upstream();
+    await approvePackage();
+    await generate({ artifacts: ["R02"] });
+    await generate({ artifacts: ["R02"], instruction: "Ciemniej.", regenerate: true });
+    const scope = {
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      track: "gpt-image" as const,
+      workspace,
+    };
+    const before = await checkReferences(scope);
+    await accept(["R02"]);
+    const record = (await readStageFile()).artifacts.R02;
+
+    expect(
+      before.ok ? before.data.artifacts.find((one) => one.id === "R02")?.inputsChanged : null
+    ).toEqual([]);
+    expect(record.review.status).toBe("approved");
+    expect(record.inputs.map((entry: { path: string }) => entry.path)).toContainEqual(
+      expect.stringContaining("/previous.png")
+    );
   });
 });

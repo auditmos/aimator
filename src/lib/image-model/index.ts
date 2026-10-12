@@ -24,5 +24,6 @@
 
 export { runImageStage } from "./attempt.js";
 export { attach, type ImageAttachment } from "./client.js";
+export { correction, PREVIOUS_ROLE, previousId } from "./correction.js";
 export { frameSize, referenceLimit } from "./track.js";
 export { type ImageVerdict, readImageResponse, validateImage } from "./validate.js";

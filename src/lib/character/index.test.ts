@@ -88,6 +88,40 @@ describe("referencePlan", () => {
     });
     expect(plan.ok ? null : plan.error.message).toContain("10");
   });
+  it("should refuse, with the numbers, a correction that pushes a full seedream hero past ten", () => {
+    const corrected = referencePlan({
+      artifact: "hero",
+      basis: "photographs",
+      correcting: true,
+      photographs: ["a.png"],
+      track: "seedream",
+    });
+
+    expect(corrected.ok ? null : corrected.error.message).toContain(
+      'najwyżej 10 obrazów, a poprawka "hero" niesie 11 (poprawiany obraz i 10 referencji)'
+    );
+  });
+  it("should lead a correction with the image it corrects, the photographs still primary", () => {
+    const corrected = referencePlan({
+      artifact: "card",
+      basis: "photographs",
+      correcting: true,
+      photographs: ["a.png", "b.png"],
+      track: "gpt-image",
+    });
+    const text = buildPrompt({
+      artifact: "card",
+      basis: "photographs",
+      correction: "CORRECTION",
+      name: "Ewa",
+      references: corrected.ok ? corrected.data : [],
+      rules: RULES,
+    });
+
+    expect(text).toContain("Image 1: previous:card, the image to correct");
+    expect(text).toContain("Image 2: photograph a.png, the primary source");
+    expect(text).toContain("Image 3: photograph b.png, supporting evidence");
+  });
 });
 describe("buildPrompt", () => {
   it("should embed the project rules verbatim", () => {

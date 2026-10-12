@@ -22,7 +22,13 @@ pnpm dev approve dzielna-ewa 01-burza --stage clips --track seedream --artifact 
 ```
 
 Dodatkowe flagi: `--artifact C01,entry:C02`, `--image-model <id>`, `--video-model <id>`,
-`--regenerate`, `--republish --artifact C01`.
+`--regenerate`, `--instruction <uwaga>` (tylko razem z `--regenerate` i jednym `--artifact`),
+`--republish --artifact C01`.
+
+`--regenerate --artifact entry:C02 --instruction "<uwaga>"` poprawia opublikowaną klatkę
+wejściową zamiast rysować ją od zera: idzie ona jako `Image 1 = previous:entry:C02`, przed
+dotychczasowymi załącznikami, a model zmienia tylko to, co nazywa uwaga. Szczegóły na stronie
+[etapu 5](05-referencje.md#poprawka-z-uwagą).
 
 ## `--json`
 

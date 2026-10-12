@@ -196,6 +196,10 @@ Obowiązują we wszystkich etapach.
   więc nie jest porównywane z bieżącymi wejściami etapu, a ponowne zatwierdzenie go nie
   gubi. Walidacja wyniku jest ta sama: nic nie przechodzi dlatego, że jest poprawką.
   Działa w etapach tekstowych: 1, 3, 4, 9 (`--artifact script`) i 10 (`--artifact cues`).
+  W etapach obrazowych, 2, 5, 6 i 7 (`entry:Cnn`), to edycja, nie nowa generacja: poprzedni
+  obraz idzie jako `Image 1 = previous:<id>`, przed dotychczasowymi załącznikami, liczy się
+  do limitu toru (przekroczenie to odmowa z liczbami, nigdy obcięcie), a w `inputs` stoi jako
+  `runs/<runId>/previous.png`. Uwaga ma jednego adresata.
 - **Każde polecenie zapisujące ma `--dry-run`**: pełna walidacja, bez sieci, sekretów
   i zapisów.
 - **Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy**, nigdy

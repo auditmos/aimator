@@ -47,6 +47,8 @@ export const OPENING_FRAME = "opening-frame";
 
 export interface Stage6Scope {
   readonly episodeId: string;
+  /** A note on the published opening frame, which then leads its list as Image 1. */
+  readonly instruction?: string | null;
   readonly projectId: string;
   readonly track: ImageTrack;
   readonly workspace: Workspace;

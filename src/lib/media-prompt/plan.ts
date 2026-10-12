@@ -7,7 +7,13 @@ import {
   toWorkspacePath,
 } from "../artifact/index.js";
 import { checkCharacter } from "../character/index.js";
-import { frameSize, referenceLimit } from "../image-model/index.js";
+import {
+  correction,
+  frameSize,
+  PREVIOUS_ROLE,
+  previousId,
+  referenceLimit,
+} from "../image-model/index.js";
 import { type CastMember, readStage0Inputs } from "../project/index.js";
 import { checkPromptPackage, type PromptPackage } from "../prompt-package/index.js";
 import { err, ok, type Result } from "../result.js";
@@ -123,6 +129,11 @@ export interface SendPlan {
 
 interface SendPlanInput {
   readonly episodeId: string;
+  /**
+   * A person's note on the one named target, or absent. Its image, as
+   * published on this track, then leads the list as `previous:<name>`.
+   */
+  readonly instruction?: string | null;
   readonly projectId: string;
   /** Names to compose in full. Empty summarises every artifact and composes none. */
   readonly targets: readonly string[];
@@ -570,6 +581,92 @@ function directionPath(scope: Scope, artifact: Artifact): Result<string> {
   return promptFile(paths, kind, artifact.id);
 }
 
+/**
+ * The image a note corrects, as it stands on this track, or `null` when the
+ * request is an ordinary drawing. A clip has none: no provider edits a
+ * finished video, so its image is the frame it starts on, already first.
+ */
+async function correcting(
+  scope: Scope,
+  artifact: Artifact,
+  instruction: string | null
+): Promise<Result<Attachment | null>> {
+  if (instruction === null || artifact.kind === "clip") {
+    return ok(null);
+  }
+
+  const located = locate(scope, artifact.name);
+
+  if (!located.ok) {
+    return located;
+  }
+
+  const digest = await digestOf(scope, located.data.path);
+  const sha256 = digest?.sha256 ?? null;
+  const relative = toWorkspacePath(scope.input.workspace.root, located.data.path);
+
+  return ok({
+    bytes: digest?.bytes ?? null,
+    id: previousId(artifact.name),
+    path: relative,
+    role: PREVIOUS_ROLE,
+    sha256,
+    state: stateOf(located.data.record, relative, sha256),
+  });
+}
+
+/** Why one call may not happen yet, in the words a person reads. */
+function blockersOf(
+  scope: Scope,
+  artifact: Artifact,
+  data: {
+    readonly attachments: readonly Attachment[];
+    readonly instruction: string | null;
+    /** The prompt file stage 4 should have published, when it did not. */
+    readonly missingDirection: string | null;
+    readonly previous: Attachment | null;
+  }
+): string[] {
+  const { attachments, instruction, missingDirection, previous } = data;
+  // The image being corrected is not something anybody has to accept first:
+  // correcting an image nobody accepted is what the flag is for. It only has
+  // to exist, and it is recorded by the attempt, from its own archive.
+  const planned = attachments.filter((attachment) => attachment !== previous);
+  const blockers = planned
+    .map((attachment) => attachmentBlocker(scope, attachment))
+    .filter((problem): problem is string => problem !== null);
+
+  if (previous !== null && previous.sha256 === null) {
+    blockers.push(
+      `${artifact.name}: nie ma opublikowanego obrazu (${previous.path}), który --instruction mógłby poprawić; pierwszy kupuje generate bez tej flagi`
+    );
+  }
+
+  if (artifact.kind === "clip" && instruction !== null) {
+    blockers.push(`${artifact.name}: --instruction przy klipie nie jest jeszcze obsługiwane`);
+  }
+
+  if (missingDirection !== null) {
+    blockers.push(
+      `brakuje ${missingDirection}, etap 4 nie opublikował promptu dla ${artifact.name}`
+    );
+  }
+
+  // The limit is an image track's: how many references one drawing request
+  // carries. A clip carries exactly one attachment by construction, so there is
+  // nothing here for that limit to be about. A corrected image counts: it is
+  // one more image in the same request, and nothing is silently dropped.
+  if (artifact.kind !== "clip" && attachments.length > scope.limit) {
+    blockers.push(
+      previous === null
+        ? `${artifact.name}: ${attachments.length} referencji, a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}, zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
+        : `${artifact.name}: ${attachments.length} załączników (poprawiany obraz i ${planned.length} referencji), a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}; --instruction dokłada poprzedni obraz jako Image 1, więc tu się nie zmieści, zaplanuj w pakiecie mniej referencji`
+    );
+  }
+
+  return blockers;
+}
+
 async function planOne(
   scope: Scope,
   artifact: Artifact,
@@ -581,7 +678,14 @@ async function planOne(
     return path;
   }
 
-  const attachments: Attachment[] = [];
+  const instruction = compose ? (scope.input.instruction ?? null) : null;
+  const previous = await correcting(scope, artifact, instruction);
+
+  if (!previous.ok) {
+    return previous;
+  }
+
+  const attachments: Attachment[] = previous.data === null ? [] : [previous.data];
 
   for (const id of artifact.referenceIds) {
     // biome-ignore lint/performance/noAwaitInLoops: ordered, and the order is the request
@@ -596,23 +700,13 @@ async function planOne(
 
   const direction = await digestOf(scope, path.data);
   const relative = toWorkspacePath(scope.input.workspace.root, path.data);
-  const blockers = attachments
-    .map((attachment) => attachmentBlocker(scope, attachment))
-    .filter((problem): problem is string => problem !== null);
-
-  if (direction === null) {
-    blockers.push(`brakuje ${relative}, etap 4 nie opublikował promptu dla ${artifact.name}`);
-  }
-
-  // The limit is an image track's: how many references one drawing request
-  // carries. A clip carries exactly one attachment by construction, so there is
-  // nothing here for that limit to be about.
-  if (artifact.kind !== "clip" && attachments.length > scope.limit) {
-    blockers.push(
-      `${artifact.name}: ${attachments.length} referencji, a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}, zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
-    );
-  }
-
+  const planned = attachments.filter((attachment) => attachment !== previous.data);
+  const blockers = blockersOf(scope, artifact, {
+    attachments,
+    instruction,
+    missingDirection: direction === null ? relative : null,
+    previous: previous.data,
+  });
   const shotListInput =
     artifact.shots.length === 0 ? [] : await recordFile(scope, scope.paths.episode.shotList);
 
@@ -624,7 +718,7 @@ async function planOne(
       ...scope.shared,
       ...shotListInput,
       ...(direction === null ? [] : [{ path: relative, sha256: direction.sha256 }]),
-      ...attachments
+      ...planned
         .filter((attachment) => attachment.sha256 !== null)
         .map((attachment) => ({ path: attachment.path, sha256: attachment.sha256 as string })),
     ],
@@ -635,6 +729,8 @@ async function planOne(
       compose && direction !== null
         ? composePrompt({
             aspectRatio: scope.aspectRatio,
+            correction:
+              previous.data === null || instruction === null ? null : correction(instruction),
             direction: direction.bytes.toString("utf8"),
             output:
               artifact.kind === "clip" && artifact.seconds !== null
@@ -752,6 +848,17 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     return err(
       new SendPlanError(
         `--artifact "${unknown.join(", ")}", ten pakiet planuje: ${[...known].join(", ")}`
+      )
+    );
+  }
+
+  // A note is about one image. Sent to several, it would ask each of them to
+  // change something only one of them was looked at for. A summary composes
+  // nothing, so it has nothing for a note to reach.
+  if ((input.instruction ?? null) !== null && input.targets.length > 1) {
+    return err(
+      new SendPlanError(
+        `--instruction ma jednego adresata, wskaż dokładnie jeden przez --artifact (wskazano: ${input.targets.join(", ")})`
       )
     );
   }

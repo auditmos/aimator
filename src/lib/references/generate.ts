@@ -85,6 +85,8 @@ interface GenerateInput {
   readonly artifacts: readonly string[];
   readonly episodeId: string;
   readonly fetch: typeof fetch;
+  /** A note correcting the one named reference; only with `regenerate`. */
+  readonly instruction?: string | null;
   readonly mode: WriteMode;
   readonly model: string | null;
   readonly projectId: string;
@@ -395,6 +397,7 @@ async function runOne(
     {
       apiKey: input.apiKey ?? "",
       fetch: input.fetch,
+      instruction: input.instruction ?? null,
       model: input.model ?? "",
       regenerate: input.regenerate,
       runs: stage5.paths.track.runs,

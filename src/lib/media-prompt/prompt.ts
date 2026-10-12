@@ -141,6 +141,11 @@ throughout, and end on an instant the next clip can continue out of.`;
 
 interface ComposeInput {
   readonly aspectRatio: string;
+  /**
+   * Under `--instruction`, the task that makes this a correction of Image 1,
+   * with the note quoted, or `null` for an ordinary drawing request.
+   */
+  readonly correction: string | null;
   /** The published prompt file, verbatim, the creative direction for one frame. */
   readonly direction: string;
   /** One frame, or a clip of the length the approved shot list planned. */
@@ -164,6 +169,7 @@ export function composePrompt(input: ComposeInput): string {
   const video = input.output.kind === "video";
   const parts = [
     renderAttachments(input.slots, video),
+    ...(input.correction === null ? [] : [input.correction]),
     input.direction.trim(),
     MEDIUM,
     input.output.kind === "video"

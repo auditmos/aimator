@@ -283,6 +283,29 @@ export function instructionOf(parsed: Parsed): Result<string | null> {
       );
 }
 
+/**
+ * `--instruction` on a command that can buy several images at once.
+ *
+ * A note is written about one image, so it names exactly one: sent to several,
+ * it would ask each of them to change something only one was looked at for.
+ */
+export function singleInstructionOf(
+  parsed: Parsed,
+  artifacts: readonly string[]
+): Result<string | null> {
+  const instruction = instructionOf(parsed);
+
+  if (!instruction.ok || instruction.data === null || artifacts.length <= 1) {
+    return instruction;
+  }
+
+  return err(
+    new UsageError(
+      `--instruction ma jednego adresata, a --artifact wskazuje ${artifacts.length}: ${artifacts.join(", ")}`
+    )
+  );
+}
+
 /** An optional number flag. Absent means "leave this one as it was". */
 export function numberFlag(parsed: Parsed, name: string): Result<number | null> {
   const raw = parsed.values[name];

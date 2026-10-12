@@ -31,7 +31,7 @@ Etap 1. Scenariusz (płatny):
 Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
   character generate <id> <character-id> --track <gpt-image|seedream>
                      [--artifact card|hero|<widok>,...] [--model <id>]
-                     [--dry-run] [--json] [--regenerate]
+                     [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
 
 Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
@@ -53,13 +53,14 @@ Etap 4. Pakiet promptów (płatny; wspólny dla obu torów, ale czeka na oba):
 Etap 5. Obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
   reference generate <id> <episode-id> --track <gpt-image|seedream>
                      [--artifact R01,R02] [--model <id>] [--dry-run] [--json]
-                     [--regenerate]
+                     [--regenerate [--instruction <uwaga>]]
     Bez --artifact rysuje wszystkie referencje, których zależności są już
     zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.
 
 Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
   opening-frame generate <id> <episode-id> --track <gpt-image|seedream>
-                         [--model <id>] [--dry-run] [--json] [--regenerate]
+                         [--model <id>] [--dry-run] [--json]
+                         [--regenerate [--instruction <uwaga>]]
     Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
     każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
     --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.
@@ -67,7 +68,7 @@ Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedno wywołanie):
 Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
   clip generate <id> <episode-id> --track <gpt-image|seedream>
                [--artifact C01,entry:C02] [--image-model <id>] [--video-model <id>]
-               [--dry-run] [--json] [--regenerate]
+               [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
     i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL).
@@ -243,4 +244,7 @@ wyłącznie --regenerate, zachowując poprzedni wynik. W etapach tekstowych (1, 
 4, 9 i 10) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
 zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę
 dosłownie, i ma zmienić tylko to, czego uwaga dotyczy. To nadal nowa płatna
-próba.
+próba. W etapach obrazowych (2, 5, 6 i 7 dla entry:Cnn) poprzedni obraz idzie
+jako Image 1 = previous:<id>, przed dotychczasowymi załącznikami, a model
+poprawia tylko to, co nazywa uwaga. Uwaga ma jednego adresata: kilka
+artefaktów z jedną uwagą to błąd użycia.

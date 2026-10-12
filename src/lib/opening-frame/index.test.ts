@@ -317,6 +317,32 @@ describe("generateOpeningFrame", () => {
     expect(await readFile(join(trackDir(), "runs", runId, "previous.png"))).toEqual(FILM);
   });
 
+  it("should correct the opening frame under --instruction, with no --artifact", async () => {
+    const note = "Zostaw noc, przyciemnij lampę.";
+    await upstream();
+    await makeReferences("gpt-image");
+    await generate();
+    const preview = await generate({ instruction: note, mode: "dry-run", regenerate: true });
+    const call = recorder();
+    const result = await generate({ fetch: call.fetch, instruction: note, regenerate: true });
+    const record = (await readStageFile()).artifacts["opening-frame"];
+    const form = call.calls[0]?.body as FormData;
+    const [first] = form.getAll("image[]") as File[];
+
+    expect(preview.ok ? preview.data.artifact.prompt : "").toContain(
+      "REFERENCE INPUTS, IN THIS ORDER\nImage 1 = previous:opening-frame — "
+    );
+    expect(result.ok).toBe(true);
+    expect(call.calls[0]?.prompt).toContain(
+      `----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`
+    );
+    expect(Buffer.from(await (first as File).arrayBuffer())).toEqual(FILM);
+    expect(record.instruction).toBe(note);
+    expect(record.inputs.map((entry: { path: string }) => entry.path)).toContainEqual(
+      `projects/${PROJECT}/episodes/${EPISODE}/gpt-image/runs/${record.runId}/previous.png`
+    );
+  });
+
   it("should refuse to publish an image in the wrong frame", async () => {
     await upstream();
     await makeReferences("gpt-image");

@@ -38,6 +38,8 @@ export const REFERENCE_ID = /^R\d{2,}$/;
 
 export interface Stage5Scope {
   readonly episodeId: string;
+  /** A note on the one named reference, which then leads its list as Image 1. */
+  readonly instruction?: string | null;
   readonly projectId: string;
   readonly track: ImageTrack;
   readonly workspace: Workspace;

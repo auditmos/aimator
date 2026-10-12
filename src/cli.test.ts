@@ -893,3 +893,45 @@ describe("--instruction", () => {
     }
   );
 });
+
+describe("--instruction on an image", () => {
+  it.each([
+    ["character", "generate", "demo", "ewa", "--track", "gpt-image", "--artifact", "card"],
+    ["reference", "generate", "demo", "01", "--track", "gpt-image", "--artifact", "R01"],
+    ["opening-frame", "generate", "demo", "01", "--track", "gpt-image"],
+    ["clip", "generate", "demo", "01", "--track", "gpt-image", "--artifact", "entry:C02"],
+  ])("should refuse %s %s without --regenerate and send nothing", async (...command) => {
+    const sent = vi.spyOn(globalThis, "fetch");
+    const result = await run([...command, "--instruction", "Ciemniej.", "--workspace", root]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(result.ok ? null : result.error.message).toContain("--regenerate");
+    expect(sent).not.toHaveBeenCalled();
+    sent.mockRestore();
+  });
+
+  it.each([
+    ["character", "demo", "ewa", "front,rear"],
+    ["reference", "demo", "01", "R01,R02"],
+    ["clip", "demo", "01", "entry:C02,entry:C03"],
+  ])("should refuse one note for several %s artifacts", async (stage, project, id, artifacts) => {
+    const result = await run([
+      stage,
+      "generate",
+      project,
+      id,
+      "--track",
+      "gpt-image",
+      "--artifact",
+      artifacts,
+      "--regenerate",
+      "--instruction",
+      "Ciemniej.",
+      "--workspace",
+      root,
+    ]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(result.ok ? null : result.error.message).toContain("jednego adresata");
+  });
+});

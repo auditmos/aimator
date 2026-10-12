@@ -47,6 +47,8 @@ export function isClipArtifact(name: string): boolean {
 
 export interface Stage7Scope {
   readonly episodeId: string;
+  /** A note on the one named entry frame, which then leads its list as Image 1. */
+  readonly instruction?: string | null;
   readonly projectId: string;
   readonly track: ImageTrack;
   readonly workspace: Workspace;

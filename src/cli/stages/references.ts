@@ -18,6 +18,7 @@ import {
   parse,
   referenceIdsOf,
   requirePositional,
+  singleInstructionOf,
   trackOf,
   UsageError,
   workspaceOf,
@@ -27,7 +28,7 @@ import {
 export const USAGE = `Etap 5. Obrazy referencyjne (płatny; per tor, kilka obrazów na polecenie):
   reference generate <id> <episode-id> --track <gpt-image|seedream>
                      [--artifact R01,R02] [--model <id>] [--dry-run] [--json]
-                     [--regenerate]
+                     [--regenerate [--instruction <uwaga>]]
     Bez --artifact rysuje wszystkie referencje, których zależności są już
     zatwierdzone NA TYM TORZE, i mówi, ile płatnych wywołań wykona.`;
 
@@ -110,6 +111,7 @@ export async function runReference(argv: readonly string[]): Promise<Result<stri
 
   const parsed = parse(argv.slice(1), {
     artifact: { type: "string" },
+    instruction: { type: "string" },
     json: { type: "boolean" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -118,6 +120,12 @@ export async function runReference(argv: readonly string[]): Promise<Result<stri
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const instruction = singleInstructionOf(parsed.data, referenceIdsOf(parsed.data));
+
+  if (!instruction.ok) {
+    return instruction;
   }
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
@@ -151,6 +159,7 @@ export async function runReference(argv: readonly string[]): Promise<Result<stri
     artifacts: referenceIdsOf(parsed.data),
     episodeId: episodeId.data,
     fetch,
+    instruction: instruction.data,
     mode,
     model: model.data,
     projectId: projectId.data,
