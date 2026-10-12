@@ -1124,8 +1124,12 @@ w ręku, więc odmawia długości tylko wtedy, gdy nie renderuje jej żaden mode
 
 **Kling nie oddaje ostatniej klatki.** Etap 7 wycina ją wtedy z pobranego MP4 przez
 `lib/muxer` (`lastFrame`, PNG w rozmiarze klipu) w tym samym kroku publikacji, **przed
-oceną**, jako drugie wyjście tego samego rekordu, więc bajty, które ktoś przyjmuje, nadal
-powstają przed werdyktem. Plik nazywa się `frames/Cnn/end.png`, bo nazwa idzie za bajtami,
+oceną** klatki, jako drugie wyjście tego samego rekordu, więc bajty, które ktoś przyjmuje,
+nadal powstają przed werdyktem. Cięcie przychodzi jednak **po** werdykcie klipu: pobrane
+bajty są dostawcy, więc lokalny ffmpeg dostaje je dopiero, gdy czytnik pudełek uznał je za
+MP4, i czyta je wyłącznie jako MP4 (`-f mov`) i wyłącznie z pliku (`-protocol_whitelist
+file`). Zgadywanie formatu pozwoliłoby liście innych plików udającej klip (`ffconcat`)
+otworzyć cokolwiek z dysku i zrobić z tego „ostatnią klatkę". Plik nazywa się `frames/Cnn/end.png`, bo nazwa idzie za bajtami,
 a `producer` rekordu zapisuje endpoint i model Klinga. Etap 7 na Klingu wymaga więc ffmpeg
 i bez niego odmawia przed wysyłką, tak jak etap 8. Przerwane zadanie odbiera się modelem,
 który je zamówił: inny model w tej samej powłoce to odmowa ze wskazaniem właściwego, nie

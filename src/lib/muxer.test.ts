@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -216,6 +216,40 @@ describe("ffmpeg lastFrame", () => {
     const still = validateEndFrame(await readFile(target), { height: 180, width: 320 });
 
     expect(still.ok ? still.data.format : still.error.message).toBe("png");
+  });
+
+  /**
+   * The clip is a provider's download, so ffmpeg must read it as the MP4 it
+   * claims to be and nothing else. Left to guess, it recognises a concat list
+   * by its first line, whatever the file is called, and opens whatever the list
+   * points at, so the frame it cuts is then a picture of a file on this machine
+   * that nobody downloaded. HLS is the same shape over the network, which
+   * newer builds refuse by extension and older ones do not.
+   */
+  it.runIf(installed())("should not follow a list of files that poses as a clip", async () => {
+    const elsewhere = join(scratch, "elsewhere.ts");
+    const video = join(scratch, "C01.mp4");
+    const target = join(scratch, "end.png");
+
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=size=320x180:rate=24:duration=2",
+      "-f",
+      "mpegts",
+      elsewhere,
+    ]);
+    await writeFile(video, "ffconcat version 1.0\nfile elsewhere.ts\n");
+
+    const result = await ffmpeg("ffmpeg").lastFrame({ target, video });
+
+    expect(result.ok).toBe(false);
+    await expect(readFile(target)).rejects.toThrow();
   });
 
   it("should refuse by name when the program is not there", async () => {

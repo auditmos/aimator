@@ -485,6 +485,14 @@ async function lastFrame(binary: string, input: FrameInput): Promise<Result<Conc
     "-nostdin",
     "-loglevel",
     "warning",
+    // The clip is a provider's download, so it is read as the MP4 it claims to
+    // be and as nothing else: no format guessed from its first bytes, which is
+    // how a list of other files posing as a clip would be followed, and no
+    // protocol but a local file, which is how a playlist would reach out.
+    "-protocol_whitelist",
+    "file",
+    "-f",
+    "mov",
     "-sseof",
     "-1",
     "-i",

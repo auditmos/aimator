@@ -592,13 +592,13 @@ describe("runVideoStage", () => {
      * from the POST, `data[0]` from the task query, and the video among the
      * task's `outputs`, with no final frame anywhere.
      */
-    function kling(options: { fail?: string; polls?: number } = {}): {
+    function kling(options: { fail?: string; polls?: number; video?: Buffer } = {}): {
       readonly calls: KlingCall[];
       readonly fetch: typeof fetch;
       /** The job id `clips.stage.json` held at the moment of each poll. */
       readonly receipts: (string | null)[];
     } {
-      const { fail, polls = 1 } = options;
+      const { fail, polls = 1, video = CLIP } = options;
       const calls: KlingCall[] = [];
       const receipts: (string | null)[] = [];
       const seen = new Map<string, number>();
@@ -617,7 +617,7 @@ describe("runVideoStage", () => {
         });
 
         if (href === "https://download/video") {
-          return Promise.resolve(new Response(CLIP, { status: 200 }));
+          return Promise.resolve(new Response(video, { status: 200 }));
         }
 
         if (method === "POST") {
@@ -790,6 +790,23 @@ describe("runVideoStage", () => {
       const archived = await readFile(join(dir, "runs", runId, "response.json"), "utf8");
 
       expect(archived).toContain("Treść nie przeszła moderacji");
+    });
+
+    /**
+     * The download is handed to ffmpeg only once it has passed for an MP4 by
+     * this module's own box reader: a local parser is not where a provider's
+     * bytes are first looked at.
+     */
+    it("should not hand ffmpeg a download that is not an MP4", async () => {
+      const engine = cutter();
+      const result = await run(
+        kling({ video: Buffer.from("ffconcat version 1.0\nfile previous.mp4\n") }).fetch,
+        { model: KLING, mux: engine.mux }
+      );
+
+      expect(reason(result)).toContain("MP4");
+      expect(engine.cuts).toEqual([]);
+      expect((await record()).status).toBe("submitted");
     });
 
     /** The video's own id, which a later lip-sync call is addressed by. */

@@ -365,9 +365,12 @@ than a module of its own: `provider.ts` maps a model id to its row, and `modelar
 operations stays in `attempt.ts`, once, which is the point: the receipt before the poll and
 the archive before the verdict are not things a second provider gets to do differently.
 The one real difference is the end frame. Kling hands none back, so `attempt.ts` cuts it
-out of the downloaded clip through `lib/muxer` before judging it; that is why
-`runVideoStage` takes a `Muxer`, and why `lib/muxer` grew `lastFrame`, an operation like its
-others rather than a process.
+out of the downloaded clip through `lib/muxer`, after the clip has passed for an MP4 and
+before the frame is judged; that is why `runVideoStage` takes a `Muxer`, and why
+`lib/muxer` grew `lastFrame`, an operation like its others rather than a process. It is
+also the first operation there that reads bytes nobody on this machine made, so it names
+the demuxer and allows only local files: a guessed format is how a list of other files
+posing as a clip gets followed.
 
 `lib/clips` therefore buys from **two** media modules, and that is the honest shape of the
 stage rather than a compromise: stage 7 produces an image and a video, the stage brings its

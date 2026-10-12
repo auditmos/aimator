@@ -605,11 +605,14 @@ async function prepare(
   );
 }
 
-/** The clip's bytes, from the archive when they are already there. */
+/**
+ * The clip's bytes, from the archive when they are already there, and the
+ * still the provider handed back beside it, if it handed one back. A still that
+ * is cut out of the clip instead is not collected here: that waits until the
+ * clip has passed for an MP4.
+ */
 async function collect(
   call: VideoCall,
-  provider: VideoProvider,
-  artifact: VideoArtifact,
   run: VideoRunPaths,
   task: Succeeded
 ): Promise<Result<{ endFrame: Buffer | null; video: Buffer }>> {
@@ -638,10 +641,6 @@ async function collect(
 
   if (savedPng.ok) {
     return ok({ endFrame: savedPng.data.bytes, video });
-  }
-
-  if (provider.endFrame === "cut") {
-    return await cut(call, artifact, run, video);
   }
 
   if (task.endFrameUrl === null) {
@@ -675,21 +674,22 @@ async function collect(
  *
  * It is written into the archive under the name the provider's own still would
  * have had, so a resume and a republication find it exactly as they would find
- * a returned one, and it happens here, before the verdict, so the bytes a human
- * accepts are the bytes that were judged. A failure leaves the record
+ * a returned one, and it happens before the frame's verdict, so the bytes a
+ * human accepts are the bytes that were judged. It happens *after* the clip's
+ * verdict, though: the download is a provider's, and a local parser is not
+ * where those bytes are first looked at. A failure leaves the record
  * resumable: the clip is bought and archived, and cutting again costs nothing.
  */
 async function cut(
   call: VideoCall,
   artifact: VideoArtifact,
-  run: VideoRunPaths,
-  video: Buffer
-): Promise<Result<{ endFrame: Buffer | null; video: Buffer }>> {
+  run: VideoRunPaths
+): Promise<Result<Buffer>> {
   const made = await call.mux.lastFrame({ target: run.endFramePng, video: run.video });
   const frame = made.ok ? await readDigest(run.endFramePng) : null;
 
   if (frame?.ok === true) {
-    return ok({ endFrame: frame.data.bytes, video });
+    return ok(frame.data.bytes);
   }
 
   return err(
@@ -714,7 +714,7 @@ async function publish(
     readonly task: Succeeded;
   }
 ): Promise<Result<VideoAttempt>> {
-  const collected = await collect(call, provider, artifact, data.run, data.task);
+  const collected = await collect(call, data.run, data.task);
 
   if (!collected.ok) {
     return collected;
@@ -749,12 +749,21 @@ async function publish(
   // inside its resolution tier, and the frame is that same picture. Its format
   // is the provider's too, so the file is named after what it holds rather than
   // re-encoded into the one the rest of the tree happens to use.
-  const still =
-    collected.data.endFrame === null
-      ? null
-      : validateEndFrame(collected.data.endFrame, verdict.data);
+  let returned = collected.data.endFrame;
+
+  if (returned === null && provider.endFrame === "cut") {
+    const cutOut = await cut(call, artifact, data.run);
+
+    if (!cutOut.ok) {
+      return cutOut;
+    }
+
+    returned = cutOut.data;
+  }
+
+  const still = returned === null ? null : validateEndFrame(returned, verdict.data);
   const target = still?.ok === true ? artifact.endFrameTarget(still.data.format) : null;
-  const endFrame = target?.ok === true ? collected.data.endFrame : null;
+  const endFrame = target?.ok === true ? returned : null;
   const outputs: RecordedFile[] = [
     {
       path: toWorkspacePath(call.workspace.root, artifact.target),
