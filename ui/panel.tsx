@@ -561,6 +561,12 @@ export interface Priced {
   readonly aside?: string;
   /** Never summed: two media on one bill are two numbers a person reads. */
   readonly billed: readonly Billed[];
+  /**
+   * What this purchase says without refusing, beside the bill. A stage opts in
+   * through its reader; stage 7 does, because its model notice depends on the
+   * model in the field, so no status block can say it.
+   */
+  readonly notices?: readonly string[];
   readonly prompts: readonly { readonly label: string; readonly text: string }[];
 }
 
@@ -877,6 +883,7 @@ function Bought(props: {
       {priced.aside === undefined ? null : <p className="actions-note">{priced.aside}</p>}
 
       <Problems problems={problems} />
+      <Notices notices={priced.notices ?? []} />
 
       {buying ? (
         <div className="actions" ref={purchase}>

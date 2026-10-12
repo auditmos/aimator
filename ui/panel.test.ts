@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { asMedia } from "./clips";
 import { approvable, asImages } from "./panel";
-import type { DrawnReport, TextStatus } from "./types";
+import type { DrawnReport, MediaReport, TextStatus } from "./types";
 
 /**
  * How a panel reads its own stage's report, and the one thing it must not do.
@@ -77,6 +78,27 @@ describe("an image stage's reader", () => {
    */
   it("should bill what the stage counted, not what it printed", () => {
     expect(asImages(VIEWS).billed).toEqual([{ count: 2, unit: ["obraz", "obrazy", "obrazów"] }]);
+  });
+});
+
+/**
+ * Stage 7's, and the one notice that exists only before a purchase: a clip
+ * about to be rendered by another model than the track's accepted ones. The
+ * status block never says it, because it depends on the model in the field.
+ */
+describe("stage 7's reader", () => {
+  const MIXED: MediaReport = {
+    artifacts: [{ id: "C02", prompt: "Ewa podchodzi do okna." }],
+    notices: [
+      "zatwierdzone klipy toru seedream pochodzą z innego modelu: C01 (dreamina-seedance-2-5-260628)",
+    ],
+    paidImages: 0,
+    paidVideos: 1,
+    problems: [],
+  };
+
+  it("should carry what the purchase says without refusing, beside the bill", () => {
+    expect(asMedia(MIXED).notices).toEqual(MIXED.notices);
   });
 });
 

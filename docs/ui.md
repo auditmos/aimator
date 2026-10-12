@@ -121,9 +121,10 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Panel etapu 7**, pierwszy, w którym się nie patrzy, tylko **ogląda**: łańcuch ogniwo po
   ogniwie, klatka wejściowa jako obraz, klip jako wideo z przewijaniem, pod każdym jego
   stan w słowach etapu, więc zablokowane mówi, czyjej zgody brakuje. Zaznaczenie kilku daje
-  jedną komendę (`--artifact C01,entry:C02`), rachunek stoi w **dwóch** liczbach, a obok
-  płatnego wywołania jest jedyna komenda tego ekranu, która zapisuje, nie płacąc:
-  `--republish` z archiwum.
+  jedną komendę (`--artifact C01,entry:C02`), rachunek stoi w **dwóch** liczbach, a pod
+  nim meldunek, gdy klip ma powstać innym modelem wideo niż zatwierdzone klipy toru (montaż
+  poczeka, aż tor będzie z jednego modelu). Obok płatnego wywołania jest jedyna komenda tego
+  ekranu, która zapisuje, nie płacąc: `--republish` z archiwum.
 - **Panel etapu 8**, pierwszy **bez rachunku i bez „Kup”**: cały odcinek jako wideo do
   obejrzenia w całości, plan cięcia wyprowadzony z zatwierdzonej listy ujęć (nigdzie nie
   zapisany), cisza jako meldunek, a nie przeszkoda, i **jeden przycisk**. Bez `ffmpeg`

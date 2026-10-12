@@ -68,13 +68,13 @@ const VIDEOS: Unit = ["klip", "klipy", "klipów"];
  * counts this way. What is shared is the arrangement around a bill, which is
  * in `PaidCall`; what a stage is billed in is the stage's own answer.
  */
-function asMedia(report: MediaReport): Priced {
+export function asMedia(report: MediaReport): Priced {
   const billed: readonly Billed[] = [
     { count: report.paidImages, unit: FRAMES },
     { count: report.paidVideos, unit: VIDEOS },
   ];
 
-  return { billed, prompts: promptsOf(report.artifacts) };
+  return { billed, notices: report.notices, prompts: promptsOf(report.artifacts) };
 }
 
 /** What the state of one link means, in the word a person reads. */

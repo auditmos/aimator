@@ -474,6 +474,8 @@ export interface DrawnReport extends PaidReport {
 /** Stage 7's: two media, two bills, and a prompt under each artifact. */
 export interface MediaReport extends PaidReport {
   readonly artifacts: readonly { readonly id: string; readonly prompt: string | null }[];
+  /** Reported, never enforced: a clip from another model than the track's accepted ones. */
+  readonly notices: readonly string[];
   readonly paidImages: number;
   readonly paidVideos: number;
 }
