@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { checkAssembly } from "../../lib/assembly/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
-import { EPISODE, makeCut, makeUpstream, PROJECT } from "../../test/fixture.js";
+import { EPISODE, makeCut, makeTrack, makeUpstream, PROJECT } from "../../test/fixture.js";
 import { run } from "../index.js";
 
 /**
@@ -250,5 +250,66 @@ describe("assembly generate --json", () => {
 
     expect(report.ready).toBe(false);
     expect(report.artifact.state).toBe("blocked");
+  });
+});
+
+/**
+ * A track whose clips came from two video models, in a workspace of its own,
+ * because the one above keeps a track nobody touched. The refusal stage 8
+ * makes there has to reach `--json` as a problem, since the ladder calls a
+ * cell blocked off `problems` alone.
+ */
+describe("check --stage assembly on a track of two video models", () => {
+  let mixed = "";
+  let mixedScratch = "";
+
+  beforeAll(async () => {
+    mixed = await mkdtemp(join(tmpdir(), "aimator-cli-assembly-mixed-"));
+    mixedScratch = await mkdtemp(join(tmpdir(), "aimator-cli-assembly-mixed-src-"));
+    const resolved = resolveWorkspace(mixed);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    await makeUpstream({
+      answer: answer(),
+      approvePackage: true,
+      root: mixed,
+      scratch: mixedScratch,
+      workspace: resolved.data,
+    });
+    await makeTrack({
+      root: mixed,
+      track: TRACK,
+      videoModels: { C02: "kling-3.0" },
+      workspace: resolved.data,
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await rm(mixed, { force: true, recursive: true });
+    await rm(mixedScratch, { force: true, recursive: true });
+  });
+
+  it("should carry the mixed models as a problem", async () => {
+    const result = await run([
+      "check",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "assembly",
+      "--track",
+      TRACK,
+      "--json",
+      "--workspace",
+      mixed,
+    ]);
+    const printed = (result.ok ? JSON.parse(result.data) : { problems: [] }) as {
+      problems: string[];
+    };
+
+    expect(printed.problems.join("\n")).toContain("C02 (kling-3.0)");
+    expect(printed.problems.join("\n")).toContain("--regenerate --artifact C02");
   });
 });

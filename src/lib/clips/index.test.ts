@@ -490,6 +490,41 @@ describe("generateClips on Kling", () => {
     expect(seedance.ok ? seedance.data.paidVideos : reason(seedance)).toBe(1);
   });
 
+  /**
+   * Re-rendering a track clip by clip with another model is legal, so it is
+   * not refused; but stage 8 will refuse the track until every clip is on one
+   * model, and a person should know that before paying, not after.
+   */
+  it("should warn, not refuse, when the track's accepted clips came from another model", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+    await generate();
+    await accept(["C01", "entry:C02"]);
+
+    const preview = await generate({
+      artifacts: ["C02"],
+      imageKey: null,
+      mode: "dry-run",
+      videoKey: null,
+      videoModel: KLING,
+    });
+
+    expect(preview.ok ? preview.data.notices.join("\n") : reason(preview)).toContain(
+      "C01 (dreamina-seedance-2-5-260628)"
+    );
+    expect(preview.ok ? preview.data.paidVideos : null).toBe(1);
+    expect(preview.ok ? preview.data.problems.join("\n") : "").not.toContain("C01 (");
+
+    const same = await generate({
+      artifacts: ["C02"],
+      imageKey: null,
+      mode: "dry-run",
+      videoKey: null,
+    });
+
+    expect(same.ok ? same.data.notices : null).toEqual([]);
+  });
+
   /** Seedance takes the same prompt: the limit is Kling's, not this stage's. */
   it("should send the same long prompt to Seedance", async () => {
     await upstream("three-clips", "Ewa idzie przez salon. ".repeat(140));

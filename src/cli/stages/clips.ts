@@ -85,6 +85,10 @@ function renderClips(
     lines.push(`  ! ${problem}`);
   }
 
+  for (const notice of report.notices) {
+    lines.push(`  · ${notice}`);
+  }
+
   if (report.created.length > 0) {
     lines.push("  ! wyniki przeszły walidację; to nie to samo co przyjęcie ich przez człowieka");
   }

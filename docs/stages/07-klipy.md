@@ -93,6 +93,10 @@ rekordu. Bez ffmpeg etap 7 na Klingu odmawia, zanim cokolwiek kupi. Kling przyjm
 prompt najwyżej 3072 znaków; dłuższy złożony prompt to odmowa przed wysyłką, z liczbą
 znaków. Przerwane zadanie odbiera się tym samym modelem, który je zamówił.
 
+Klip innym modelem niż zatwierdzone klipy toru jest legalny, ale [montaż](08-montaz.md)
+odmówi toru z klipami różnych modeli, więc `clip generate` mówi o tym meldunkiem (`·`,
+w `notices`) przed zakupem, a nie odmową.
+
 ```bash
 pnpm dev clip generate dzielna-ewa 01-burza --track seedream --video-model kling-3.0 --dry-run
 ```

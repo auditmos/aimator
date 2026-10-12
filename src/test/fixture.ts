@@ -924,9 +924,15 @@ export async function makeTrack(options: {
   readonly pending?: readonly string[];
   readonly root: string;
   readonly track: ImageTrack;
+  /**
+   * Clips re-rendered by another video model once the track is finished, by
+   * id, and accepted again: what a person does with `--regenerate
+   * --video-model`. Everything else is rendered by Seedance.
+   */
+  readonly videoModels?: Readonly<Record<string, string>>;
   readonly workspace: Workspace;
 }): Promise<void> {
-  const { clipSeconds = {}, pending = [], track, workspace } = options;
+  const { clipSeconds = {}, pending = [], track, videoModels = {}, workspace } = options;
 
   await generateReferences({
     apiKey: API_KEY,
@@ -982,9 +988,53 @@ export async function makeTrack(options: {
     const bought = await buyAndAccept({ clipSeconds, pending, track, workspace });
 
     if (bought.length === 0) {
-      return;
+      break;
     }
   }
+
+  for (const [id, model] of Object.entries(videoModels)) {
+    // biome-ignore lint/performance/noAwaitInLoops: one paid re-render at a time
+    await rerender({ clipSeconds, id, model, track, workspace });
+  }
+}
+
+/** One clip bought again by another video model, then accepted again. */
+async function rerender(options: {
+  readonly clipSeconds: Readonly<Record<string, number>>;
+  readonly id: string;
+  readonly model: string;
+  readonly track: ImageTrack;
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { id, track, workspace } = options;
+
+  await generateClips({
+    artifacts: [id],
+    episodeId: EPISODE,
+    fetch: videoProvider(options.clipSeconds),
+    imageKey: API_KEY,
+    imageModel: "gpt-image-2.5-sunburst",
+    mode: "apply",
+    mux: muxer(),
+    projectId: PROJECT,
+    regenerate: true,
+    republish: false,
+    track,
+    videoKey: API_KEY,
+    videoModel: options.model,
+    wait: () => Promise.resolve(),
+    workspace,
+  });
+  await approveClips({
+    artifacts: [id],
+    episodeId: EPISODE,
+    mode: "apply",
+    note: "ok",
+    projectId: PROJECT,
+    reviewer: "fixture",
+    track,
+    workspace,
+  });
 }
 
 /** How many times the stage-7 chain is pumped before the fixture gives up. */
@@ -1041,8 +1091,9 @@ async function buyAndAccept(options: {
 }
 
 /**
- * Both providers behind one transport: the image API an entry frame is drawn
- * with, and the video API a clip is rendered by.
+ * Every provider behind one transport: the image API an entry frame is drawn
+ * with, and the two video APIs a clip is rendered by, ModelArk and Kling, each
+ * answering in its own envelope.
  *
  * Clips come back at the length `clipSeconds` names, or at the length the plan
  * ordered. The distinction is what a downstream stage needs in order to see a
@@ -1057,6 +1108,7 @@ function videoProvider(clipSeconds: Readonly<Record<string, number>>): typeof fe
 
   return ((url: string | URL, init?: RequestInit) => {
     const href = String(url);
+    const kling = href.startsWith(KLING_API);
 
     if (href === "https://download/clip") {
       return Promise.resolve(new Response(clip, { status: 200 }));
@@ -1066,19 +1118,28 @@ function videoProvider(clipSeconds: Readonly<Record<string, number>>): typeof fe
       return Promise.resolve(new Response(png(1920, 1080, 3), { status: 200 }));
     }
 
-    if (!href.includes("/contents/generations/tasks")) {
+    if (!(kling || href.includes("/contents/generations/tasks"))) {
       return images.fetch(url, init);
     }
 
     if ((init?.method ?? "GET") === "POST") {
       const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
-      const planned = Number((body as { duration?: number }).duration ?? 0);
       const id = clipIdOf(body);
 
       jobs += 1;
-      clip = mp4({ height: 1080, seconds: clipSeconds[id] ?? planned, width: 1920 });
+      clip = mp4({ height: 1080, seconds: clipSeconds[id] ?? orderedSeconds(body), width: 1920 });
 
-      return Promise.resolve(Response.json({ id: `cgt-${jobs}` }));
+      return Promise.resolve(
+        Response.json(
+          kling
+            ? { code: 0, data: { id: `kt-${jobs}`, status: "submitted" } }
+            : { id: `cgt-${jobs}` }
+        )
+      );
+    }
+
+    if (kling) {
+      return Promise.resolve(Response.json(klingTask(href)));
     }
 
     return Promise.resolve(
@@ -1494,8 +1555,38 @@ const CLIP_HEADING = /### (C\d{2,}) \|/;
  * legitimately appears: the verbatim shot-list entries the composer attaches.
  */
 function clipIdOf(body: unknown): string {
-  const content = body as { content?: readonly { text?: string }[] };
-  const text = content.content?.map((one) => one.text ?? "").join("\n") ?? "";
+  // ModelArk calls the list `content`, Kling `contents`; both carry the text.
+  const parts = body as {
+    content?: readonly { text?: string }[];
+    contents?: readonly { text?: string }[];
+  };
+  const text = (parts.content ?? parts.contents ?? []).map((one) => one.text ?? "").join("\n");
 
   return CLIP_HEADING.exec(text)?.[1] ?? "";
+}
+
+/** Where Kling answers, so the fixture's transport can answer in its envelope. */
+const KLING_API = "https://api-singapore.klingai.com/";
+
+/** How long a request ordered its clip: ModelArk says `duration`, Kling `settings.duration`. */
+function orderedSeconds(body: unknown): number {
+  const ordered = body as { duration?: number; settings?: { duration?: number } };
+
+  return Number(ordered.duration ?? ordered.settings?.duration ?? 0);
+}
+
+/** A Kling task query, answered as finished, with the clip among its outputs. */
+function klingTask(href: string): unknown {
+  const task = new URL(href).searchParams.get("task_ids") ?? "";
+
+  return {
+    code: 0,
+    data: [
+      {
+        id: task,
+        outputs: [{ id: `vid-${task}`, type: "video", url: "https://download/clip" }],
+        status: "succeeded",
+      },
+    ],
+  };
 }

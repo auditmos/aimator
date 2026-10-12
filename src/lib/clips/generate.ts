@@ -80,6 +80,12 @@ export interface ClipsReport {
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
+   * What a person should know before paying that is not a reason to refuse: a
+   * clip rendered by another model than the track's accepted ones is legal,
+   * and stage 8 will still refuse the track until every clip is on one model.
+   */
+  readonly notices: readonly string[];
+  /**
    * How many billed calls this invocation is about, per medium. They are
    * counted apart because they cost differently by an order of magnitude, and
    * a person reading a preview is deciding whether to run it.
@@ -353,6 +359,7 @@ function idle(input: GenerateInput, stage7: Stage7Inputs): ClipsReport {
       waiting.length > 0
         ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${waiting.map((one) => one.name).join(",")}`
         : `etap 7 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 8, montaż`,
+    notices: [],
     paidImages: 0,
     paidVideos: 0,
     problems: [
@@ -416,6 +423,7 @@ function preview(
       problems.length === 0 && runnable.length > 0
         ? `aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track}`
         : "usuń powyższe przeszkody przed płatnym wywołaniem",
+    notices: modelNotices(input, stage7, targets),
     paidImages: runnable.filter((one) => one.kind === "entry-frame").length,
     paidVideos: runnable.filter((one) => one.kind === "clip").length,
     problems: [
@@ -427,6 +435,41 @@ function preview(
     size: stage7.plan.size,
     track: input.track,
   };
+}
+
+/**
+ * The track's accepted clips that came from another video model than the one
+ * this run renders with, said without refusing.
+ *
+ * Re-rendering a track clip by clip is legal, and the clips this run replaces
+ * are not counted, since they are on their way out. What is left is what stage
+ * 8 will refuse until every clip is on one model, which a person should hear
+ * before paying rather than after.
+ */
+function modelNotices(
+  input: GenerateInput,
+  stage7: Stage7Inputs,
+  targets: readonly Stage7Target[]
+): readonly string[] {
+  const clips = targets.filter((one) => one.kind === "clip").map((one) => one.name);
+
+  if (input.republish || input.videoModel === null || clips.length === 0) {
+    return [];
+  }
+
+  const others = Object.entries(stage7.stage.artifacts).filter(
+    ([id, record]) =>
+      CLIP_ID.test(id) &&
+      !clips.includes(id) &&
+      record.review.status === "approved" &&
+      record.producer.model !== input.videoModel
+  );
+
+  return others.length === 0
+    ? []
+    : [
+        `zatwierdzone klipy toru ${input.track} pochodzą z innego modelu: ${others.map(([id, record]) => `${id} (${record.producer.model ?? "nieznany"})`).join(", ")}; montaż (etap 8) odmówi toru, dopóki wszystkie klipy nie będą z ${input.videoModel}`,
+      ];
 }
 
 function base(target: Stage7Target): {
@@ -491,6 +534,7 @@ async function runAll(
       bought.length > 0
         ? `oceń wyniki, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${bought.map((one) => one.id).join(",")}`
         : `usuń przeszkody i powtórz: aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track}`,
+    notices: modelNotices(input, stage7, targets),
     paidImages: artifacts.filter((one) => one.state === "published" && one.kind === "entry-frame")
       .length,
     paidVideos: artifacts.filter((one) => one.state === "published" && one.kind === "clip").length,

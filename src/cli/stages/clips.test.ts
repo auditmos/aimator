@@ -249,4 +249,37 @@ describe("clip generate --json", () => {
 
     expect(prose).toContain("płatnych wywołań do wykonania, obrazów: 0, wideo: 0");
   });
+
+  /**
+   * A clip re-rendered by another model than the track's accepted ones is a
+   * notice, `·`, never a refusal, `!`: the purchase is legal, and the person
+   * only has to know that stage 8 will wait until the track is on one model.
+   */
+  it("should print a model the track's accepted clips do not share as a notice", async () => {
+    const argv = [
+      "clip",
+      "generate",
+      PROJECT,
+      EPISODE,
+      "--track",
+      DRAWN,
+      "--artifact",
+      "C02",
+      "--regenerate",
+      "--video-model",
+      "kling-3.0",
+      "--dry-run",
+    ] as const;
+    const prose = await cli(...argv);
+    const report = (await object(...argv, "--json")) as {
+      notices: readonly string[];
+      paidVideos: number;
+    };
+
+    expect(prose).toContain(
+      "  · zatwierdzone klipy toru gpt-image pochodzą z innego modelu: C01 (dreamina-seedance-2-5-260628)"
+    );
+    expect(report.notices.join("\n")).toContain("C01 (dreamina-seedance-2-5-260628)");
+    expect(report.paidVideos).toBe(1);
+  });
 });

@@ -91,6 +91,8 @@ export interface ClipCut {
   /** Why this clip may not be cut in yet. Empty means it may. */
   readonly blockers: readonly string[];
   readonly id: string;
+  /** The video model its stage-7 record says rendered it. `null` without a finished record. */
+  readonly model: string | null;
   /** Absolute, for the muxer. */
   readonly path: string;
   /** What the approved shot list ordered. */
@@ -158,8 +160,10 @@ async function readClip(
 ): Promise<ClipCut> {
   const plannedSeconds = plan.end - plan.start;
   const file = clipVideo(paths.track, plan.id);
+  const record = clips.artifacts[plan.id];
   const base: Omit<ClipCut, "actualSeconds" | "blockers" | "recorded"> = {
     id: plan.id,
+    model: record?.status === "completed" ? record.producer.model : null,
     path: file.ok ? file.data : "",
     plannedSeconds,
   };
@@ -167,8 +171,6 @@ async function readClip(
   if (!file.ok) {
     return { ...base, actualSeconds: null, blockers: [file.error.message], recorded: null };
   }
-
-  const record = clips.artifacts[plan.id];
 
   if (record === undefined || record.status !== "completed") {
     return {
@@ -293,6 +295,7 @@ export async function readStage8Inputs(input: Stage8Scope): Promise<Result<Stage
       // revokes its approval and this refuses without a rule of its own.
       ...(plan.data.approved ? [] : ["lista ujęć nie jest zatwierdzona, bez niej nie ma montażu"]),
       ...cut.flatMap((one) => one.blockers),
+      ...mixedModels(input, cut),
     ],
     inputs: [
       { path: relative(paths.data.project.file), sha256: projectJson.data.sha256 },
@@ -304,6 +307,37 @@ export async function readStage8Inputs(input: Stage8Scope): Promise<Result<Stage
     plannedSeconds: plan.data.verdict.durationSeconds,
     stage: stage.ok ? stage.data : emptyStage(STAGE),
   });
+}
+
+/**
+ * Why a track whose clips came from more than one video model may not be cut.
+ *
+ * The cut is a stream copy, which holds only while every clip shares one
+ * resolution and one frame rate, and two models promise neither. Copying
+ * anyway would end in a broken file or in an ffmpeg error far from its cause,
+ * and re-encoding would put frames into the film that nobody accepted, so it is
+ * a refusal rather than a report, made before the muxer is asked for anything.
+ *
+ * The remedy keeps the model most of the track already uses, and on a tie the
+ * one the film opens with, so the command it prints re-buys the fewest clips.
+ * Two tracks may use two models: this reads one track.
+ */
+function mixedModels(input: Stage8Scope, cut: readonly ClipCut[]): readonly string[] {
+  const rendered = cut.filter((one) => one.model !== null);
+  const models = [...new Set(rendered.map((one) => one.model as string))];
+
+  if (models.length < 2) {
+    return [];
+  }
+
+  const count = (model: string): number => rendered.filter((one) => one.model === model).length;
+  const keep = models.reduce((best, model) => (count(model) > count(best) ? model : best));
+  const odd = rendered.filter((one) => one.model !== keep).map((one) => one.id);
+
+  return [
+    `klipy toru ${input.track} pochodzą z różnych modeli wideo: ${rendered.map((one) => `${one.id} (${one.model})`).join(", ")}; montaż kopiuje strumienie bez przekodowania, więc wymaga jednego modelu na tor`,
+    `przerenderuj odstające klipy jednym modelem: aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track} --regenerate --artifact ${odd.join(",")} --video-model ${keep}`,
+  ];
 }
 
 /** Seconds, to the hundredth, the precision a movie header actually carries. */

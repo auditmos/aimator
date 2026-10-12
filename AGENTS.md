@@ -856,6 +856,12 @@ bring to their own tests. Those count calls, because for a stage that bills per 
 count *is* the assertion; `makeTrack` only has to leave a correct track on disk. That is the
 same line the fixture already draws around the manifest: what a stage tests, it owns.
 
+Its `videoModels` option re-renders the named clips with another video model once the
+track is finished, through the real `--regenerate --video-model` and a second yes, which is
+exactly how a person ends up with a track of two models. Stage 8 refuses such a track, so it
+needs one to refuse, and forging the records' `producer.model` would be writing artifacts.
+The fixture's transport answers in both providers' envelopes for that reason.
+
 It was promoted at the third copy, not the second. Stages 5 and 6 and `media-prompt` each
 carried the same two hundred lines, byte-identical in `screenplay()`, `shot()` and
 `shotList()`, and stage 7 was the fourth: the same threshold `lib/text-model` was promoted

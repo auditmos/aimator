@@ -23,9 +23,10 @@ import { err, ok, type Result } from "./result.js";
  * anything, which is the widened interface this module exists to prevent. A
  * stage says what it wants done; how ffmpeg says it stays in here.
  *
- * **Picture is copied, never re-encoded.** Both tracks render at one resolution
- * and one frame rate from one video model, so the concat demuxer's precondition
- * genuinely holds, and a re-encode would put pixels into the film that nobody
+ * **Picture is copied, never re-encoded.** Every clip of a track renders at one
+ * resolution and one frame rate from one video model, which stage 8 checks
+ * before it asks for a cut, so the concat demuxer's precondition genuinely
+ * holds, and a re-encode would put pixels into the film that nobody
  * accepted, which is the same thing rule 6 and the bytes-bound approval forbid a
  * step above. `mix` holds to it too: it adds a sound track to an approved cut
  * and passes every frame through untouched. Where the precondition does not

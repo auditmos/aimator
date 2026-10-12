@@ -61,9 +61,30 @@ z **sumą jego własnych klipów**, nie z `durationSeconds`.
 
 ## ffmpeg, bez przekodowania, bez objazdu
 
-Strumieniowe kopiowanie (`-c copy`) jest możliwe, bo oba tory renderują jednym modelem
-w jednej rozdzielczości i tempie klatek. Gdy ffmpeg nie ma w `PATH` ani w
+Strumieniowe kopiowanie (`-c copy`) wymaga jednej rozdzielczości i jednego tempa klatek,
+a to obiecuje tylko **jeden model wideo na tor**. Gdy ffmpeg nie ma w `PATH` ani w
 `AIMATOR_FFMPEG`, montaż odmawia. `check` go nie potrzebuje.
+
+## Jeden model wideo na tor
+
+Etap 7 zna dwa modele (`dreamina-seedance-*` i `kling-3.0`), a jeden tor może skończyć
+z C01 z Seedance i C02 z Klinga, np. po `--regenerate --video-model kling-3.0` na jednym
+klipie. Montaż czyta `producer.model` rekordu każdego klipu toru i **odmawia** toru, którego
+klipy pochodzą z różnych modeli: wymienia klipy i ich modele oraz polecenie naprawy, np.
+
+```bash
+pnpm dev clip generate dzielna-ewa 01-burza --track seedream --regenerate --artifact C02 --video-model dreamina-seedance-2-5-260628
+```
+
+Polecenie zostawia model, z którego jest większość toru (przy remisie ten, którym film się
+zaczyna), więc odkupuje najmniej klipów. Odmowa pada przed uruchomieniem cięcia, także
+przy `--dry-run` i w `check --stage assembly` (w `problems`). Montaż niczego nie
+przekodowuje, więc mieszanego toru nie „naprawi" sam.
+
+Dwa tory mogą używać różnych modeli, o ile każdy jest jednolity. Samo przerenderowanie
+toru klip po klipie innym modelem jest legalne: `clip generate` z modelem innym niż
+zatwierdzone klipy toru dostaje **meldunek** (`·`, w `notices`), nie odmowę, żeby człowiek
+wiedział przed zakupem, że montaż poczeka do końca przejścia.
 
 ## „Ocena całości" to nie powtórka ocen klipów
 

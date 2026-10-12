@@ -1267,10 +1267,15 @@ już walidacji etapu 7.
 
 **ffmpeg, znaleziony w `PATH` albo wskazany przez `AIMATOR_FFMPEG`, wywołany raz, ze
 strumieniowym kopiowaniem (`-c copy`).** Bez przekodowania, bo klipy to bajty, które ktoś
-przyjął; warunek konkatenacji (identyczne parametry strumienia) jest spełniony
-z konstrukcji, bo oba tory renderują jednym modelem wideo w jednej rozdzielczości i jednym
-tempie klatek. Gdzie nie jest spełniony, narzędzie odmawia; nigdy po cichu nie przechodzi
-na przekodowanie.
+przyjął; warunek konkatenacji (identyczne parametry strumienia) obiecuje tylko jeden model
+wideo na tor. Plan montażu czyta więc `producer.model` rekordu każdego klipu toru, a dwa
+różne modele na jednym torze to **problem** (odmowa), nie meldunek: komunikat wymienia
+klipy, ich modele i polecenie `clip generate --regenerate --artifact Cnn --video-model
+<model>`, z modelem, z którego jest większość toru. Odmowa pada przed cięciem, także przy
+`--dry-run` i w `check`. Dwa tory mogą mieć różne modele, o ile każdy jest jednolity, a
+`clip generate` z modelem innym niż zatwierdzone klipy toru dostaje tylko meldunek
+(`notices`), bo przerenderowanie toru klip po klipie jest legalne. Gdzie warunek nie jest
+spełniony, narzędzie odmawia; nigdy po cichu nie przechodzi na przekodowanie.
 
 **Brak ffmpeg jest odmową, nie objazdem.** Innej drogi nie ma: mikser napisany w tym
 repozytorium byłby zapisywaczem kontenera, któremu trzeba by potem ufać, czyli tym, czego

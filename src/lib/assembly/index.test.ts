@@ -258,6 +258,84 @@ describe("generateAssembly gates", { timeout: 45_000 }, () => {
   });
 });
 
+/**
+ * The cut is a stream copy, and a stream copy holds only while every clip
+ * shares one resolution and one frame rate, which two video models do not
+ * promise. So a track whose approved clips came from two models is refused
+ * before the muxer is asked to cut anything, with the clips, their models and
+ * the command that makes the track whole again.
+ */
+describe("generateAssembly across video models", { timeout: 45_000 }, () => {
+  const SEEDANCE = "dreamina-seedance-2-5-260628";
+  const KLING = "kling-3.0";
+
+  it("should refuse a track whose clips came from two video models", async () => {
+    await upstream();
+    await makeTrack({ root, track: "gpt-image", videoModels: { C02: KLING }, workspace });
+
+    const fake = muxer();
+    const result = await generate({ mux: fake.mux });
+    const said = reason(result);
+
+    expect(fake.runs).toHaveLength(0);
+    expect(said).toContain(`C01 (${SEEDANCE})`);
+    expect(said).toContain(`C02 (${KLING})`);
+    expect(said).toContain(
+      `clip generate ${PROJECT} ${EPISODE} --track gpt-image --regenerate --artifact C02 --video-model ${SEEDANCE}`
+    );
+  });
+
+  it("should name the same refusal in a preview, which cuts nothing either", async () => {
+    await upstream();
+    await makeTrack({ root, track: "gpt-image", videoModels: { C02: KLING }, workspace });
+
+    const fake = muxer();
+    const result = await generate({ mode: "dry-run", mux: fake.mux });
+
+    expect(result.ok ? result.data.problems.join("\n") : reason(result)).toContain(
+      `C02 (${KLING})`
+    );
+    expect(result.ok ? result.data.ready : null).toBe(false);
+    expect(fake.runs).toHaveLength(0);
+  });
+
+  /** One model per track is the whole rule; which model it is does not matter. */
+  it("should cut a track rendered by one model, whichever model that is", async () => {
+    await upstream();
+    await makeTrack({
+      root,
+      track: "gpt-image",
+      videoModels: { C01: KLING, C02: KLING, C03: KLING },
+      workspace,
+    });
+
+    const fake = muxer();
+    const result = await generate({ mux: fake.mux });
+
+    expect(result.ok ? result.data.artifact.state : reason(result)).toBe("published");
+    expect(fake.runs).toHaveLength(1);
+  });
+
+  it("should let two tracks use two models, each its own", async () => {
+    await upstream();
+    await makeTrack({ root, track: "gpt-image", workspace });
+    await makeTrack({
+      root,
+      track: "seedream",
+      videoModels: { C01: KLING, C02: KLING, C03: KLING },
+      workspace,
+    });
+
+    const fake = muxer();
+    const first = await generate({ mux: fake.mux });
+    const second = await generate({ mux: fake.mux, track: "seedream" });
+
+    expect(first.ok ? first.data.artifact.state : reason(first)).toBe("published");
+    expect(second.ok ? second.data.artifact.state : reason(second)).toBe("published");
+    expect(fake.runs).toHaveLength(2);
+  });
+});
+
 describe("generateAssembly", { timeout: 45_000 }, () => {
   it("should cut the clips into one episode and record a local producer", async () => {
     await upstream();
