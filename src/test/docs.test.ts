@@ -1,4 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { run } from "../cli/index.js";
@@ -21,46 +22,34 @@ const repoRoot = resolve(import.meta.dirname, "../..");
 const READER_DOCS = ["README.md", "docs"];
 
 /**
- * Dotted directories are tooling, not documentation; `dist/` and `out/` are
- * output. `site/` is skipped for a different reason: the Markdown under it is a
- * frozen episode source, which travels verbatim and is material rather than
- * prose this repository wrote.
+ * Dotted directories are tooling, not documentation. `site/` is skipped for a
+ * different reason: the Markdown under it is a frozen episode source, which
+ * travels verbatim and is material rather than prose this repository wrote.
  */
-const SKIPPED = new Set(["dist", "node_modules", "out", "site"]);
+const SKIPPED = new Set(["site"]);
+
+/**
+ * The Markdown git would commit: tracked, plus new files nobody ignored. The
+ * disk holds more than that, such as private notes in the ignored `plans/`,
+ * which are nobody's documentation; a walk of the disk read a regex quoted in
+ * one of them as a broken link. Output directories are ignored the same way.
+ */
+const MARKDOWN = execFileSync(
+  "git",
+  ["ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+  { cwd: repoRoot, encoding: "utf8" }
+)
+  .split("\n")
+  .filter((path) => path !== "" && existsSync(join(repoRoot, path)))
+  .filter((path) => !path.split("/").some((part) => SKIPPED.has(part) || part.startsWith(".")));
 
 function markdownUnder(path: string): string[] {
-  if (!existsSync(path)) {
-    return [];
-  }
-  const found: string[] = [];
-  for (const entry of readdirSync(path, { withFileTypes: true })) {
-    if (SKIPPED.has(entry.name) || entry.name.startsWith(".")) {
-      continue;
-    }
-    const child = join(path, entry.name);
-    if (entry.isDirectory()) {
-      found.push(...markdownUnder(child));
-    } else if (entry.name.endsWith(".md")) {
-      found.push(child);
-    }
-  }
-  return found;
+  const prefix = `${relative(repoRoot, path)}/`;
+  return MARKDOWN.filter((file) => file.startsWith(prefix)).map((file) => join(repoRoot, file));
 }
 
 function everyMarkdownFile(): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(repoRoot, { withFileTypes: true })) {
-    if (SKIPPED.has(entry.name) || entry.name.startsWith(".")) {
-      continue;
-    }
-    const child = join(repoRoot, entry.name);
-    if (entry.isDirectory()) {
-      found.push(...markdownUnder(child));
-    } else if (entry.name.endsWith(".md")) {
-      found.push(child);
-    }
-  }
-  return found;
+  return MARKDOWN.map((file) => join(repoRoot, file));
 }
 
 function readerDocs(): string[] {
