@@ -63,6 +63,12 @@ import { stillFormat, type VideoVerdict, validateEndFrame, validateVideo } from 
 interface VideoCall {
   readonly apiKey: string;
   readonly fetch: typeof fetch;
+  /**
+   * A person's note on the previous take, or absent. It is already quoted in
+   * the prompt; this module only records it, because no provider edits a
+   * finished video and the request is otherwise an ordinary new job.
+   */
+  readonly instruction?: string | null;
   readonly model: string;
   /**
    * The local engine, for a provider that hands back no final frame: the frame
@@ -307,6 +313,7 @@ async function resume(
   }
 
   return await publish(call, provider, artifact, stage, {
+    instruction: record.instruction,
     jobId: record.jobId,
     producer: record.producer,
     resumed: true,
@@ -358,6 +365,7 @@ async function fromArchive(
   }
 
   return await publish(call, provider, artifact, stage, {
+    instruction: record.instruction,
     jobId: record.jobId,
     producer: record.producer,
     resumed: true,
@@ -412,7 +420,14 @@ async function attempt(
   const submitted = withRecord(
     stage,
     artifact.key,
-    newRecord({ inputs: artifact.inputs, outputs: [], producer, runId, status: "submitted" })
+    newRecord({
+      inputs: artifact.inputs,
+      instruction: call.instruction ?? null,
+      outputs: [],
+      producer,
+      runId,
+      status: "submitted",
+    })
   );
 
   await write(artifact.stagePath, serialize(submitted));
@@ -450,6 +465,7 @@ async function attempt(
     artifact.key,
     newRecord({
       inputs: artifact.inputs,
+      instruction: call.instruction ?? null,
       jobId: jobId.data,
       outputs: [],
       producer,
@@ -476,6 +492,7 @@ async function attempt(
   }
 
   return await publish(call, provider, artifact, started, {
+    instruction: call.instruction ?? null,
     jobId: jobId.data,
     producer,
     resumed: false,
@@ -706,6 +723,7 @@ async function publish(
   artifact: VideoArtifact,
   stage: StageFile,
   data: {
+    readonly instruction: string | null;
     readonly jobId: string | null;
     readonly producer: ReturnType<typeof modelProducer>;
     readonly resumed: boolean;
@@ -797,6 +815,7 @@ async function publish(
     artifact.key,
     newRecord({
       inputs: artifact.inputs,
+      instruction: data.instruction,
       jobId: data.jobId,
       outputs,
       producer: data.producer,

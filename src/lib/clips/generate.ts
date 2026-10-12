@@ -409,7 +409,7 @@ function preview(
 
     return {
       ...base(target),
-      note: blocked ? target.blockers.join("; ") : "gotowe do płatnego wywołania",
+      note: blocked ? target.blockers.join("; ") : readyNote(input, target),
       prompt: target.artifact.text,
       runId: null,
       state: blocked ? "blocked" : "planned",
@@ -437,6 +437,19 @@ function preview(
     size: stage7.plan.size,
     track: input.track,
   };
+}
+
+/**
+ * What a preview says about a target it would buy.
+ *
+ * A note on a clip is the one case where "ready" is not the whole story: an
+ * image under a note is edited, but no provider edits a finished video, so the
+ * note buys a whole new clip and the person paying has to read that first.
+ */
+function readyNote(input: GenerateInput, target: Stage7Target): string {
+  return target.kind === "clip" && (input.instruction ?? null) !== null
+    ? "gotowe do płatnego wywołania: nowa generacja z tej samej klatki wejściowej, z uwagą w prompcie; żaden dostawca nie edytuje gotowego wideo, więc to pełna nowa opłata"
+    : "gotowe do płatnego wywołania";
 }
 
 /**
@@ -612,6 +625,7 @@ async function runClip(
     {
       apiKey: input.videoKey ?? "",
       fetch: input.fetch,
+      instruction: input.instruction ?? null,
       model: input.videoModel ?? "",
       mux: input.mux,
       regenerate: input.regenerate,

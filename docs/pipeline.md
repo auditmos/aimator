@@ -200,6 +200,9 @@ Obowiązują we wszystkich etapach.
   obraz idzie jako `Image 1 = previous:<id>`, przed dotychczasowymi załącznikami, liczy się
   do limitu toru (przekroczenie to odmowa z liczbami, nigdy obcięcie), a w `inputs` stoi jako
   `runs/<runId>/previous.png`. Uwaga ma jednego adresata.
+  Klip (`--artifact Cnn`) jest wyjątkiem z konieczności: żaden dostawca nie edytuje gotowego
+  wideo, więc uwaga kupuje nową generację z tej samej klatki wejściowej, z uwagą w prompcie,
+  i raport nazywa ją pełną nową opłatą; rekord klipu zapisuje `instruction`.
 - **Każde polecenie zapisujące ma `--dry-run`**: pełna walidacja, bez sieci, sekretów
   i zapisów.
 - **Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy**, nigdy

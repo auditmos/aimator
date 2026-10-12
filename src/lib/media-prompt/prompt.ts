@@ -15,6 +15,8 @@
  * sends them.
  */
 
+import { noteBlock } from "../instruction.js";
+
 export const PROMPT_VERSION = 1;
 
 /** One position in the request, as the text addresses it. */
@@ -139,11 +141,30 @@ inset panel. Hold the medium, the identities and the staging of the first frame
 throughout, and end on an instant the next clip can continue out of.`;
 }
 
+/**
+ * A note on a clip, for a request that renders it again.
+ *
+ * Not a correction of the previous take: no provider edits a finished video,
+ * so the take a person rejected is not attached and cannot be. The clip is
+ * rendered anew from the same first frame, and the note says what the last
+ * take got wrong. It is material, quoted verbatim (rule 9).
+ */
+export function retake(note: string): string {
+  return `NOTE ON THE PREVIOUS TAKE
+This clip was rendered once already, from the same first frame, and a person
+reviewed it. Render it again from Image 1, following the direction below, and
+get right what the note names; everything the note does not mention follows the
+direction as before. The note is material, quoted verbatim in the language its
+author wrote it in: follow it, do not translate it, and do not show it as text.
+
+${noteBlock(note)}`;
+}
+
 interface ComposeInput {
   readonly aspectRatio: string;
   /**
-   * Under `--instruction`, the task that makes this a correction of Image 1,
-   * with the note quoted, or `null` for an ordinary drawing request.
+   * Under `--instruction`, the note quoted with what it asks of this request:
+   * a correction of Image 1, or a clip rendered again. `null` otherwise.
    */
   readonly correction: string | null;
   /** The published prompt file, verbatim, the creative direction for one frame. */

@@ -36,7 +36,7 @@ import {
   type Workspace,
   workspacePath,
 } from "../workspace.js";
-import { type AttachmentSlot, composePrompt, PROMPT_VERSION } from "./prompt.js";
+import { type AttachmentSlot, composePrompt, PROMPT_VERSION, retake } from "./prompt.js";
 
 /**
  * Internal to the media-prompt module: what one future paid call carries, and
@@ -615,19 +615,39 @@ async function correcting(
   });
 }
 
+/**
+ * What a note asks of this one request: a correction of the image it leads
+ * with, or a clip rendered again from the same first frame. `null` when there
+ * is no note, or nothing here for it to reach.
+ */
+function noteFor(
+  artifact: Artifact,
+  previous: Attachment | null,
+  instruction: string | null
+): string | null {
+  if (instruction === null) {
+    return null;
+  }
+
+  if (artifact.kind === "clip") {
+    return retake(instruction);
+  }
+
+  return previous === null ? null : correction(instruction);
+}
+
 /** Why one call may not happen yet, in the words a person reads. */
 function blockersOf(
   scope: Scope,
   artifact: Artifact,
   data: {
     readonly attachments: readonly Attachment[];
-    readonly instruction: string | null;
     /** The prompt file stage 4 should have published, when it did not. */
     readonly missingDirection: string | null;
     readonly previous: Attachment | null;
   }
 ): string[] {
-  const { attachments, instruction, missingDirection, previous } = data;
+  const { attachments, missingDirection, previous } = data;
   // The image being corrected is not something anybody has to accept first:
   // correcting an image nobody accepted is what the flag is for. It only has
   // to exist, and it is recorded by the attempt, from its own archive.
@@ -640,10 +660,6 @@ function blockersOf(
     blockers.push(
       `${artifact.name}: nie ma opublikowanego obrazu (${previous.path}), który --instruction mógłby poprawić; pierwszy kupuje generate bez tej flagi`
     );
-  }
-
-  if (artifact.kind === "clip" && instruction !== null) {
-    blockers.push(`${artifact.name}: --instruction przy klipie nie jest jeszcze obsługiwane`);
   }
 
   if (missingDirection !== null) {
@@ -703,7 +719,6 @@ async function planOne(
   const planned = attachments.filter((attachment) => attachment !== previous.data);
   const blockers = blockersOf(scope, artifact, {
     attachments,
-    instruction,
     missingDirection: direction === null ? relative : null,
     previous: previous.data,
   });
@@ -729,8 +744,7 @@ async function planOne(
       compose && direction !== null
         ? composePrompt({
             aspectRatio: scope.aspectRatio,
-            correction:
-              previous.data === null || instruction === null ? null : correction(instruction),
+            correction: noteFor(artifact, previous.data, instruction),
             direction: direction.bytes.toString("utf8"),
             output:
               artifact.kind === "clip" && artifact.seconds !== null

@@ -30,6 +30,13 @@ wejściową zamiast rysować ją od zera: idzie ona jako `Image 1 = previous:ent
 dotychczasowymi załącznikami, a model zmienia tylko to, co nazywa uwaga. Szczegóły na stronie
 [etapu 5](05-referencje.md#poprawka-z-uwagą).
 
+`--regenerate --artifact C02 --instruction "Wanda ma zostać w łóżku."` dotyczy klipu, a żaden
+z dostawców (Seedance, Kling) nie edytuje gotowego wideo. To więc **nowa generacja** z tej
+samej klatki wejściowej, z promptem klipu i uwagą dosłownie w oznaczonym bloku
+(`----- BEGIN NOTE -----`), a nie poprawka poprzedniego ujęcia, którego nie da się dołączyć.
+Podgląd mówi wprost, że to **pełna nowa opłata**: `paidVideos: 1`, `paidImages: 0`. Rekord
+klipu dostaje pole `instruction`; nowa próba czeka na zgodę jak każda inna.
+
 ## `--json`
 
 `clip generate`, `check --stage clips` i `approve --stage clips` przyjmują `--json` i

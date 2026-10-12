@@ -54,7 +54,9 @@ zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę
 dosłownie, i ma zmienić tylko to, czego uwaga dotyczy. To nadal nowa płatna
 próba. W etapach obrazowych (2, 5, 6 i 7 dla entry:Cnn) poprzedni obraz idzie
 jako Image 1 = previous:<id>, przed dotychczasowymi załącznikami, a model
-poprawia tylko to, co nazywa uwaga. Uwaga ma jednego adresata: kilka
+poprawia tylko to, co nazywa uwaga. Przy klipie (--artifact Cnn) żaden dostawca
+nie edytuje gotowego wideo, więc to nowa generacja z tej samej klatki wejściowej,
+z uwagą w prompcie, i pełna nowa opłata. Uwaga ma jednego adresata: kilka
 artefaktów z jedną uwagą to błąd użycia.`;
 
 /**

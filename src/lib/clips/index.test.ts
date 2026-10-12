@@ -139,22 +139,29 @@ async function makeOpeningFrame(track: ImageTrack, approve = true): Promise<void
 interface Provider {
   readonly calls: { method: string; url: string }[];
   readonly fetch: typeof fetch;
+  /** Every video job's body, as the provider received it. */
+  readonly jobs: unknown[];
 }
+
+/** Where Kling answers, so this transport can answer in its envelope. */
+const KLING_API = "https://api-singapore.klingai.com/";
 
 /**
  * Both providers behind one transport: the image API stage 7 draws entry frames
- * with, and the video API it buys clips from. One fake because one command uses
- * both, and the count of each is the assertion that matters most.
+ * with, and the video APIs it buys clips from, ModelArk and Kling, each in its
+ * own envelope. One fake because one command uses both, and the count of each
+ * is the assertion that matters most.
  */
 function provider(options: { clip?: Buffer } = {}): Provider {
   const clip = options.clip ?? CLIP;
   const images = recorder();
   const calls: { method: string; url: string }[] = [];
-  let jobs = 0;
+  const jobs: unknown[] = [];
 
   const impl = ((url: string | URL, init?: RequestInit) => {
     const href = String(url);
     const method = init?.method ?? "GET";
+    const kling = href.startsWith(KLING_API);
 
     calls.push({ method, url: href });
 
@@ -166,14 +173,37 @@ function provider(options: { clip?: Buffer } = {}): Provider {
       return Promise.resolve(new Response(END_FRAME, { status: 200 }));
     }
 
-    if (!href.includes("/contents/generations/tasks")) {
+    if (!(kling || href.includes("/contents/generations/tasks"))) {
       return images.fetch(url, init);
     }
 
     if (method === "POST") {
-      jobs += 1;
+      jobs.push(JSON.parse(String(init?.body ?? "{}")));
 
-      return Promise.resolve(Response.json({ id: `cgt-${jobs}` }));
+      return Promise.resolve(
+        Response.json(
+          kling
+            ? { code: 0, data: { id: `kt-${jobs.length}`, status: "submitted" } }
+            : { id: `cgt-${jobs.length}` }
+        )
+      );
+    }
+
+    if (kling) {
+      const task = new URL(href).searchParams.get("task_ids") ?? "";
+
+      return Promise.resolve(
+        Response.json({
+          code: 0,
+          data: [
+            {
+              id: task,
+              outputs: [{ id: `vid-${task}`, type: "video", url: "https://download/clip" }],
+              status: "succeeded",
+            },
+          ],
+        })
+      );
     }
 
     return Promise.resolve(
@@ -185,7 +215,7 @@ function provider(options: { clip?: Buffer } = {}): Provider {
     );
   }) as unknown as typeof fetch;
 
-  return { calls, fetch: impl };
+  return { calls, fetch: impl, jobs };
 }
 
 function generate(overrides: Partial<Parameters<typeof generateClips>[0]> = {}) {
@@ -700,4 +730,69 @@ describe("--republish", () => {
     expect(api.calls).toHaveLength(before);
     expect((await stageFile()).C01?.review.status).toBe("pending");
   });
+});
+
+/**
+ * `--regenerate --artifact Cnn --instruction`: no provider edits a finished
+ * video, so a note on a clip buys a new one, from the same entry frame, with
+ * the note quoted in the clip's prompt.
+ *
+ * Assumptions this block encodes: the clip's attachment list is unchanged, one
+ * image, the frame it starts on; the note travels verbatim between markers;
+ * the report says plainly that this is a full new charge; both video models
+ * take it the same way, each in its own wire.
+ */
+describe("generateClips --instruction on a clip", () => {
+  const NOTE = "Wanda ma zostać w łóżku.";
+
+  /** The first frame a job carried, in whichever wire it was sent. */
+  function frameOf(job: unknown): string | undefined {
+    const body = job as {
+      content?: readonly { image_url?: { url: string }; type: string }[];
+      contents?: readonly { type: string; url?: string }[];
+    };
+
+    return (
+      body.content?.find((part) => part.type === "image_url")?.image_url?.url ??
+      body.contents?.find((part) => part.type === "first_frame")?.url
+    );
+  }
+
+  /** The prompt a job carried, in whichever wire it was sent. */
+  function promptOf(job: unknown): string {
+    const body = job as {
+      content?: readonly { text?: string }[];
+      contents?: readonly { text?: string }[];
+    };
+
+    return (body.content ?? body.contents ?? []).map((part) => part.text ?? "").join("");
+  }
+
+  it.each([["dreamina-seedance-2-5-260628"], ["kling-3.0"]])(
+    "should render %s anew from the same entry frame, the note quoted",
+    async (videoModel) => {
+      await upstream();
+      await makeOpeningFrame("gpt-image");
+      const first = provider();
+      await generate({ artifacts: ["C01"], fetch: first.fetch, videoModel });
+      const named = { artifacts: ["C01"], instruction: NOTE, regenerate: true, videoModel };
+      const preview = await generate({ ...named, imageKey: null, mode: "dry-run", videoKey: null });
+      const again = provider();
+      const result = await generate({ ...named, fetch: again.fetch });
+      const clip = preview.ok ? preview.data.artifacts[0] : undefined;
+      const record = (await stageFile()).C01 as unknown as { readonly instruction: string };
+
+      expect(clip?.prompt).toContain(`----- BEGIN NOTE -----\n${NOTE}\n----- END NOTE -----`);
+      expect(clip?.prompt).toContain("FIRST FRAME, THIS CLIP BEGINS HERE\nImage 1 = opening-frame");
+      expect(preview.ok ? [preview.data.paidVideos, preview.data.paidImages] : null).toEqual([
+        1, 0,
+      ]);
+      expect(clip?.note).toContain("pełna nowa opłata");
+      expect(result.ok ? result.data.paidVideos : reason(result)).toBe(1);
+      expect(again.jobs).toHaveLength(1);
+      expect(frameOf(again.jobs[0])).toBe(frameOf(first.jobs[0]));
+      expect(promptOf(again.jobs[0])).toContain(`----- BEGIN NOTE -----\n${NOTE}\n`);
+      expect(record.instruction).toBe(NOTE);
+    }
+  );
 });
