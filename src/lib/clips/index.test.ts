@@ -7,6 +7,7 @@ import {
   EPISODE,
   makeUpstream,
   mp4,
+  muxer,
   PROJECT,
   png,
   recorder,
@@ -14,6 +15,7 @@ import {
 } from "../../test/fixture.js";
 import { approveOpeningFrame, generateOpeningFrame } from "../opening-frame/index.js";
 import { approveReferences, generateReferences } from "../references/index.js";
+import { err } from "../result.js";
 import { type ImageTrack, resolveWorkspace, type Workspace } from "../workspace.js";
 import { approveClips, checkClips, generateClips } from "./index.js";
 
@@ -36,17 +38,19 @@ const VIDEO_KEY = "ark-test-key";
 const CLIP = mp4({ height: 1080, seconds: 10, width: 1920 });
 const SHORT_CLIP = mp4({ height: 1080, seconds: 3, width: 1920 });
 const END_FRAME = png(1920, 1080, 3);
+/** How stage 7 names a prompt Kling will not take: the clip, then the count. */
+const TOO_LONG = /C01: prompt klipu ma \d{4} znaków/;
 
 let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
 
 /** A manifest for however many clips the shot list plans. */
-function answer(clipIds: readonly string[]): string {
+function answer(clipIds: readonly string[], action = "Akcja klipu"): string {
   return JSON.stringify({
     clips: clipIds.map((id) => ({
       id,
-      prompt: `Akcja klipu ${id}.`,
+      prompt: `${action} ${id}.`,
       referenceIds: ["hero:ewa", "hero:tata", "R01"],
     })),
     entryFrames: clipIds.slice(1).map((id) => ({
@@ -67,12 +71,12 @@ function answer(clipIds: readonly string[]): string {
   });
 }
 
-function upstream(shape: ShotListShape = "three-clips"): Promise<void> {
+function upstream(shape: ShotListShape = "three-clips", action?: string): Promise<void> {
   const clipIds =
     shape === "unrenderable-clip" ? ["C01", "C02", "C03", "C04"] : ["C01", "C02", "C03"];
 
   return makeUpstream({
-    answer: answer(clipIds),
+    answer: answer(clipIds, action),
     approvePackage: true,
     root,
     scratch,
@@ -192,6 +196,7 @@ function generate(overrides: Partial<Parameters<typeof generateClips>[0]> = {}) 
     imageKey: API_KEY,
     imageModel: "gpt-image-2.5-sunburst",
     mode: "apply",
+    mux: muxer(),
     projectId: PROJECT,
     regenerate: false,
     republish: false,
@@ -378,6 +383,121 @@ describe("generateClips", () => {
     await makeOpeningFrame("gpt-image");
 
     expect(reason(await generate({ artifacts: ["R01"] }))).toContain("etapu 5");
+  });
+});
+
+/**
+ * The second video model. The id picks the provider through a closed table in
+ * `lib/video-model`, so what this stage owns is the refusals that come before
+ * any money moves: a model nobody listed, a key that is missing, a prompt Kling
+ * will not take, and an engine that is not there to cut the end frame.
+ */
+describe("generateClips on Kling", () => {
+  const KLING = "kling-3.0";
+
+  function videoPosts(api: Provider): number {
+    return api.calls.filter((call) => call.method === "POST" && !call.url.includes("openai"))
+      .length;
+  }
+
+  it("should refuse a model outside the table before sending anything", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    const api = provider();
+    const result = await generate({ artifacts: ["C01"], fetch: api.fetch, videoModel: "veo-9" });
+
+    expect(reason(result)).toContain("dreamina-seedance-*");
+    expect(reason(result)).toContain("kling-3.0");
+    expect(api.calls).toHaveLength(0);
+    expect(videoPosts(api)).toBe(0);
+  });
+
+  /** The key follows the provider the model names, and only a paid run reads it. */
+  it("should demand KLING_API_KEY on the paid path, and nowhere else", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    const api = provider();
+    const paid = await generate({
+      artifacts: ["C01"],
+      fetch: api.fetch,
+      videoKey: null,
+      videoModel: KLING,
+    });
+
+    expect(reason(paid)).toContain("KLING_API_KEY");
+    expect(api.calls).toHaveLength(0);
+
+    const preview = await generate({
+      artifacts: ["C01"],
+      fetch: api.fetch,
+      mode: "dry-run",
+      videoKey: null,
+      videoModel: KLING,
+    });
+
+    expect(preview.ok ? preview.data.paidVideos : reason(preview)).toBe(1);
+    expect(preview.ok ? preview.data.problems.join("\n") : "").not.toContain("KLING_API_KEY");
+    expect(preview.ok ? preview.data.artifacts[0]?.prompt : null).toContain("OUTPUT CLIP");
+    expect(api.calls).toHaveLength(0);
+  });
+
+  /**
+   * Kling refuses a prompt over 3072 characters, and the prompt is composed
+   * here, out of stage 4's direction and the shot list's own words, so this is
+   * where its length is known. Refused before the POST, with the number.
+   */
+  it("should refuse a composed prompt Kling will not take, before sending it", async () => {
+    await upstream("three-clips", "Ewa idzie przez salon. ".repeat(140));
+    await makeOpeningFrame("gpt-image");
+
+    const api = provider();
+    const result = await generate({ artifacts: ["C01"], fetch: api.fetch, videoModel: KLING });
+    const said = result.ok ? result.data.problems.join("\n") : reason(result);
+
+    expect(said).toContain("3072");
+    expect(said).toMatch(TOO_LONG);
+    expect(api.calls).toHaveLength(0);
+  });
+
+  /**
+   * Kling's clip comes back without its last frame, so the frame is cut out
+   * here, and a paid clip whose frame cannot be cut is a chain with a missing
+   * link. Stage 8's precedent: no engine is a refusal before anything is spent.
+   */
+  it("should refuse to render on Kling without ffmpeg, before sending anything", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    const api = provider();
+    const absent = {
+      ...muxer(),
+      version: () => Promise.resolve(err(new Error("nie znaleziono ffmpeg (AIMATOR_FFMPEG)"))),
+    };
+    const result = await generate({
+      artifacts: ["C01"],
+      fetch: api.fetch,
+      mux: absent,
+      videoModel: KLING,
+    });
+
+    expect(reason(result)).toContain("ffmpeg");
+    expect(api.calls).toHaveLength(0);
+
+    const seedance = await generate({ artifacts: ["C01"], mux: absent });
+
+    expect(seedance.ok ? seedance.data.paidVideos : reason(seedance)).toBe(1);
+  });
+
+  /** Seedance takes the same prompt: the limit is Kling's, not this stage's. */
+  it("should send the same long prompt to Seedance", async () => {
+    await upstream("three-clips", "Ewa idzie przez salon. ".repeat(140));
+    await makeOpeningFrame("gpt-image");
+
+    const result = await generate({ artifacts: ["C01"] });
+
+    expect(result.ok ? result.data.paidVideos : reason(result)).toBe(1);
   });
 });
 

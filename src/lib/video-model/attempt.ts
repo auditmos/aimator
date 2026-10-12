@@ -19,6 +19,7 @@ import {
   writeNewBytes,
 } from "../artifact/index.js";
 import type { ImageAttachment } from "../image-model/index.js";
+import type { Muxer } from "../muxer.js";
 import { err, ok, type Result } from "../result.js";
 import {
   type StillFormat,
@@ -27,8 +28,6 @@ import {
   type Workspace,
 } from "../workspace.js";
 import {
-  archiveRequest,
-  buildRequest,
   downloadAsset,
   httpFailure,
   pollVideo,
@@ -37,14 +36,8 @@ import {
   type Transport,
   type VideoRequest,
 } from "./client.js";
-import {
-  readSubmitResponse,
-  readTaskResponse,
-  stillFormat,
-  type VideoVerdict,
-  validateEndFrame,
-  validateVideo,
-} from "./validate.js";
+import { providerOf, type VideoProvider } from "./provider.js";
+import { stillFormat, type VideoVerdict, validateEndFrame, validateVideo } from "./validate.js";
 
 /**
  * Internal to the video-model module: one paid clip, start to finish.
@@ -71,6 +64,11 @@ interface VideoCall {
   readonly apiKey: string;
   readonly fetch: typeof fetch;
   readonly model: string;
+  /**
+   * The local engine, for a provider that hands back no final frame: the frame
+   * is then cut out of the downloaded clip, before anything judges it.
+   */
+  readonly mux: Muxer;
   /** The only road to a second charge. Nothing here retries on its own. */
   readonly regenerate: boolean;
   /**
@@ -187,15 +185,29 @@ export async function runVideoStage(
   const record = stage.artifacts[artifact.key];
 
   if (call.republish === true) {
-    return record === undefined
-      ? err(
-          artifact.blocked([`${artifact.key}: nie ma próby, którą można by opublikować ponownie`])
-        )
-      : await fromArchive(call, artifact, stage, record);
+    if (record === undefined) {
+      return err(
+        artifact.blocked([`${artifact.key}: nie ma próby, którą można by opublikować ponownie`])
+      );
+    }
+
+    // The archive is read in the dialect of whoever wrote it, which is the
+    // model the record names, not whatever model this shell happens to pick.
+    const provider = providerOf(record.producer.model ?? "");
+
+    return provider.ok
+      ? await fromArchive(call, provider.data, artifact, stage, record)
+      : err(artifact.blocked([`${artifact.key}: ${provider.error.message}`]));
+  }
+
+  const provider = providerOf(call.model);
+
+  if (!provider.ok) {
+    return err(artifact.blocked([provider.error.message]));
   }
 
   if (record !== undefined && !call.regenerate) {
-    const resumed = await resume(call, artifact, stage, record);
+    const resumed = await resume(call, provider.data, artifact, stage, record);
 
     // `null` means the archived attempt was refused or abandoned rather than
     // billed, so there is nothing to finish and starting over costs nothing.
@@ -204,7 +216,7 @@ export async function runVideoStage(
     }
   }
 
-  return await attempt(call, artifact, stage);
+  return await attempt(call, provider.data, artifact, stage);
 }
 
 /**
@@ -218,6 +230,7 @@ export async function runVideoStage(
  */
 async function resume(
   call: VideoCall,
+  provider: VideoProvider,
   artifact: VideoArtifact,
   stage: StageFile,
   record: StageFile["artifacts"][string]
@@ -252,6 +265,18 @@ async function resume(
     );
   }
 
+  // A job is collected from the provider that started it, with that
+  // provider's key. Another model in this shell is not a reason to buy again,
+  // and asking the wrong provider about the receipt would only get a 404.
+  if (record.producer.model !== call.model) {
+    return err(
+      artifact.blocked([
+        `${artifact.key}: zadanie ${record.jobId} zamówiono u modelu ${record.producer.model ?? "nieznanego"}, a to polecenie wskazuje ${call.model}`,
+        `odbierz je tym samym modelem: --video-model ${record.producer.model ?? ""}; nową płatną próbę innym modelem zaczyna wyłącznie --regenerate`,
+      ])
+    );
+  }
+
   // The job was started for the inputs recorded beside it. Publishing it
   // against changed inputs would attach a result to a question nobody asked.
   const changed = record.inputs.filter(
@@ -268,7 +293,7 @@ async function resume(
     );
   }
 
-  const finished = await awaitJob(call, artifact, run, record.jobId);
+  const finished = await awaitJob(call, provider, artifact, run, record.jobId);
 
   if (!finished.ok) {
     return finished;
@@ -281,7 +306,7 @@ async function resume(
     return null;
   }
 
-  return await publish(call, artifact, stage, {
+  return await publish(call, provider, artifact, stage, {
     jobId: record.jobId,
     producer: record.producer,
     resumed: true,
@@ -301,6 +326,7 @@ async function resume(
  */
 async function fromArchive(
   call: VideoCall,
+  provider: VideoProvider,
   artifact: VideoArtifact,
   stage: StageFile,
   record: StageFile["artifacts"][string]
@@ -317,7 +343,7 @@ async function fromArchive(
     );
   }
 
-  const task = readTaskResponse(saved.data.bytes.toString("utf8"));
+  const task = provider.readTask(saved.data.bytes.toString("utf8"));
 
   if (!task.ok) {
     return task;
@@ -331,7 +357,7 @@ async function fromArchive(
     );
   }
 
-  return await publish(call, artifact, stage, {
+  return await publish(call, provider, artifact, stage, {
     jobId: record.jobId,
     producer: record.producer,
     resumed: true,
@@ -343,23 +369,29 @@ async function fromArchive(
 
 async function attempt(
   call: VideoCall,
+  provider: VideoProvider,
   artifact: VideoArtifact,
   stage: StageFile
 ): Promise<Result<VideoAttempt>> {
   const runId = newRunId();
   const run = videoRunPaths(call, runId);
-  const request = buildRequest({
+  const request: VideoRequest = {
     duration: artifact.seconds,
+    endpoint: provider.endpoint(call.model),
     firstFrame: artifact.firstFrame,
     model: call.model,
     prompt: artifact.prompt,
-  });
+  };
   const producer = modelProducer({
     endpoint: request.endpoint,
     model: call.model,
     promptVersion: artifact.promptVersion,
   });
-  const prepared = await prepare(run, artifact, { request, runId });
+  const prepared = await prepare(run, artifact, {
+    archive: provider.archive(request),
+    request,
+    runId,
+  });
 
   if (!prepared.ok) {
     return prepared;
@@ -385,7 +417,12 @@ async function attempt(
 
   await write(artifact.stagePath, serialize(submitted));
 
-  const transport = await submitVideo({ apiKey: call.apiKey, fetch: call.fetch, request });
+  const transport = await submitVideo({
+    apiKey: call.apiKey,
+    body: provider.body(request),
+    fetch: call.fetch,
+    url: request.endpoint,
+  });
 
   // Nothing reached the provider, so there is nothing to archive.
   if (!transport.ok) {
@@ -400,7 +437,7 @@ async function attempt(
     return err(refused);
   }
 
-  const jobId = readSubmitResponse(transport.data.body);
+  const jobId = provider.readSubmit(transport.data.body);
 
   if (!jobId.ok) {
     return jobId;
@@ -423,7 +460,7 @@ async function attempt(
 
   await write(artifact.stagePath, serialize(started));
 
-  const finished = await awaitJob(call, artifact, run, jobId.data);
+  const finished = await awaitJob(call, provider, artifact, run, jobId.data);
 
   if (!finished.ok) {
     return finished;
@@ -438,7 +475,7 @@ async function attempt(
     );
   }
 
-  return await publish(call, artifact, started, {
+  return await publish(call, provider, artifact, started, {
     jobId: jobId.data,
     producer,
     resumed: false,
@@ -471,6 +508,7 @@ type Ending = { readonly failed: string } | { readonly done: Succeeded };
  */
 async function awaitJob(
   call: VideoCall,
+  provider: VideoProvider,
   artifact: VideoArtifact,
   run: VideoRunPaths,
   jobId: string
@@ -480,7 +518,11 @@ async function awaitJob(
 
   for (;;) {
     // biome-ignore lint/performance/noAwaitInLoops: polling is the sequence
-    const transport = await pollVideo({ apiKey: call.apiKey, fetch: call.fetch, jobId });
+    const transport = await pollVideo({
+      apiKey: call.apiKey,
+      fetch: call.fetch,
+      url: provider.pollUrl(jobId),
+    });
 
     if (!transport.ok) {
       return transport;
@@ -492,7 +534,7 @@ async function awaitJob(
       return err(refused);
     }
 
-    const task = readTaskResponse(transport.data.body);
+    const task = provider.readTask(transport.data.body);
 
     if (!task.ok) {
       return task;
@@ -531,7 +573,7 @@ async function archiveAnswer(run: VideoRunPaths, transport: Transport): Promise<
 async function prepare(
   run: VideoRunPaths,
   artifact: VideoArtifact,
-  data: { readonly request: VideoRequest; readonly runId: string }
+  data: { readonly archive: unknown; readonly request: VideoRequest; readonly runId: string }
 ): Promise<Result<true>> {
   const prompt = await writeNew(run.prompt, data.request.prompt);
 
@@ -539,7 +581,7 @@ async function prepare(
     return prompt;
   }
 
-  const request = await writeNew(run.request, serialize(archiveRequest(data.request)));
+  const request = await writeNew(run.request, serialize(data.archive));
 
   if (!request.ok) {
     return request;
@@ -566,6 +608,8 @@ async function prepare(
 /** The clip's bytes, from the archive when they are already there. */
 async function collect(
   call: VideoCall,
+  provider: VideoProvider,
+  artifact: VideoArtifact,
   run: VideoRunPaths,
   task: Succeeded
 ): Promise<Result<{ endFrame: Buffer | null; video: Buffer }>> {
@@ -596,6 +640,10 @@ async function collect(
     return ok({ endFrame: savedPng.data.bytes, video });
   }
 
+  if (provider.endFrame === "cut") {
+    return await cut(call, artifact, run, video);
+  }
+
   if (task.endFrameUrl === null) {
     return ok({ endFrame: null, video });
   }
@@ -622,8 +670,39 @@ async function collect(
   return ok({ endFrame: frame.data, video });
 }
 
+/**
+ * The frame the clip ends on, cut out of the clip this attempt downloaded.
+ *
+ * It is written into the archive under the name the provider's own still would
+ * have had, so a resume and a republication find it exactly as they would find
+ * a returned one, and it happens here, before the verdict, so the bytes a human
+ * accepts are the bytes that were judged. A failure leaves the record
+ * resumable: the clip is bought and archived, and cutting again costs nothing.
+ */
+async function cut(
+  call: VideoCall,
+  artifact: VideoArtifact,
+  run: VideoRunPaths,
+  video: Buffer
+): Promise<Result<{ endFrame: Buffer | null; video: Buffer }>> {
+  const made = await call.mux.lastFrame({ target: run.endFramePng, video: run.video });
+  const frame = made.ok ? await readDigest(run.endFramePng) : null;
+
+  if (frame?.ok === true) {
+    return ok({ endFrame: frame.data.bytes, video });
+  }
+
+  return err(
+    artifact.blocked([
+      `${artifact.key}: nie udało się wyciąć ostatniej klatki z klipu: ${made.ok ? "ffmpeg nie zapisał pliku" : made.error.message}`,
+      `klip jest opłacony i zachowany w ${toWorkspacePath(call.workspace.root, run.root)}; powtórz polecenie, --regenerate nie jest potrzebne`,
+    ])
+  );
+}
+
 async function publish(
   call: VideoCall,
+  provider: VideoProvider,
   artifact: VideoArtifact,
   stage: StageFile,
   data: {
@@ -635,7 +714,7 @@ async function publish(
     readonly task: Succeeded;
   }
 ): Promise<Result<VideoAttempt>> {
-  const collected = await collect(call, data.run, data.task);
+  const collected = await collect(call, provider, artifact, data.run, data.task);
 
   if (!collected.ok) {
     return collected;

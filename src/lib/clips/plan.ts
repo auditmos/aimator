@@ -1,7 +1,7 @@
 import { emptyStage, readJson, type StageFile, stageFileSchema } from "../artifact/index.js";
 import { type PlannedArtifact, readSendPlan, type SendPlan } from "../media-prompt/index.js";
 import { ok, type Result } from "../result.js";
-import { clipDuration } from "../video-model/index.js";
+import { clipDuration, clipPrompt } from "../video-model/index.js";
 import {
   type EpisodePaths,
   type EpisodeTrackPaths,
@@ -126,26 +126,34 @@ function resolvePaths(input: Stage7Scope): Result<Stage7Paths> {
  * any length its `maxClipSeconds` allows, and the model renders a narrower
  * range. Refusing here is what keeps the tool from ordering a duration nobody
  * decided, and refusing *before* the POST is what keeps that refusal free.
+ *
+ * The range is the chosen model's. With no model in hand, which is `check`'s
+ * situation, a length is refused only when no model renders it.
+ *
+ * The second is the prompt's length, which only some models cap, and which is
+ * known only once the prompt is composed, so it is judged when it is.
  */
-function localBlockers(seconds: number | null, name: string): readonly string[] {
-  if (seconds === null) {
-    return [`${name}: lista ujęć nie planuje takiego klipu`];
+function localBlockers(artifact: PlannedArtifact, videoModel: string | null): readonly string[] {
+  if (artifact.seconds === null) {
+    return [`${artifact.name}: lista ujęć nie planuje takiego klipu`];
   }
 
-  const renderable = clipDuration(seconds);
+  const renderable = clipDuration(artifact.seconds, videoModel);
+  const fits =
+    videoModel === null || artifact.text === null ? null : clipPrompt(artifact.text, videoModel);
 
-  return renderable.ok ? [] : [`${name}: ${renderable.error.message}`];
+  return [
+    ...(renderable.ok ? [] : [`${artifact.name}: ${renderable.error.message}`]),
+    ...(fits === null || fits.ok ? [] : [`${artifact.name}: ${fits.error.message}`]),
+  ];
 }
 
-function toTarget(artifact: PlannedArtifact): Stage7Target {
+function toTarget(artifact: PlannedArtifact, videoModel: string | null): Stage7Target {
   const clip = artifact.kind === "clip";
 
   return {
     artifact,
-    blockers: [
-      ...artifact.blockers,
-      ...(clip ? localBlockers(artifact.seconds, artifact.name) : []),
-    ],
+    blockers: [...artifact.blockers, ...(clip ? localBlockers(artifact, videoModel) : [])],
     kind: clip ? "clip" : "entry-frame",
     name: artifact.name,
     seconds: artifact.seconds,
@@ -159,10 +167,14 @@ function toTarget(artifact: PlannedArtifact): Stage7Target {
  * happens in the same pass that hashes the attachments: the bytes a paid call
  * carries are the bytes this read just verified, rather than bytes trusted from
  * a stage file written at some earlier moment.
+ *
+ * `videoModel` is the model a paid run would render with; `null` when there is
+ * none to ask about, as in `check`.
  */
 export async function readStage7Inputs(
   input: Stage7Scope,
-  targets: readonly string[] = []
+  targets: readonly string[] = [],
+  videoModel: string | null = null
 ): Promise<Result<Stage7Inputs>> {
   const paths = resolvePaths(input);
 
@@ -185,7 +197,7 @@ export async function readStage7Inputs(
     stage: stage.ok ? stage.data : emptyStage(STAGE),
     targets: plan.data.artifacts
       .filter((one) => one.kind === "clip" || one.kind === "entry-frame")
-      .map(toTarget),
+      .map((one) => toTarget(one, videoModel)),
   });
 }
 

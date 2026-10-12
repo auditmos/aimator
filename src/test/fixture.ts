@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { sha256Of } from "../lib/artifact/index.js";
 import { approveAssembly, generateAssembly } from "../lib/assembly/index.js";
 import { approveClips, generateClips } from "../lib/clips/index.js";
@@ -433,7 +433,7 @@ function shot(
  * both: a clip that continues the previous one out of its end frame, and a clip
  * that opens a new scene and continues nothing. `unrenderable-clip` is that same
  * cut with a first clip of three seconds, legal for stage 3, which only caps
- * the longest clip, and shorter than any video model renders, which is what
+ * the longest clip, and shorter than Seedance renders, which is what
  * stage 7 has to refuse before it spends anything.
  *
  * These are options rather than the only shape because the manifest a test
@@ -1005,6 +1005,7 @@ async function buyAndAccept(options: {
     imageKey: API_KEY,
     imageModel: "gpt-image-2.5-sunburst",
     mode: "apply",
+    mux: muxer(),
     projectId: PROJECT,
     regenerate: false,
     republish: false,
@@ -1110,6 +1111,14 @@ export function muxer(): Muxer {
       await write(input.target, mp4({ height: 1080, seconds, width: 1920 }));
 
       return ok({ argv: ["ffmpeg", "-f", "concat"], engine: ENGINE, stderr: "" });
+    },
+    lastFrame: async (input) => {
+      // The last instant of a fixture clip, in that clip's size, as the PNG a
+      // real ffmpeg would cut out of it.
+      await mkdir(dirname(input.target), { recursive: true });
+      await writeFile(input.target, png(1920, 1080));
+
+      return ok({ argv: ["ffmpeg", "-sseof", "-1"], engine: ENGINE, stderr: "" });
     },
     master: async (input) => {
       const { writeFile: write } = await import("node:fs/promises");

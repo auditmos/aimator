@@ -4,7 +4,8 @@ import { err, ok, type Result } from "./result.js";
 
 /**
  * The local engine, shared by every stage that asks a program on this machine
- * for bytes. Stage 8 cuts with it; stage 9 lays the narration over that cut.
+ * for bytes. Stage 8 cuts with it; stage 9 lays the narration over that cut;
+ * stage 7 cuts the last frame out of a clip whose provider hands none back.
  *
  * It lived inside `lib/assembly` while stage 8 was its only caller, because
  * `AGENTS.md` says a module promoted for one caller is a widened interface
@@ -113,6 +114,13 @@ interface MixLevels {
   readonly musicDb: number;
 }
 
+export interface FrameInput {
+  /** Where the PNG goes. */
+  readonly target: string;
+  /** The clip, exactly as it was downloaded. Read, never rewritten. */
+  readonly video: string;
+}
+
 export interface MasterInput {
   readonly effects: readonly Stem[];
   readonly levels: MixLevels;
@@ -140,9 +148,15 @@ export interface MasterInput {
  * way, and `master` produces the film with everything in it. Collapsing them
  * would remove the only artifact in the pipeline where the narration can be
  * heard on its own.
+ *
+ * `lastFrame` is stage 7's, and the one operation that writes a picture rather
+ * than a film. A provider that hands back no final frame still sold a clip
+ * whose last instant the next clip has to continue out of, so the frame is cut
+ * out of the downloaded bytes, losslessly, as a PNG in the clip's own size.
  */
 export interface Muxer {
   readonly concat: (input: ConcatInput) => Promise<Result<ConcatReport>>;
+  readonly lastFrame: (input: FrameInput) => Promise<Result<ConcatReport>>;
   readonly master: (input: MasterInput) => Promise<Result<ConcatReport>>;
   readonly mix: (input: MixInput) => Promise<Result<ConcatReport>>;
   readonly version: () => Promise<Result<string>>;
@@ -168,6 +182,7 @@ interface ProcessResult {
 export function ffmpeg(binary: string): Muxer {
   return {
     concat: (input) => concat(binary, input),
+    lastFrame: (input) => lastFrame(binary, input),
     master: (input) => master(binary, input),
     mix: (input) => mix(binary, input),
     version: () => version(binary),
@@ -437,6 +452,64 @@ async function master(binary: string, input: MasterInput): Promise<Result<Concat
         new MuxError(
           "failed",
           `ffmpeg zakończył się kodem ${run.data.code} i nie złożył pełnej ścieżki:\n${run.data.stderr.trim()}`
+        )
+      );
+}
+
+/**
+ * Cuts the final frame out of a clip, as a PNG in the clip's own size.
+ *
+ * Only the last second is decoded: `-sseof -1` seeks there, and `-update 1`
+ * keeps overwriting one file with every frame that follows, so what is left on
+ * disk is the last one. PNG because the frame is a still the next clip starts
+ * on and a human approves, and a lossy re-encode would put pixels into it that
+ * the clip never had.
+ */
+async function lastFrame(binary: string, input: FrameInput): Promise<Result<ConcatReport>> {
+  const engine = await version(binary);
+
+  if (!engine.ok) {
+    return engine;
+  }
+
+  try {
+    await mkdir(dirOf(input.target), { recursive: true });
+  } catch (cause) {
+    return err(
+      new MuxError("failed", `nie można utworzyć katalogu dla ${input.target}`, { cause })
+    );
+  }
+
+  const args = [
+    "-hide_banner",
+    "-nostdin",
+    "-loglevel",
+    "warning",
+    "-sseof",
+    "-1",
+    "-i",
+    input.video,
+    "-map",
+    "0:v:0",
+    "-update",
+    "1",
+    "-c:v",
+    "png",
+    "-y",
+    input.target,
+  ];
+  const run = await spawn(binary, args);
+
+  if (!run.ok) {
+    return run;
+  }
+
+  return run.data.code === 0
+    ? ok({ argv: [binary, ...args], engine: engine.data, stderr: run.data.stderr })
+    : err(
+        new MuxError(
+          "failed",
+          `ffmpeg zakończył się kodem ${run.data.code} i nie wyciął ostatniej klatki:\n${run.data.stderr.trim()}`
         )
       );
 }

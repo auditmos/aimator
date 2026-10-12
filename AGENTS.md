@@ -237,12 +237,16 @@ src/
     │   ├── review.ts     # Internal: verification and approval of the one frame
     │   └── index.test.ts    # Gate per track/resume/regenerate/approve, through the entry
     ├── video-model/   # Folder form: one billed video job, shared by stage 7 and on
-    │   ├── index.ts       # Public: runVideoStage, clipDuration, validateVideo
+    │   ├── index.ts       # Public: runVideoStage, clipDuration, clipPrompt, videoModel,
+    │   │                  #         validateVideo
+    │   ├── provider.ts    # Internal: the closed table, model id → provider, and limits
+    │   ├── modelark.ts    # Internal: ModelArk's wire: body, poll URL, answer readers
+    │   ├── kling.ts       # Internal: Kling's wire, the same five things
     │   ├── client.ts      # Internal: submit, poll, download; redaction
     │   ├── attempt.ts     # Internal: submitted + jobId before the poll, archive,
-    │   │                  #            resume by asking, publish both files
+    │   │                  #            resume by asking, cut or fetch the end, publish
     │   ├── validate.ts    # Internal: the MP4 verdict and the task's three shapes
-    │   └── index.test.ts  # The order of operations around a paid job
+    │   └── index.test.ts  # The order of operations around a paid job, on both wires
     ├── clips/        # Folder form: index.ts is the only entry (stage 7)
     │   ├── index.ts      # Public: generateClips, checkClips, approveClips
     │   ├── plan.ts       # Internal: the chain, and the one refusal that is
@@ -298,7 +302,7 @@ src/
     │   ├── mix.ts         # Internal: the per-track half; buys nothing
     │   ├── review.ts      # Internal: two reviews, because there are two levels
     │   └── index.test.ts  # Wiring/gate/bill/refusal, through the entry
-    ├── muxer.ts      # Single-file form: the local engine, shared by stages 8, 9 and 10
+    ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
     ├── muxer.test.ts
     ├── timeline.ts   # Single-file form: the plan's clock as one film's, stages 9 and 10
     ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
@@ -353,6 +357,17 @@ answers with the picture, and the order of operations *is* the contract of a bil
 so it is a module, not a flag. It also holds what is true of any clip: how long one may be,
 and the verdict on the bytes, read from the MP4's own boxes rather than from a decoder, so
 that `check` works on a machine with no media tools on it.
+
+It grew a **second provider** without growing a second lifecycle. Kling is the same kind of
+call as ModelArk (an id, a poll, a signed URL), so it is a row in a closed table rather
+than a module of its own: `provider.ts` maps a model id to its row, and `modelark.ts` and
+`kling.ts` each hold one wire, its body, its poll URL and its answer readers. The order of
+operations stays in `attempt.ts`, once, which is the point: the receipt before the poll and
+the archive before the verdict are not things a second provider gets to do differently.
+The one real difference is the end frame. Kling hands none back, so `attempt.ts` cuts it
+out of the downloaded clip through `lib/muxer` before judging it; that is why
+`runVideoStage` takes a `Muxer`, and why `lib/muxer` grew `lastFrame`, an operation like its
+others rather than a process.
 
 `lib/clips` therefore buys from **two** media modules, and that is the honest shape of the
 stage rather than a compromise: stage 7 produces an image and a video, the stage brings its
@@ -751,7 +766,7 @@ function parsePort(raw: string): Result<number> {
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm unused` | Detect unused code with Knip |
 | `pnpm ui` | The local UI: one process on `127.0.0.1:4317`, Vite serving `ui/` and Hono serving `/api`. Reads `AIMATOR_WORKSPACE`, writes nothing and publishes nothing; [docs/ui.md](docs/ui.md) says what it shows and what it deliberately does not do |
-| `ffmpeg` | Not a script but a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
+| `ffmpeg` | Not a script but a **system** dependency stages 8, 9 and 10 need on `PATH`, or at `AIMATOR_FFMPEG`, and stage 7 too when its video model is Kling, to cut the last frame out of a clip. Nothing else in the repo uses it, and `check` deliberately does not: it reads MP4 boxes and MP3 frames, so a cut, a narrated cut and a full mix can all be verified on a machine with no media tools. Absent, those stages refuse rather than re-encoding. |
 | `pnpm update` | Interactive dependency updates with Taze |
 | `pnpm site:freeze` | `<project> <episode> <version>`: take one finished episode out of the workspace, re-encode it for the web and write a registry whose prose is still `TODO` |
 | `pnpm site:build` | Build the release page into `out/site`; needs no frozen export on disk |
@@ -924,10 +939,14 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
   because the two tracks are *drawn* side by side and a shared variable would make running
   both from one shell an edit between commands. A clip is not drawn: it is rendered from a
   frame that track already produced, by a model chosen once, so the axis is the call site.
-  Its key is `BYTEPLUS_MODELARK` on both tracks, including `gpt-image`, because the key
-  follows the model rather than the directory it writes into. Stage 7's entry frames reuse
-  `AIMATOR_IMAGE_MODEL_<TRACK>` for the opposite reason: a different image model inside one
-  track would put two hands on the same drawing.
+  The id picks the provider through a closed table in `lib/video-model`:
+  `dreamina-seedance-*` is ModelArk with `BYTEPLUS_MODELARK`, `kling-3.0` is Kling with
+  `KLING_API_KEY`, and anything else is refused before a request is built. The key is the
+  same on both tracks, including `gpt-image`, because the key follows the model rather than
+  the directory it writes into. Kling hands back no last frame, so stage 7 on Kling needs
+  `AIMATOR_FFMPEG` (or `ffmpeg` on `PATH`) to cut it, and refuses without. Stage 7's entry
+  frames reuse `AIMATOR_IMAGE_MODEL_<TRACK>` for the opposite reason: a different image model
+  inside one track would put two hands on the same drawing.
 - Stage 10 carries **three**, because it has three paid call sites: `AIMATOR_SOUND_MODEL`
   writes the cue sheet, `AIMATOR_MUSIC_MODEL` composes a bed and `AIMATOR_EFFECTS_MODEL`
   renders an effect. The last two are one variable each for **both tracks**, for the reason

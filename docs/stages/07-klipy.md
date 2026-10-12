@@ -75,9 +75,27 @@ Dźwięku nie generujemy, bo ścieżka dźwiękowa jest ciągła przez cięcia, 
 
 ## Modele
 
-Model wideo jest **jeden dla obu torów** (`AIMATOR_VIDEO_MODEL`, klucz
-`BYTEPLUS_MODELARK`), a klatki wejściowe rysuje ten sam model obrazowy co referencje na tym
-torze. Dlatego zamiast `--model` są dwie flagi: `--image-model` i `--video-model`.
+Model wideo jest **jeden dla obu torów** (`AIMATOR_VIDEO_MODEL`), a klatki wejściowe
+rysuje ten sam model obrazowy co referencje na tym torze. Dlatego zamiast `--model` są dwie
+flagi: `--image-model` i `--video-model`.
+
+Identyfikator modelu wybiera dostawcę przez zamkniętą tabelę:
+
+| Model | Dostawca | Klucz | Długość klipu | Ostatnia klatka |
+|---|---|---|---|---|
+| `dreamina-seedance-*` | BytePlus ModelArk | `BYTEPLUS_MODELARK` | 4–30 s | oddaje ją dostawca (`end.jpg`) |
+| `kling-3.0` | Kling | `KLING_API_KEY` | 3–15 s | wycina ją ffmpeg z klipu (`end.png`) |
+
+Inny identyfikator to odmowa przed wysyłką, z listą znanych. **Kling wymaga ffmpeg**
+(`PATH` albo `AIMATOR_FFMPEG`): nie oddaje ostatniej klatki, więc etap 7 wycina ją z
+pobranego MP4 w tym samym kroku publikacji, przed oceną, jako drugie wyjście tego samego
+rekordu. Bez ffmpeg etap 7 na Klingu odmawia, zanim cokolwiek kupi. Kling przyjmuje też
+prompt najwyżej 3072 znaków; dłuższy złożony prompt to odmowa przed wysyłką, z liczbą
+znaków. Przerwane zadanie odbiera się tym samym modelem, który je zamówił.
+
+```bash
+pnpm dev clip generate dzielna-ewa 01-burza --track seedream --video-model kling-3.0 --dry-run
+```
 
 ## Zadanie asynchroniczne
 

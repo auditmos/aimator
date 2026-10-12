@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ffmpeg } from "./muxer.js";
-import { hasSound, validateVideo } from "./video-model/index.js";
+import { hasSound, validateEndFrame, validateVideo } from "./video-model/index.js";
 
 /**
  * The real engine, which every other test replaces with a fake.
@@ -173,5 +173,57 @@ describe("ffmpeg mix", () => {
 
     expect(hasSound(await readFile(video))).toBe(false);
     expect(hasSound(await readFile(target))).toBe(true);
+  });
+});
+
+/**
+ * `lastFrame` against the real engine, on a clip the engine made itself, read
+ * back with the same PNG reader the clip verdict uses on a provider's still.
+ */
+describe("ffmpeg lastFrame", () => {
+  let scratch = "";
+
+  beforeEach(async () => {
+    scratch = await mkdtemp(join(tmpdir(), "aimator-frame-"));
+  });
+
+  afterEach(async () => {
+    await rm(scratch, { force: true, recursive: true });
+  });
+
+  it.runIf(installed())("should cut a PNG in the clip's own size", async () => {
+    const video = join(scratch, "C01.mp4");
+    const target = join(scratch, "run", "last-frame.png");
+
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=size=320x180:rate=24:duration=4",
+      "-pix_fmt",
+      "yuv420p",
+      video,
+    ]);
+
+    const result = await ffmpeg("ffmpeg").lastFrame({ target, video });
+
+    expect(result.ok ? null : result.error.message).toBe(null);
+
+    const still = validateEndFrame(await readFile(target), { height: 180, width: 320 });
+
+    expect(still.ok ? still.data.format : still.error.message).toBe("png");
+  });
+
+  it("should refuse by name when the program is not there", async () => {
+    const result = await ffmpeg("aimator-no-such-muxer").lastFrame({
+      target: join(scratch, "end.png"),
+      video: join(scratch, "C01.mp4"),
+    });
+
+    expect(result.ok ? "" : result.error.message).toContain("AIMATOR_FFMPEG");
   });
 });

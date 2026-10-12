@@ -6,7 +6,9 @@ import {
   generateClips,
 } from "../../lib/clips/index.js";
 import { env } from "../../lib/env.js";
+import { ffmpeg } from "../../lib/muxer.js";
 import { err, ok, type Result } from "../../lib/result.js";
+import { videoModel } from "../../lib/video-model/index.js";
 import type { ImageTrack, Workspace } from "../../lib/workspace.js";
 import {
   type Answer,
@@ -31,13 +33,17 @@ export const USAGE = `Etap 7. Klipy (płatny; per tor, dwa media w jednym polece
                [--dry-run] [--json] [--regenerate]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
-    i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL, klucz
-    BYTEPLUS_MODELARK). Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną
-    klatkę otwarcia, klatka wejściowa C02 na zatwierdzoną końcówkę C01 (gdy
-    lista ujęć mówi previous-end-frame), a klip C02 na tę klatkę. Raport podaje
-    liczbę wywołań OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle.
-    Długość klipu bierze się z listy ujęć; klipu, którego model nie renderuje,
-    narzędzie nie zaokrągli, odmówi i wskaże poprawkę w etapie 3.`;
+    i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL).
+    Model wybiera dostawcę: dreamina-seedance-* idzie na BytePlus (klucz
+    BYTEPLUS_MODELARK), kling-3.0 na Kling (klucz KLING_API_KEY; ostatnią
+    klatkę wycina ffmpeg, bez niego odmowa). Inny identyfikator to odmowa.
+    Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną klatkę otwarcia,
+    klatka wejściowa C02 na zatwierdzoną końcówkę C01 (gdy lista ujęć mówi
+    previous-end-frame), a klip C02 na tę klatkę. Raport podaje liczbę wywołań
+    OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle. Długość klipu
+    bierze się z listy ujęć; klipu, którego model nie renderuje (Seedance
+    4-30 s, Kling 3-15 s), narzędzie nie zaokrągli, odmówi i wskaże poprawkę
+    w etapie 3.`;
 
 /** Which stage this file answers for, in the word `--stage` takes. */
 const STAGE = "clips";
@@ -139,6 +145,16 @@ function videoModelOf(parsed: Parsed): Result<string | null> {
     : ok(value);
 }
 
+/**
+ * The key the chosen video model's provider takes. An id outside the table has
+ * none, and the stage refuses it by name, so `null` here is never the refusal.
+ */
+function videoKeyOf(model: string | null): string | null {
+  const known = model === null ? null : videoModel(model);
+
+  return known?.ok === true ? (env[known.data.key] ?? null) : null;
+}
+
 export async function runClip(argv: readonly string[]): Promise<Result<string>> {
   if (argv[0] !== "generate") {
     return err(new UsageError(`nieznane polecenie: clip ${argv[0] ?? ""}`.trim()));
@@ -188,18 +204,19 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
   }
 
   const imageModel = imageModelFlagOf(parsed.data, track.data);
-  const videoModel = videoModelOf(parsed.data);
+  const video = videoModelOf(parsed.data);
 
   if (!imageModel.ok) {
     return imageModel;
   }
-  if (!videoModel.ok) {
-    return videoModel;
+  if (!video.ok) {
+    return video;
   }
 
   const mode = modeOf(parsed.data);
   // Keys are read only on the paid path: a dry run must never need a secret.
-  // The video key is BytePlus on both tracks, because the model is one.
+  // The video key is the one the model's provider takes, the same on both
+  // tracks, because the model is one.
   const result = await generateClips({
     artifacts: referenceIdsOf(parsed.data),
     episodeId: episodeId.data,
@@ -207,12 +224,13 @@ export async function runClip(argv: readonly string[]): Promise<Result<string>> 
     imageKey: mode === "dry-run" ? null : (keyFor(track.data) ?? null),
     imageModel: imageModel.data,
     mode,
+    mux: ffmpeg(env.AIMATOR_FFMPEG ?? "ffmpeg"),
     projectId: projectId.data,
     regenerate: parsed.data.values.regenerate === true,
     republish: parsed.data.values.republish === true,
     track: track.data,
-    videoKey: mode === "dry-run" ? null : (env.BYTEPLUS_MODELARK ?? null),
-    videoModel: videoModel.data,
+    videoKey: mode === "dry-run" ? null : videoKeyOf(video.data),
+    videoModel: video.data,
     workspace: workspace.data,
   });
 

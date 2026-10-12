@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { env } from "./env.js";
 
@@ -74,5 +75,31 @@ describe("env", () => {
 
   it("should expose the stage-10 effects model as an optional string", () => {
     expect(["string", "undefined"]).toContain(typeof env.AIMATOR_EFFECTS_MODEL);
+  });
+
+  /**
+   * Stage 7's second video provider. The key follows the provider, so Kling has
+   * its own, read only on the paid path like every other one.
+   */
+  it("should expose KLING_API_KEY as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.KLING_API_KEY);
+  });
+
+  /**
+   * Every variable the schema declares is written down twice for a person:
+   * `.env.example` is the committed reference and `docs/konfiguracja.md` says
+   * what each is for. The list is read off the schema, so a new variable that
+   * is not documented fails here rather than being remembered.
+   */
+  it("should document every variable in .env.example and docs/konfiguracja.md", () => {
+    const declared = [
+      ...readFileSync("src/lib/env.ts", "utf8").matchAll(/^ {4}([A-Z][A-Z0-9_]+): z\./gm),
+    ].map((match) => match[1] ?? "");
+    const example = readFileSync(".env.example", "utf8");
+    const guide = readFileSync("docs/konfiguracja.md", "utf8");
+
+    expect(declared).toContain("KLING_API_KEY");
+    expect(declared.filter((name) => !example.includes(name))).toEqual([]);
+    expect(declared.filter((name) => !guide.includes(name))).toEqual([]);
   });
 });

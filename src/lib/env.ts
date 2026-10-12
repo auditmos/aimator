@@ -129,6 +129,13 @@ export const env = createEnv({
     BYTEPLUS_MODELARK: z.string().min(1).optional(),
     /** Stage 9's speech key. Read only on the paid path, like every other one. */
     ELEVENLABS_API_KEY: z.string().min(1).optional(),
+    /**
+     * Stage 7's key when `AIMATOR_VIDEO_MODEL` names a Kling model. The key
+     * follows the provider and the variable follows the call site, so a clip
+     * on either track reads this one exactly when its model is `kling-3.0`.
+     * Read only on the paid path, like every other one.
+     */
+    KLING_API_KEY: z.string().min(1).optional(),
     /** Read only on the paid path; `--dry-run` never asks for it. */
     OPENAI_API_KEY: z.string().min(1).optional(),
   },

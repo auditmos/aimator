@@ -2,7 +2,8 @@ import type { ImageAttachment } from "../image-model/index.js";
 import { err, ok, type Result } from "../result.js";
 
 /**
- * Internal to the video-model module: the paid job, and nothing else.
+ * Internal to the video-model module: the paid job's transport, and nothing
+ * else.
  *
  * `fetch` is injected so every rule around the call, no retry, the key never
  * reaching disk, a refusal being an error rather than a blank clip, is
@@ -10,35 +11,19 @@ import { err, ok, type Result } from "../result.js";
  *
  * A clip differs from an image in the one way that shapes this whole module:
  * the POST does not answer with the work, it answers with an id. Rendering
- * takes minutes, so the answer arrives through polling, and the clip and its
- * final frame arrive through signed URLs that live 24 hours. That is also what
- * makes an interrupted attempt cheap to finish: the id is the receipt.
+ * takes minutes, so the answer arrives through polling, and the clip arrives
+ * through a signed URL that does not live forever. That is also what makes an
+ * interrupted attempt cheap to finish: the id is the receipt.
+ *
+ * What a body looks like and where it goes is each provider's business, in
+ * `modelark.ts` and `kling.ts`. This file only carries it, the same way for
+ * both: one bearer key, one POST, a GET per poll, and nothing retried.
  */
-
-const BASE = "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks";
 
 const REDACTED = "[UKRYTY KLUCZ]";
 const TIMEOUT_MS = 2 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
 const MAX_DOWNLOAD_BYTES = 500_000_000;
-
-/**
- * The resolution tier every clip is rendered in: the largest the model offers.
- *
- * The same reasoning as the image frame. A clip is bought once and cut into a
- * film afterwards, so pixels given up here cannot be recovered in the edit,
- * while an editor who wants fewer can always be given fewer.
- */
-const RESOLUTION = "1080p";
-
-/**
- * The ratio is inherited from the first frame, and it has to be: the provider
- * requires `adaptive` whenever a request pins its opening frame. That is not a
- * limitation here but the right answer, the entry frame was drawn in the
- * episode's `aspectRatio`, so the clip inherits a decision stage 0 stored
- * rather than one this module would have to restate.
- */
-const RATIO = "adaptive";
 
 export interface VideoRequest {
   readonly duration: number;
@@ -67,53 +52,18 @@ class VideoCallError extends Error {
   }
 }
 
-export function buildRequest(input: {
-  readonly duration: number;
-  readonly firstFrame: ImageAttachment;
-  readonly model: string;
-  readonly prompt: string;
-}): VideoRequest {
-  return { ...input, endpoint: BASE };
-}
-
-/**
- * The archive of a request: everything except the frame's bytes.
- *
- * Those bytes are an input, and the invariant says a run archive never copies
- * one. It is not only a rule: a film frame is megabytes, and an archive that
- * kept it would store the same picture twice on every attempt.
- */
-export function archiveRequest(request: VideoRequest): unknown {
-  return {
-    duration: request.duration,
-    endpoint: request.endpoint,
-    firstFrame: {
-      bytes: request.firstFrame.bytes.length,
-      name: request.firstFrame.name,
-      position: 1,
-      role: "first_frame",
-      sha256: request.firstFrame.sha256,
-      type: request.firstFrame.type,
-    },
-    generateAudio: false,
-    model: request.model,
-    prompt: request.prompt,
-    ratio: RATIO,
-    resolution: RESOLUTION,
-  };
-}
-
 /**
  * Starts one job. Never two: a non-2xx answer is reported as it stands,
  * because a retry here is a second charge nobody asked for.
  */
 export async function submitVideo(input: {
   readonly apiKey: string;
+  readonly body: unknown;
   readonly fetch: typeof fetch;
-  readonly request: VideoRequest;
+  readonly url: string;
 }): Promise<Result<Transport>> {
-  return await call(input.fetch, input.apiKey, input.request.endpoint, {
-    body: JSON.stringify(wireBody(input.request)),
+  return await call(input.fetch, input.apiKey, input.url, {
+    body: JSON.stringify(input.body),
     headers: {
       Authorization: `Bearer ${input.apiKey}`,
       "Content-Type": "application/json",
@@ -126,9 +76,9 @@ export async function submitVideo(input: {
 export async function pollVideo(input: {
   readonly apiKey: string;
   readonly fetch: typeof fetch;
-  readonly jobId: string;
+  readonly url: string;
 }): Promise<Result<Transport>> {
-  return await call(input.fetch, input.apiKey, `${BASE}/${encodeURIComponent(input.jobId)}`, {
+  return await call(input.fetch, input.apiKey, input.url, {
     headers: { Authorization: `Bearer ${input.apiKey}` },
     method: "GET",
   });
@@ -216,40 +166,6 @@ export function refusedWithoutCharge(httpStatus: number): boolean {
   return httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
 }
 
-function wireBody(request: VideoRequest): unknown {
-  return {
-    content: [
-      { text: request.prompt, type: "text" },
-      {
-        image_url: { url: dataUri(request.firstFrame) },
-        // Seedance 2.5 requires a role on every image, and this one is not a
-        // reference: it is the instant the clip has to start on. The provider
-        // treats the two as mutually exclusive modes, which is why a clip
-        // carries its entry frame and nothing else.
-        role: "first_frame",
-        type: "image_url",
-      },
-    ],
-    duration: request.duration,
-    // The episode's soundtrack is continuous across cuts, so it belongs to the
-    // edit and not to a model that can only hear one clip at a time. The field
-    // defaults to true, so silence has to be asked for.
-    generate_audio: false,
-    model: request.model,
-    ratio: RATIO,
-    resolution: RESOLUTION,
-    // The frame the clip ends on, handed back as a picture. It is what the next
-    // clip is continued out of, so asking for it here is what keeps the chain
-    // from needing a decoder of its own.
-    return_last_frame: true,
-    watermark: false,
-  };
-}
-
-function dataUri(item: ImageAttachment): string {
-  return `data:${item.type};base64,${item.bytes.toString("base64")}`;
-}
-
 /**
  * Fetches a finished asset. Unbilled and therefore repeatable: an attempt that
  * died after the job succeeded can be finished from the saved answer, with no
@@ -272,7 +188,7 @@ export async function downloadAsset(input: {
     return err(
       new VideoCallError(
         null,
-        `nie udało się pobrać ${input.what} spod adresu zwróconego przez API, zadanie jest już opłacone, a adres żyje 24 h, więc powtórz to samo polecenie zamiast --regenerate`,
+        `nie udało się pobrać ${input.what} spod adresu zwróconego przez API, zadanie jest już opłacone, a adres żyje co najmniej 24 h, więc powtórz to samo polecenie zamiast --regenerate`,
         { cause }
       )
     );
@@ -282,7 +198,7 @@ export async function downloadAsset(input: {
     return err(
       new VideoCallError(
         response.status,
-        `pobranie ${input.what} zwróciło HTTP ${response.status}, zadanie jest już opłacone; powtórz polecenie, adres żyje 24 h`
+        `pobranie ${input.what} zwróciło HTTP ${response.status}, zadanie jest już opłacone; powtórz polecenie, adres żyje co najmniej 24 h`
       )
     );
   }

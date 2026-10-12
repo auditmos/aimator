@@ -32,8 +32,8 @@ AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
 AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream
 AIMATOR_SHOTLIST_MODEL=…              # etap 3
 AIMATOR_PROMPTS_MODEL=…               # etap 4
-AIMATOR_VIDEO_MODEL=…                 # etap 7, JEDEN dla obu torów
-AIMATOR_FFMPEG=ffmpeg                 # etapy 8-10; program, nie model; tylko gdy nie jest w PATH
+AIMATOR_VIDEO_MODEL=…                 # etap 7, JEDEN dla obu torów: dreamina-seedance-* albo kling-3.0
+AIMATOR_FFMPEG=ffmpeg                 # etapy 7 (Kling), 8-10; program, nie model; tylko gdy nie jest w PATH
 AIMATOR_NARRATION_MODEL=…             # etap 9, tekstowy; podnosi skrypt
 AIMATOR_VOICE_MODEL=…                 # etap 9, mowa; JEDEN dla obu torów
 AIMATOR_SOUND_MODEL=…                 # etap 10, tekstowy; pisze arkusz cue
@@ -41,9 +41,16 @@ AIMATOR_MUSIC_MODEL=…                 # etap 10, podkład; JEDEN dla obu toró
 AIMATOR_EFFECTS_MODEL=…               # etap 10, efekty; JEDEN dla obu torów
 
 OPENAI_API_KEY=…
-BYTEPLUS_MODELARK=…                   # także klucz wideo, na obu torach
+BYTEPLUS_MODELARK=…                   # także klucz wideo Seedance, na obu torach
+KLING_API_KEY=…                       # klucz wideo, gdy AIMATOR_VIDEO_MODEL=kling-3.0
 ELEVENLABS_API_KEY=…                  # mowa, muzyka i efekty; trzy miejsca wywołania, jeden klucz
 ```
+
+**Model wideo wybiera dostawcę.** Identyfikator przechodzi przez zamkniętą tabelę:
+`dreamina-seedance-*` idzie na BytePlus ModelArk z kluczem `BYTEPLUS_MODELARK`, a
+`kling-3.0` na Kling z kluczem `KLING_API_KEY`. Inny identyfikator to odmowa przed
+wysyłką, z listą znanych. Kling nie oddaje ostatniej klatki klipu, więc etap 7 wycina ją
+lokalnie przez ffmpeg i bez niego odmawia, zanim cokolwiek kupi.
 
 ## Dlaczego tyle zmiennych
 

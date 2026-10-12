@@ -30,7 +30,8 @@
  * attempt, as an output of the same record, which is what lets one review
  * cover the clip and the frame the next one continues out of. Its format is the
  * provider's choice, so the file is named after what it holds: `end.jpg` for the
- * JPEG ModelArk returns, `end.png` if a provider ever returns one.
+ * JPEG ModelArk returns, `end.png` for the frame cut out of a Kling clip, which
+ * hands none back, so `lib/video-model` cuts it out before the verdict.
  *
  * **A duration the model cannot render is refused before the POST.** The shot
  * list may plan any length its `maxClipSeconds` allows; the model renders a

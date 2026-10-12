@@ -68,13 +68,17 @@ Etap 7. Klipy (płatny; per tor, dwa media w jednym poleceniu):
                [--dry-run] [--json] [--regenerate]
                [--republish --artifact C01]  ← publikuje z archiwum, nic nie wysyła
     Kupuje dwie rzeczy: klatki wejściowe (obraz, modelem obrazowym tego toru)
-    i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL, klucz
-    BYTEPLUS_MODELARK). Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną
-    klatkę otwarcia, klatka wejściowa C02 na zatwierdzoną końcówkę C01 (gdy
-    lista ujęć mówi previous-end-frame), a klip C02 na tę klatkę. Raport podaje
-    liczbę wywołań OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle.
-    Długość klipu bierze się z listy ujęć; klipu, którego model nie renderuje,
-    narzędzie nie zaokrągli, odmówi i wskaże poprawkę w etapie 3.
+    i klipy (wideo, jednym modelem dla obu torów, AIMATOR_VIDEO_MODEL).
+    Model wybiera dostawcę: dreamina-seedance-* idzie na BytePlus (klucz
+    BYTEPLUS_MODELARK), kling-3.0 na Kling (klucz KLING_API_KEY; ostatnią
+    klatkę wycina ffmpeg, bez niego odmowa). Inny identyfikator to odmowa.
+    Bramka jest łańcuchem: klip C01 czeka na zatwierdzoną klatkę otwarcia,
+    klatka wejściowa C02 na zatwierdzoną końcówkę C01 (gdy lista ujęć mówi
+    previous-end-frame), a klip C02 na tę klatkę. Raport podaje liczbę wywołań
+    OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle. Długość klipu
+    bierze się z listy ujęć; klipu, którego model nie renderuje (Seedance
+    4-30 s, Kling 3-15 s), narzędzie nie zaokrągli, odmówi i wskaże poprawkę
+    w etapie 3.
 
 Etap 8. Montaż (darmowy; per tor, jeden artefakt):
   assembly generate <id> <episode-id> --track <gpt-image|seedream>

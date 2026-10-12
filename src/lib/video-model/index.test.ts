@@ -1,11 +1,13 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { jpeg, mp4, png } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { attach } from "../image-model/index.js";
-import { ok } from "../result.js";
+import type { ConcatReport, Muxer } from "../muxer.js";
+import { err, ok, type Result } from "../result.js";
 import { clipDuration, runVideoStage, validateEndFrame, validateVideo } from "./index.js";
 
 const FRAME = { aspectRatio: "16:9", seconds: 14 };
@@ -87,10 +89,13 @@ describe("validateEndFrame", () => {
 });
 
 describe("clipDuration", () => {
+  const SEEDANCE = "dreamina-seedance-2-5-260628";
+  const KLING = "kling-3.0";
+
   it("should accept a whole number of seconds the model renders", () => {
-    expect(clipDuration(14).ok).toBe(true);
-    expect(clipDuration(4).ok).toBe(true);
-    expect(clipDuration(30).ok).toBe(true);
+    expect(clipDuration(14, SEEDANCE).ok).toBe(true);
+    expect(clipDuration(4, SEEDANCE).ok).toBe(true);
+    expect(clipDuration(30, SEEDANCE).ok).toBe(true);
   });
 
   /**
@@ -100,12 +105,42 @@ describe("clipDuration", () => {
    * the tool does not get to change the film's timing on its own.
    */
   it("should refuse a clip shorter or longer than the model renders", () => {
-    expect(reason(clipDuration(3))).toContain("4");
-    expect(reason(clipDuration(31))).toContain("30");
+    expect(reason(clipDuration(3, SEEDANCE))).toContain("4");
+    expect(reason(clipDuration(31, SEEDANCE))).toContain("30");
   });
 
   it("should name the remedy, which is upstream in the shot list", () => {
-    expect(reason(clipDuration(45))).toContain("maxClipSeconds");
+    expect(reason(clipDuration(45, SEEDANCE))).toContain("maxClipSeconds");
+  });
+
+  /** Each model has its own range; the shot list is judged against the one chosen. */
+  it("should hold Kling to its own three to fifteen seconds", () => {
+    expect(clipDuration(3, KLING).ok).toBe(true);
+    expect(clipDuration(15, KLING).ok).toBe(true);
+    expect(reason(clipDuration(2, KLING))).toContain("3");
+    expect(reason(clipDuration(16, KLING))).toContain("15");
+  });
+
+  it("should refuse a fraction of a second on either model", () => {
+    expect(clipDuration(7.5, KLING).ok).toBe(false);
+    expect(clipDuration(7.5, SEEDANCE).ok).toBe(false);
+  });
+
+  /**
+   * `check` has no model to ask about, so it refuses only a length that no model
+   * this module knows would render: three seconds is Kling's, sixteen Seedance's.
+   */
+  it("should accept, with no model named, what some known model renders", () => {
+    expect(clipDuration(3, null).ok).toBe(true);
+    expect(clipDuration(16, null).ok).toBe(true);
+    expect(reason(clipDuration(2, null))).toContain("maxClipSeconds");
+  });
+
+  it("should refuse a model it does not know, naming the ones it does", () => {
+    const refused = reason(clipDuration(10, "veo-9"));
+
+    expect(refused).toContain("dreamina-seedance-");
+    expect(refused).toContain("kling-3.0");
   });
 });
 
@@ -238,11 +273,54 @@ describe("runVideoStage", () => {
     };
   }
 
+  interface Cutter {
+    /** Every clip the muxer was asked to cut a last frame out of. */
+    readonly cuts: string[];
+    readonly mux: Muxer;
+  }
+
+  /**
+   * The local engine, faked at its boundary: asked for a last frame, it writes
+   * the PNG a real ffmpeg would, in the clip's size. The real one is exercised
+   * in `muxer.test.ts`, against a clip it made itself.
+   */
+  function cutter(options: { absent?: boolean } = {}): Cutter {
+    const cuts: string[] = [];
+    const refuse = (): Promise<Result<ConcatReport>> =>
+      Promise.resolve(err(new Error("etap 7 tylko wycina klatkę")));
+
+    return {
+      cuts,
+      mux: {
+        concat: refuse,
+        lastFrame: async (input) => {
+          cuts.push(input.video);
+
+          if (options.absent === true) {
+            return err(new Error("nie znaleziono ffmpeg, wskaż go przez AIMATOR_FFMPEG"));
+          }
+
+          await mkdir(dirname(input.target), { recursive: true });
+          await writeFile(input.target, END_AS_PNG);
+
+          return ok({ argv: ["ffmpeg", "-sseof"], engine: "ffmpeg 9.0.2", stderr: "" });
+        },
+        master: refuse,
+        mix: refuse,
+        version: () =>
+          Promise.resolve(
+            options.absent === true ? err(new Error("nie znaleziono ffmpeg")) : ok("ffmpeg 9.0.2")
+          ),
+      },
+    };
+  }
+
   function callOf(fetchImpl: typeof fetch, impatient = false) {
     return {
       apiKey: "ark-test-key",
       fetch: fetchImpl,
       model: "dreamina-seedance-2-5-260628",
+      mux: cutter().mux,
       regenerate: false,
       runs: join(dir, "runs"),
       wait: waiting(impatient),
@@ -270,13 +348,20 @@ describe("runVideoStage", () => {
 
   function run(
     fetchImpl: typeof fetch,
-    overrides: { impatient?: boolean; regenerate?: boolean; seconds?: number } = {}
+    overrides: {
+      impatient?: boolean;
+      model?: string;
+      mux?: Muxer;
+      regenerate?: boolean;
+      seconds?: number;
+    } = {}
   ) {
     return runVideoStage(
       {
         apiKey: "ark-test-key",
         fetch: fetchImpl,
-        model: "dreamina-seedance-2-5-260628",
+        model: overrides.model ?? "dreamina-seedance-2-5-260628",
+        mux: overrides.mux ?? cutter().mux,
         regenerate: overrides.regenerate ?? false,
         runs: join(dir, "runs"),
         wait: waiting(overrides.impatient ?? false),
@@ -482,5 +567,243 @@ describe("runVideoStage", () => {
 
     const outputs = (await record()).outputs as { path: string }[];
     expect(outputs.map((one) => one.path)).toEqual(["clips/C01.mp4"]);
+  });
+
+  /**
+   * The second provider. The model id decides who renders, through a closed
+   * table, so everything below is the same lifecycle on a different wire:
+   * the receipt before the poll, resume by asking, the answer archived before
+   * it is judged. What differs is that Kling hands back no final frame, so the
+   * clip's end is cut out of the downloaded MP4, here, before the verdict.
+   */
+  describe("on Kling", () => {
+    const KLING = "kling-3.0";
+    const TASKS = "https://api-singapore.klingai.com/tasks?task_ids=";
+
+    interface KlingCall {
+      readonly authorization: string | null;
+      readonly body: unknown;
+      readonly method: string;
+      readonly url: string;
+    }
+
+    /**
+     * A Kling that answers the way its documentation says it does: `data.id`
+     * from the POST, `data[0]` from the task query, and the video among the
+     * task's `outputs`, with no final frame anywhere.
+     */
+    function kling(options: { fail?: string; polls?: number } = {}): {
+      readonly calls: KlingCall[];
+      readonly fetch: typeof fetch;
+      /** The job id `clips.stage.json` held at the moment of each poll. */
+      readonly receipts: (string | null)[];
+    } {
+      const { fail, polls = 1 } = options;
+      const calls: KlingCall[] = [];
+      const receipts: (string | null)[] = [];
+      const seen = new Map<string, number>();
+      let jobs = 0;
+
+      const impl = ((url: string | URL, init?: RequestInit) => {
+        const href = String(url);
+        const method = init?.method ?? "GET";
+        const headers = new Headers(init?.headers);
+
+        calls.push({
+          authorization: headers.get("authorization"),
+          body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
+          method,
+          url: href,
+        });
+
+        if (href === "https://download/video") {
+          return Promise.resolve(new Response(CLIP, { status: 200 }));
+        }
+
+        if (method === "POST") {
+          jobs += 1;
+
+          return Promise.resolve(
+            Response.json({
+              code: 0,
+              data: { id: `kt-${jobs}`, status: "submitted" },
+              message: "SUCCEED",
+              request_id: `req-${jobs}`,
+            })
+          );
+        }
+
+        const id = new URL(href).searchParams.get("task_ids") ?? "";
+        const asked = (seen.get(id) ?? 0) + 1;
+        seen.set(id, asked);
+        receipts.push(
+          (
+            JSON.parse(readFileSync(join(dir, "clips.stage.json"), "utf8")) as {
+              artifacts: Record<string, { jobId: string | null } | undefined>;
+            }
+          ).artifacts.C01?.jobId ?? null
+        );
+
+        if (fail !== undefined) {
+          return Promise.resolve(
+            Response.json({ code: 0, data: [{ id, message: fail, status: "failed" }] })
+          );
+        }
+
+        return Promise.resolve(
+          Response.json({
+            code: 0,
+            data: [
+              asked < polls
+                ? { id, status: "processing" }
+                : {
+                    id,
+                    outputs: [
+                      {
+                        duration: "14",
+                        id: `vid-${id}`,
+                        type: "video",
+                        url: "https://download/video",
+                      },
+                    ],
+                    status: "succeeded",
+                  },
+            ],
+          })
+        );
+      }) as unknown as typeof fetch;
+
+      return { calls, fetch: impl, receipts };
+    }
+
+    it("should send a kling-3.0 job to Kling, silent, starting on the entry frame", async () => {
+      const api = kling();
+      const result = await run(api.fetch, { model: KLING });
+
+      expect(result.ok ? result.data.state : reason(result)).toBe("published");
+
+      const [post] = api.calls.filter((call) => call.method === "POST");
+
+      expect(post?.url).toBe("https://api-singapore.klingai.com/image-to-video/kling-3.0");
+      expect(post?.authorization).toBe("Bearer ark-test-key");
+      expect(post?.body).toEqual({
+        contents: [
+          { text: "Ewa siada przy stole.", type: "prompt" },
+          // Raw Base64, no `data:` prefix: the format the first real call confirms.
+          { type: "first_frame", url: FIRST.toString("base64") },
+        ],
+        options: { watermark_info: { enabled: false } },
+        settings: { audio: "off", duration: 14, multi_shot: false, resolution: "1080p" },
+      });
+      expect(api.calls.map((call) => call.url)).toContain(`${TASKS}kt-1`);
+    });
+
+    it("should keep sending a Seedance model to ModelArk", async () => {
+      const api = provider();
+      await run(api.fetch);
+
+      const [post] = api.calls.filter((call) => call.method === "POST");
+
+      expect(post?.url).toContain("ark.ap-southeast.bytepluses.com");
+    });
+
+    /**
+     * The frame is cut out of the bytes that were downloaded, before anything
+     * judges them, and published as a second output of the same record, under
+     * the name of what it is.
+     */
+    it("should cut the end frame out of the clip and publish it beside it", async () => {
+      const engine = cutter();
+      await run(kling().fetch, { model: KLING, mux: engine.mux });
+
+      const runId = (await record()).runId as string;
+      const outputs = (await record()).outputs as { path: string }[];
+
+      expect(engine.cuts).toEqual([join(dir, "runs", runId, "original.mp4")]);
+      expect(outputs.map((one) => one.path)).toEqual(["clips/C01.mp4", "frames/C01/end.png"]);
+      expect((await readFile(join(dir, "frames", "C01", "end.png"))).equals(END_AS_PNG)).toBe(true);
+      expect((await record()).producer).toMatchObject({
+        endpoint: "https://api-singapore.klingai.com/image-to-video/kling-3.0",
+        model: KLING,
+      });
+    });
+
+    /** The receipt is on disk before Kling is asked anything about the job. */
+    it("should record the task id before the first poll", async () => {
+      const api = kling({ polls: 2 });
+      await run(api.fetch, { model: KLING });
+
+      expect(api.receipts).toEqual(["kt-1", "kt-1"]);
+    });
+
+    it("should finish an interrupted Kling job by asking after the same id", async () => {
+      const abandoned = await run(kling({ polls: Number.POSITIVE_INFINITY }).fetch, {
+        impatient: true,
+        model: KLING,
+      });
+
+      expect(reason(abandoned)).toContain("powtórz to samo polecenie");
+      expect((await record()).jobId).toBe("kt-1");
+
+      const second = kling();
+      const resumed = await run(second.fetch, { model: KLING });
+
+      expect(resumed.ok ? resumed.data.state : reason(resumed)).toBe("resumed");
+      expect(second.calls.filter((call) => call.method === "POST")).toHaveLength(0);
+      expect(second.calls.map((call) => call.url)).toContain(`${TASKS}kt-1`);
+    });
+
+    /**
+     * A job is collected from the provider that started it. Asking ModelArk
+     * about a Kling task would be a 404 at best; the person is told which
+     * model to name instead.
+     */
+    it("should refuse to collect a job with a model other than the one that started it", async () => {
+      await run(kling({ polls: Number.POSITIVE_INFINITY }).fetch, {
+        impatient: true,
+        model: KLING,
+      });
+
+      const other = provider();
+      const resumed = await run(other.fetch);
+
+      expect(reason(resumed)).toContain("--video-model kling-3.0");
+      expect(other.calls).toHaveLength(0);
+    });
+
+    /**
+     * Kling's `message` is the only account of why a job was turned down, so
+     * it is the reason the person reads, and the answer carrying it is
+     * archived. Nothing is published, and nothing was rendered to publish.
+     */
+    it("should give Kling's own message as the reason a job failed, and publish nothing", async () => {
+      const result = await run(kling({ fail: "Treść nie przeszła moderacji" }).fetch, {
+        model: KLING,
+      });
+
+      expect(reason(result)).toContain("Treść nie przeszła moderacji");
+      expect((await record()).status).toBe("submitted");
+      expect((await record()).outputs).toEqual([]);
+      await expect(readFile(join(dir, "clips", "C01.mp4"))).rejects.toThrow();
+
+      const runId = (await record()).runId as string;
+      const archived = await readFile(join(dir, "runs", runId, "response.json"), "utf8");
+
+      expect(archived).toContain("Treść nie przeszła moderacji");
+    });
+
+    /** The video's own id, which a later lip-sync call is addressed by. */
+    it("should archive the answer that carried the result, with the output's id", async () => {
+      await run(kling().fetch, { model: KLING });
+
+      const runId = (await record()).runId as string;
+      const archived = JSON.parse(
+        await readFile(join(dir, "runs", runId, "response.json"), "utf8")
+      ) as { data: { outputs: { id: string; type: string }[] }[] };
+
+      expect(archived.data[0]?.outputs).toContainEqual(
+        expect.objectContaining({ id: "vid-kt-1", type: "video" })
+      );
+    });
   });
 });

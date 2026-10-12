@@ -8,8 +8,9 @@ import {
 } from "../artifact/index.js";
 import { attach, runImageStage } from "../image-model/index.js";
 import type { PlannedArtifact } from "../media-prompt/index.js";
+import type { Muxer } from "../muxer.js";
 import { err, ok, type Result } from "../result.js";
-import { runVideoStage } from "../video-model/index.js";
+import { runVideoStage, videoModel } from "../video-model/index.js";
 import { clipFrame, clipVideo, type ImageTrack, type Workspace } from "../workspace.js";
 import {
   CLIP_ID,
@@ -53,10 +54,10 @@ const IMAGE_MODEL_NAME: Record<ImageTrack, string> = {
 };
 
 /**
- * The video key and the video model are the same on both tracks, because the
- * model is: a track says what a clip is drawn from, not who renders it.
+ * The video model is the same on both tracks: a track says what a clip is
+ * drawn from, not who renders it. Its key is whichever provider's the model
+ * names, which `lib/video-model` answers.
  */
-const VIDEO_KEY_NAME = "BYTEPLUS_MODELARK";
 const VIDEO_MODEL_NAME = "AIMATOR_VIDEO_MODEL";
 
 /** What happened to one clip or entry frame, in the words a person reads. */
@@ -100,6 +101,11 @@ interface GenerateInput {
   readonly imageKey: string | null;
   readonly imageModel: string | null;
   readonly mode: WriteMode;
+  /**
+   * The local engine, injected the way `fetch` is: a video model that hands
+   * back no final frame needs the frame cut out of the clip on this machine.
+   */
+  readonly mux: Muxer;
   readonly projectId: string;
   readonly regenerate: boolean;
   /**
@@ -138,11 +144,11 @@ class LockError extends Error {
  * renders clips has none demanding an image model. A dry run never reads a key,
  * so it must not claim one is missing, it says what it did not check instead.
  */
-function blockers(
+async function blockers(
   input: GenerateInput,
   stage7: Stage7Inputs,
   targets: readonly Stage7Target[]
-): readonly string[] {
+): Promise<readonly string[]> {
   const problems = [...stage7.gate];
 
   // A republication sends nothing, so it needs neither a model nor a key. It
@@ -161,23 +167,62 @@ function blockers(
     );
   }
 
-  if (videos && (input.videoModel === null || input.videoModel === "")) {
+  if (images && input.mode !== "dry-run" && (input.imageKey === null || input.imageKey === "")) {
+    problems.push(`brak ${IMAGE_KEY_NAME[input.track]} w środowisku lub .env`);
+  }
+
+  return videos ? [...problems, ...(await videoBlockers(input))] : problems;
+}
+
+/**
+ * Why no clip may be bought, when the run would buy one.
+ *
+ * The model id picks the provider, and with it the key and the limits, so an id
+ * outside the table is one refusal for the whole run, not one per clip.
+ */
+async function videoBlockers(input: GenerateInput): Promise<readonly string[]> {
+  if (input.videoModel === null || input.videoModel === "") {
+    return [
+      `brak modelu wideo, wskaż go przez --video-model <id> albo ${VIDEO_MODEL_NAME}; jest jeden dla obu torów`,
+    ];
+  }
+
+  const video = videoModel(input.videoModel);
+
+  if (!video.ok) {
+    return [video.error.message];
+  }
+
+  const problems: string[] = [];
+
+  // A model that hands back no final frame needs it cut out of the clip here,
+  // so a missing engine is asked about before anything is bought, and in a
+  // preview too: it is an obstacle a person reads beside the others.
+  if (video.data.endFrame === "cut") {
+    const engine = await input.mux.version();
+
+    if (!engine.ok) {
+      problems.push(
+        `model ${input.videoModel} oddaje klip bez ostatniej klatki, wycina ją ffmpeg: ${engine.error.message}`
+      );
+    }
+  }
+
+  if (input.mode !== "dry-run" && (input.videoKey === null || input.videoKey === "")) {
     problems.push(
-      `brak modelu wideo, wskaż go przez --video-model <id> albo ${VIDEO_MODEL_NAME}; jest jeden dla obu torów`
+      `brak ${video.data.key} w środowisku lub .env, klucz idzie za modelem ${input.videoModel}`
     );
   }
 
-  if (input.mode !== "dry-run") {
-    if (images && (input.imageKey === null || input.imageKey === "")) {
-      problems.push(`brak ${IMAGE_KEY_NAME[input.track]} w środowisku lub .env`);
-    }
-
-    if (videos && (input.videoKey === null || input.videoKey === "")) {
-      problems.push(`brak ${VIDEO_KEY_NAME} w środowisku lub .env, model wideo idzie na BytePlus`);
-    }
-  }
-
   return problems;
+}
+
+/**
+ * The video model, when the table knows it. An unknown one is refused once by
+ * `blockers`; judging every clip's length against it would only repeat that.
+ */
+function knownVideoModel(input: GenerateInput): string | null {
+  return input.videoModel !== null && videoModel(input.videoModel).ok ? input.videoModel : null;
 }
 
 /**
@@ -235,7 +280,7 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
     );
   }
 
-  const survey = await readStage7Inputs(input);
+  const survey = await readStage7Inputs(input, [], knownVideoModel(input));
 
   if (!survey.ok) {
     return survey;
@@ -245,14 +290,14 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
     input.artifacts.length > 0 ? input.artifacts : readyTargets(survey.data).map((one) => one.name);
   // Read again with the targets named, so the prompts are composed, and the
   // attachments hashed, in the same pass that is about to send them.
-  const stage7 = await readStage7Inputs(input, wanted);
+  const stage7 = await readStage7Inputs(input, wanted, knownVideoModel(input));
 
   if (!stage7.ok) {
     return stage7;
   }
 
   const targets = stage7.data.targets.filter((one) => wanted.includes(one.name));
-  const problems = blockers(input, stage7.data, targets);
+  const problems = await blockers(input, stage7.data, targets);
 
   if (input.mode === "dry-run") {
     return ok(preview(input, stage7.data, targets, problems));
@@ -522,6 +567,7 @@ async function runClip(
       apiKey: input.videoKey ?? "",
       fetch: input.fetch,
       model: input.videoModel ?? "",
+      mux: input.mux,
       regenerate: input.regenerate,
       republish: input.republish,
       runs: stage7.paths.track.runs,

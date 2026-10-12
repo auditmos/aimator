@@ -32,14 +32,6 @@ const SECOND = 1;
 const RATIO_TOLERANCE = 0.01;
 const RATIO = /^(\d{1,4}):(\d{1,4})$/;
 
-/**
- * What the video model renders. Both tracks send their clips to the same model,
- * so this is one range rather than one per track: the model is a decision the
- * user stores in a variable, and the track decides what the clip is drawn from.
- */
-const MIN_SECONDS = 4;
-const MAX_SECONDS = 30;
-
 export interface VideoVerdict {
   readonly bytes: number;
   readonly height: number;
@@ -56,43 +48,6 @@ class VideoError extends Error {
     this.name = "VideoError";
     this.reason = reason;
   }
-}
-
-class DurationError extends Error {
-  readonly seconds: number;
-
-  constructor(seconds: number, message: string) {
-    super(message);
-    this.name = "DurationError";
-    this.seconds = seconds;
-  }
-}
-
-/**
- * Whether the model will render a clip of this length.
- *
- * Refused rather than rounded, for the reason `frameSize` refuses a ratio no
- * track renders: the shot list is an approved decision, and a tool that
- * silently ordered fifteen seconds where a human planned fourteen would be
- * changing the film's timing on nobody's authority. The remedy is upstream,
- * a different `maxClipSeconds` and a re-planned shot list, and the message
- * says so, because that is a decision the person makes, not the tool.
- */
-export function clipDuration(seconds: number): Result<number> {
-  if (!Number.isInteger(seconds)) {
-    return err(
-      new DurationError(seconds, `długość klipu ${seconds}s nie jest pełną liczbą sekund`)
-    );
-  }
-
-  return seconds >= MIN_SECONDS && seconds <= MAX_SECONDS
-    ? ok(seconds)
-    : err(
-        new DurationError(
-          seconds,
-          `klip trwa ${seconds}s, a model wideo renderuje od ${MIN_SECONDS} do ${MAX_SECONDS}s, zmień maxClipSeconds odcinka i przeplanuj listę ujęć, bo tego narzędzie nie zaokrągli za ciebie`
-        )
-      );
 }
 
 /**
@@ -318,20 +273,20 @@ function readJpeg(bytes: Buffer): { format: StillFormat; height: number; width: 
   return null;
 }
 
-/** Where a job stands, in the only three shapes a caller can act on. */
-type VideoTask =
+/**
+ * Where a job stands, in the only three shapes a caller can act on.
+ *
+ * Every provider's answer is read into this, by that provider's own reader in
+ * `modelark.ts` or `kling.ts`, so the lifecycle around a job never learns
+ * which wire it came over. `endFrameUrl` is `null` when the provider handed no
+ * final frame back, which for Kling is always and for ModelArk is a surprise.
+ */
+export type VideoTask =
   | { readonly kind: "failed"; readonly message: string }
   | { readonly kind: "running"; readonly status: string }
   | { readonly endFrameUrl: string | null; readonly kind: "succeeded"; readonly videoUrl: string };
 
-interface TaskAnswer {
-  readonly content?: { readonly last_frame_url?: string; readonly video_url?: string };
-  readonly error?: { readonly code?: string; readonly message?: string };
-  readonly id?: string;
-  readonly status?: string;
-}
-
-class TaskError extends Error {
+export class TaskError extends Error {
   readonly reason: "empty" | "malformed" | "provider" | "url";
 
   constructor(reason: TaskError["reason"], message: string) {
@@ -341,86 +296,13 @@ class TaskError extends Error {
   }
 }
 
-function parse(body: string): Result<TaskAnswer> {
+/** An answer's JSON, typed as the shape its provider documents; nothing is trusted yet. */
+export function parseAnswer<T>(body: string): Result<T> {
   try {
-    return ok(JSON.parse(body) as TaskAnswer);
+    return ok(JSON.parse(body) as T);
   } catch {
     return err(new TaskError("malformed", "odpowiedź API nie jest poprawnym JSON-em"));
   }
-}
-
-/**
- * The job id a submitted request came back with.
- *
- * It is the only thing the POST returns, and it is the receipt: with it an
- * interrupted attempt is finished by asking, without it the only way forward is
- * paying again. That is why the caller writes it to disk before doing anything
- * else with it.
- */
-export function readSubmitResponse(body: string): Result<string> {
-  const answer = parse(body);
-
-  if (!answer.ok) {
-    return answer;
-  }
-
-  if (answer.data.error !== undefined) {
-    return err(
-      new TaskError(
-        "provider",
-        `API odmówiło uruchomienia zadania [${answer.data.error.code ?? "brak kodu"}]: ${answer.data.error.message ?? "bez treści"}`
-      )
-    );
-  }
-
-  return typeof answer.data.id === "string" && answer.data.id !== ""
-    ? ok(answer.data.id)
-    : err(new TaskError("empty", "API nie zwróciło identyfikatora zadania"));
-}
-
-/**
- * What a poll says about a job.
- *
- * A failed job is reported as failed rather than as an error of its own, because
- * the caller treats the two differently: a job the provider abandoned was not
- * rendered and not billed, so it may simply be started again.
- */
-export function readTaskResponse(body: string): Result<VideoTask> {
-  const answer = parse(body);
-
-  if (!answer.ok) {
-    return answer;
-  }
-
-  const { content, error, status } = answer.data;
-
-  if (status === "failed" || status === "cancelled" || status === "expired") {
-    return ok({
-      kind: "failed",
-      message: `zadanie zakończyło się statusem "${status}"${error?.message === undefined ? "" : `: ${error.message}`}`,
-    });
-  }
-
-  if (status !== "succeeded") {
-    return ok({ kind: "running", status: status ?? "unknown" });
-  }
-
-  const video = readUrl(content?.video_url, "wideo");
-
-  if (!video.ok) {
-    return video;
-  }
-
-  // The end frame is asked for, not required. A clip that came back without one
-  // is still a clip somebody paid for, and the chain that needs the frame says
-  // so in its own words rather than losing the video over it.
-  const endFrame = readUrl(content?.last_frame_url, "ostatniej klatki");
-
-  return ok({
-    endFrameUrl: endFrame.ok ? endFrame.data : null,
-    kind: "succeeded",
-    videoUrl: video.data,
-  });
 }
 
 /**
@@ -428,7 +310,7 @@ export function readTaskResponse(body: string): Result<VideoTask> {
  * would be sent onward by the download, and a non-HTTPS one would carry the
  * result in the clear.
  */
-function readUrl(value: string | undefined, what: string): Result<string> {
+export function readUrl(value: string | undefined, what: string): Result<string> {
   if (typeof value !== "string" || value === "") {
     return err(new TaskError("empty", `API nie zwróciło adresu ${what}`));
   }

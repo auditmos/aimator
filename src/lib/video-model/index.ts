@@ -15,10 +15,12 @@
  * words it uses for a refusal.
  *
  * One model renders both tracks, which is a decision the user stores in one
- * variable rather than a fact about a track. The tracks still differ, in the
+ * variable, and the model id names its provider through `provider.ts`; it is a
+ * decision rather than a fact about a track. The tracks still differ, in the
  * only way that matters here: the entry frame a clip starts from is drawn by
  * that track's image model, from that track's own references.
  */
 
 export { runVideoStage } from "./attempt.js";
-export { clipDuration, hasSound, validateEndFrame, validateVideo } from "./validate.js";
+export { clipDuration, clipPrompt, videoModel } from "./provider.js";
+export { hasSound, validateEndFrame, validateVideo } from "./validate.js";

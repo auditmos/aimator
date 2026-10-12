@@ -231,7 +231,7 @@ Obowiązują we wszystkich etapach.
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
 | 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
-| 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i, przy `previous-end-frame`, zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` (format oddaje dostawca), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; potem ocena klipu i klatek z osobna | **zaimplementowany** |
+| 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i, przy `previous-end-frame`, zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` albo `end.png` (format oddaje dostawca; przy Klingu wycina ją ffmpeg), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; model z tabeli dostawców, jego klucz i, przy Klingu, ffmpeg; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
@@ -1112,8 +1112,25 @@ tory**, w odróżnieniu od modeli obrazowych. Reguła „jedna zmienna na tor" i
 że dwa tory są *rysowane* obok siebie dwoma różnymi modelami obrazu; klip nie jest
 rysowany, tylko renderowany z klatki, którą ten tor już wyprodukował. Osią jest więc
 miejsce wywołania, jak przy każdym etapie tekstowym, a tory nadal się różnią w jedyny
-sposób, który tu cokolwiek znaczy: klip zaczyna się na klatce swojego toru. Klucz wideo to
-`BYTEPLUS_MODELARK` na obu torach, również na gpt-image.
+sposób, który tu cokolwiek znaczy: klip zaczyna się na klatce swojego toru.
+
+Identyfikator modelu wybiera dostawcę przez **zamkniętą tabelę** w `lib/video-model`:
+`dreamina-seedance-*` idzie na BytePlus ModelArk z kluczem `BYTEPLUS_MODELARK`, a
+`kling-3.0` na Kling z kluczem `KLING_API_KEY`, na obu torach, również na gpt-image, bo
+klucz idzie za dostawcą. Identyfikator spoza tabeli to odmowa przed wysyłką, wymieniająca
+znane. Każdy wiersz niesie własny zakres długości (Seedance 4–30 s, Kling 3–15 s) i własny
+limit promptu (Kling 3072 znaki), a odmowa obu pada przed wysyłką. `check` nie ma modelu
+w ręku, więc odmawia długości tylko wtedy, gdy nie renderuje jej żaden model z tabeli.
+
+**Kling nie oddaje ostatniej klatki.** Etap 7 wycina ją wtedy z pobranego MP4 przez
+`lib/muxer` (`lastFrame`, PNG w rozmiarze klipu) w tym samym kroku publikacji, **przed
+oceną**, jako drugie wyjście tego samego rekordu, więc bajty, które ktoś przyjmuje, nadal
+powstają przed werdyktem. Plik nazywa się `frames/Cnn/end.png`, bo nazwa idzie za bajtami,
+a `producer` rekordu zapisuje endpoint i model Klinga. Etap 7 na Klingu wymaga więc ffmpeg
+i bez niego odmawia przed wysyłką, tak jak etap 8. Przerwane zadanie odbiera się modelem,
+który je zamówił: inny model w tej samej powłoce to odmowa ze wskazaniem właściwego, nie
+druga opłata. Odpowiedź, która przyniosła wynik, ląduje w archiwum próby razem z
+`outputs[].id` klipu.
 
 Klatki wejściowe rysuje ten sam model obrazowy co referencje i klatkę otwarcia:
 `--image-model <id>`, a bez flagi `AIMATOR_IMAGE_MODEL_<TOR>`. Inny model dla klatki
