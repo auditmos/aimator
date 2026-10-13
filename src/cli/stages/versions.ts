@@ -150,6 +150,18 @@ function renderStatus(headline: string, status: VersionsStatus): string {
 
   for (const clip of status.clips) {
     lines.push(`  ${clip.id}: ${clip.approved ? "zatwierdzony" : clip.state}, ${clip.note}`);
+
+    if (clip.faces !== null) {
+      const found = clip.faces.map((face) => `${face.id} (${face.start}–${face.end} ms)`);
+      const bound =
+        clip.binding === null
+          ? "brak"
+          : Object.entries(clip.binding)
+              .map(([face, cast]) => `${face}=${cast}`)
+              .join(", ");
+
+      lines.push(`      twarze: ${found.join(", ")}; przypisanie: ${bound}`);
+    }
   }
 
   if (status.untouched.length > 0) {

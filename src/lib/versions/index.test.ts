@@ -389,6 +389,27 @@ describe("versions bind", { timeout: 45_000 }, () => {
       },
     });
   });
+
+  /** A person binds by looking, so `check` carries what was found and the word given on it. */
+  it("should report each clip's faces and who they are, through check", async () => {
+    await found();
+    const before = await checkVersions(scope());
+    await bind({ 0: "ewa" });
+    const after = await checkVersions(scope());
+    const clip = (status: typeof after, id: string) =>
+      status.ok ? status.data.clips.find((one) => one.id === id) : reason(status);
+    const dir = `projects/${PROJECT}/episodes/${EPISODE}/gpt-image/versions/faces/C01`;
+
+    expect(clip(before, "C01")).toMatchObject({
+      binding: null,
+      faces: [
+        { end: 15_000, id: "0", image: `${dir}/0.png`, start: 0 },
+        { end: 15_000, id: "1", image: `${dir}/1.png`, start: 0 },
+      ],
+    });
+    expect(clip(after, "C01")).toMatchObject({ binding: { 0: "ewa" } });
+    expect(clip(after, "C02")).toMatchObject({ binding: null, faces: null });
+  });
 });
 
 describe("versions lip-sync preview", { timeout: 45_000 }, () => {

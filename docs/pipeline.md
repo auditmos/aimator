@@ -2231,6 +2231,10 @@ bo nic tu nie jest osądem. Klip wyrenderowany przez Kling w ciągu 30 dni idzie
 twarzy (reguła 7), razem z sha256 `faces.json`, któremu odpowiada. To plik decyzji, nie
 rekord, tak jak `lip-sync.json`: nie ma producenta ani zgody, jest wejściem zadań.
 
+Obiekt `check` niesie przy każdym klipie `faces` (id, przedział w ms i ścieżkę obrazka
+każdej twarzy; `null` przed rozpoznaniem) i `binding` (twarz → postać; `null`, dopóki
+przypisanie nie dotyczy twarzy rozpoznanych teraz), bo człowiek przypisuje, patrząc.
+
 ### Jedna twarz na zadanie
 
 Każda postać mówiąca w klipie to osobne zadanie, w kolejności jej pierwszej kwestii.

@@ -64,6 +64,10 @@ jednej postaci to błąd. `binding.json` zapisuje sha256 `faces.json`, któremu 
 więc ponowne rozpoznanie cofa przypisanie, a ponowne wyrenderowanie klipu w etapie 7 cofa
 rozpoznanie.
 
+`check` pokazuje przy każdym klipie, co znaleziono i kogo przypisano: w tekście linia
+`twarze: 0 (0–15000 ms); przypisanie: 0=ewa`, a w `--json` pola `faces` (id, przedział
+i ścieżka obrazka) i `binding`, oba `null`, dopóki nie ma czego pokazać.
+
 ## Lip-sync i rachunek
 
 Dostawca porusza **jedną twarz na zadanie**. Postać mówiąca w kadrze dostaje więc jedno

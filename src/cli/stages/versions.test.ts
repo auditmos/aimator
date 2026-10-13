@@ -182,6 +182,13 @@ describe("versions bind and lip-sync", () => {
     expect(text).toContain("C01: ewa, twarz 0, od 1000 ms do 3000 ms, en:D01, planned");
   });
 
+  it("should print each clip's faces and who they are bound to in check", async () => {
+    await cli("versions", "bind", ...ON, "--artifact", "C01", "--face", "0=ewa");
+    const text = await cli("check", ...ON, "--stage", "versions");
+
+    expect(text).toContain("      twarze: 0 (0–15000 ms); przypisanie: 0=ewa");
+  });
+
   it("should answer check --json with the stage's own object", async () => {
     const parsed = JSON.parse(await cli("check", ...ON, "--stage", "versions", "--json")) as {
       clips: { id: string }[];

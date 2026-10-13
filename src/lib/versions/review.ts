@@ -32,10 +32,23 @@ import {
  * face moved and another not yet, which is nothing anybody is meant to watch.
  */
 
+/** One face the face call found: on screen from `start` to `end` ms, and its picture. */
+interface ClipFace {
+  readonly end: number;
+  readonly id: string;
+  /** Workspace-relative, or null when the provider's picture did not arrive. */
+  readonly image: string | null;
+  readonly start: number;
+}
+
 /** One clip whose mouths move, and where its version stands. */
 export interface ClipVersion {
   /** True once a person accepted the version and nothing it was made from changed. */
   readonly approved: boolean;
+  /** Face id → character, while that word is about the faces found now; null otherwise. */
+  readonly binding: Readonly<Record<string, string>> | null;
+  /** What the face call found in this clip; null until it is made. */
+  readonly faces: readonly ClipFace[] | null;
   readonly id: string;
   /** Recorded inputs whose bytes on disk no longer match what the version used. */
   readonly inputsChanged: readonly string[];
@@ -158,11 +171,29 @@ async function inspectClip(
 ): Promise<Result<ClipInspection>> {
   const record = stage12.stage.artifacts[target.id];
   const file = versionClip(stage12.paths.track, target.id);
-  const base = { id: target.id, inputsChanged: [], speakers: target.speakers } as const;
+  // Read for what a person binds by, not for the gate: `waiting` judges them.
+  const faces = await readClipFaces(input, stage12, target, null);
 
   if (!file.ok) {
     return file;
   }
+  if (!faces.ok) {
+    return faces;
+  }
+
+  const base = {
+    binding: faces.data.binding,
+    faces:
+      faces.data.found?.faces.map(({ end, id, image, start }) => ({
+        end,
+        id,
+        image: image?.path ?? null,
+        start,
+      })) ?? null,
+    id: target.id,
+    inputsChanged: [],
+    speakers: target.speakers,
+  } as const;
 
   if (record === undefined) {
     const wait = await waiting(input, stage12, target);
