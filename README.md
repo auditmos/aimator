@@ -106,6 +106,11 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 /prepare-project
 ```
 
+Etap 0 pyta o wygląd serii słowami, które ustala [docs/slownik.md](docs/slownik.md): jedno
+pojęcie, jedno słowo, po polsku w rozmowie i po angielsku w prompcie. Jak opisać styl, żeby
+model obrazu nie dopowiadał go sobie w każdym przebiegu inaczej, pokazuje
+[docs/styl.md](docs/styl.md), razem z katalogiem gotowych linii i ceną każdej rodziny stylów.
+
 ## Zasady, na których stoi całe narzędzie
 
 - Każdy etap konsumuje wyłącznie artefakty wytworzone przez wcześniejsze etapy, nigdy

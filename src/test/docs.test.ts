@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { run } from "../cli/index.js";
+import { imageTracks } from "../lib/workspace.js";
 
 /**
  * The documentation is the one artifact in this repo that nothing else proves.
@@ -88,6 +89,43 @@ const DIAGRAM = /```mermaid\n([\s\S]*?)```/;
 
 const readRepoFile = (path: string): string => readFileSync(join(repoRoot, path), "utf8");
 
+/** What stage 0 reads when the conversation reaches the look of a series. */
+const STYLE_PAGES = ["docs/slownik.md", "docs/styl.md"];
+
+const TABLE_SEPARATOR = /^:?-+:?$/;
+const ENV_VARIABLE = /^([A-Z][A-Z0-9_]*)=(.*)$/gm;
+const MODEL_VARIABLE = /_MODEL(_|$)/;
+const WHITESPACE = /\s+/;
+const CLOSING_VOWEL = /[aeiouyąęó]$/;
+
+/** Every cell under `header`, in every Markdown table of `text` that has it. */
+function tableColumn(text: string, header: string): string[] {
+  const cells: string[] = [];
+  // `undefined` outside a table; -1 inside one that lacks the header.
+  let column: number | undefined;
+
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("|")) {
+      column = undefined;
+      continue;
+    }
+    const row = line
+      .split("|")
+      .slice(1, -1)
+      .map((part) => part.trim());
+    if (column === undefined) {
+      column = row.indexOf(header);
+      continue;
+    }
+    const cell = row[column];
+    if (column !== -1 && cell !== undefined && !TABLE_SEPARATOR.test(cell)) {
+      cells.push(cell);
+    }
+  }
+
+  return cells;
+}
+
 function stageList(text: string, pattern: RegExp): string[] {
   return [...text.matchAll(pattern)]
     .map(([, number, name]) => `${number}. ${name?.trim().toLowerCase()}`)
@@ -132,6 +170,113 @@ describe("documentation", () => {
       }
     }
     expect(broken).toEqual([]);
+  });
+
+  /**
+   * A page nothing links to is found only by somebody who already knows it is
+   * there, which is nobody it was written for. Reachable means by any path of
+   * links from the front page, not necessarily one click from it.
+   */
+  it("should lead from the README to every page under docs", () => {
+    const reached = new Set<string>();
+    const queue = [join(repoRoot, "README.md")];
+
+    for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+      if (reached.has(file) || !existsSync(file)) {
+        continue;
+      }
+      reached.add(file);
+      for (const [, target] of readFileSync(file, "utf8").matchAll(LOCAL_LINK)) {
+        const path = target?.split("#")[0];
+        if (path?.endsWith(".md") && !ABSOLUTE_LINK.test(target ?? "")) {
+          queue.push(resolve(dirname(file), path));
+        }
+      }
+    }
+
+    const orphans = markdownUnder(join(repoRoot, "docs"))
+      .filter((page) => !reached.has(page))
+      .map((page) => relative(repoRoot, page));
+    expect(orphans).toEqual([]);
+  });
+
+  /**
+   * The pages a conversation about the look of a series reads. A model named in
+   * them turns into advice ("this line works on X"), which is a model chosen by
+   * a page, and a model nobody chose is not a decision. Both lists come from the
+   * committed reference of every variable and from the tracks themselves, so a
+   * model this repo starts using is caught without editing this file.
+   */
+  it("should name no model and no key on the pages about style", () => {
+    const variables = [...readRepoFile(".env.example").matchAll(ENV_VARIABLE)];
+    const forbidden = [
+      ...variables.map(([, name]) => name ?? ""),
+      ...variables
+        .filter(([, name]) => MODEL_VARIABLE.test(name ?? ""))
+        .map(([, , id]) => id ?? ""),
+      ...imageTracks,
+    ].filter((word) => word !== "");
+
+    const named: string[] = [];
+    for (const page of STYLE_PAGES) {
+      const text = readRepoFile(page).toLowerCase();
+      named.push(
+        ...forbidden
+          .filter((word) => text.includes(word.toLowerCase()))
+          .map((word) => `${page}: ${word}`)
+      );
+    }
+    expect(forbidden.length).toBeGreaterThan(imageTracks.length);
+    expect(named).toEqual([]);
+  });
+
+  /**
+   * A studio or an artist named anywhere but in the column that decomposes it
+   * is a name on its way into `project.md`, and from there verbatim into every
+   * paid image. The names are read from that column rather than listed here.
+   *
+   * Polish inflects names ("u Burtona", "z Laiki"), so a cell is matched word by
+   * word, each by its stem: without a closing vowel, capitalised as written.
+   * Words under four letters are first names too short to tell from prose.
+   */
+  it("should name a studio or an artist only in the „Zamiast” column", () => {
+    const names = tableColumn(readRepoFile("docs/styl.md"), "Zamiast");
+    const stems = names
+      .flatMap((name) => name.split(WHITESPACE))
+      .filter((word) => word.length >= 4)
+      .map((word) => word.replace(CLOSING_VOWEL, ""));
+    const texts = everyMarkdownFile().map((file) => readFileSync(file, "utf8"));
+
+    const repeated = stems
+      .map((stem) => ({
+        count: texts.reduce((sum, text) => sum + text.split(stem).length - 1, 0),
+        stem,
+      }))
+      .filter(({ count }) => count !== 1)
+      .map(({ count, stem }) => `${stem}: ${count}×`);
+
+    expect(names.length).toBeGreaterThan(0);
+    expect(repeated).toEqual([]);
+  });
+
+  /**
+   * The page teaches five to seven tokens a line, so every line it offers has
+   * to obey that, or the catalogue is the first counterexample a reader copies.
+   */
+  it("should keep every style line on the style page to five to seven tokens", () => {
+    const page = readRepoFile("docs/styl.md");
+    const catalogue = tableColumn(page, "Linia");
+    const lines = [...catalogue, ...tableColumn(page, "Użyj")].map((cell) =>
+      cell.replaceAll("`", "")
+    );
+
+    const outside = lines
+      .map((line) => ({ line, tokens: line.split(",").length }))
+      .filter(({ tokens }) => tokens < 5 || tokens > 7)
+      .map(({ line, tokens }) => `${tokens}: ${line}`);
+
+    expect(catalogue.length).toBeGreaterThan(0);
+    expect(outside).toEqual([]);
   });
 
   it("should invoke only commands the usage text defines", () => {
