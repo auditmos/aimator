@@ -5,6 +5,7 @@ import {
   artifactUrl,
   type Billed,
   Block,
+  Checklist,
   Drift,
   Field,
   InstructionField,
@@ -20,6 +21,7 @@ import {
   Redraw,
   Said,
   type Unit,
+  useChecklist,
   useRedraw,
   Zoomable,
 } from "./panel";
@@ -244,7 +246,26 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
     () => INTENTS.checkClips({ episodeId, projectId, track }),
     [episodeId, projectId, track]
   );
-  const approve = useMemo(() => INTENTS.approveClips(scope), [scope]);
+  // One `--checks` covers every entry frame chosen, so the list is all of
+  // theirs, in the stage's order; a clip adds nothing to it.
+  const required = useMemo(
+    () => [
+      ...new Set(
+        (status?.artifacts ?? [])
+          .filter((one) => selected.includes(one.id))
+          .flatMap((one) => one.checks)
+      ),
+    ],
+    [selected, status]
+  );
+  const { complete, setTicked, ticked } = useChecklist(
+    required,
+    `${episodeId}/${track}/${cell.state}/${selected.join(",")}`
+  );
+  const approve = useMemo(
+    () => INTENTS.approveClips({ ...scope, checks: ticked }),
+    [scope, ticked]
+  );
   const republish = useMemo(() => INTENTS.republishClips(scope), [scope]);
   const preview = useMemo(
     () => INTENTS.previewClips({ ...scope, imageModel, instruction, regenerate, videoModel }),
@@ -362,7 +383,18 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
         <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
         {acceptable ? (
-          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+          <>
+            {required.length > 0 ? (
+              <Checklist id="clips-checks" onTick={setTicked} required={required} ticked={ticked} />
+            ) : null}
+            <Action
+              argv={approve}
+              disabled={running || !complete}
+              label="Zatwierdź"
+              onRun={startRun}
+              primary
+            />
+          </>
         ) : null}
         {redrawable ? (
           <Redraw argv={again} count={picked.length} onRedraw={redraw} running={running} />

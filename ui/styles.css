@@ -1454,6 +1454,23 @@ h1 {
 .block-decision .actions-note {
   flex: 1 1 20rem;
 }
+/* The checklist a frame ready for animation is accepted against: a row of its
+   own above the buttons, its boxes wrapping, so the bar stays a few lines. */
+.checklist {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.checklist legend {
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-neutral-50);
+}
 .hint {
   margin: 0 0 1rem;
   font-size: 0.875rem;

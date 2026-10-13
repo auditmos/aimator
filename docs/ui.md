@@ -201,7 +201,12 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
 3. **Decyzja**: „Sprawdź” i „Zatwierdź”, a w etapach 9 i 10 oba „tak” tego etapu
    (skrypt i kwestie, arkusz i stemy). Gdy w bloku stoi przycisk zatwierdzenia, blok jedzie
    z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na
-   górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania. Dryf wejść nie
+   górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania. Przy klatce
+   otwarcia i klatkach wejściowych nad „Zatwierdź” stoi **checklista QC**: pole na każde
+   kryterium, którego etap wymaga (lista `checks` z jego `check`, przy kilku klatkach suma
+   ich list). Przycisk odblokowuje się dopiero przy pełnej liście, bo niepełnej terminal by
+   odmówił, a komenda pod nim niesie `--checks` z tym, co zaznaczono. Nowy rysunek albo
+   inny wybór ogniw czyści zaznaczenia, bo dotyczyły obrazu, którego już nie ma. Dryf wejść nie
    chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
    wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje. W etapach, które
    rysują (2, 5, 6 i 7), obok stoi „Narysuj ponownie”, bo odrzucenia nie ma: obraz, którego

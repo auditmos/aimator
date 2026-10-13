@@ -5,6 +5,7 @@ import {
   artifactUrl,
   asImages,
   Block,
+  Checklist,
   Field,
   Gallery,
   InstructionField,
@@ -12,6 +13,7 @@ import {
   Problems,
   Redraw,
   Said,
+  useChecklist,
   useRedraw,
 } from "./panel";
 import type { OpeningFrameStatus, RunDone, StatusCell } from "./types";
@@ -51,7 +53,15 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
   const [sent, setSent] = useState<readonly string[] | null>(null);
   const scope = useMemo(() => ({ episodeId, projectId, track }), [episodeId, projectId, track]);
   const check = useMemo(() => INTENTS.checkOpeningFrame(scope), [scope]);
-  const approve = useMemo(() => INTENTS.approveOpeningFrame(scope), [scope]);
+  const required = status?.artifact.checks ?? [];
+  const { complete, setTicked, ticked } = useChecklist(
+    required,
+    `${episodeId}/${track}/${cell.state}`
+  );
+  const approve = useMemo(
+    () => INTENTS.approveOpeningFrame({ ...scope, checks: ticked }),
+    [scope, ticked]
+  );
   const preview = useMemo(
     () => INTENTS.previewOpeningFrame({ ...scope, instruction, model, regenerate }),
     [instruction, model, regenerate, scope]
@@ -143,7 +153,16 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
         <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
         {acceptable ? (
-          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+          <>
+            <Checklist id="opening-checks" onTick={setTicked} required={required} ticked={ticked} />
+            <Action
+              argv={approve}
+              disabled={running || !complete}
+              label="Zatwierdź"
+              onRun={startRun}
+              primary
+            />
+          </>
         ) : null}
         {redrawable ? (
           <Redraw argv={again} count={1} onRedraw={redraw} running={running} />

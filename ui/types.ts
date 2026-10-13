@@ -148,10 +148,20 @@ export interface ReferencesStatus {
   readonly track: string;
 }
 
+/**
+ * A frame ready for animation: drawn, and accepted against a checklist.
+ *
+ * `checks` is the stage's answer to which QC criteria a yes needs, derived
+ * from what the frame attaches, so the panel never decides it.
+ */
+interface Judged extends Drawn {
+  readonly checks: readonly string[];
+}
+
 /** Stage 6's own object: one frame, per track, and nothing to narrow it with. */
 export interface OpeningFrameStatus {
   readonly approved: boolean;
-  readonly artifact: Drawn;
+  readonly artifact: Judged;
   readonly nextStep: string;
   readonly problems: readonly string[];
   readonly track: string;
@@ -169,6 +179,8 @@ export interface OpeningFrameStatus {
  */
 export interface ClipState {
   readonly approved: boolean;
+  /** The QC criteria a yes needs: an entry frame's, and none for a clip. */
+  readonly checks: readonly string[];
   readonly id: string;
   /** Recorded inputs whose bytes on disk no longer match what this run used. */
   readonly inputsChanged: readonly string[];

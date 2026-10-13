@@ -48,6 +48,7 @@ const scope = {
   aspectRatio: "16:9",
   audio: "narration",
   characterId: "ewa",
+  checks: ["anatomy", "style"],
   dryRun: false,
   duckDb: "-12",
   duckRelease: "400",
@@ -450,9 +451,20 @@ describe("the stage-5 and stage-6 panels", () => {
       "opening-frame",
       "--track",
       "gpt-image",
+      "--checks",
+      "anatomy,style",
     ]);
     expect(INTENTS.approveOpeningFrame(scope)).not.toContain("--artifact");
     expect(INTENTS.previewOpeningFrame(scope)).not.toContain("--artifact");
+  });
+
+  /**
+   * A frame ready for animation is accepted against a checklist, and the yes
+   * spells exactly the criteria a person ticked. None ticked spells no flag,
+   * so what the CLI answers is its own refusal, naming what is missing.
+   */
+  it("should spell the ticked criteria on the frame's yes, and no flag for none", () => {
+    expect(INTENTS.approveOpeningFrame({ ...scope, checks: [] })).not.toContain("--checks");
   });
 
   it("should draw whatever the graph allows when no reference is named", () => {
@@ -507,6 +519,23 @@ describe("the stage-7 panel", () => {
       "gpt-image",
       "--artifact",
       "C01,entry:C02",
+      "--checks",
+      "anatomy,style",
+    ]);
+  });
+
+  /** A clip is accepted without a checklist, so a yes on clips alone carries none. */
+  it("should spell no checklist when nothing named needs one", () => {
+    expect(INTENTS.approveClips({ ...scope, artifacts: ["C01"], checks: [] })).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "clips",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01",
     ]);
   });
 

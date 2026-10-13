@@ -100,6 +100,18 @@ interface TrackRef extends EpisodeRef {
 }
 
 /**
+ * A yes on a frame ready for animation, and the QC criteria a person ticked.
+ *
+ * The list is what was ticked, never what the stage requires: a box left
+ * empty is not spelled, so the CLI answers with its own refusal naming what is
+ * missing, rather than this screen saying yes on somebody's behalf. An empty
+ * list spells no flag, which is also what a yes on clips alone needs.
+ */
+interface Judged extends TrackRef {
+  readonly checks: readonly string[];
+}
+
+/**
  * How the narrator of a series reads: five knobs, none of them a number here.
  *
  * Strings for the reason every settings field is one: an empty box means the
@@ -151,6 +163,11 @@ function artifacts(names: readonly string[]): readonly string[] {
   return listed.length === 0 ? [] : ["--artifact", listed.join(",")];
 }
 
+/** `--checks anatomy,style`: the criteria ticked, or no flag when none was. */
+function checklist(names: readonly string[]): readonly string[] {
+  return names.length === 0 ? [] : ["--checks", names.join(",")];
+}
+
 /** A purchase the two-step rule would not allow. Never a refusal to show. */
 class NotPreviewedError extends Error {
   constructor(message: string) {
@@ -190,7 +207,7 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Delivery, Levels, Send, Settings, TrackRef {
+interface Everything extends Delivery, Judged, Levels, Send, Settings {
   readonly artifact: string;
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
@@ -308,7 +325,7 @@ export const INTENTS = {
    * front of a clip and the frame it hands on is one decision, so it is one
    * command, and the ids are the CLI's own.
    */
-  approveClips: (one: TrackRef & { readonly artifacts: readonly string[] }): readonly string[] => [
+  approveClips: (one: Judged & { readonly artifacts: readonly string[] }): readonly string[] => [
     "approve",
     one.projectId,
     one.episodeId,
@@ -317,6 +334,7 @@ export const INTENTS = {
     "--track",
     one.track,
     ...artifacts(one.artifacts),
+    ...checklist(one.checks),
   ],
   /**
    * Stage 10, accepted: the cue sheet, which is the gate the stems wait on.
@@ -406,7 +424,7 @@ export const INTENTS = {
    * which track, and there is nothing else it could mean, so a flag with one
    * legal value would be ceremony standing where a decision used to be.
    */
-  approveOpeningFrame: (one: TrackRef): readonly string[] => [
+  approveOpeningFrame: (one: Judged): readonly string[] => [
     "approve",
     one.projectId,
     one.episodeId,
@@ -414,6 +432,7 @@ export const INTENTS = {
     "opening-frame",
     "--track",
     one.track,
+    ...checklist(one.checks),
   ],
   /** Stage 0, accepted: the rules, the cast and the episode's decisions. */
   approvePrepare: (one: ProjectRef): readonly string[] => [

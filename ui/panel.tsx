@@ -311,6 +311,88 @@ export function InstructionField(props: {
 }
 
 /**
+ * What each QC criterion asks a person to look at, in stage 6's page's words.
+ *
+ * Which criteria a frame needs is the stage's answer (`checks` in its `check`
+ * object), never this list's: here is only the gloss beside each name, and a
+ * criterion it does not know is still shown, by its name alone.
+ */
+const CRITERIA: Readonly<Record<string, string>> = {
+  anatomy: "anatomia postaci",
+  continuity: "ciągłość z listą ujęć",
+  master: "zgodność z Character Master (hero.png na tym torze)",
+  props: "rekwizyty i otoczenie",
+  style: "zgodność ze stylem serii",
+};
+
+/**
+ * The criteria a person has ticked, let go of whenever `reset` changes.
+ *
+ * A tick is a statement about the frame in front of somebody, so a frame drawn
+ * again, or a different set of frames chosen, starts from an empty list.
+ * `complete` holds the yes back until every required box is ticked, because
+ * the terminal refuses a partial list and a button that only leads to a
+ * refusal is one more thing to read.
+ */
+export function useChecklist(
+  required: readonly string[],
+  reset: string
+): {
+  readonly complete: boolean;
+  readonly setTicked: (ticked: readonly string[]) => void;
+  readonly ticked: readonly string[];
+} {
+  const [ticked, setTicked] = useState<readonly string[]>([]);
+
+  useEffect(() => {
+    setTicked([]);
+  }, [reset]);
+
+  return { complete: required.every((one) => ticked.includes(one)), setTicked, ticked };
+}
+
+/**
+ * The checklist a frame ready for animation is accepted against: one box per
+ * criterion the stage requires, kept in the stage's order, so the command
+ * under "Zatwierdź" spells them the way its own "Dalej:" does.
+ */
+export function Checklist(props: {
+  readonly id: string;
+  readonly onTick: (ticked: readonly string[]) => void;
+  readonly required: readonly string[];
+  readonly ticked: readonly string[];
+}): JSX.Element {
+  const { id, onTick, required, ticked } = props;
+  const change = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const { checked, value } = event.target;
+
+      onTick(required.filter((one) => (one === value ? checked : ticked.includes(one))));
+    },
+    [onTick, required, ticked]
+  );
+
+  return (
+    <fieldset className="checklist">
+      <legend>Checklista QC: zgoda bez pełnej listy nie jest zgodą</legend>
+      {required.map((one) => (
+        <label className="field-check" htmlFor={`${id}-${one}`} key={one}>
+          <input
+            checked={ticked.includes(one)}
+            id={`${id}-${one}`}
+            onChange={change}
+            type="checkbox"
+            value={one}
+          />
+          <code>{one}</code>
+          {CRITERIA[one] ?? ""}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/**
  * A form's own command, and what to do once the CLI has said yes to it.
  *
  * A form whose fields held what it just sent should let go of it once the
