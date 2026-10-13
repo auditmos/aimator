@@ -14,6 +14,7 @@ import {
   Problems,
   pickable,
   Redraw,
+  Reject,
   Said,
   useRedraw,
 } from "./panel";
@@ -74,6 +75,10 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
     [characterId, projectId, track]
   );
   const approve = useMemo(() => INTENTS.approveCharacter(scope), [scope]);
+  const rejection = useCallback(
+    (note: string) => INTENTS.rejectCharacter({ ...scope, note }),
+    [scope]
+  );
   const preview = useMemo(
     () => INTENTS.previewCharacter({ ...scope, instruction, model, regenerate }),
     [instruction, model, regenerate, scope]
@@ -200,14 +205,24 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
         <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
         {acceptable ? (
-          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+          <>
+            <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+            <Reject
+              argvOf={rejection}
+              criteria={[]}
+              id="character-reject"
+              onRun={startRun}
+              run={run}
+              running={running}
+            />
+          </>
         ) : null}
         {redrawable ? (
           <Redraw argv={again} count={picked.length} onRedraw={redraw} running={running} />
         ) : (
           <p className="actions-note">
-            Zaznacz obrazy, żeby je zatwierdzić albo narysować ponownie. Tak samo odmówiłby
-            terminal.
+            Zaznacz obrazy, żeby je zatwierdzić, odrzucić albo narysować ponownie. Tak samo
+            odmówiłby terminal.
           </p>
         )}
       </Block>

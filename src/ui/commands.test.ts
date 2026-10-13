@@ -56,6 +56,7 @@ const scope = {
   effectsDb: "-10",
   effectsModel: "eleven-sfx",
   episodeId: "01-burza",
+  failed: ["anatomy"],
   imageModel: "gpt-image-2.5-sunburst",
   instruction: "Ewa ma mieć czerwony szalik",
   language: "pl",
@@ -66,6 +67,7 @@ const scope = {
   musicModel: "eleven-music",
   name: "Ewa",
   nature: "law-or-idea",
+  note: "Za ciemno, Ewa ma sześć palców.",
   projectId: "dzielna-ewa",
   regenerate: false,
   similarity: "0.8",
@@ -742,6 +744,93 @@ describe("a note on a new paid attempt", () => {
     const bought = buy({ argv: preview, runId: "9f1c" });
 
     expect(bought.slice(bought.indexOf("--instruction"))).toEqual(["--instruction", NOTE]);
+  });
+});
+
+/**
+ * The no beside every yes, on the four stages that draw.
+ *
+ * A rejection is recorded with its reason, and the reason is what the next
+ * `--regenerate` corrects by when nobody writes an instruction, so the note
+ * travels whole. `--fail` names the QC criteria a frame missed, and only a
+ * frame accepted against a checklist has any: stage 2 and stage 5 never spell
+ * it, and stages 6 and 7 spell it only when something was marked.
+ */
+describe("the rejections", () => {
+  it("should reject the chosen pictures of one character, with the note", () => {
+    expect(INTENTS.rejectCharacter(scope)).toEqual([
+      "reject",
+      "dzielna-ewa",
+      "ewa",
+      "--stage",
+      "character",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "card,front",
+      "--note",
+      "Za ciemno, Ewa ma sześć palców.",
+    ]);
+  });
+
+  it("should reject the chosen references, never naming a criterion", () => {
+    expect(INTENTS.rejectReferences({ ...scope, artifacts: ["R01", "R02"] })).toEqual([
+      "reject",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "references",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "R01,R02",
+      "--note",
+      "Za ciemno, Ewa ma sześć palców.",
+    ]);
+  });
+
+  it("should reject the opening frame with the criteria it failed", () => {
+    expect(INTENTS.rejectOpeningFrame(scope)).toEqual([
+      "reject",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "opening-frame",
+      "--track",
+      "gpt-image",
+      "--note",
+      "Za ciemno, Ewa ma sześć palców.",
+      "--fail",
+      "anatomy",
+    ]);
+    expect(INTENTS.rejectOpeningFrame({ ...scope, failed: [] })).not.toContain("--fail");
+  });
+
+  it("should reject the chosen links of the chain, failed criteria and all", () => {
+    expect(INTENTS.rejectClips({ ...scope, artifacts: ["entry:C02"] })).toEqual([
+      "reject",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "clips",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "entry:C02",
+      "--note",
+      "Za ciemno, Ewa ma sześć palców.",
+      "--fail",
+      "anatomy",
+    ]);
+    expect(INTENTS.rejectClips({ ...scope, artifacts: ["C01"], failed: [] })).not.toContain(
+      "--fail"
+    );
+  });
+
+  it("should quote the note so the line can be pasted whole", () => {
+    expect(commandLine(INTENTS.rejectReferences(scope))).toContain(
+      "--note 'Za ciemno, Ewa ma sześć palców.'"
+    );
   });
 });
 

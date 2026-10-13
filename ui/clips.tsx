@@ -18,7 +18,9 @@ import {
   Problems,
   pickable,
   promptsOf,
+  QC_LEGEND,
   Redraw,
+  Reject,
   Said,
   type Unit,
   useChecklist,
@@ -266,6 +268,10 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
     () => INTENTS.approveClips({ ...scope, checks: ticked }),
     [scope, ticked]
   );
+  const rejection = useCallback(
+    (note: string, failed: readonly string[]) => INTENTS.rejectClips({ ...scope, failed, note }),
+    [scope]
+  );
   const republish = useMemo(() => INTENTS.republishClips(scope), [scope]);
   const preview = useMemo(
     () => INTENTS.previewClips({ ...scope, imageModel, instruction, regenerate, videoModel }),
@@ -313,6 +319,10 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   const picked = artifacts.filter((one) => selected.includes(one.id));
   const acceptable =
     picked.length > 0 && picked.every((one) => one.state === "completed" && !one.approved);
+  // One `--fail` is recorded on every link refused, and only a frame with a
+  // checklist takes it: the CLI refuses the flag over a choice holding a clip,
+  // so there it is not offered.
+  const failable = picked.every((one) => one.checks.length > 0) ? required : [];
   // Only what exists can be made again; a link nobody rendered yet needs no
   // "again", and the preview would only answer zero.
   const redrawable = picked.length > 0 && picked.every((one) => one.state === "completed");
@@ -385,7 +395,13 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
         {acceptable ? (
           <>
             {required.length > 0 ? (
-              <Checklist id="clips-checks" onTick={setTicked} required={required} ticked={ticked} />
+              <Checklist
+                id="clips-checks"
+                legend={QC_LEGEND}
+                onTick={setTicked}
+                required={required}
+                ticked={ticked}
+              />
             ) : null}
             <Action
               argv={approve}
@@ -393,6 +409,14 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
               label="Zatwierdź"
               onRun={startRun}
               primary
+            />
+            <Reject
+              argvOf={rejection}
+              criteria={failable}
+              id="clips-reject"
+              onRun={startRun}
+              run={run}
+              running={running}
             />
           </>
         ) : null}

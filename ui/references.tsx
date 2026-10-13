@@ -13,6 +13,7 @@ import {
   Problems,
   pickable,
   Redraw,
+  Reject,
   Said,
   useRedraw,
 } from "./panel";
@@ -65,6 +66,10 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
     [episodeId, projectId, track]
   );
   const approve = useMemo(() => INTENTS.approveReferences(scope), [scope]);
+  const rejection = useCallback(
+    (note: string) => INTENTS.rejectReferences({ ...scope, note }),
+    [scope]
+  );
   const preview = useMemo(
     () => INTENTS.previewReferences({ ...scope, instruction, model, regenerate }),
     [instruction, model, regenerate, scope]
@@ -169,14 +174,24 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
         <Action argv={check} disabled={running} label="Sprawdź" onRun={startRun} />
 
         {acceptable ? (
-          <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+          <>
+            <Action argv={approve} disabled={running} label="Zatwierdź" onRun={startRun} primary />
+            <Reject
+              argvOf={rejection}
+              criteria={[]}
+              id="references-reject"
+              onRun={startRun}
+              run={run}
+              running={running}
+            />
+          </>
         ) : null}
         {redrawable ? (
           <Redraw argv={again} count={picked.length} onRedraw={redraw} running={running} />
         ) : (
           <p className="actions-note">
-            Zaznacz referencje, żeby je zatwierdzić albo narysować ponownie. Tak samo odmówiłby
-            terminal.
+            Zaznacz referencje, żeby je zatwierdzić, odrzucić albo narysować ponownie. Tak samo
+            odmówiłby terminal.
           </p>
         )}
       </Block>

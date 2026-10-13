@@ -1432,8 +1432,10 @@ h1 {
 /* The decision stays within reach while a long gallery or reel scrolls past,
    but only once it holds a yes to give: ticking a picture at the bottom of
    the list and finding "Zatwierdź" a screen above it was a round trip on
-   every review, while a bar with nothing to accept only hides the page. */
-.block-decision:has(.action-primary) {
+   every review, while a bar with nothing to accept only hides the page. It
+   lets go while a rejection is being written: that form is taller than many
+   windows, and a bar stuck to the bottom hides whatever does not fit. */
+.block-decision:has(.action-primary):not(:has(.reject)) {
   position: sticky;
   bottom: 0.75rem;
   z-index: 2;
@@ -1470,6 +1472,20 @@ h1 {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-neutral-50);
+}
+/* A no needs its reason written before it is sent, so the form takes a row
+   of its own under the buttons, and only while it is open. */
+.reject {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.reject-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
 }
 .hint {
   margin: 0 0 1rem;

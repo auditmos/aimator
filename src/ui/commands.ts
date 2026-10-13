@@ -112,6 +112,20 @@ interface Judged extends TrackRef {
 }
 
 /**
+ * A no, and why. The CLI refuses one without a reason, because the reason is
+ * what the next new paid attempt corrects by when nobody writes an
+ * instruction, so it is sent exactly as typed.
+ */
+interface Refusal {
+  readonly note: string;
+}
+
+/** A no on a frame ready for animation, and the QC criteria it was marked as missing. */
+interface Failed extends Refusal {
+  readonly failed: readonly string[];
+}
+
+/**
  * How the narrator of a series reads: five knobs, none of them a number here.
  *
  * Strings for the reason every settings field is one: an empty box means the
@@ -168,6 +182,11 @@ function checklist(names: readonly string[]): readonly string[] {
   return names.length === 0 ? [] : ["--checks", names.join(",")];
 }
 
+/** `--fail anatomy`: the criteria a refused frame missed, or no flag when none was marked. */
+function failing(names: readonly string[]): readonly string[] {
+  return names.length === 0 ? [] : ["--fail", names.join(",")];
+}
+
 /** A purchase the two-step rule would not allow. Never a refusal to show. */
 class NotPreviewedError extends Error {
   constructor(message: string) {
@@ -207,7 +226,7 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Delivery, Judged, Levels, Send, Settings {
+interface Everything extends Delivery, Failed, Judged, Levels, Send, Settings {
   readonly artifact: string;
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
@@ -925,6 +944,69 @@ export const INTENTS = {
     ...attempt(one),
     "--dry-run",
     "--json",
+  ],
+  /**
+   * Stage 2, refused: the chosen pictures of one character, and why.
+   *
+   * Every rejection below names what it refuses, and the panels offer it only
+   * over a choice: with no `--artifact` the CLI reads a no as one about every
+   * artifact in the file, which on a gallery is a decision nobody made.
+   */
+  rejectCharacter: (one: CharacterTrackRef & Refusal): readonly string[] => [
+    "reject",
+    one.projectId,
+    one.characterId,
+    "--stage",
+    "character",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    "--note",
+    one.note,
+  ],
+  /** Stage 7, refused: chosen links, and the criteria the entry frames among them missed. */
+  rejectClips: (
+    one: TrackRef & Failed & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "reject",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "clips",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    "--note",
+    one.note,
+    ...failing(one.failed),
+  ],
+  /** Stage 6, refused: the one frame, so no `--artifact`, as on its yes. */
+  rejectOpeningFrame: (one: TrackRef & Failed): readonly string[] => [
+    "reject",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "opening-frame",
+    "--track",
+    one.track,
+    "--note",
+    one.note,
+    ...failing(one.failed),
+  ],
+  /** Stage 5, refused: the chosen references; none is judged against a checklist. */
+  rejectReferences: (
+    one: TrackRef & Refusal & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "reject",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "references",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    "--note",
+    one.note,
   ],
   /**
    * Stage 7, republished: the clip again, out of its own archive.

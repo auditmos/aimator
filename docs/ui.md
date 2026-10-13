@@ -209,11 +209,15 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    inny wybór ogniw czyści zaznaczenia, bo dotyczyły obrazu, którego już nie ma. Dryf wejść nie
    chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
    wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje. W etapach, które
-   rysują (2, 5, 6 i 7), obok stoi „Narysuj ponownie”, bo odrzucenia nie ma: obraz, którego
-   nikt nie przyjął, po prostu czeka, a jedynym ruchem jest nowa próba. Przycisk niczego nie
+   rysują (2, 5, 6 i 7), obok „Zatwierdź” stoi **„Odrzuć…”** (`reject`): otwiera pole na
+   powód, bez którego terminal odrzucenia nie przyjmie, a przy klatce otwarcia i samych
+   klatkach wejściowych także pola na niespełnione kryteria QC (`--fail`). Powód trafia do
+   oceny i na drabinę („odrzucone: …”). Odrzucenie niczego nie kupuje ani nie rysuje;
+   odrzucone można nadal zatwierdzić. Dalej stoi „Narysuj ponownie”. Przycisk niczego nie
    kupuje. Włącza „Nową płatną próbę” zaznaczonych pozycji, rozwija blok generowania,
    przewija do niego i uruchamia darmowy podgląd, więc płaci się dalej wyłącznie
-   przyciskiem „Kup” pod przeczytanym rachunkiem.
+   przyciskiem „Kup” pod przeczytanym rachunkiem. Nowa próba odrzuconej pozycji bez własnej
+   uwagi poprawia ją według powodu odrzucenia, więc prompt w podglądzie niesie ten powód.
 4. **Generowanie (płatne)**: zwinięte, chyba że komórka jest „gotowa do generowania”.
    Tam kupowanie jest tym, po co się przyszło; przy przeglądzie ponowny zakup jest
    rzadszym pytaniem. Prompty z podglądu są zwinięte każdy osobno, a rachunek stoi nad nimi.

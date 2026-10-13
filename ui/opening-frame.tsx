@@ -11,7 +11,9 @@ import {
   InstructionField,
   PaidCall,
   Problems,
+  QC_LEGEND,
   Redraw,
+  Reject,
   Said,
   useChecklist,
   useRedraw,
@@ -61,6 +63,11 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
   const approve = useMemo(
     () => INTENTS.approveOpeningFrame({ ...scope, checks: ticked }),
     [scope, ticked]
+  );
+  const rejection = useCallback(
+    (note: string, failed: readonly string[]) =>
+      INTENTS.rejectOpeningFrame({ ...scope, failed, note }),
+    [scope]
   );
   const preview = useMemo(
     () => INTENTS.previewOpeningFrame({ ...scope, instruction, model, regenerate }),
@@ -154,7 +161,13 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
 
         {acceptable ? (
           <>
-            <Checklist id="opening-checks" onTick={setTicked} required={required} ticked={ticked} />
+            <Checklist
+              id="opening-checks"
+              legend={QC_LEGEND}
+              onTick={setTicked}
+              required={required}
+              ticked={ticked}
+            />
             <Action
               argv={approve}
               disabled={running || !complete}
@@ -162,13 +175,21 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
               onRun={startRun}
               primary
             />
+            <Reject
+              argvOf={rejection}
+              criteria={required}
+              id="opening-reject"
+              onRun={startRun}
+              run={run}
+              running={running}
+            />
           </>
         ) : null}
         {redrawable ? (
           <Redraw argv={again} count={1} onRedraw={redraw} running={running} />
         ) : (
           <p className="actions-note">
-            „Zatwierdź” i „Narysuj ponownie” pojawiają się, gdy klatka istnieje i czeka na
+            „Zatwierdź”, „Odrzuć” i „Narysuj ponownie” pojawiają się, gdy klatka istnieje i czeka na
             przyjęcie. Tak samo odmówiłby terminal.
           </p>
         )}

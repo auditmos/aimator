@@ -325,6 +325,9 @@ const CRITERIA: Readonly<Record<string, string>> = {
   style: "zgodność ze stylem serii",
 };
 
+/** What the checklist above "Zatwierdź" asks, on both stages that have one. */
+export const QC_LEGEND = "Checklista QC: zgoda bez pełnej listy nie jest zgodą";
+
 /**
  * The criteria a person has ticked, let go of whenever `reset` changes.
  *
@@ -354,15 +357,18 @@ export function useChecklist(
 /**
  * The checklist a frame ready for animation is accepted against: one box per
  * criterion the stage requires, kept in the stage's order, so the command
- * under "Zatwierdź" spells them the way its own "Dalej:" does.
+ * under "Zatwierdź" spells them the way its own "Dalej:" does. The same boxes
+ * mark what a refused frame missed, under a legend that says which question
+ * they answer.
  */
 export function Checklist(props: {
   readonly id: string;
+  readonly legend: string;
   readonly onTick: (ticked: readonly string[]) => void;
   readonly required: readonly string[];
   readonly ticked: readonly string[];
 }): JSX.Element {
-  const { id, onTick, required, ticked } = props;
+  const { id, legend, onTick, required, ticked } = props;
   const change = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const { checked, value } = event.target;
@@ -374,7 +380,7 @@ export function Checklist(props: {
 
   return (
     <fieldset className="checklist">
-      <legend>Checklista QC: zgoda bez pełnej listy nie jest zgodą</legend>
+      <legend>{legend}</legend>
       {required.map((one) => (
         <label className="field-check" htmlFor={`${id}-${one}`} key={one}>
           <input
@@ -433,6 +439,89 @@ export function useOwnRun(props: {
       onRun(argv);
     },
     [onRun]
+  );
+}
+
+/**
+ * A no with a reason, beside the yes it answers.
+ *
+ * "Odrzuć…" opens a note rather than refusing at once, because the CLI takes
+ * no no without a reason: it is recorded in the review, the ladder shows it,
+ * and the next "Narysuj ponownie" corrects by it when nobody writes a note of
+ * their own. Where a frame is judged against a checklist, what it missed can
+ * be marked as well. Once the CLI has recorded it the form closes and lets go;
+ * a refusal leaves it as typed, like every form here.
+ */
+export function Reject(props: {
+  /** The command for this note and these missed criteria, the panel's own intent. */
+  readonly argvOf: (note: string, failed: readonly string[]) => readonly string[];
+  /** What can be marked as missed; empty where nothing chosen has a checklist. */
+  readonly criteria: readonly string[];
+  readonly id: string;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { argvOf, criteria, id, onRun, run, running } = props;
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [failed, setFailed] = useState<readonly string[]>([]);
+  const close = useCallback(() => {
+    setOpen(false);
+    setNote("");
+    setFailed([]);
+  }, []);
+  const send = useOwnRun({ onRun, run, running, succeeded: close });
+  // A criterion marked over an earlier choice is not one this choice can miss.
+  const argv = useMemo(
+    () =>
+      argvOf(
+        note,
+        failed.filter((one) => criteria.includes(one))
+      ),
+    [argvOf, criteria, failed, note]
+  );
+  const change = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => setNote(event.target.value),
+    []
+  );
+  const show = useCallback(() => setOpen(true), []);
+
+  if (!open) {
+    return (
+      <button className="action" disabled={running} onClick={show} type="button">
+        Odrzuć…
+      </button>
+    );
+  }
+
+  return (
+    <div className="reject">
+      <div className="field field-note">
+        <label htmlFor={id}>Powód odrzucenia</label>
+        <textarea aria-describedby={`${id}-hint`} id={id} onChange={change} rows={3} value={note} />
+        <p className="field-hint" id={`${id}-hint`}>
+          Zapisany w ocenie i widoczny na drabinie. „Narysuj ponownie” bez własnej uwagi poprawi
+          według niego; uwaga wpisana przy nowej próbie ma pierwszeństwo. Odrzucone można nadal
+          zatwierdzić.
+        </p>
+      </div>
+      {criteria.length > 0 ? (
+        <Checklist
+          id={`${id}-fail`}
+          legend="Niespełnione kryteria QC (opcjonalnie)"
+          onTick={setFailed}
+          required={criteria}
+          ticked={failed}
+        />
+      ) : null}
+      <div className="reject-actions">
+        <Action argv={argv} disabled={running || note.trim() === ""} label="Odrzuć" onRun={send} />
+        <button className="action" disabled={running} onClick={close} type="button">
+          Anuluj
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -927,11 +1016,11 @@ export function PaidCall<Report extends PaidReport>(props: {
 /**
  * "Not this one, again": the way out of a picture nobody is going to accept.
  *
- * There is no reject in this pipeline, because a refusal is not a decision
- * worth storing: an unapproved picture simply waits, and what a person does
- * about it is draw it again. That used to live behind a checkbox inside the
- * folded paid block, which is exactly where nobody looks while judging, so the
- * decision block carries the way in. It does not spend: it turns on a new
+ * A rejection records why a picture will not do, and this new attempt
+ * corrects by it when nobody writes a note; but a no buys nothing, and the way
+ * out of a picture is still to draw it again. That used to live behind a
+ * checkbox inside the folded paid block, which is exactly where nobody looks
+ * while judging, so the decision block carries the way in. It does not spend: it turns on a new
  * paid attempt, opens the paid block where the bill will stand, and runs the
  * free preview, so the one click that costs money is still "Kup" under a bill
  * somebody has read.
