@@ -191,6 +191,14 @@ Zmiana głosu `ewa` cofa zgody na kwestie `ewa` i nie rusza kwestii `tata`. Zgod
 kwestię przeczytaną głosem, którego już nie ma, nie da się wydać ponownie: to nagranie
 kogoś innego, więc `approve` odmawia i wskazuje `--regenerate --artifact Dnn`.
 
+„Nie” ma te same zakresy: `reject … --stage dialogue --artifact <klucz> --note <uwaga>`
+też wymaga `--artifact`, bo „nie” o skrypcie, przekładzie i każdej kwestii naraz to
+decyzja, której nikt nie podjął. Odrzucony skrypt poprawia według uwagi
+`dialogue generate --regenerate --artifact script`, a odrzucony przekład
+`dialogue translate --regenerate`. Odrzuconą kwestię kupuje się od nowa w jej języku
+(`--artifact D01` albo `--language en --artifact en:D01`); model mowy uwagi nie czyta, więc
+zostaje ona w rekordzie dla człowieka.
+
 ## Drugi język: skrypt pod lip-sync
 
 Wersja z ustami w drugim języku zaczyna się od zatwierdzanego tekstu, nie od nagrania. Język

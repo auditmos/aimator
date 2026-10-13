@@ -9,6 +9,7 @@ import { checkAssembly } from "../lib/assembly/index.js";
 import { checkCharacter } from "../lib/character/index.js";
 import type { Check } from "../lib/checklist.js";
 import { checkClips } from "../lib/clips/index.js";
+import { checkDialogue } from "../lib/dialogue/index.js";
 import { checkMix, checkNarration } from "../lib/narration/index.js";
 import { checkOpeningFrame } from "../lib/opening-frame/index.js";
 import { checkPromptPackage } from "../lib/prompt-package/index.js";
@@ -18,6 +19,7 @@ import { checkScreenplay } from "../lib/screenplay/index.js";
 import { checkShotList } from "../lib/shot-list/index.js";
 import { checkMaster, checkSoundDesign } from "../lib/sound-design/index.js";
 import { checkStyle } from "../lib/style/index.js";
+import { checkVersions } from "../lib/versions/index.js";
 import {
   characterPaths,
   characterTrackPaths,
@@ -56,7 +58,9 @@ export const USAGE = `  reject <id> <episode-id> --stage <etap> [--track <tor>] 
     samymi zakresami co approve (bez etapu 0). Bramki traktują odrzucony artefakt
     jak niezatwierdzony; approve może go potem przyjąć. --fail tylko na klatkach
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
-    artefaktu bez --instruction poprawia go według tej uwagi.`;
+    artefaktu bez --instruction poprawia go według tej uwagi. W dialogue
+    i versions --artifact jest wymagane, jak w approve; versions odrzuca tylko
+    klip wersji (C01), nie twarze ani kroki pośrednie.`;
 
 /** A stage that has produced nothing here yet: there is no result to say no to. */
 class NothingToRejectError extends Error {
@@ -64,6 +68,13 @@ class NothingToRejectError extends Error {
     super(message);
     this.name = "NothingToRejectError";
   }
+}
+
+/** Where a no has to name what it refuses, as a yes there does: the keys it may name. */
+interface Named {
+  /** What `--artifact` takes here, in the words a refusal prints. */
+  readonly allowed: string;
+  readonly takes: (key: string) => boolean;
 }
 
 /** Where one stage's rejection is written, and what it prints afterwards. */
@@ -74,6 +85,8 @@ interface Located {
   readonly checklisted: (key: string) => boolean;
   /** The stage file the rejection is written into. */
   readonly file: string;
+  /** Set where one file holds artifacts of several kinds, so "every one" is nobody's decision. */
+  readonly named?: Named;
   /** What a person runs next: the same artifacts, bought again. */
   readonly regenerate: (keys: readonly string[]) => string;
   /** How the headline names the scope, after the stage. */
@@ -123,6 +136,7 @@ interface EpisodeOn {
 function episodeStage(spec: {
   readonly check: (on: EpisodeOn) => Promise<Result<object>>;
   readonly file: (paths: EpisodePaths) => string;
+  readonly named?: Named;
   readonly regenerate: (on: EpisodeOn, keys: readonly string[]) => string;
 }): Locate {
   return (scope) => {
@@ -138,6 +152,7 @@ function episodeStage(spec: {
       check: () => spec.check(on),
       checklisted: NO_CHECKLIST,
       file: spec.file(episode.data.paths),
+      ...(spec.named === undefined ? {} : { named: spec.named }),
       regenerate: (keys) => spec.regenerate(on, keys),
       where: `odcinek ${on.episodeId}`,
     });
@@ -151,6 +166,7 @@ function trackStage(spec: {
   readonly check: (on: TrackOn) => Promise<Result<object>>;
   readonly checklisted?: (key: string) => boolean;
   readonly file: (paths: EpisodeTrackPaths) => string;
+  readonly named?: Named;
   readonly regenerate: (on: TrackOn, keys: readonly string[]) => string;
 }): Locate {
   return (scope) => {
@@ -170,6 +186,7 @@ function trackStage(spec: {
       check: () => spec.check(on),
       checklisted: spec.checklisted ?? NO_CHECKLIST,
       file: spec.file(episodeTrackPaths(episode.data.paths, track.data)),
+      ...(spec.named === undefined ? {} : { named: spec.named }),
       regenerate: (keys) => spec.regenerate(on, keys),
       where: `tor ${track.data}`,
     });
@@ -182,6 +199,37 @@ function twoLevels(episode: Locate, track: Locate): Locate {
 }
 
 const artifactFlag = (keys: readonly string[]): string => `--artifact ${keys.join(",")}`;
+
+/**
+ * Stage 11's keys, each sent back to the command that buys it again: the
+ * script is lifted, a translation is translated, and lines are spoken in
+ * their own language, one command per language.
+ */
+function dialogueAgain(on: EpisodeOn, keys: readonly string[]): string {
+  const scope = `${on.projectId} ${on.episodeId}`;
+  const commands: string[] = [];
+  const lines = new Map<string, string[]>();
+
+  for (const key of keys) {
+    if (key === "script") {
+      commands.push(`aimator dialogue generate ${scope} --regenerate --artifact script`);
+    } else if (key.startsWith("script-")) {
+      commands.push(`aimator dialogue translate ${scope} --regenerate`);
+    } else {
+      const language = key.includes(":") ? (key.split(":")[0] ?? "") : "";
+
+      lines.set(language, [...(lines.get(language) ?? []), key]);
+    }
+  }
+
+  for (const [language, ids] of lines) {
+    const spoken = language === "" ? "" : ` --language ${language}`;
+
+    commands.push(`aimator dialogue generate ${scope}${spoken} --regenerate ${artifactFlag(ids)}`);
+  }
+
+  return commands.join("; ");
+}
 
 /**
  * One table, so whatever can be accepted can be refused the same way.
@@ -235,6 +283,12 @@ const STAGES: Readonly<Record<string, Locate>> = {
     file: (paths) => paths.clipsStage,
     regenerate: (on, keys) =>
       `aimator clip generate ${on.projectId} ${on.episodeId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
+  }),
+  dialogue: episodeStage({
+    check: checkDialogue,
+    file: (paths) => paths.dialogueStage,
+    named: { allowed: "script, script-<kod>, D01[,D02] albo <kod>:D01", takes: () => true },
+    regenerate: dialogueAgain,
   }),
   "opening-frame": trackStage({
     check: checkOpeningFrame,
@@ -315,7 +369,43 @@ const STAGES: Readonly<Record<string, Locate>> = {
       where: `projekt, tor ${on.track}`,
     });
   },
+  versions: trackStage({
+    check: checkVersions,
+    file: (paths) => paths.versionsStage,
+    // A clip's version is all a person watches here: `faces:C01` is what the
+    // provider found, and `C01:ewa` a step with one face moved and not the next.
+    named: { allowed: "C01[,C02] (wersja klipu)", takes: (key) => !key.includes(":") },
+    regenerate: (on, keys) =>
+      `aimator versions lip-sync ${on.projectId} ${on.episodeId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
+  }),
 };
+
+/** The keys a no is about, where it has to name them: at least one, each of a kind it may name. */
+function namedFor(located: Located, keys: readonly string[], stage: string): Result<null> {
+  const { named } = located;
+
+  if (named === undefined) {
+    return ok(null);
+  }
+
+  if (keys.length === 0) {
+    return err(
+      new UsageError(
+        `--artifact jest wymagane: ${named.allowed}; "nie" o wszystkim naraz to decyzja, której nikt nie podjął`
+      )
+    );
+  }
+
+  const foreign = keys.filter((key) => !named.takes(key));
+
+  return foreign.length > 0
+    ? err(
+        new UsageError(
+          `nie da się odrzucić ${foreign.join(", ")} w --stage ${stage}: --artifact przyjmuje ${named.allowed}`
+        )
+      )
+    : ok(null);
+}
 
 /** `--fail` only where a checklist was the yes it stands in for. */
 function failedFor(
@@ -346,7 +436,8 @@ function failedFor(
  * no way to say what is wrong with it. What it does refuse is a no about
  * nothing: an artifact the stage file does not hold, or an attempt that never
  * finished. With no `--artifact` it means every artifact in the file, which is
- * exactly one wherever `approve` does not ask for the flag either.
+ * exactly one wherever `approve` does not ask for the flag either. Stages 11
+ * and 12 ask for it, as their yes does.
  */
 export async function runReject(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
@@ -445,6 +536,12 @@ async function writeRejection(input: {
   readonly stage: string;
 }): Promise<Result<{ readonly keys: readonly string[]; readonly status: object }>> {
   const { located } = input;
+  const named = namedFor(located, input.named, input.stage);
+
+  if (!named.ok) {
+    return named;
+  }
+
   const file = await readJson(located.file, stageFileSchema);
 
   if (!file.ok) {

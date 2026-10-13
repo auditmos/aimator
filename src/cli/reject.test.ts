@@ -4,7 +4,16 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { generateReferences } from "../lib/references/index.js";
 import { resolveWorkspace, type Workspace } from "../lib/workspace.js";
-import { API_KEY, EPISODE, makeTrack, makeUpstream, PROJECT, recorder } from "../test/fixture.js";
+import {
+  API_KEY,
+  EPISODE,
+  makeDialogue,
+  makeTrack,
+  makeUpstream,
+  makeVersions,
+  PROJECT,
+  recorder,
+} from "../test/fixture.js";
 import { run } from "./index.js";
 
 /**
@@ -444,6 +453,206 @@ describe("reject, across the scopes approve takes", () => {
     );
 
     expect(result.ok ? null : result.error.message).toContain("nie ma czego odrzucić: R09");
+  });
+});
+
+/**
+ * Stages 11 and 12, whose one stage file holds artifacts of several kinds: the
+ * script, its translation and every line; a clip's version beside its faces
+ * and the steps it was made in. Assumptions: `--artifact` is required, as on
+ * their yes, because a no about every one of them is a decision nobody made;
+ * stage 12 takes a no about a clip's version alone, the only thing a person
+ * watches there; "Dalej" names the command that buys each refused artifact
+ * again. Not tested: what a lip-sync redone after a no looks like.
+ */
+describe("reject --stage dialogue and --stage versions", () => {
+  let spoken = "";
+
+  beforeAll(async () => {
+    spoken = await mkdtemp(join(tmpdir(), "aimator-reject-spoken-"));
+    const sources = await mkdtemp(join(tmpdir(), "aimator-reject-spoken-src-"));
+    const resolved = resolveWorkspace(spoken);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    await makeUpstream({
+      answer: chainAnswer(),
+      approvePackage: true,
+      dialogue: true,
+      root: spoken,
+      scratch: sources,
+      workspace: resolved.data,
+    });
+    await makeTrack({ root: spoken, track: TRACK, workspace: resolved.data });
+    await makeDialogue({ workspace: resolved.data });
+    // C02 is Tata alone speaking on screen: one face, one job, one version.
+    await makeVersions({ faces: { C02: { 1: "tata" } }, workspace: resolved.data });
+    await rm(sources, { force: true, recursive: true });
+  }, 240_000);
+
+  afterAll(async () => {
+    await rm(spoken, { force: true, recursive: true });
+  });
+
+  function inSpoken(...argv: readonly string[]) {
+    return run([...argv, "--workspace", spoken]);
+  }
+
+  function said(result: Awaited<ReturnType<typeof run>>): string {
+    return result.ok ? result.data : result.error.message;
+  }
+
+  async function dialogueRecord(key: string): Promise<{ readonly review: object }> {
+    const path = join(spoken, "projects", PROJECT, "episodes", EPISODE, "dialogue.stage.json");
+
+    return JSON.parse(await readFile(path, "utf8")).artifacts[key];
+  }
+
+  it("should refuse a no about the whole dialogue, as approve refuses a yes", async () => {
+    const result = await inSpoken(
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "dialogue",
+      "--note",
+      "nie"
+    );
+
+    expect(said(result)).toContain("--artifact jest wymagane");
+  });
+
+  it("should send a rejected line in the language of the mouths back to that language", async () => {
+    const result = await inSpoken(
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "dialogue",
+      "--artifact",
+      "en:D01",
+      "--note",
+      "za szybko"
+    );
+
+    expect(said(result)).toContain(
+      `Dalej: popraw z tą uwagą: aimator dialogue generate ${PROJECT} ${EPISODE} --language en --regenerate --artifact en:D01`
+    );
+    expect((await dialogueRecord("en:D01")).review).toMatchObject({
+      note: "za szybko",
+      status: "rejected",
+    });
+  });
+
+  it("should correct a rejected translation by its note in the preview", async () => {
+    const rejected = await inSpoken(
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "dialogue",
+      "--artifact",
+      "script-en",
+      "--note",
+      "za długie w D02"
+    );
+    const preview = await inSpoken(
+      "dialogue",
+      "translate",
+      PROJECT,
+      EPISODE,
+      "--regenerate",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run"
+    );
+
+    expect(said(rejected)).toContain(
+      `Dalej: popraw z tą uwagą: aimator dialogue translate ${PROJECT} ${EPISODE} --regenerate`
+    );
+    expect(said(preview)).toContain("uwaga z odrzucenia script-en (review.note)");
+  });
+
+  it("should correct a rejected script by its note, and send its lines back apart", async () => {
+    const rejected = await inSpoken(
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "dialogue",
+      "--artifact",
+      "script,en:D03",
+      "--note",
+      "Tata mówi za wcześnie"
+    );
+    const preview = await inSpoken(
+      "dialogue",
+      "generate",
+      PROJECT,
+      EPISODE,
+      "--artifact",
+      "script",
+      "--regenerate",
+      "--model",
+      "gpt-6-astra",
+      "--dry-run"
+    );
+
+    expect(said(rejected)).toContain(
+      `Dalej: popraw z tą uwagą: aimator dialogue generate ${PROJECT} ${EPISODE} --regenerate --artifact script; aimator dialogue generate ${PROJECT} ${EPISODE} --language en --regenerate --artifact en:D03`
+    );
+    expect(said(preview)).toContain("uwaga z odrzucenia script (review.note)");
+  });
+
+  function rejectVersion(...flags: readonly string[]) {
+    return inSpoken(
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "versions",
+      "--track",
+      TRACK,
+      ...flags,
+      "--note",
+      "usta spóźnione"
+    );
+  }
+
+  it("should refuse a no about every clip's version at once", async () => {
+    expect(said(await rejectVersion())).toContain(
+      "--artifact jest wymagane: C01[,C02] (wersja klipu)"
+    );
+  });
+
+  /** The faces are what the provider found and a step is half a clip: nobody watches either. */
+  it("should refuse a no about anything but a clip's version", async () => {
+    expect(said(await rejectVersion("--artifact", "faces:C02"))).toContain(
+      "nie da się odrzucić faces:C02 w --stage versions"
+    );
+  });
+
+  it("should reject a clip's version and send it back to lip-sync", async () => {
+    const result = await rejectVersion("--artifact", "C02");
+    const path = join(
+      spoken,
+      "projects",
+      PROJECT,
+      "episodes",
+      EPISODE,
+      TRACK,
+      "versions.stage.json"
+    );
+
+    expect(said(result)).toContain(
+      `Dalej: popraw z tą uwagą: aimator versions lip-sync ${PROJECT} ${EPISODE} --track ${TRACK} --regenerate --artifact C02`
+    );
+    expect(JSON.parse(await readFile(path, "utf8")).artifacts.C02.review).toMatchObject({
+      note: "usta spóźnione",
+      status: "rejected",
+    });
   });
 });
 

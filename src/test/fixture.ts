@@ -35,6 +35,7 @@ import {
   generateMaster,
   generateSoundDesign,
 } from "../lib/sound-design/index.js";
+import { approveVersions, bindFaces, findFaces, generateLipSync } from "../lib/versions/index.js";
 import { type ImageTrack, imageTracks, type Workspace } from "../lib/workspace.js";
 
 /**
@@ -1861,6 +1862,143 @@ export async function makeDialogue(options: {
 
   if (bought.length > 0) {
     await accept(bought);
+  }
+}
+
+/** The private bucket stage 12 lends a clip from, in the variables that name it. */
+const LENDING = {
+  AIMATOR_LIPSYNC_BUCKET: "aimator-lipsync",
+  R2_ACCESS_KEY_ID: "access-id",
+  R2_ACCOUNT_ID: "acc123",
+  R2_SECRET_ACCESS_KEY: "secret",
+} as const;
+
+const LIP_SYNC = "/v1/videos/advanced-lip-sync";
+
+/**
+ * Kling's face call and lip-sync job, and the bucket a clip is lent from,
+ * answering the way their documentation says: every face call opens a new
+ * session and finds faces `0` and `1` on screen for the whole clip, and every
+ * job is finished at its first poll.
+ */
+function lipSyncProvider(): typeof fetch {
+  let sessions = 0;
+  let jobs = 0;
+
+  return ((url: string | URL, init?: RequestInit) => {
+    const href = new URL(String(url));
+    const method = init?.method ?? "GET";
+
+    if (href.hostname.endsWith("r2.cloudflarestorage.com")) {
+      return Promise.resolve(new Response(null, { status: method === "DELETE" ? 204 : 200 }));
+    }
+
+    if (href.hostname === "faces") {
+      return Promise.resolve(new Response(png(256, 256, 7), { status: 200 }));
+    }
+
+    if (href.pathname === "/v1/videos/identify-face") {
+      sessions += 1;
+
+      return Promise.resolve(
+        Response.json({
+          code: 0,
+          data: {
+            face_data: ["0", "1"].map((id) => ({
+              end_time: 15_000,
+              face_id: id,
+              face_image: `https://faces/${sessions}/${id}.png`,
+              start_time: 0,
+            })),
+            session_id: `session-${sessions}`,
+          },
+          message: "SUCCEED",
+        })
+      );
+    }
+
+    if (href.pathname === LIP_SYNC && method === "POST") {
+      jobs += 1;
+
+      return Promise.resolve(
+        Response.json({ code: 0, data: { task_id: `ls-${jobs}`, task_status: "submitted" } })
+      );
+    }
+
+    if (href.pathname.startsWith(`${LIP_SYNC}/`)) {
+      const task = href.pathname.slice(LIP_SYNC.length + 1);
+
+      return Promise.resolve(
+        Response.json({
+          code: 0,
+          data: {
+            task_id: task,
+            task_result: {
+              videos: [{ duration: "15", id: `v${task}`, url: `https://synced/${task}` }],
+            },
+            task_status: "succeed",
+          },
+        })
+      );
+    }
+
+    if (href.hostname === "synced") {
+      return Promise.resolve(
+        new Response(mp4({ height: 1080, seconds: 15, width: 1920 }), { status: 200 })
+      );
+    }
+
+    return Promise.reject(new Error(`nieoczekiwane wywołanie ${method} ${href.href}`));
+  }) as unknown as typeof fetch;
+}
+
+/**
+ * Stage 12 on one track, finished: each clip `faces` names has its faces
+ * found, bound as given, lip-synced and, unless `pending` names it, accepted.
+ *
+ * Promoted because the CLI's tests need a clip's version that is finished
+ * rather than under test. Stage 12's own tests keep their instrumented Kling,
+ * for `makeTrack`'s reason: what they buy is what they assert on.
+ *
+ * The episode has to have been through `makeTrack` and `makeDialogue`.
+ */
+export async function makeVersions(options: {
+  /** Clip, then face, then the character a person says it is. */
+  readonly faces: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  readonly pending?: readonly string[];
+  readonly track?: ImageTrack;
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { faces, pending = [], track = "gpt-image", workspace } = options;
+  const scope = { episodeId: EPISODE, projectId: PROJECT, track, workspace } as const;
+  const paid = {
+    ...scope,
+    apiKey: API_KEY,
+    fetch: lipSyncProvider(),
+    hosting: LENDING,
+    mode: "apply",
+    regenerate: false,
+  } as const;
+  const clips = Object.keys(faces);
+
+  for (const [clip, bound] of Object.entries(faces)) {
+    // biome-ignore lint/performance/noAwaitInLoops: one clip's faces at a time, as a person binds them
+    await findFaces({ ...paid, artifact: clip });
+    await bindFaces({ ...scope, artifact: clip, faces: bound, mode: "apply" });
+  }
+
+  await generateLipSync({ ...paid, artifacts: clips });
+
+  const accepted = clips.filter((clip) => !pending.includes(clip));
+
+  if (accepted.length > 0) {
+    await approveVersions({
+      ...scope,
+      artifacts: accepted,
+      mode: "apply",
+      note: "ok",
+      reviewer: "fixture",
+    });
   }
 }
 

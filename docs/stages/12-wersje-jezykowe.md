@@ -100,6 +100,13 @@ związany z jego sha256 i ze wszystkim, z czego powstał: klipem, `faces.json`,
 osobny osąd, czy usta trafiają w kwestie. Zmiana któregokolwiek wejścia cofa zgodę, a
 `check` mówi, który plik się zmienił. Przyjmuje się wyłącznie klip, nigdy krok przed nim.
 
+`reject … --stage versions --track <tor> --artifact C01 --note <uwaga>` zapisuje „nie” na
+tych samych zasadach: `--artifact` jest wymagane i wskazuje wyłącznie klip wersji, nie
+`faces:C01` (to, co znalazł dostawca) ani krok `C01:ewa`. Odrzucony klip kupuje się od
+nowa przez `versions lip-sync … --artifact C01 --regenerate`; jeśli uwaga dotyczy tego, kto
+jest kim, najpierw poprawia się przypisanie przez `versions bind`. Lip-sync uwagi nie czyta,
+więc zostaje ona w rekordzie dla człowieka.
+
 ---
 
 [← etap 11](11-dialog.md) · [README](../../README.md) · [pełny kontrakt](../pipeline.md)
