@@ -192,6 +192,21 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
     () => pickable(status?.lines ?? [], chosen, flags.regenerate),
     [chosen, flags.regenerate, status]
   );
+  // The script is named apart from the lines, because "select all" is about
+  // recordings, and it is the only thing a note may correct here: the CLI
+  // takes `--instruction` with `--artifact script` and nothing else.
+  const [scriptChosen, setScriptChosen] = useState(false);
+  const named = useMemo(
+    () => [
+      ...pickable(
+        status === null ? [] : [status.script],
+        scriptChosen && status !== null ? [status.script.id] : [],
+        flags.regenerate
+      ),
+      ...selected,
+    ],
+    [flags.regenerate, scriptChosen, selected, status]
+  );
   const check = useMemo(() => INTENTS.checkNarration(scope), [scope]);
   const approveScript = useMemo(() => INTENTS.approveNarrationScript(scope), [scope]);
   const approveLines = useMemo(
@@ -202,13 +217,14 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
     () =>
       INTENTS.previewNarration({
         ...scope,
-        artifacts: selected,
+        artifacts: named,
+        instruction: flags.instruction,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         regenerate: flags.regenerate,
         voiceModel,
       }),
-    [flags, scope, selected, voiceModel]
+    [flags, named, scope, voiceModel]
   );
   const direct = useMemo(
     () => INTENTS.directNarrator({ ...delivery, projectId }),
@@ -224,6 +240,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
   const toggle = useCallback((id: string, wanted: boolean) => {
     setChosen((current) => (wanted ? [...current, id] : current.filter((one) => one !== id)));
   }, []);
+  const toggleScript = useCallback((_id: string, wanted: boolean) => setScriptChosen(wanted), []);
   const changeBoost = useCallback(
     (event: ChangeEvent<HTMLInputElement>) =>
       setDelivery((current) => ({ ...current, speakerBoost: event.target.checked })),
@@ -253,6 +270,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
 
   useEffect(() => {
     setChosen([]);
+    setScriptChosen(false);
     setSent(null);
   }, [episodeId]);
 
@@ -315,6 +333,16 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
             }
             title="Skrypt narracji"
           >
+            {status.script.state === "completed" ? (
+              <PickBox
+                approved={status.script.approved}
+                boxId="narration-script"
+                chosen={scriptChosen}
+                id={status.script.id}
+                onToggle={toggleScript}
+                unlocked={flags.regenerate}
+              />
+            ) : null}
             <p className="picture-state">
               {status.script.approved ? "zatwierdzony" : LINE_STATE[status.script.state]} ·{" "}
               {status.script.note}
@@ -399,6 +427,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
       >
         <SendFields
           id="narration"
+          instructionHint="Uwaga poprawia sam skrypt, więc działa tylko z zaznaczonym skryptem i niczym więcej (--artifact script). Nagrania kupuje się potem z jego słów, nigdy z uwagi. Model dostaje ten sam prompt, poprzedni skrypt i uwagę dosłownie. To nowa płatna próba."
           modelPlaceholder="AIMATOR_NARRATION_MODEL"
           onChange={setFlags}
           tokensPlaceholder="12000"

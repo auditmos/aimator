@@ -277,6 +277,40 @@ export function Field(props: {
 }
 
 /**
+ * The note a new paid attempt may carry: `--instruction`, in a person's words.
+ *
+ * A panel shows it only while a new attempt is chosen, never disabled beside a
+ * first one, because the CLI refuses a note there and a box that cannot be
+ * sent is one more thing to read. Several lines, because what is wrong with a
+ * picture is rarely one phrase; and sent exactly as typed, because the model
+ * reads it as material in the language its author wrote it in. `hint` is the
+ * stage's own sentence on what the note does there, which differs between a
+ * text, a picture and a clip.
+ */
+export function InstructionField(props: {
+  readonly hint: string;
+  readonly id: string;
+  readonly onValue: (value: string) => void;
+  readonly value: string;
+}): JSX.Element {
+  const { hint, id, onValue, value } = props;
+  const change = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => onValue(event.target.value),
+    [onValue]
+  );
+
+  return (
+    <div className="field field-note">
+      <label htmlFor={id}>Uwaga do poprawki (opcjonalnie)</label>
+      <textarea aria-describedby={`${id}-hint`} id={id} onChange={change} rows={3} value={value} />
+      <p className="field-hint" id={`${id}-hint`}>
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+/**
  * A form's own command, and what to do once the CLI has said yes to it.
  *
  * A form whose fields held what it just sent should let go of it once the
@@ -616,23 +650,28 @@ function namedBy(one: DrawnPrompt): string {
 
 /** What a text stage's paid command is told, beyond which episode it is about. */
 export interface SendFlags {
+  /** The note on a new attempt; see `InstructionField`. */
+  readonly instruction: string;
   readonly model: string;
   readonly regenerate: boolean;
   readonly tokens: string;
 }
 
-export const NO_FLAGS: SendFlags = { model: "", regenerate: false, tokens: "" };
+export const NO_FLAGS: SendFlags = { instruction: "", model: "", regenerate: false, tokens: "" };
 
 /**
- * The three flags every paid text stage takes, and nothing about any of them.
+ * The flags every paid text stage takes, and nothing about any of them.
  *
  * An empty field is not a value: the flag is then not spelled at all and the
  * CLI's own answer stands, which for the model is that stage's environment
  * variable and for the budget is the command's default. Rule 7 at the edge of
- * the screen, where a blank box must not become a zero.
+ * the screen, where a blank box must not become a zero. Switching the new
+ * attempt off lets go of its note, so a note nobody can see is never sent.
  */
 export function SendFields(props: {
   readonly id: string;
+  /** What a note corrects on this stage, said in one sentence beside it. */
+  readonly instructionHint: string;
   readonly modelPlaceholder: string;
   readonly onChange: (flags: SendFlags) => void;
   readonly tokensPlaceholder: string;
@@ -649,7 +688,11 @@ export function SendFields(props: {
   );
   const changeRegenerate = useCallback(
     (event: ChangeEvent<HTMLInputElement>) =>
-      onChange({ ...value, regenerate: event.target.checked }),
+      onChange({ ...value, instruction: "", regenerate: event.target.checked }),
+    [onChange, value]
+  );
+  const changeInstruction = useCallback(
+    (instruction: string) => onChange({ ...value, instruction }),
     [onChange, value]
   );
 
@@ -678,6 +721,14 @@ export function SendFields(props: {
         />
         Nowa płatna próba, zachowując poprzednią
       </label>
+      {value.regenerate ? (
+        <InstructionField
+          hint={props.instructionHint}
+          id={`${id}-instruction`}
+          onValue={changeInstruction}
+          value={value.instruction}
+        />
+      ) : null}
     </div>
   );
 }

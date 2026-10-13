@@ -57,6 +57,7 @@ export function ShotListPanel(props: PanelProps): JSX.Element {
     () =>
       INTENTS.previewShotList({
         episodeId,
+        instruction: flags.instruction,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         projectId,
@@ -161,6 +162,7 @@ export function ShotListPanel(props: PanelProps): JSX.Element {
       >
         <SendFields
           id="shot-list-send"
+          instructionHint="Uwaga poprawia opublikowaną listę ujęć, zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę dosłownie, a zmienia tylko to, czego uwaga dotyczy. Puste pole to nowa wersja od zera. W obu przypadkach to nowa płatna próba."
           modelPlaceholder="AIMATOR_SHOTLIST_MODEL"
           onChange={setFlags}
           tokensPlaceholder="24000"

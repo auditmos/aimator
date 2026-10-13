@@ -55,6 +55,7 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
     () =>
       INTENTS.previewScreenplay({
         episodeId,
+        instruction: flags.instruction,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         projectId,
@@ -145,6 +146,7 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
       >
         <SendFields
           id="screenplay-send"
+          instructionHint="Uwaga poprawia opublikowany scenariusz, zamiast pisać nowy: model dostaje ten sam prompt, poprzednią wersję i uwagę dosłownie, a zmienia tylko to, czego uwaga dotyczy. Puste pole to nowa wersja od zera. W obu przypadkach to nowa płatna próba."
           modelPlaceholder="AIMATOR_SCREENPLAY_MODEL"
           onChange={setFlags}
           tokensPlaceholder="12000"

@@ -526,6 +526,7 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
     () =>
       INTENTS.previewPromptPackage({
         episodeId,
+        instruction: flags.instruction,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         projectId,
@@ -650,6 +651,7 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
       >
         <SendFields
           id="package-send"
+          instructionHint="Uwaga poprawia opublikowany pakiet, zamiast pisać nowy: model dostaje ten sam prompt, manifest i każdy plik promptu w poprzedniej wersji oraz uwagę dosłownie, a zmienia tylko to, czego uwaga dotyczy. Puste pole to nowa wersja od zera. W obu przypadkach to nowa płatna próba."
           modelPlaceholder="AIMATOR_PROMPTS_MODEL"
           onChange={setFlags}
           tokensPlaceholder="32000"

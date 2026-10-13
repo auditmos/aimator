@@ -7,6 +7,7 @@ import {
   Block,
   Drift,
   Field,
+  InstructionField,
   Lightbox,
   PaidCall,
   PickAll,
@@ -226,6 +227,7 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   const [imageModel, setImageModel] = useState("");
   const [videoModel, setVideoModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
+  const [instruction, setInstruction] = useState("");
   /** Republishing rewrites accepted clips on purpose, so it unlocks them too. */
   const [reopen, setReopen] = useState(false);
   const [sent, setSent] = useState<readonly string[] | null>(null);
@@ -245,13 +247,13 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   const approve = useMemo(() => INTENTS.approveClips(scope), [scope]);
   const republish = useMemo(() => INTENTS.republishClips(scope), [scope]);
   const preview = useMemo(
-    () => INTENTS.previewClips({ ...scope, imageModel, regenerate, videoModel }),
-    [imageModel, regenerate, scope, videoModel]
+    () => INTENTS.previewClips({ ...scope, imageModel, instruction, regenerate, videoModel }),
+    [imageModel, instruction, regenerate, scope, videoModel]
   );
   /** The same preview with a new paid attempt on, whatever the checkbox says now. */
   const again = useMemo(
-    () => INTENTS.previewClips({ ...scope, imageModel, regenerate: true, videoModel }),
-    [imageModel, scope, videoModel]
+    () => INTENTS.previewClips({ ...scope, imageModel, instruction, regenerate: true, videoModel }),
+    [imageModel, instruction, scope, videoModel]
   );
   const startRun = useCallback(
     (argv: readonly string[]) => {
@@ -264,10 +266,12 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
   const toggle = useCallback((id: string, wanted: boolean) => {
     setChosen((current) => (wanted ? [...current, id] : current.filter((one) => one !== id)));
   }, []);
-  const changeRegenerate = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
-    []
-  );
+  // Switching the new attempt off lets go of its note, so a note nobody can
+  // see is never sent.
+  const changeRegenerate = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setRegenerate(event.target.checked);
+    setInstruction("");
+  }, []);
   const changeReopen = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setReopen(event.target.checked),
     []
@@ -280,6 +284,7 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
 
   useEffect(() => {
     setChosen([]);
+    setInstruction("");
     setSent(null);
   }, [episodeId, track]);
 
@@ -403,6 +408,14 @@ export function ClipsPanel(props: PanelProps): JSX.Element {
             />
             Nowa płatna próba zaznaczonych ogniw
           </label>
+          {regenerate ? (
+            <InstructionField
+              hint="Przy klatce wejściowej (entry:Cnn) uwaga poprawia opublikowany obraz: poprzednia wersja idzie jako Image 1 = previous:entry:Cnn, a model zmienia tylko to, co nazywa uwaga. Przy klipie (Cnn) żaden dostawca nie edytuje gotowego wideo, więc to nowa generacja z tej samej klatki wejściowej, z uwagą w prompcie, i pełna nowa opłata. Jedna uwaga, jedno ogniwo: przy kilku zaznaczonych terminal odmówi."
+              id="clips-instruction"
+              onValue={setInstruction}
+              value={instruction}
+            />
+          ) : null}
         </div>
       </PaidCall>
 

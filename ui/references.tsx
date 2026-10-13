@@ -7,6 +7,7 @@ import {
   Block,
   Field,
   Gallery,
+  InstructionField,
   PaidCall,
   PickAll,
   Problems,
@@ -47,6 +48,7 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
   const [chosen, setChosen] = useState<readonly string[]>([]);
   const [model, setModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
+  const [instruction, setInstruction] = useState("");
   // An accepted reference stays ticked and locked unless a new paid attempt is
   // what is being chosen for.
   const selected = useMemo(
@@ -64,13 +66,13 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
   );
   const approve = useMemo(() => INTENTS.approveReferences(scope), [scope]);
   const preview = useMemo(
-    () => INTENTS.previewReferences({ ...scope, model, regenerate }),
-    [model, regenerate, scope]
+    () => INTENTS.previewReferences({ ...scope, instruction, model, regenerate }),
+    [instruction, model, regenerate, scope]
   );
   /** The same preview with a new paid attempt on, whatever the checkbox says now. */
   const again = useMemo(
-    () => INTENTS.previewReferences({ ...scope, model, regenerate: true }),
-    [model, scope]
+    () => INTENTS.previewReferences({ ...scope, instruction, model, regenerate: true }),
+    [instruction, model, scope]
   );
   const startRun = useCallback(
     (argv: readonly string[]) => {
@@ -83,10 +85,12 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
   const toggle = useCallback((id: string, wanted: boolean) => {
     setChosen((current) => (wanted ? [...current, id] : current.filter((one) => one !== id)));
   }, []);
-  const changeRegenerate = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
-    []
-  );
+  // Switching the new attempt off lets go of its note, so a note nobody can
+  // see is never sent.
+  const changeRegenerate = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setRegenerate(event.target.checked);
+    setInstruction("");
+  }, []);
   const urlOf = useCallback(
     (artifact: string) =>
       `${artifactUrl({ artifact, episodeId, projectId, stage: "references", track })}&v=${encodeURIComponent(cell.state)}`,
@@ -95,6 +99,7 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
 
   useEffect(() => {
     setChosen([]);
+    setInstruction("");
     setSent(null);
   }, [episodeId, track]);
 
@@ -204,6 +209,14 @@ export function ReferencesPanel(props: PanelProps): JSX.Element {
             />
             Nowa płatna próba zaznaczonych referencji
           </label>
+          {regenerate ? (
+            <InstructionField
+              hint="Uwaga poprawia jedną zaznaczoną referencję, zamiast rysować ją od nowa: poprzednia wersja idzie jako Image 1 = previous:Rnn, przed dotychczasowymi załącznikami, a model zmienia tylko to, co nazywa uwaga. Jedna uwaga, jedna referencja: przy kilku zaznaczonych terminal odmówi. Gdy z poprawianym obrazem załączników jest więcej, niż tor przyjmuje, podgląd poda liczby i nic nie wyśle. To nowa płatna próba."
+              id="references-instruction"
+              onValue={setInstruction}
+              value={instruction}
+            />
+          ) : null}
         </div>
       </PaidCall>
     </section>

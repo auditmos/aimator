@@ -197,6 +197,21 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
     () => pickable(status?.cues ?? [], chosen, flags.regenerate),
     [chosen, flags.regenerate, status]
   );
+  // The sheet is named apart from the stems, because "select all" is about
+  // stems, and it is the only thing a note may correct here: the CLI takes
+  // `--instruction` with `--artifact cues` and nothing else.
+  const [sheetChosen, setSheetChosen] = useState(false);
+  const named = useMemo(
+    () => [
+      ...pickable(
+        status === null ? [] : [status.sheet],
+        sheetChosen && status !== null ? [status.sheet.id] : [],
+        flags.regenerate
+      ),
+      ...selected,
+    ],
+    [flags.regenerate, selected, sheetChosen, status]
+  );
   const check = useMemo(() => INTENTS.checkSoundDesign(scope), [scope]);
   const approveSheet = useMemo(() => INTENTS.approveCueSheet(scope), [scope]);
   const approveStems = useMemo(
@@ -207,14 +222,15 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
     () =>
       INTENTS.previewSoundDesign({
         ...scope,
-        artifacts: selected,
+        artifacts: named,
         effectsModel,
+        instruction: flags.instruction,
         maxOutputTokens: flags.tokens,
         model: flags.model,
         musicModel,
         regenerate: flags.regenerate,
       }),
-    [effectsModel, flags, musicModel, scope, selected]
+    [effectsModel, flags, musicModel, named, scope]
   );
   const setMix = useMemo(() => INTENTS.setLevels({ ...levels, projectId }), [levels, projectId]);
   const startRun = useCallback(
@@ -227,6 +243,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
   const toggle = useCallback((id: string, wanted: boolean) => {
     setChosen((current) => (wanted ? [...current, id] : current.filter((one) => one !== id)));
   }, []);
+  const toggleSheet = useCallback((_id: string, wanted: boolean) => setSheetChosen(wanted), []);
   const changeMusicDb = useCallback(
     (musicDb: string) => setLevels((current) => ({ ...current, musicDb })),
     []
@@ -251,6 +268,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
 
   useEffect(() => {
     setChosen([]);
+    setSheetChosen(false);
     setSent(null);
   }, [episodeId]);
 
@@ -315,6 +333,16 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
             }
             title="Arkusz cue"
           >
+            {status.sheet.state === "completed" ? (
+              <PickBox
+                approved={status.sheet.approved}
+                boxId="sound-design-sheet"
+                chosen={sheetChosen}
+                id={status.sheet.id}
+                onToggle={toggleSheet}
+                unlocked={flags.regenerate}
+              />
+            ) : null}
             <p className="picture-state">
               {status.sheet.approved ? "zatwierdzony" : CUE_STATE[status.sheet.state]} ·{" "}
               {status.sheet.note}
@@ -396,6 +424,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
       >
         <SendFields
           id="sound-design"
+          instructionHint="Uwaga poprawia sam arkusz cue, więc działa tylko z zaznaczonym arkuszem i niczym więcej (--artifact cues). Podkłady i efekty kupuje się potem z jego linii, nigdy z uwagi. Model dostaje ten sam prompt, poprzedni arkusz i uwagę dosłownie. To nowa płatna próba."
           modelPlaceholder="AIMATOR_SOUND_MODEL"
           onChange={setFlags}
           tokensPlaceholder="12000"

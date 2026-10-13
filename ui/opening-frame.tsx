@@ -7,6 +7,7 @@ import {
   Block,
   Field,
   Gallery,
+  InstructionField,
   PaidCall,
   Problems,
   Redraw,
@@ -46,18 +47,19 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
   const track = cell.track ?? "";
   const [model, setModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
+  const [instruction, setInstruction] = useState("");
   const [sent, setSent] = useState<readonly string[] | null>(null);
   const scope = useMemo(() => ({ episodeId, projectId, track }), [episodeId, projectId, track]);
   const check = useMemo(() => INTENTS.checkOpeningFrame(scope), [scope]);
   const approve = useMemo(() => INTENTS.approveOpeningFrame(scope), [scope]);
   const preview = useMemo(
-    () => INTENTS.previewOpeningFrame({ ...scope, model, regenerate }),
-    [model, regenerate, scope]
+    () => INTENTS.previewOpeningFrame({ ...scope, instruction, model, regenerate }),
+    [instruction, model, regenerate, scope]
   );
   /** The same preview with a new paid attempt on, whatever the checkbox says now. */
   const again = useMemo(
-    () => INTENTS.previewOpeningFrame({ ...scope, model, regenerate: true }),
-    [model, scope]
+    () => INTENTS.previewOpeningFrame({ ...scope, instruction, model, regenerate: true }),
+    [instruction, model, scope]
   );
   const startRun = useCallback(
     (argv: readonly string[]) => {
@@ -67,17 +69,22 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
     [onRun]
   );
   const { redraw, reveal } = useRedraw(startRun, setRegenerate);
-  const changeRegenerate = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
-    []
-  );
+  // Switching the new attempt off lets go of its note, so a note nobody can
+  // see is never sent.
+  const changeRegenerate = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setRegenerate(event.target.checked);
+    setInstruction("");
+  }, []);
   const urlOf = useCallback(
     (artifact: string) =>
       `${artifactUrl({ artifact, episodeId, projectId, stage: "opening-frame", track })}&v=${encodeURIComponent(cell.state)}`,
     [cell.state, episodeId, projectId, track]
   );
 
-  useEffect(() => setSent(null), [episodeId, track]);
+  useEffect(() => {
+    setInstruction("");
+    setSent(null);
+  }, [episodeId, track]);
 
   const frame = status?.artifact ?? null;
   const acceptable = frame !== null && frame.state === "completed" && !frame.approved;
@@ -176,6 +183,14 @@ export function OpeningFramePanel(props: PanelProps): JSX.Element {
             />
             Nowa płatna próba tej klatki
           </label>
+          {regenerate ? (
+            <InstructionField
+              hint="Uwaga poprawia opublikowaną klatkę, zamiast rysować ją od nowa: poprzednia wersja idzie jako Image 1 = previous:opening-frame, przed referencjami, a model zmienia tylko to, co nazywa uwaga. Gdy z poprawianym obrazem załączników jest więcej, niż tor przyjmuje, podgląd poda liczby i nic nie wyśle. To nowa płatna próba."
+              id="opening-instruction"
+              onValue={setInstruction}
+              value={instruction}
+            />
+          ) : null}
         </div>
       </PaidCall>
     </section>

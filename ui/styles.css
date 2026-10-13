@@ -854,6 +854,27 @@ h1 {
   border: 1px solid var(--color-neutral-800);
   border-radius: 0.25rem;
 }
+/* A note is prose, not a value: a whole row of its own, in the reading face. */
+.field-note {
+  flex-basis: 100%;
+}
+.field-note textarea {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.5rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--color-neutral-50);
+  resize: vertical;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
+.field-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+}
 /* Inside a character card the card is already the box, so the field sheds its
    own, and a path is as wide as the card rather than cut off at twelve
    characters. After the base rules, which these three override. */

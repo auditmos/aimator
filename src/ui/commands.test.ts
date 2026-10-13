@@ -56,6 +56,7 @@ const scope = {
   effectsModel: "eleven-sfx",
   episodeId: "01-burza",
   imageModel: "gpt-image-2.5-sunburst",
+  instruction: "Ewa ma mieć czerwony szalik",
   language: "pl",
   maxClip: "15",
   maxOutputTokens: "12000",
@@ -81,6 +82,9 @@ const scope = {
   voiceModel: "eleven_multilingual_v2",
 };
 
+/** The same scope on a new paid attempt, which is where a note can travel. */
+const AGAIN = { ...scope, regenerate: true };
+
 /**
  * Every argv this screen can build, the purchase included.
  *
@@ -89,11 +93,11 @@ const scope = {
  * still has to be checked against `--help` like the rest: a command nobody
  * could paste is no less wrong for having cost money.
  */
-function everyIntent(): readonly (readonly [string, readonly string[]])[] {
-  const preview = INTENTS.previewScreenplay(scope);
+function everyIntent(one = scope): readonly (readonly [string, readonly string[]])[] {
+  const preview = INTENTS.previewScreenplay(one);
 
   return [
-    ...Object.entries(INTENTS).map(([name, build]) => [name, build(scope)] as const),
+    ...Object.entries(INTENTS).map(([name, build]) => [name, build(one)] as const),
     ["buy", buy({ argv: preview, runId: "9f1c" })] as const,
   ];
 }
@@ -149,7 +153,7 @@ describe("the command dictionary", () => {
     const flags = new Set((await usage()).match(FLAG) ?? []);
     const unknown: string[] = [];
 
-    for (const [intent, argv] of everyIntent()) {
+    for (const [intent, argv] of [...everyIntent(), ...everyIntent(AGAIN)]) {
       for (const argument of argv) {
         if (argument.startsWith("--") && !flags.has(argument)) {
           unknown.push(`${intent}: ${argument}`);
@@ -642,6 +646,73 @@ describe("the two steps of a paid call", () => {
   it("should refuse to build a purchase with no finished dry run behind it", () => {
     expect(() => buy({ argv: INTENTS.checkScreenplay(scope), runId: "9f1c" })).toThrow(NO_DRY_RUN);
     expect(() => buy({ argv: INTENTS.previewScreenplay(scope), runId: "" })).toThrow(NO_RUN_ID);
+  });
+});
+
+/**
+ * A note on a new paid attempt, and the only place one may travel.
+ *
+ * The CLI refuses `--instruction` without `--regenerate`, because a note
+ * corrects a version that was published, and correcting it is a new paid
+ * attempt. So the note belongs to the attempt rather than standing as a flag
+ * of its own: spelled beside a first attempt it would be a refusal the screen
+ * built, and spelled from a box nobody can see it would be a decision nobody
+ * made. It travels verbatim, because the model reads it as material in the
+ * language its author wrote it in.
+ */
+describe("a note on a new paid attempt", () => {
+  const NOTE = "Ewa ma mieć czerwony szalik, nie niebieski";
+  /** Every send whose command takes `--instruction`, text and image alike. */
+  const CORRECTING = [
+    "previewScreenplay",
+    "previewShotList",
+    "previewPromptPackage",
+    "previewNarration",
+    "previewSoundDesign",
+    "previewCharacter",
+    "previewReferences",
+    "previewOpeningFrame",
+    "previewClips",
+  ] as const;
+
+  it.each(CORRECTING)("%s should spell the note right after --regenerate, verbatim", (name) => {
+    const argv = INTENTS[name]({ ...scope, instruction: NOTE, regenerate: true });
+    const at = argv.indexOf("--regenerate");
+
+    expect(argv.slice(at, at + 3)).toEqual(["--regenerate", "--instruction", NOTE]);
+  });
+
+  it.each(CORRECTING)("%s should leave the note out of a first attempt", (name) => {
+    expect(INTENTS[name]({ ...scope, instruction: NOTE, regenerate: false })).not.toContain(
+      "--instruction"
+    );
+  });
+
+  it.each(CORRECTING)("%s should leave out a note nobody wrote", (name) => {
+    expect(INTENTS[name]({ ...scope, instruction: "", regenerate: true })).not.toContain(
+      "--instruction"
+    );
+  });
+
+  /**
+   * The line under the button is one a person pastes, and a note is the first
+   * value on this screen that is nearly always several words. Quoted the way a
+   * POSIX shell reads it, so the pasted command carries the note as one
+   * argument, apostrophes included; a word a shell would not split stays bare.
+   */
+  it("should quote the note so the command under the button still pastes", () => {
+    const argv = INTENTS.previewScreenplay({ ...AGAIN, instruction: "Ewa nie mówi 'nie'" });
+
+    expect(commandLine(argv)).toBe(
+      "aimator screenplay generate dzielna-ewa 01-burza --model gpt-6-astra --max-output-tokens 12000 --regenerate --instruction 'Ewa nie mówi '\\''nie'\\''' --dry-run --json"
+    );
+  });
+
+  it("should buy exactly the note it previewed", () => {
+    const preview = INTENTS.previewCharacter({ ...scope, instruction: NOTE, regenerate: true });
+    const bought = buy({ argv: preview, runId: "9f1c" });
+
+    expect(bought.slice(bought.indexOf("--instruction"))).toEqual(["--instruction", NOTE]);
   });
 });
 

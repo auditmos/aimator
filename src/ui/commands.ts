@@ -52,6 +52,21 @@ interface Settings {
 }
 
 /**
+ * A new paid attempt over a result already published, and the note it carries.
+ *
+ * The note belongs to the attempt rather than standing as a flag of its own:
+ * the CLI refuses `--instruction` without `--regenerate`, because correcting a
+ * published version is a new paid attempt. So a note left in a box after the
+ * attempt was switched off is not spelled, and an empty one never is.
+ */
+interface Attempt {
+  /** What the published version gets wrong, verbatim, as a person wrote it. */
+  readonly instruction: string;
+  /** A second paid attempt over a result that already exists. */
+  readonly regenerate: boolean;
+}
+
+/**
  * What stage 1's paid command is told, beyond which episode it is about.
  *
  * An empty string is not a value here: it means the panel's field was left
@@ -60,11 +75,9 @@ interface Settings {
  * command's default. That is rule 7 read at the edge of the screen: a field
  * nobody filled in is undecided, never a zero.
  */
-interface Send extends EpisodeRef {
+interface Send extends Attempt, EpisodeRef {
   readonly maxOutputTokens: string;
   readonly model: string;
-  /** A second paid attempt over a screenplay that already exists. */
-  readonly regenerate: boolean;
 }
 
 /**
@@ -151,6 +164,11 @@ function flag(name: string, value: string): readonly string[] {
   return value === "" ? [] : [name, value];
 }
 
+/** `--regenerate [--instruction <uwaga>]`, exactly as the usage text nests them. */
+function attempt(one: Attempt): readonly string[] {
+  return one.regenerate ? ["--regenerate", ...flag("--instruction", one.instruction)] : [];
+}
+
 /** The six decisions, in the order the usage text lists them. */
 function settings(one: Settings): readonly string[] {
   return [
@@ -203,10 +221,9 @@ interface Everything extends Delivery, Levels, Send, Settings, TrackRef {
  * so a single flag would not say which; the CLI refuses `--model` here with a
  * sentence, and a panel that offered one would be offering a refusal.
  */
-interface ClipSend extends TrackRef {
+interface ClipSend extends Attempt, TrackRef {
   readonly artifacts: readonly string[];
   readonly imageModel: string;
-  readonly regenerate: boolean;
   readonly videoModel: string;
 }
 
@@ -714,7 +731,7 @@ export const INTENTS = {
    * clicking rather than after.
    */
   previewCharacter: (
-    one: CharacterTrackRef & { readonly model: string; readonly regenerate: boolean }
+    one: Attempt & CharacterTrackRef & { readonly model: string }
   ): readonly string[] => [
     "character",
     "generate",
@@ -724,7 +741,7 @@ export const INTENTS = {
     one.track,
     ...artifacts(one.artifacts),
     ...flag("--model", one.model),
-    ...(one.regenerate ? ["--regenerate"] : []),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],
@@ -748,7 +765,7 @@ export const INTENTS = {
     ...artifacts(one.artifacts),
     ...flag("--image-model", one.imageModel),
     ...flag("--video-model", one.videoModel),
-    ...(one.regenerate ? ["--regenerate"] : []),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],
@@ -777,13 +794,13 @@ export const INTENTS = {
     ...flag("--model", one.model),
     ...flag("--voice-model", one.voiceModel),
     ...flag("--max-output-tokens", one.maxOutputTokens),
-    ...(one.regenerate ? ["--regenerate"] : []),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],
   /** Stage 6, previewed: one image or the reason there is none. */
   previewOpeningFrame: (
-    one: TrackRef & { readonly model: string; readonly regenerate: boolean }
+    one: Attempt & TrackRef & { readonly model: string }
   ): readonly string[] => [
     "opening-frame",
     "generate",
@@ -792,7 +809,7 @@ export const INTENTS = {
     "--track",
     one.track,
     ...flag("--model", one.model),
-    ...(one.regenerate ? ["--regenerate"] : []),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],
@@ -804,7 +821,7 @@ export const INTENTS = {
     send.episodeId,
     ...flag("--model", send.model),
     ...flag("--max-output-tokens", send.maxOutputTokens),
-    ...(send.regenerate ? ["--regenerate"] : []),
+    ...attempt(send),
     "--dry-run",
     "--json",
   ],
@@ -816,11 +833,11 @@ export const INTENTS = {
    * how a person asks the other question: why not that one yet.
    */
   previewReferences: (
-    one: TrackRef & {
-      readonly artifacts: readonly string[];
-      readonly model: string;
-      readonly regenerate: boolean;
-    }
+    one: Attempt &
+      TrackRef & {
+        readonly artifacts: readonly string[];
+        readonly model: string;
+      }
   ): readonly string[] => [
     "reference",
     "generate",
@@ -830,7 +847,7 @@ export const INTENTS = {
     one.track,
     ...artifacts(one.artifacts),
     ...flag("--model", one.model),
-    ...(one.regenerate ? ["--regenerate"] : []),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],
@@ -842,7 +859,7 @@ export const INTENTS = {
     send.episodeId,
     ...flag("--model", send.model),
     ...flag("--max-output-tokens", send.maxOutputTokens),
-    ...(send.regenerate ? ["--regenerate"] : []),
+    ...attempt(send),
     "--dry-run",
     "--json",
   ],
@@ -854,7 +871,7 @@ export const INTENTS = {
     send.episodeId,
     ...flag("--model", send.model),
     ...flag("--max-output-tokens", send.maxOutputTokens),
-    ...(send.regenerate ? ["--regenerate"] : []),
+    ...attempt(send),
     "--dry-run",
     "--json",
   ],
@@ -886,7 +903,7 @@ export const INTENTS = {
     ...flag("--music-model", one.musicModel),
     ...flag("--effects-model", one.effectsModel),
     ...flag("--max-output-tokens", one.maxOutputTokens),
-    ...(one.regenerate ? ["--regenerate"] : []),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],
@@ -995,7 +1012,20 @@ export function buy(preview: Preview): readonly string[] {
   return preview.argv.filter((one) => one !== "--dry-run" && one !== "--json");
 }
 
-/** The same argv, spelled the way a terminal takes it. */
+/** What a POSIX shell reads as one word without quotes, Polish letters included. */
+const BARE = /^[\p{L}\p{N}_@%+=:,./-]+$/u;
+
+/** One argument as a shell reads it: bare where it can be, single-quoted otherwise. */
+function shellWord(one: string): string {
+  return BARE.test(one) ? one : `'${one.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * The same argv, spelled the way a terminal takes it.
+ *
+ * Quoted, because the line is one a person pastes: a note or a title is
+ * several words, and unquoted a shell would hand the CLI each of them apart.
+ */
 export function commandLine(argv: readonly string[]): string {
-  return ["aimator", ...argv].join(" ");
+  return ["aimator", ...argv.map(shellWord)].join(" ");
 }

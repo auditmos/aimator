@@ -993,6 +993,7 @@ describe("running a command", () => {
       body: JSON.stringify({
         argv: INTENTS.previewScreenplay({
           episodeId: EPISODE,
+          instruction: "",
           maxOutputTokens: "",
           model: "gpt-6-astra",
           projectId: PROJECT,
@@ -1017,6 +1018,51 @@ describe("running a command", () => {
     expect(report.stage).toBe("screenplay");
     expect(report.paidCalls).toBe(1);
     expect(report.prompt).toContain("# Task: write a screenplay");
+    await events.close();
+  });
+
+  /**
+   * A note typed into the panel, as far as the prompt the model would read.
+   *
+   * The dictionary's own test proves the argv; this proves the argv is a
+   * command the CLI takes and that the preview a person reads before "Kup"
+   * carries the note exactly as typed, beside the version it corrects. It is a
+   * dry run, so by contract nothing is sent and no key is read.
+   */
+  it("should carry a note from the panel into the prompt it previews", async () => {
+    const note = "Burza ma zacząć się dopiero w drugiej scenie.";
+    const app = createUi({ workspace });
+    const stream = await app.request(`/api/events/${PROJECT}/${EPISODE}`);
+    const events = new Events(stream.body as ReadableStream<Uint8Array>);
+
+    await events.next();
+
+    const started = await app.request("/api/run", {
+      body: JSON.stringify({
+        argv: INTENTS.previewScreenplay({
+          episodeId: EPISODE,
+          instruction: note,
+          maxOutputTokens: "",
+          model: "gpt-6-astra",
+          projectId: PROJECT,
+          regenerate: true,
+        }),
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const { runId } = (await started.json()) as { runId: string };
+    const done = JSON.parse((await events.nextOf("run")).data) as {
+      data: string;
+      ok: boolean;
+      runId: string;
+    };
+    const report = JSON.parse(done.data) as { paidCalls: number; prompt: string };
+
+    expect(done).toMatchObject({ ok: true, runId });
+    expect(report.paidCalls).toBe(1);
+    expect(report.prompt).toContain("# Previous version, as published");
+    expect(report.prompt).toContain(`----- BEGIN NOTE -----\n${note}\n----- END NOTE -----`);
     await events.close();
   });
 

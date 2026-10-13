@@ -338,8 +338,10 @@ musi dać się wkleić. Na stronie etapu komendy pokazuje przełącznik „Poka�
 pod przyciskami”, domyślnie wyłączony, bo dwanaście ramek z komendami utrudniało
 znalezienie przycisków. Wybór zapamiętuje ta przeglądarka i nic poza nią. Każdy przycisk
 dalej uruchamia dokładnie jedno `argv`, a pasek wyniku zawsze pokazuje komendę, która
-właśnie poszła. Całą gramatykę CLI zna jeden plik (`src/ui/commands.ts`), a test
-sprawdza każde zbudowane `argv` względem `--help` tą samą metodą, co test dokumentacji.
+właśnie poszła. Argument, który powłoka rozbiłaby na kilka słów, jak uwaga do poprawki czy
+tytuł, stoi w pojedynczych cudzysłowach, więc wklejona linia niesie go w całości. Całą
+gramatykę CLI zna jeden plik (`src/ui/commands.ts`), a test sprawdza każde zbudowane `argv`
+względem `--help` tą samą metodą, co test dokumentacji.
 
 Ten sam przełącznik dotyczy zdań etapu. Odmowa, meldunek i „Dalej” często kończą się
 komendą (`…zatwierdź ponownie: aimator approve …`), która w terminalu mówi, co zrobić,
@@ -407,6 +409,22 @@ otworzyło) i dokłada zdanie, którego nie ma nigdzie indziej na tym ekranie: t
 nalicza przy **generacji**, a nie przy pobraniu, więc `--regenerate` tego samego cue to
 druga pełna opłata, nie dopłata. Stoi obok rachunku, bo to nie jest liczba, tylko rzecz do
 przeczytania, zanim ktoś kliknie drugi raz.
+
+**Uwaga do poprawki** to `--instruction` i na ekranie jest tym samym, czym w terminalu:
+częścią nowej płatnej próby, nie osobną flagą. Pole pojawia się dopiero po zaznaczeniu
+„Nowej płatnej próby”, a jej odznaczenie czyści uwagę, więc nie da się wysłać uwagi, której
+nikt nie widzi. CLI i tak odmówiłoby `--instruction` bez `--regenerate`. Puste pole nie
+dokłada flagi. Wpisany tekst jedzie co do znaku, bo model czyta go jako materiał w języku
+autora. Podgląd pokazuje cały prompt poprawki, z poprzednią wersją i uwagą w oznaczonym
+bloku, więc to, co się kupuje, czyta się przed „Kup”, jak każdą inną wysyłkę. Co robi
+uwaga, zależy od etapu, i panel mówi to pod polem. W etapach tekstowych poprawia
+opublikowany tekst. W obrazowych poprzedni obraz idzie jako `Image 1 = previous:<id>`. Przy
+klipie to nowa generacja z tej samej klatki wejściowej i pełna nowa opłata. Uwaga ma
+jednego adresata: przy kilku zaznaczonych obrazach terminal odmawia, a panel pokazuje tę
+odmowę. W etapach 9 i 10 adresatem może być tylko skrypt albo arkusz cue, dlatego każdy z
+nich ma nad tekstem własne pole wyboru (`script`, `cues`), osobne od „Zaznacz wszystkie”,
+które dotyczy nagrań i stemów. To samo pole pozwala wygenerować skrypt albo arkusz ponownie
+bez uwagi, czego ekran wcześniej nie umiał wyrazić.
 
 ## Uruchamianie komendy i artefakty
 
@@ -516,4 +534,6 @@ na strumieniu katalogu roboczego, gdy żaden odcinek nie jest otwarty. Słownik
 komend jest sprawdzany względem `--help`, a zakup osobno: że jest tą samą wysyłką bez próby
 na sucho i że bez ukończonej próby nie daje się zbudować. Ścieżka z formularza etapu 0 ma
 własny test przez `app.request()`: po uruchomieniu komendy `episode.json` zapisuje dokładnie
-ten ciąg znaków, który dostało pole. Klient jest sprawdzany w przeglądarce, w obu motywach.
+ten ciąg znaków, który dostało pole. Uwaga do poprawki też ma test przez `app.request()`:
+podgląd zbudowany przez słownik wraca z promptem, który niesie poprzednią wersję i uwagę co
+do znaku. Klient jest sprawdzany w przeglądarce, w obu motywach.

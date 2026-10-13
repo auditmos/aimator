@@ -8,6 +8,7 @@ import {
   Drift,
   Field,
   Gallery,
+  InstructionField,
   PaidCall,
   PickAll,
   Problems,
@@ -54,6 +55,7 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
   const [chosen, setChosen] = useState<readonly string[]>([]);
   const [model, setModel] = useState("");
   const [regenerate, setRegenerate] = useState(false);
+  const [instruction, setInstruction] = useState("");
   const [sent, setSent] = useState<readonly string[] | null>(null);
   /** The stage's word for a picture is `artifact`; the gallery's is `id`. */
   const drawn = useMemo(
@@ -73,13 +75,13 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
   );
   const approve = useMemo(() => INTENTS.approveCharacter(scope), [scope]);
   const preview = useMemo(
-    () => INTENTS.previewCharacter({ ...scope, model, regenerate }),
-    [model, regenerate, scope]
+    () => INTENTS.previewCharacter({ ...scope, instruction, model, regenerate }),
+    [instruction, model, regenerate, scope]
   );
   /** The same preview with a new paid attempt on, whatever the checkbox says now. */
   const again = useMemo(
-    () => INTENTS.previewCharacter({ ...scope, model, regenerate: true }),
-    [model, scope]
+    () => INTENTS.previewCharacter({ ...scope, instruction, model, regenerate: true }),
+    [instruction, model, scope]
   );
   const startRun = useCallback(
     (argv: readonly string[]) => {
@@ -94,10 +96,12 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
       wanted ? [...current, artifact] : current.filter((one) => one !== artifact)
     );
   }, []);
-  const changeRegenerate = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setRegenerate(event.target.checked),
-    []
-  );
+  // Switching the new attempt off lets go of its note, so a note nobody can
+  // see is never sent.
+  const changeRegenerate = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setRegenerate(event.target.checked);
+    setInstruction("");
+  }, []);
   const urlOf = useCallback(
     (artifact: string) =>
       `${artifactUrl({ artifact, characterId, projectId, stage: "character", track })}&v=${encodeURIComponent(cell.state)}`,
@@ -108,6 +112,7 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
   // the character it was built for, so neither survives the switch.
   useEffect(() => {
     setChosen([]);
+    setInstruction("");
     setSent(null);
   }, [characterId, track]);
 
@@ -235,6 +240,14 @@ export function CharacterPanel(props: PanelProps): JSX.Element {
             />
             Nowa płatna próba zaznaczonych obrazów
           </label>
+          {regenerate ? (
+            <InstructionField
+              hint="Uwaga poprawia jeden zaznaczony obraz, zamiast rysować go od nowa: poprzednia wersja idzie jako Image 1 = previous:<nazwa>, przed referencjami, a model zmienia tylko to, co nazywa uwaga. Jedna uwaga, jeden obraz: przy kilku zaznaczonych terminal odmówi. To nowa płatna próba."
+              id="character-instruction"
+              onValue={setInstruction}
+              value={instruction}
+            />
+          ) : null}
         </div>
       </PaidCall>
     </section>
