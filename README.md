@@ -5,7 +5,7 @@ scenariusz i assety, po gotowy film sklejony z klipów.
 
 ## Co to potrafi dzisiaj
 
-- **Prowadzi całą produkcję od pomysłu do zmontowanego filmu z dźwiękiem.** Jedenaście
+- **Prowadzi całą produkcję od pomysłu do zmontowanego filmu z dźwiękiem.** Dwanaście
   etapów, z których każdy zostawia na dysku plik, który można obejrzeć, odrzucić
   i wygenerować ponownie.
 - **Robi dwie wersje tej samej historii naraz.** Artefakty są grupowane per projekt
@@ -40,10 +40,10 @@ zostaje, więc każdy krok da się powtórzyć, obejrzeć i cofnąć.
 
 ```
 sesja pytań → scenariusz → postać → lista ujęć → pakiet promptów →
-referencje → klatka otwarcia → klipy → montaż → narracja → muzyka i efekty
+referencje → klatka otwarcia → klipy → montaż → narracja i dialog → muzyka i efekty
 ```
 
-Diagram tych samych jedenastu etapów, rozłożonych na preprodukcję, zdjęcia i postprodukcję,
+Diagram tych samych dwunastu etapów, rozłożonych na preprodukcję, zdjęcia i postprodukcję,
 razem z opisem, czego każdy etap potrzebuje i co oddaje, jest w
 [docs/jak-to-powstaje.md](docs/jak-to-powstaje.md). To strona dla osoby, która zna produkcję
 wideo i nie musi znać kodu.
@@ -77,6 +77,7 @@ plików stanu i szczegóły walidacji, jest w [docs/pipeline.md](docs/pipeline.m
 | [8. montaż](docs/stages/08-montaz.md) | wszystkie zatwierdzone klipy tego toru | `episode.mp4`: nieme cięcie obrazu | darmowy (ffmpeg) |
 | [9. narracja](docs/stages/09-narracja.md) | zatwierdzona lista ujęć, obsadzony głos, zatwierdzony montaż | `narration/Nnn.wav` + `narrated.mp4` | rozliczany w znakach |
 | [10. muzyka i efekty](docs/stages/10-muzyka-i-efekty.md) | zatwierdzona lista ujęć, zatwierdzony `narrated.mp4` (z narracją), przyjęte kwestie etapu 11 (z dialogiem) | `sound/*.mp3` + `mixed.mp4`: film ze wszystkim | rozliczany w sekundach |
+| [11. dialog](docs/stages/11-dialog.md) | zatwierdzona lista ujęć z kwestiami przypisanymi postaciom, przyjęte próbki głosów obsady | `dialogue.md` + `dialogue/<język>/Dnn.wav`, kładzione w `mixed.mp4` przez etap 10 | 1 wywołanie tekstowe + kwestie rozliczane w znakach |
 
 Etapy tekstowe (1, 3, 4) są **wspólne dla obu torów**, bo opisują historię, a nie obrazy.
 Rozejście zaczyna się przy pierwszym obrazie odcinka i kończy dwiema niezależnymi

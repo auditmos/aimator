@@ -374,9 +374,9 @@ describe("documentation", () => {
     expect([...new Set(unknown)]).toEqual([]);
   });
 
-  it("should name the same eleven stages in the README, the page and the site", () => {
+  it("should name the same twelve stages in the README, the page and the site", () => {
     const listed = stageList(readRepoFile("README.md"), README_STAGE);
-    expect(listed).toHaveLength(11);
+    expect(listed).toHaveLength(12);
     expect(stageList(readRepoFile("docs/jak-to-powstaje.md"), PAGE_STAGE)).toEqual(listed);
     expect(stageList(readRepoFile("site/jak-to-powstaje.html"), SITE_STAGE)).toEqual(listed);
   });

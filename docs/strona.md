@@ -24,7 +24,7 @@ do katalogu, dlatego ścieżki do zasobów są w niej bezwzględne, a nie `./`.
 Diagram na tej stronie to **wklejony SVG**, nie obrazek i nie Mermaid. Wklejony, bo tylko
 wtedy `<text>` łapie tokeny motywu i mechanizm `.t` obu języków; Mermaid odpada, bo
 wymagałby JavaScriptu z obcego CDN-u. Rysunek nie przelewa się, więc na wąskim ekranie
-przewija się w bok, a karty pod nim niosą te same jedenaście etapów w jednej kolumnie.
+przewija się w bok, a karty pod nim niosą te same dwanaście etapów w jednej kolumnie.
 
 Że wszystkie trzy listy etapów mówią to samo, pilnuje `src/test/docs.test.ts`: nazwy muszą
 się zgadzać w tabeli README, w nagłówkach [docs/jak-to-powstaje.md](jak-to-powstaje.md)

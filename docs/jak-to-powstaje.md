@@ -3,7 +3,7 @@
 Ta strona jest dla osoby, która zna produkcję wideo i nie musi znać kodu. Opisuje, co
 narzędzie robi po kolei, czego każdy etap potrzebuje i co oddaje.
 
-Krótko: jedenaście etapów w trzech fazach. Każdy zostawia na dysku plik, a następny rusza
+Krótko: dwanaście etapów w trzech fazach. Każdy zostawia na dysku plik, a następny rusza
 dopiero wtedy, gdy człowiek ten plik obejrzał i się na niego zgodził.
 
 ## Cała produkcja na jednym obrazku
@@ -35,8 +35,10 @@ flowchart TB
     direction TB
     S8["8. Montaż<br/>episode.mp4, nieme cięcie obrazu"]
     S9["9. Narracja<br/>narrated.mp4, lektor na obrazie"]
+    S11["11. Dialog<br/>kwestie postaci, głosem obsady"]
     S10["10. Muzyka i efekty<br/>mixed.mp4, film ze wszystkim"]
     S8 --> S9 --> S10
+    S11 --> S10
   end
 
   OUT(["Dwa filmy, po jednym na każdy tor obrazu"])
@@ -44,6 +46,7 @@ flowchart TB
   IN --> S0
   S4 --> S5
   S7 --> S8
+  S3 --> S11
   S10 --> OUT
 ```
 
@@ -182,6 +185,20 @@ raz, a podkład może uczciwie ustąpić pod każdym głosem.
 - **Produkuje:** `sound/*.mp3` i `mixed.mp4`, czyli film ze wszystkim.
 - **Koszt:** rozliczany w sekundach wygenerowanego dźwięku.
 - [Komendy tego etapu](stages/10-muzyka-i-efekty.md)
+
+### 11. Dialog
+
+Kwestie postaci, jak w dubbingu: każda nagrana głosem obsadzonym dla tej postaci. Tekst
+pochodzi ze scenariusza i listy ujęć, a walidator sprawdza w obie strony, że żadnej kwestii
+nie dopisano i żadnej nie pominięto. Numer stoi po etapie 10, ale nagrania trafiają do jego
+miksu: dwie wypowiedzi, które brzmiałyby naraz, to odmowa, nie przesunięcie. Kwestie są
+wspólne dla obu torów, bo głos nie wie, nad którym filmem usiądzie.
+
+- **Potrzebuje:** zatwierdzonej listy ujęć z kwestiami przypisanymi postaciom i przyjętej
+  próbki głosu każdej mówiącej postaci.
+- **Produkuje:** `dialogue.md` i `dialogue/<język>/Dnn.wav`.
+- **Koszt:** jedno wywołanie tekstowe na skrypt, potem kwestie rozliczane w znakach.
+- [Komendy tego etapu](stages/11-dialog.md)
 
 ## Projekcja i podpis
 
