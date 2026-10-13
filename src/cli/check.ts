@@ -12,6 +12,7 @@ import {
 import { checkAssemblyStage } from "./stages/assembly.js";
 import { checkCharacterStage, checkVoiceStage } from "./stages/character.js";
 import { checkClipsStage } from "./stages/clips.js";
+import { checkDialogueStage } from "./stages/dialogue.js";
 import { checkSoundtrackStage } from "./stages/narration.js";
 import { checkOpeningFrameStage } from "./stages/opening-frame.js";
 import { checkPrepareStage } from "./stages/project.js";
@@ -36,7 +37,8 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage clips --track <tor> [--json]
   check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]
-  check <id> <episode-id> --stage sound-design [--track <tor>] [--json]`;
+  check <id> <episode-id> --stage sound-design [--track <tor>] [--json]
+  check <id> <episode-id> --stage dialogue [--json]`;
 
 /**
  * The text stages, whose whole question is an episode and how to print it.
@@ -50,6 +52,7 @@ export const USAGE = `  check <id> [<episode-id>]
 const NARROW: Readonly<
   Record<string, (scope: EpisodeScope, answer: Answer) => Promise<Result<string>>>
 > = {
+  dialogue: checkDialogueStage,
   "prompt-package": checkPromptPackageStage,
   screenplay: checkScreenplayStage,
   "shot-list": checkShotListStage,

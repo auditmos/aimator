@@ -98,7 +98,7 @@ w prostym cudzysłowie:
 - Audio: Deszcz o szybę; ewa: "Tato, czy burza już idzie?"
 ```
 
-Dosłownie ze scenariusza i w języku filmu. Z tego zapisu etap 11 podnosi
+Dosłownie ze scenariusza i w języku filmu. Z tego zapisu [etap 11](11-dialog.md) podnosi
 skrypt dialogu i dowodzi, że niczego nie wymyślił ani nie pominął; z prozy nie da się
 wyczytać, kto mówi. Narrator pisze dalej prozą (`narrator: „…”`), bo
 [etap 9](09-narracja.md) sprawdza go po samym tekście.

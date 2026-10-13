@@ -28,6 +28,12 @@ Odcinek "01-burza", tor gpt-image, zatwierdzono
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
 `;
 
+exports[`every command >   approve <id> <episode-id> --stage dialogue --artifact script [--json] 1`] = `
+"DialogueStateError
+nie ma czego zatwierdzić: script
+  - odcinek deklaruje audio: narration, ten odcinek nie ma dialogu, etap 11 nie ma czego podnosić"
+`;
+
 exports[`every command >   approve <id> <episode-id> --stage opening-frame --track <tor> --checks <kryteria>|all 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, zatwierdzono klatkę otwarcia
@@ -276,6 +282,14 @@ Odcinek "01-burza", tor gpt-image, etap 7, zatwierdzony w całości
   entry:C02 (entry-frame): zatwierdzony, 2816x1584
   C02 (clip): zatwierdzony, 1920x1080, 15s
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
+`;
+
+exports[`every command >   check <id> <episode-id> --stage dialogue [--json] 1`] = `
+"ok
+Odcinek "01-burza", etap 11, dialog
+  script: absent, odcinek deklaruje audio: narration, ten odcinek nie ma dialogu, etap 11 nie ma czego podnosić
+  ! odcinek deklaruje audio: narration, ten odcinek nie ma dialogu, etap 11 nie ma czego podnosić
+Dalej: aimator dialogue generate ewa 01-burza"
 `;
 
 exports[`every command >   check <id> <episode-id> --stage opening-frame --track <tor> [--json] 1`] = `
@@ -553,6 +567,187 @@ Próba na sucho: nic nie zapisano, nic nie wysłano. Klipy ewa/01-burza, tor gpt
   płatnych wywołań do wykonania, obrazów: 0, wideo: 0
   ! klucze nie były czytane, próba na sucho nie sięga po sekrety; płatne wywołanie ich wymaga
 Dalej: usuń powyższe przeszkody przed płatnym wywołaniem"
+`;
+
+exports[`every command >   dialogue generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Dialog ewa/01-burza
+  płatnych wywołań do wykonania: 0
+  ! odcinek deklaruje audio: narration, ten odcinek nie ma dialogu, etap 11 nie ma czego podnosić
+Dalej: usuń powyższe przeszkody przed płatnym wywołaniem
+
+--- prompt wysłany do modelu (dokładnie ten tekst) ---
+# Task
+
+Produce the dialogue script for one episode of an animated series: which line
+each character speaks, in which shot, and at which second of the plan it begins.
+
+You are **not** writing dialogue. It is already written. Stage 1 wrote the lines
+into the screenplay, and stage 3 recorded every one of them in the \`Audio\`
+field of the shots below, in the form \`<cast-id>: "<line>"\`. Your work is to
+list them and lay them on a timeline.
+
+## The rules that matter
+
+- **Every attributed line in the shot list appears in your script exactly
+  once**, under the shot whose \`Audio\` field holds it and with the cast
+  identifier written before it. Do not leave one out, do not repeat one, and do
+  not merge two into one block or split one across two.
+- **Nothing else appears.** Copy the line word for word: same words, same
+  order, same spelling, same punctuation. Strip only the cast identifier, the
+  colon and the surrounding straight quotes. A line that is not attributed in
+  its shot is refused, however much better it reads; if a character has to say
+  something new, that is a correction to the screenplay and belongs to stage 1.
+- The narrator is not a character. Prose a narrator speaks is not a line here.
+- Do not translate anything. The lines go into the film in the language they
+  were written in, which is the episode's \`language\` setting.
+
+This is checked mechanically, in both directions.
+
+## What you decide
+
+Only **when each line begins**, in the seconds of the plan. A line begins inside
+the shot it belongs to, late enough that the picture it belongs to is already
+on screen. If a shot's audio states its own window, such as "at 7-12s", begin at
+the start of it. Leave room: a spoken line takes roughly as long to say as it
+takes to read aloud. Lines are ordered by their anchor, and each begins later
+than the one before it.
+
+# Output format
+
+Markdown, exactly three sections, in this order, none empty, no code blocks.
+
+## Plan
+
+Prose. Who speaks across this episode, how often, and how the lines sit against
+the music, the effects and any narration the shots describe. Two to six
+sentences.
+
+## Lines
+
+One block per line. The heading is four fields separated by \`|\`:
+
+\`\`\`
+### D01 | U03 | ewa | 7s
+\`\`\`
+
+- the line id, numbered consecutively from \`D01\`;
+- the id of the shot the line belongs to;
+- the cast identifier of the character who speaks it;
+- the second of the plan the line begins at, written with a trailing \`s\`.
+
+The line itself goes below the heading, as plain text, with no quotation marks,
+no speaker label and no formatting.
+
+## Review
+
+Prose. State, for each line, which shot you took it from, and confirm that every
+attributed line of the shot list is in the script once. Do not call the result
+approved.
+
+# Production settings
+
+{
+  "audio": "narration",
+  "cast": [
+    {
+      "id": "ewa",
+      "name": "Ewa"
+    },
+    {
+      "id": "tata",
+      "name": "Tata"
+    }
+  ],
+  "durationSeconds": 30,
+  "language": "pl"
+}
+
+# Project rules, original source material
+
+# Ewa, zasady wspólne
+
+Płaskie 2D. Paleta dziesięciu barw.
+
+
+# Shot list, the approved source for this script
+
+## Plan
+
+Dwa klipy, kadr 16:9.
+
+## Clips
+
+### C01 | 0-15s
+
+- Shots: U01,U02
+- Reference: opening-frame
+- Continuity: Ewa przy stole.
+
+### C02 | 15-30s
+
+- Shots: U03,U04
+- Reference: previous-end-frame
+- Continuity: Ewa siedzi, tata obok.
+
+## Shots
+
+### U01 | S01 | C01 | 0-10s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: ewa
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.
+
+### U02 | S02 | C01 | 10-15s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: ewa,tata
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.
+
+### U03 | S02 | C02 | 15-20s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: tata
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.
+
+### U04 | S03 | C02 | 20-30s
+
+- Purpose: Pokazuje, że Ewa zostaje sama z burzą.
+- Frame: Plan amerykański, Ewa po lewej.
+- Action: Ewa odsuwa krzesło i siada.
+- Expression: Zaciśnięte usta.
+- Camera: Statyczny kadr.
+- Cast: ewa,tata
+- Audio: Deszcz o szybę.
+- Text: none
+- Start state: Ewa stoi przy krześle.
+- End state: Ewa siedzi.
+
+## Review
+
+Sprawdzono sumy czasów. Plan wymaga oceny.
+"
 `;
 
 exports[`every command >   episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json] 1`] = `

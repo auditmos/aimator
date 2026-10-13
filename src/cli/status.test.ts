@@ -155,13 +155,15 @@ describe("status --json", () => {
     expect(cell?.status).toEqual(JSON.parse(JSON.stringify(own.data)));
   });
 
+  // Two whole ladders, each reading every stage: 4.3 s under a full parallel
+  // run, too close to the 5 s default to fail only when something is wrong.
   it("should name exactly one next step for the episode", async () => {
     const episode = await json("status", PROJECT, EPISODE);
     const text = await status("status", PROJECT, EPISODE);
 
     expect(episode.next).not.toBeNull();
     expect(text.match(NEXT_LINE)).toHaveLength(1);
-  });
+  }, 60_000);
 
   it("should fail the same way with the flag as without it", async () => {
     const plain = await run(["status", "nie-ma-takiego", EPISODE, "--workspace", root]);

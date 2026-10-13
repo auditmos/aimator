@@ -241,7 +241,7 @@ Obowiązują we wszystkich etapach.
   `previous/` nie powstaje. Takie wejście leży w archiwum próby i nigdy się nie zmienia,
   więc nie jest porównywane z bieżącymi wejściami etapu, a ponowne zatwierdzenie go nie
   gubi. Walidacja wyniku jest ta sama: nic nie przechodzi dlatego, że jest poprawką.
-  Działa w etapach tekstowych: 1, 3, 4, 9 (`--artifact script`) i 10 (`--artifact cues`).
+  Działa w etapach tekstowych: 1, 3, 4, 9 (`--artifact script`), 10 (`--artifact cues`) i 11.
   W etapach obrazowych, 2, 5, 6 i 7 (`entry:Cnn`), to edycja, nie nowa generacja: poprzedni
   obraz idzie jako `Image 1 = previous:<id>`, przed dotychczasowymi załącznikami, liczy się
   do limitu toru (przekroczenie to odmowa z liczbami, nigdy obcięcie), a w `inputs` stoi jako
@@ -306,7 +306,7 @@ Obowiązują we wszystkich etapach.
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
-| 11 dialog | zatwierdzona `shot-list.md`, głos każdej postaci z `project.json` | kwestie postaci, dosypywane do miksu etapu 10 | ocena każdej kwestii | niezaimplementowany |
+| 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json` | `dialogue.md`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; potem ocena skryptu, ocena każdej kwestii | **skrypt zaimplementowany**, kwestie nie |
 
 **Wiersz 10 zmienił się przy implementacji i to jest zapisane tutaj, a nie przemilczane.**
 Mówił, że muzyka i efekty są **wejściem** wnoszonym przez człowieka, i sam przyznawał, że
@@ -316,16 +316,19 @@ inną nazwą, a nie wierszem 10. Stemy kupuje więc etap 10, z ElevenLabs, co ni
 czwartym dostawcą, tylko **czwartym i piątym miejscem wywołania u dostawcy, którego potok
 już ma** na mowę. Dostawców dalej jest trzech: OpenAI, BytePlus, ElevenLabs.
 
-Etap 11 jest **zadeklarowanym kontraktem**, nie działającym kodem, dokładnie tak, jak
-wiersz etapu 9, a potem 10, istniał zanim powstał. Wiersz istnieje po to, żeby mowa postaci
-wpięła się w ustalony układ zamiast wymyślać własny: kupowana wspólnie dla obu torów jak
-narracja, i lądująca w miksie etapu 10 jako kolejny stem, a nie jako drugi miks.
+Etap 11 jest **zaimplementowany do połowy**: istnieje skrypt, czyli które kwestie, kto je
+mówi, w którym ujęciu i od której sekundy planu ([Etap 11: szczegóły](#etap-11-szczegóły)).
+Reszta wiersza jest zadeklarowanym kontraktem, tak jak wiersz etapu 9, a potem 10, istniał
+zanim powstał: mowa postaci ma się wpiąć w ustalony układ zamiast wymyślać własny, kupowana
+wspólnie dla obu torów jak narracja i lądująca w miksie etapu 10 jako kolejny stem, a nie
+jako drugi miks.
 
-Głos każdej postaci rozstrzyga już obsada głosów obok etapu 0
+Głos każdej postaci rozstrzyga obsada głosów obok etapu 0
 ([Głosy postaci](#głosy-postaci)): osobny `voice.json` na postać i język, z próbką i własną
-zgodą. Kwestii nie kupuje jeszcze nic, więc reguła 7 nadal obowiązuje: brak odpowiedzi nie
-udaje odpowiedzi, dialogi są **nieobecne**, a ich brak jest raportowany przy każdym `check`
-i przy każdej generacji etapu 10, ale wyłącznie w dwóch trybach, które go deklarują.
+zgodą, **nie** `project.json`. Kwestii nie kupuje jeszcze nic, więc reguła 7 nadal
+obowiązuje: brak odpowiedzi nie udaje odpowiedzi, dialogi są **nieobecne**, a ich brak jest
+raportowany przy każdym `check` i przy każdej generacji etapu 10, ale wyłącznie w dwóch
+trybach, które go deklarują.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
 Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2; nazywa
@@ -1984,4 +1987,39 @@ artefakt na tor i nic poniżej, co przyjęcie mogłoby kupić.
 Po etapie 10 tryby `music-and-effects` i `narration` są **domknięte**: to dokładnie to, co
 etapy 9 i 10 produkują między sobą. `dialogue` i `dialogue-and-narration` nie są:
 **mowy postaci nie wytwarza dziś żaden etap tego potoku i po tym etapie nadal nie będzie.**
-Raportowane, nie egzekwowane, jak wszędzie. Dalej prowadzi zadeklarowany wiersz 11.
+Raportowane, nie egzekwowane, jak wszędzie. Dalej prowadzi wiersz 11, dziś do skryptu.
+
+## Etap 11: szczegóły
+
+Etap 11 kupuje dziś jedną rzecz: **skrypt dialogu**, jednym płatnym wywołaniem tekstowym
+(`AIMATOR_DIALOGUE_MODEL`, własna zmienna, bo własne miejsce wywołania). Wynik to
+`dialogue.md` pod odcinkiem, wspólny dla obu torów, i rekord `script` w
+`dialogue.stage.json`. Bloki mają nagłówek `### D01 | U03 | ewa | 7s`: kwestia, ujęcie,
+postać i kotwica w sekundach planu, a pod nim sam tekst kwestii, wzorem `narration.md`.
+
+### Podniesione, nie wymyślone, i nic nie pominięte
+
+Etap 9 dowodzi tylko pierwszej połowy, bo zdanie narratora siedzi w prozie. Kwestię postaci
+etap 3 zapisuje jako `ewa: "…"`, a `validateShotList` oddaje ją jako dane, więc werdykt
+skryptu działa **w obie strony**:
+
+- identyfikatory biegną kolejno od `D01`, ujęcie istnieje, kotwica mieści się w ujęciu
+  (koniec wyłącznie), a kwestie idą w kolejności kotwic;
+- postać jest w obsadzie, a tekst kwestii występuje dosłownie w `Audio` tego ujęcia **jako
+  kwestia tej postaci**; te same słowa przypisane komuś innemu to odmowa;
+- każda przypisana kwestia z listy ujęć jest w skrypcie **dokładnie raz**: pominięta to
+  odmowa z nazwą ujęcia i kwestii, powtórzona też.
+
+Mówiący spoza `Cast` ujęcia (głos zza kadru) to **meldunek**, nie odmowa: kwestia jest
+prawdziwa, tylko lip-sync nie ma czyich ust poruszyć.
+
+### Bramka
+
+Zatwierdzona lista ujęć i `audio` równe `dialogue` albo `dialogue-and-narration`. W
+pozostałych trybach pada odmowa „ten odcinek nie ma dialogu”. Lista ujęć zatwierdzona,
+zanim etap 3 zaczął przypisywać kwestie, nie ma ani jednej, więc etap 11 odmawia i wskazuje
+`shot-list generate --regenerate`, zamiast kupować skrypt, który powie, że nie ma czego
+podnosić. Głosy postaci nie są bramką skryptu; będą bramką kupowania kwestii.
+
+`approve <id> <episode-id> --stage dialogue --artifact script` przyjmuje skrypt; `--artifact`
+jest wymagane z powodu etapu 9: przyjęcie skryptu otworzy kupowanie każdej jego kwestii.

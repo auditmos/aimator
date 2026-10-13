@@ -227,6 +227,17 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
+  "  approve <id> <episode-id> --stage dialogue --artifact script [--json]": [
+    "approve",
+    ...ON,
+    "--stage",
+    "dialogue",
+    "--artifact",
+    "script",
+    "--reviewer",
+    "fixture",
+    "--dry-run",
+  ],
   "  approve <id> <episode-id> --stage opening-frame --track <tor> --checks <kryteria>|all": [
     "approve",
     ...ON,
@@ -409,6 +420,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--track",
     T,
   ],
+  "  check <id> <episode-id> --stage dialogue [--json]": ["check", ...ON, "--stage", "dialogue"],
   "  check <id> <episode-id> --stage opening-frame --track <tor> [--json]": [
     "check",
     ...ON,
@@ -472,6 +484,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "gpt-image-2.5-sunburst",
     "--video-model",
     "seedance-2.0",
+    "--dry-run",
+  ],
+  "  dialogue generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]": [
+    "dialogue",
+    "generate",
+    ...ON,
+    "--model",
+    "gpt-6-astra",
     "--dry-run",
   ],
   '  episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]': [

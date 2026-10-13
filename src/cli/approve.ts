@@ -1,6 +1,7 @@
 import type { Checklist } from "../lib/checklist.js";
 import { err, type Result } from "../lib/result.js";
 import {
+  type Approval,
   answerOf,
   checksOf,
   modeOf,
@@ -14,6 +15,7 @@ import {
 import { approveAssemblyStage } from "./stages/assembly.js";
 import { approveCharacterStage, approveVoiceStage } from "./stages/character.js";
 import { approveClipsStage } from "./stages/clips.js";
+import { approveDialogueStage } from "./stages/dialogue.js";
 import { approveSoundtrackStage } from "./stages/narration.js";
 import { approveOpeningFrameStage } from "./stages/opening-frame.js";
 import { approvePrepareStage } from "./stages/project.js";
@@ -41,7 +43,8 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
   approve <id> <episode-id> --stage soundtrack --artifact script|N01[,N02] [--json]
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
-  approve <id> <episode-id> --stage sound-design --track <tor> [--json]`;
+  approve <id> <episode-id> --stage sound-design --track <tor> [--json]
+  approve <id> <episode-id> --stage dialogue --artifact script [--json]`;
 
 /** The stages whose frames are accepted against the QC checklist. */
 const CHECKLIST_STAGES = ["opening-frame", "clips"] as const;
@@ -65,6 +68,28 @@ function checksFor(parsed: Parsed): Result<Checklist | null> {
     )
   );
 }
+
+/**
+ * Every stage below stage 0, by the word `--stage` takes. A table for the
+ * reason `check.ts` keeps one: which stages exist is a list, not control flow.
+ */
+const STAGES: Readonly<
+  Record<string, (parsed: Parsed, approval: Approval) => Promise<Result<string>>>
+> = {
+  assembly: approveAssemblyStage,
+  character: approveCharacterStage,
+  clips: approveClipsStage,
+  dialogue: approveDialogueStage,
+  "opening-frame": approveOpeningFrameStage,
+  "prompt-package": approvePromptPackageStage,
+  references: approveReferencesStage,
+  screenplay: approveScreenplayStage,
+  "shot-list": approveShotListStage,
+  "sound-design": approveSoundDesignStage,
+  soundtrack: approveSoundtrackStage,
+  style: approveStyleStage,
+  voice: approveVoiceStage,
+};
 
 /**
  * Acceptance, and only over artifacts that already validate.
@@ -129,57 +154,16 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
     return await approvePrepareStage(approval);
   }
 
-  if (stage === "character") {
-    return await approveCharacterStage(parsed.data, approval);
-  }
+  const accept =
+    typeof stage === "string" && Object.hasOwn(STAGES, stage) ? STAGES[stage] : undefined;
 
-  if (stage === "style") {
-    return await approveStyleStage(parsed.data, approval);
-  }
-
-  if (stage === "voice") {
-    return await approveVoiceStage(parsed.data, approval);
-  }
-
-  if (stage === "references") {
-    return await approveReferencesStage(parsed.data, approval);
-  }
-
-  if (stage === "opening-frame") {
-    return await approveOpeningFrameStage(parsed.data, approval);
-  }
-
-  if (stage === "clips") {
-    return await approveClipsStage(parsed.data, approval);
-  }
-
-  if (stage === "assembly") {
-    return await approveAssemblyStage(parsed.data, approval);
-  }
-
-  if (stage === "soundtrack") {
-    return await approveSoundtrackStage(parsed.data, approval);
-  }
-
-  if (stage === "sound-design") {
-    return await approveSoundDesignStage(parsed.data, approval);
-  }
-
-  if (stage === "screenplay") {
-    return await approveScreenplayStage(parsed.data, approval);
-  }
-
-  if (stage === "shot-list") {
-    return await approveShotListStage(parsed.data, approval);
-  }
-
-  if (stage === "prompt-package") {
-    return await approvePromptPackageStage(parsed.data, approval);
+  if (accept !== undefined) {
+    return await accept(parsed.data, approval);
   }
 
   return err(
     new UsageError(
-      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design, voice`
+      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design, dialogue, voice`
     )
   );
 }

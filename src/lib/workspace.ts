@@ -381,6 +381,15 @@ interface MixRunPaths {
 }
 
 export interface EpisodePaths {
+  readonly dialogueLock: string;
+  /**
+   * Stage 11's script: which line each character speaks, in which shot, and
+   * where it is anchored in the plan. Beside the narration script, and shared
+   * by both tracks for its reason: a line has no idea which film it is in.
+   */
+  readonly dialogueScript: string;
+  /** Stage 11's shared state file, holding the script. */
+  readonly dialogueStage: string;
   readonly file: string;
   /**
    * Stage 9's spoken lines, one file per utterance and per paid call.
@@ -761,6 +770,9 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
   const root = join(project.episodes, episodeId);
 
   return ok({
+    dialogueLock: join(root, "dialogue.lock"),
+    dialogueScript: join(root, "dialogue.md"),
+    dialogueStage: join(root, "dialogue.stage.json"),
     file: join(root, "episode.json"),
     narration: join(root, "narration"),
     narrationLock: join(root, "narration.lock"),

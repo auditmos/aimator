@@ -19,6 +19,12 @@ export const env = createEnv({
   runtimeEnv: process.env,
   server: {
     /**
+     * The text model stage 11 lifts the dialogue script with. Its own variable
+     * because it is its own call site: sharing stage 9's would mean that
+     * choosing who lifts the narration quietly chose who lifts the dialogue.
+     */
+    AIMATOR_DIALOGUE_MODEL: z.string().min(1).optional(),
+    /**
      * The speech model a character's lines are read with, and the sample bought
      * to hear a cast voice. **One variable for both**: a sample exists to
      * sound like the lines will, and a different model would make it a sample

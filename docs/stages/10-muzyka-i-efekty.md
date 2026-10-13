@@ -139,4 +139,5 @@ ma, zamiast milczeć.
 
 ---
 
-[← etap 9](09-narracja.md) · [README](../../README.md) · [pełny kontrakt](../pipeline.md)
+[← etap 9](09-narracja.md) · [README](../../README.md) ·
+[etap 11: dialog →](11-dialog.md) · [pełny kontrakt](../pipeline.md)

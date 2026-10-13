@@ -5,6 +5,7 @@ import { USAGE as REJECT } from "./reject.js";
 import { USAGE as ASSEMBLY } from "./stages/assembly.js";
 import { CAST_USAGE as CAST, USAGE as CHARACTER } from "./stages/character.js";
 import { USAGE as CLIPS } from "./stages/clips.js";
+import { USAGE as DIALOGUE } from "./stages/dialogue.js";
 import { USAGE as EPISODE } from "./stages/episode.js";
 import { USAGE as NARRATION } from "./stages/narration.js";
 import { USAGE as OPENING_FRAME } from "./stages/opening-frame.js";
@@ -24,7 +25,7 @@ const FLAGS = `  --audio      music-and-effects | dialogue | narration | dialogu
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve z każdym --stage, na komendach etapu na wszystkich
-               etapach 0–10. Pole command niesie podpolecenie tam, gdzie jeden
+               etapach 0–11. Pole command niesie podpolecenie tam, gdzie jeden
                etap piszą dwie gramatyki albo więcej
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
@@ -51,7 +52,7 @@ etapu 2. Etap 4 czeka na zatwierdzoną listę ujęć i na zatwierdzony hero.png
 każdej postaci, którą lista ujęć stawia w kadrze, na obu torach naraz, bo
 pakiet jest jeden dla obu. Nic nie ponawia się samo; nową płatną próbę zaczyna
 wyłącznie --regenerate, zachowując poprzedni wynik. W etapach tekstowych (1, 3,
-4, 9 i 10) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
+4, 9, 10 i 11) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
 zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę
 dosłownie, i ma zmienić tylko to, czego uwaga dotyczy. To nadal nowa płatna
 próba. W etapach obrazowych (2, 5, 6 i 7 dla entry:Cnn) poprzedni obraz idzie
@@ -85,6 +86,7 @@ export const USAGE = [
   ASSEMBLY,
   NARRATION,
   SOUND_DESIGN,
+  DIALOGUE,
   ["Wspólne:", LIST, STATUS, CHECK, APPROVE, REJECT].join("\n"),
   FLAGS,
   CAST_NOTE,

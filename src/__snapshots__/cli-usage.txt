@@ -209,6 +209,16 @@ Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
     Efekt, który wychodzi poza koniec filmu, jest ODMOWĄ; podkład, który kończy
     się przed nim, jest MELDUNKIEM, pierwsze to zderzenie, drugie to dryf.
 
+Etap 11. Dialog (płatny; skrypt wspólny dla obu torów):
+  dialogue generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                    [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+    Podnosi skrypt dialogu z zatwierdzonej listy ujęć: kto, w którym ujęciu
+    i od której sekundy planu. Kwestii nie pisze: etap 3 zapisał każdą jako
+    <id>: "…", a walidator sprawdza w obie strony, że żadnej nie wymyślono
+    i żadnej nie pominięto. Tylko przy --audio dialogue albo
+    dialogue-and-narration; w innym trybie odcinek nie ma dialogu.
+    Model: --model albo AIMATOR_DIALOGUE_MODEL.
+
 Wspólne:
   list [--json]
     Co w ogóle jest w katalogu roboczym: identyfikator każdego projektu i
@@ -239,6 +249,7 @@ Wspólne:
   check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]
   check <id> <episode-id> --stage sound-design [--track <tor>] [--json]
+  check <id> <episode-id> --stage dialogue [--json]
   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>] [--json]
   approve <id> <character-id> --stage character --track <tor> [--json]
@@ -256,6 +267,7 @@ Wspólne:
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
+  approve <id> <episode-id> --stage dialogue --artifact script [--json]
   reject <id> <episode-id> --stage <etap> [--track <tor>] [--artifact <klucz>[,...]]
               --note <uwaga> [--fail <kryteria>] [--reviewer <kto>] [--json]
   reject <id> <character-id> --stage character --track <tor> --artifact <klucz>
@@ -273,7 +285,7 @@ Wspólne:
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve z każdym --stage, na komendach etapu na wszystkich
-               etapach 0–10. Pole command niesie podpolecenie tam, gdzie jeden
+               etapach 0–11. Pole command niesie podpolecenie tam, gdzie jeden
                etap piszą dwie gramatyki albo więcej
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
@@ -297,7 +309,7 @@ etapu 2. Etap 4 czeka na zatwierdzoną listę ujęć i na zatwierdzony hero.png
 każdej postaci, którą lista ujęć stawia w kadrze, na obu torach naraz, bo
 pakiet jest jeden dla obu. Nic nie ponawia się samo; nową płatną próbę zaczyna
 wyłącznie --regenerate, zachowując poprzedni wynik. W etapach tekstowych (1, 3,
-4, 9 i 10) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
+4, 9, 10 i 11) --regenerate --instruction "<uwaga>" poprawia opublikowaną wersję
 zamiast pisać nową: model dostaje ten sam prompt, poprzednią wersję i uwagę
 dosłownie, i ma zmienić tylko to, czego uwaga dotyczy. To nadal nowa płatna
 próba. W etapach obrazowych (2, 5, 6 i 7 dla entry:Cnn) poprzedni obraz idzie

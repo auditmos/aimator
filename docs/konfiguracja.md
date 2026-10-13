@@ -40,6 +40,7 @@ AIMATOR_DIALOGUE_VOICE_MODEL=…        # głosy postaci: próbka i kwestie; inn
 AIMATOR_SOUND_MODEL=…                 # etap 10, tekstowy; pisze arkusz cue
 AIMATOR_MUSIC_MODEL=…                 # etap 10, podkład; JEDEN dla obu torów
 AIMATOR_EFFECTS_MODEL=…               # etap 10, efekty; JEDEN dla obu torów
+AIMATOR_DIALOGUE_MODEL=…              # etap 11, tekstowy; podnosi skrypt dialogu
 
 OPENAI_API_KEY=…
 BYTEPLUS_MODELARK=…                   # także klucz wideo Seedance, na obu torach

@@ -23,7 +23,9 @@ build when a documented command or flag is missing from `--help`, when a local l
 at nothing, and when an implemented stage has no page, so this is enforced rather than
 remembered. It cannot check prose, so a renamed concept is still yours to carry across.
 
-Stages 0 through 10 are implemented. Stage 11 is a declared contract, not working code.
+Stages 0 through 10 are implemented. Stage 11 has its script and nothing more yet: which
+line each character says, where, and when, lifted from the attributed lines stage 3 writes;
+the lines themselves are a declared contract, not working code.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -120,7 +122,8 @@ src/
 │       ├── clips.ts          # Etap 7
 │       ├── assembly.ts       # Etap 8
 │       ├── narration.ts      # Etap 9
-│       └── sound-design.ts   # Etap 10
+│       ├── sound-design.ts   # Etap 10
+│       └── dialogue.ts       # Etap 11, the script
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form: the published page; not a pipeline domain
@@ -323,6 +326,14 @@ src/
     │   ├── mix.ts         # Internal: the per-track half; buys nothing
     │   ├── review.ts      # Internal: two reviews, because there are two levels
     │   └── index.test.ts  # Wiring/gate/bill/refusal, through the entry
+    ├── dialogue/      # Folder form: index.ts is the only entry (stage 11, its script)
+    │   ├── index.ts       # Public: generateDialogue, checkDialogue, approveDialogue
+    │   ├── prompt.ts      # Internal: the instruction that forbids writing a line
+    │   ├── validate.ts    # Internal: lifted, not invented, nothing left behind
+    │   ├── plan.ts        # Internal: the gate: an accepted plan, and a film that speaks
+    │   ├── generate.ts    # Internal: one paid text call
+    │   ├── review.ts      # Internal: verification and approval of the script
+    │   └── index.test.ts  # Both directions of the lift, gate, approval, through the entry
     ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
     ├── muxer.test.ts
     ├── instruction.ts # Single-file form: the marked block a person's note travels in
@@ -1013,6 +1024,9 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
   it is **not** in `project.json`: it lives per character per language in
   `characters/<c>/voices/<language>/voice.json`, recorded by that language's sample alone,
   so changing it lapses that sample and nothing that `project.json` is an input of.
+- `AIMATOR_DIALOGUE_MODEL` is stage 11's text call site, the model that lifts the dialogue
+  script out of the shot list. Not `AIMATOR_NARRATION_MODEL`, for the per-call-site reason:
+  choosing who lifts the narration must not quietly choose who lifts the dialogue.
 - `AIMATOR_FFMPEG` is the only variable here that names a **program** rather than a model or
   a key, and the only one whose absence has a sensible answer. Every other one refuses a
   default because a model nobody chose is not a decision; "the ffmpeg on this machine" is

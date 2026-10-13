@@ -7,6 +7,7 @@ import { runReject } from "./reject.js";
 import { runAssembly } from "./stages/assembly.js";
 import { runCharacter } from "./stages/character.js";
 import { runClip } from "./stages/clips.js";
+import { runDialogue } from "./stages/dialogue.js";
 import { runEpisode } from "./stages/episode.js";
 import { runNarration } from "./stages/narration.js";
 import { runOpeningFrame } from "./stages/opening-frame.js";
@@ -21,6 +22,33 @@ import { runStatus } from "./status.js";
 import { USAGE } from "./usage.js";
 
 /**
+ * Every command, by its first word. A table rather than a chain of `if`s, for
+ * the reason `check.ts` gives: what the dispatcher knows is which commands
+ * exist, and a list of them is a list, not control flow.
+ */
+const COMMANDS: Readonly<Record<string, (argv: readonly string[]) => Promise<Result<string>>>> = {
+  approve: runApprove,
+  assembly: runAssembly,
+  character: runCharacter,
+  check: runCheck,
+  clip: runClip,
+  dialogue: runDialogue,
+  episode: runEpisode,
+  list: runList,
+  narration: runNarration,
+  "opening-frame": runOpeningFrame,
+  project: runProject,
+  "prompt-package": runPromptPackage,
+  reference: runReference,
+  reject: runReject,
+  screenplay: runScreenplay,
+  "shot-list": runShotList,
+  "sound-design": runSoundDesign,
+  status: runStatus,
+  style: runStyle,
+};
+
+/**
  * argv in, outcome out. Filesystem effects live in lib/project; streams and
  * exit codes live in bin.ts, which is what keeps this testable by calling a
  * function instead of spawning a process.
@@ -32,77 +60,11 @@ export async function run(argv: string[]): Promise<Result<string>> {
     return ok(USAGE);
   }
 
-  if (command === "project") {
-    return await runProject(rest);
-  }
+  // `Object.hasOwn`, so a word such as `constructor` is an unknown command
+  // rather than a property every object inherits.
+  const handler = Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined;
 
-  if (command === "character") {
-    return await runCharacter(rest);
-  }
-
-  if (command === "episode") {
-    return await runEpisode(rest);
-  }
-
-  if (command === "screenplay") {
-    return await runScreenplay(rest);
-  }
-
-  if (command === "shot-list") {
-    return await runShotList(rest);
-  }
-
-  if (command === "prompt-package") {
-    return await runPromptPackage(rest);
-  }
-
-  if (command === "reference") {
-    return await runReference(rest);
-  }
-
-  if (command === "opening-frame") {
-    return await runOpeningFrame(rest);
-  }
-
-  if (command === "clip") {
-    return await runClip(rest);
-  }
-
-  if (command === "assembly") {
-    return await runAssembly(rest);
-  }
-
-  if (command === "narration") {
-    return await runNarration(rest);
-  }
-
-  if (command === "sound-design") {
-    return await runSoundDesign(rest);
-  }
-
-  if (command === "style") {
-    return await runStyle(rest);
-  }
-
-  if (command === "list") {
-    return await runList(rest);
-  }
-
-  if (command === "status") {
-    return await runStatus(rest);
-  }
-
-  if (command === "check") {
-    return await runCheck(rest);
-  }
-
-  if (command === "approve") {
-    return await runApprove(rest);
-  }
-
-  if (command === "reject") {
-    return await runReject(rest);
-  }
-
-  return err(new UsageError(`unknown command: ${command}`));
+  return handler === undefined
+    ? err(new UsageError(`unknown command: ${command}`))
+    : await handler(rest);
 }

@@ -394,17 +394,49 @@ export const NARRATION = {
   U04: "Burza przeszła",
 } as const satisfies Readonly<Record<string, string>>;
 
+/**
+ * What the cast says in one shot, when the episode has dialogue.
+ *
+ * Stage 3 writes each line as `<cast-id>: "<line>"`, and stage 11 proves its
+ * script lifted every one exactly once. U03 shows only Tata, so Ewa's line
+ * there comes from off screen: the one speaker stage 11 reports, not refuses.
+ */
+export const DIALOGUE = {
+  U01: { cast: "ewa", text: "Tato, czy burza już idzie?" },
+  U03: { cast: "ewa", text: "Tato, gdzie jesteś?" },
+  U04: { cast: "tata", text: "Jestem tutaj, Ewo." },
+} as const satisfies Readonly<Record<string, { cast: string; text: string }>>;
+
+/** Who speaks in the shots: the narrator, the cast, both, or nobody. */
+interface Sound {
+  readonly dialogue: boolean;
+  readonly narrated: boolean;
+}
+
+/** The episode's audio mode, which is what lets a shot carry what it says. */
+function audioOf(sound: Sound): "dialogue" | "dialogue-and-narration" | "narration" {
+  if (!sound.dialogue) {
+    return "narration";
+  }
+
+  return sound.narrated ? "dialogue-and-narration" : "dialogue";
+}
+
 function shot(
   id: string,
   scene: string,
   clip: string,
   range: string,
   cast: string,
-  narrated = false
+  sound: Sound
 ): string {
   const line: string | undefined = (NARRATION as Readonly<Record<string, string>>)[id];
-  const audio =
-    narrated && line !== undefined ? `Deszcz o szybę; narrator: „${line}”.` : "Deszcz o szybę.";
+  const spoken = (DIALOGUE as Readonly<Record<string, { cast: string; text: string }>>)[id];
+  const audio = `${[
+    "Deszcz o szybę",
+    ...(sound.narrated && line !== undefined ? [`narrator: „${line}”`] : []),
+    ...(sound.dialogue && spoken !== undefined ? [`${spoken.cast}: "${spoken.text}"`] : []),
+  ].join("; ")}.`;
 
   return [
     `### ${id} | ${scene} | ${clip} | ${range}`,
@@ -447,15 +479,15 @@ function shot(
  */
 export type ShotListShape = "empty-opening" | "three-clips" | "two-clips" | "unrenderable-clip";
 
-function shotList(shape: ShotListShape, narrated: boolean): string {
+function shotList(shape: ShotListShape, sound: Sound): string {
   if (shape === "two-clips" || shape === "empty-opening") {
-    return twoClips(narrated, shape === "empty-opening" ? "none" : "ewa");
+    return twoClips(sound, shape === "empty-opening" ? "none" : "ewa");
   }
 
-  return shape === "three-clips" ? threeClips(narrated) : unrenderableClips(narrated);
+  return shape === "three-clips" ? threeClips(sound) : unrenderableClips(sound);
 }
 
-function twoClips(narrated: boolean, openingCast: string): string {
+function twoClips(sound: Sound, openingCast: string): string {
   return [
     "## Plan\n\nDwa klipy, kadr 16:9.\n",
     [
@@ -477,17 +509,17 @@ function twoClips(narrated: boolean, openingCast: string): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-10s", openingCast, narrated),
-      shot("U02", "S02", "C01", "10-15s", "ewa,tata", narrated),
-      shot("U03", "S02", "C02", "15-20s", "tata", narrated),
-      shot("U04", "S03", "C02", "20-30s", "ewa,tata", narrated),
+      shot("U01", "S01", "C01", "0-10s", openingCast, sound),
+      shot("U02", "S02", "C01", "10-15s", "ewa,tata", sound),
+      shot("U03", "S02", "C02", "15-20s", "tata", sound),
+      shot("U04", "S03", "C02", "20-30s", "ewa,tata", sound),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
 }
 
 /** The same thirty seconds, cut so that every way of seeding a clip appears. */
-function threeClips(narrated: boolean): string {
+function threeClips(sound: Sound): string {
   return [
     "## Plan\n\nTrzy klipy, kadr 16:9.\n",
     [
@@ -515,9 +547,9 @@ function threeClips(narrated: boolean): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-10s", "ewa", narrated),
-      shot("U02", "S02", "C02", "10-20s", "ewa,tata", narrated),
-      shot("U03", "S03", "C03", "20-30s", "tata", narrated),
+      shot("U01", "S01", "C01", "0-10s", "ewa", sound),
+      shot("U02", "S02", "C02", "10-20s", "ewa,tata", sound),
+      shot("U03", "S03", "C03", "20-30s", "tata", sound),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
@@ -531,7 +563,7 @@ function threeClips(narrated: boolean): string {
  * the episode's duration. The video model does not render anything under four
  * seconds, so this is the plan stage 7 has to refuse, before it spends.
  */
-function unrenderableClips(narrated: boolean): string {
+function unrenderableClips(sound: Sound): string {
   return [
     "## Plan\n\nCztery klipy, pierwszy bardzo krótki, kadr 16:9.\n",
     [
@@ -565,10 +597,10 @@ function unrenderableClips(narrated: boolean): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-3s", "ewa", narrated),
-      shot("U02", "S01", "C02", "3-10s", "ewa,tata", narrated),
-      shot("U03", "S02", "C03", "10-20s", "ewa,tata", narrated),
-      shot("U04", "S03", "C04", "20-30s", "tata", narrated),
+      shot("U01", "S01", "C01", "0-3s", "ewa", sound),
+      shot("U02", "S01", "C02", "3-10s", "ewa,tata", sound),
+      shot("U03", "S02", "C03", "10-20s", "ewa,tata", sound),
+      shot("U04", "S03", "C04", "20-30s", "tata", sound),
     ].join("\n"),
     "## Review\n\nSprawdzono sumy czasów. Plan wymaga oceny.\n",
   ].join("\n");
@@ -732,6 +764,13 @@ interface UpstreamOptions {
    */
   readonly approvePackage: boolean;
   /**
+   * Whether the cast speaks: the episode's audio becomes `dialogue`, or
+   * `dialogue-and-narration` beside `narration`, and the shots carry
+   * `DIALOGUE` in the attributed form stage 3 writes. Off by default for the
+   * reason `narration` is.
+   */
+  readonly dialogue?: boolean;
+  /**
    * Which cut of the same thirty seconds the shot list plans. Two clips by
    * default; three when a test needs both ways of seeding a later clip, which
    * only a third one can show; and one cut so short no video model renders it,
@@ -825,6 +864,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
     shotList: shape = "two-clips",
     workspace,
   } = options;
+  const sound = { dialogue: options.dialogue ?? false, narrated: options.narration ?? false };
   const source = join(scratch, "01-Burza.md");
   await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
 
@@ -876,7 +916,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
     mode: "apply",
     projectId: PROJECT,
     settings: {
-      audio: "narration",
+      audio: audioOf(sound),
       durationSeconds: 30,
       language: "pl",
       maxClipSeconds: 15,
@@ -924,7 +964,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
   await generateShotList({
     apiKey: API_KEY,
     episodeId: EPISODE,
-    fetch: respondWith(completion(shotList(shape, options.narration ?? false))),
+    fetch: respondWith(completion(shotList(shape, sound))),
     maxOutputTokens: 24_000,
     mode: "apply",
     model: "gpt-6-astra",

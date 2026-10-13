@@ -274,6 +274,9 @@ describe("episodePaths", () => {
   it("should place every episode artifact under the episode directory", () => {
     const result = project.ok ? episodePaths(project.data, "01-arrival") : null;
     expect(result?.ok ? result.data : null).toEqual({
+      dialogueLock: `${episode}/dialogue.lock`,
+      dialogueScript: `${episode}/dialogue.md`,
+      dialogueStage: `${episode}/dialogue.stage.json`,
       file: `${episode}/episode.json`,
       narration: `${episode}/narration`,
       narrationLock: `${episode}/narration.lock`,
