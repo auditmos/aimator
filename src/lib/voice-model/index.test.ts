@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { wav } from "../../test/fixture.js";
-import { billedCharacters, utteranceLength, validateSpeech } from "./index.js";
+import { billedCharacters, speechTrack, utteranceLength, validateSpeech } from "./index.js";
 
 /**
  * What is true of any utterance a stage buys, through the module entry.
@@ -112,5 +112,91 @@ describe("utteranceLength", () => {
 
     expect(length.ok).toBe(false);
     expect(length.ok ? "" : length.error.message).toContain("skróć");
+  });
+});
+
+/**
+ * One character's speech in one clip, as one file, because a lip-sync job takes
+ * exactly one face and one sound.
+ *
+ * Assumptions this pins: positions are seconds of the clip's own clock; the
+ * file starts at the first line, so the provider is told to insert it there;
+ * every sample between and after the lines is silence; the file is padded at
+ * its end to the provider's two-second floor; the lines' PCM is copied, never
+ * resampled, so lines in different formats are refused rather than converted.
+ */
+describe("speechTrack", () => {
+  const RATE = 24_000;
+  const FRAME = 2;
+
+  /** The value of every sample in a span of the track's own seconds. */
+  function samples(track: Buffer, from: number, to: number): Set<number> {
+    const data = track.subarray(44);
+    const values = new Set<number>();
+
+    for (let at = Math.round(from * RATE); at < Math.round(to * RATE); at += 1) {
+      values.add(data.readUInt16LE(at * FRAME));
+    }
+
+    return values;
+  }
+
+  it("should lay two lines at their positions with silence between and after", () => {
+    const track = speechTrack(
+      [
+        { at: 1.85, wav: wav({ fill: 0x22, seconds: 1.1 }) },
+        { at: 1, wav: wav({ fill: 0x11, seconds: 0.8 }) },
+      ],
+      10
+    );
+
+    expect(track.ok ? { seconds: track.data.seconds, start: track.data.start } : null).toEqual({
+      seconds: 2,
+      start: 1,
+    });
+
+    const bytes = track.ok ? track.data.wav : Buffer.alloc(0);
+
+    expect(validateSpeech(bytes).ok ? validateSpeech(bytes) : null).toMatchObject({
+      data: { channels: 1, sampleRate: RATE, seconds: 2 },
+    });
+    expect(samples(bytes, 0, 0.8)).toEqual(new Set([0x11_11]));
+    expect(samples(bytes, 0.8, 0.85)).toEqual(new Set([0]));
+    expect(samples(bytes, 0.85, 1.95)).toEqual(new Set([0x22_22]));
+    expect(samples(bytes, 1.95, 2)).toEqual(new Set([0]));
+  });
+
+  it("should refuse lines recorded at different sample rates", () => {
+    const track = speechTrack(
+      [
+        { at: 0, wav: wav({ seconds: 1 }) },
+        { at: 2, wav: wav({ sampleRate: 44_100, seconds: 1 }) },
+      ],
+      10
+    );
+
+    expect(track.ok ? "laid" : track.error.message).toContain("44100");
+  });
+
+  it("should refuse a track longer than the provider's sixty seconds", () => {
+    const track = speechTrack(
+      [
+        { at: 0, wav: wav({ seconds: 1 }) },
+        { at: 60, wav: wav({ seconds: 1 }) },
+      ],
+      90
+    );
+
+    expect(track.ok ? "laid" : track.error.message).toContain("60");
+  });
+
+  it("should refuse a track heavier than the provider's five megabytes", () => {
+    const track = speechTrack(
+      [{ at: 0, wav: wav({ channels: 2, sampleRate: 48_000, seconds: 28 }) }],
+      30
+    );
+
+    expect(track.ok ? "laid" : track.error.message).toContain("5");
+    expect(track.ok ? "laid" : track.error.message).toContain("MB");
   });
 });

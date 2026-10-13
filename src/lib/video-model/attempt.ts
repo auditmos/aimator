@@ -36,7 +36,7 @@ import {
   type Transport,
   type VideoRequest,
 } from "./client.js";
-import { providerOf, type VideoProvider } from "./provider.js";
+import { type JobWire, providerOf, type VideoProvider } from "./provider.js";
 import { stillFormat, type VideoVerdict, validateEndFrame, validateVideo } from "./validate.js";
 
 /**
@@ -57,6 +57,11 @@ import { stillFormat, type VideoVerdict, validateEndFrame, validateVideo } from 
  * What a stage brings is everything about *its* artifact: the prompt, the frame
  * the clip starts on, how many seconds it ordered, where the files go and the
  * words it uses for a refusal. The sequence is not its business.
+ *
+ * A clip is one kind of job and a lip-sync is the other. They differ in what is
+ * sent, how the answers read and what a result must be to be published, and in
+ * nothing else, so `runJob` is the sequence once and each kind is an adapter
+ * that brings its order, its wire and its verdict.
  */
 
 /** Everything a job needs that is not about one particular clip. */
@@ -124,7 +129,46 @@ interface VideoArtifact {
   readonly target: string;
 }
 
-interface VideoAttempt {
+/**
+ * What every kind of job needs that is not about one artifact. The engine is
+ * optional here because only a wire that cuts the end frame out of the result
+ * uses it, and only a clip's wire does.
+ */
+export type JobCall = Omit<VideoCall, "mux"> & { readonly mux?: Muxer };
+
+/** The half of an attempt that belongs to one artifact, whatever kind of job buys it. */
+interface JobArtifact {
+  readonly blocked: (problems: readonly string[]) => Error;
+  /** Where a frame handed back or cut out goes; never asked of a wire without one. */
+  readonly endFrameTarget: (format: StillFormat) => Result<string>;
+  readonly inputs: readonly RecordedFile[];
+  readonly key: string;
+  readonly promptVersion: number | null;
+  /** What the job is expected to last, recorded in `run.json`. */
+  readonly seconds: number;
+  readonly stage: StageName;
+  readonly stagePath: string;
+  readonly target: string;
+  /** Whether a downloaded result is the one that was ordered; it is published only if so. */
+  readonly verdict: (video: Buffer) => Result<VideoVerdict>;
+}
+
+/** What one new job sends, as sent and as archived. */
+interface Order {
+  readonly archive: unknown;
+  readonly body: unknown;
+  readonly endpoint: string;
+  /** Written to the archive as `prompt.md`; `null` for a job that carries no prompt. */
+  readonly prompt: string | null;
+}
+
+/** How a kind of job finds its wire for a model, and what it sends on it. */
+interface JobKind<W extends JobWire> {
+  readonly order: (wire: W) => Order;
+  readonly wireOf: (model: string) => Result<W>;
+}
+
+export interface VideoAttempt {
   /** Workspace-relative paths this attempt wrote, for the report. */
   readonly created: readonly string[];
   /** Whether the provider handed back the frame the next clip continues from. */
@@ -187,6 +231,41 @@ export async function runVideoStage(
   call: VideoCall,
   artifact: VideoArtifact
 ): Promise<Result<VideoAttempt>> {
+  return await runJob(
+    call,
+    {
+      ...artifact,
+      verdict: (video) =>
+        validateVideo(video, { aspectRatio: artifact.aspectRatio, seconds: artifact.seconds }),
+    },
+    {
+      order: (provider: VideoProvider) => {
+        const request: VideoRequest = {
+          duration: artifact.seconds,
+          endpoint: provider.endpoint(call.model),
+          firstFrame: artifact.firstFrame,
+          model: call.model,
+          prompt: artifact.prompt,
+        };
+
+        return {
+          archive: provider.archive(request),
+          body: provider.body(request),
+          endpoint: request.endpoint,
+          prompt: request.prompt,
+        };
+      },
+      wireOf: providerOf,
+    }
+  );
+}
+
+/** The sequence around any kind of job: republish, resume, or a new attempt. */
+export async function runJob<W extends JobWire>(
+  call: JobCall,
+  artifact: JobArtifact,
+  kind: JobKind<W>
+): Promise<Result<VideoAttempt>> {
   const stage = await readStage(artifact.stagePath, artifact.stage);
   const record = stage.artifacts[artifact.key];
 
@@ -199,21 +278,21 @@ export async function runVideoStage(
 
     // The archive is read in the dialect of whoever wrote it, which is the
     // model the record names, not whatever model this shell happens to pick.
-    const provider = providerOf(record.producer.model ?? "");
+    const wire = kind.wireOf(record.producer.model ?? "");
 
-    return provider.ok
-      ? await fromArchive(call, provider.data, artifact, stage, record)
-      : err(artifact.blocked([`${artifact.key}: ${provider.error.message}`]));
+    return wire.ok
+      ? await fromArchive(call, wire.data, artifact, stage, record)
+      : err(artifact.blocked([`${artifact.key}: ${wire.error.message}`]));
   }
 
-  const provider = providerOf(call.model);
+  const wire = kind.wireOf(call.model);
 
-  if (!provider.ok) {
-    return err(artifact.blocked([provider.error.message]));
+  if (!wire.ok) {
+    return err(artifact.blocked([wire.error.message]));
   }
 
   if (record !== undefined && !call.regenerate) {
-    const resumed = await resume(call, provider.data, artifact, stage, record);
+    const resumed = await resume(call, wire.data, artifact, stage, record);
 
     // `null` means the archived attempt was refused or abandoned rather than
     // billed, so there is nothing to finish and starting over costs nothing.
@@ -222,7 +301,7 @@ export async function runVideoStage(
     }
   }
 
-  return await attempt(call, provider.data, artifact, stage);
+  return await attempt(call, wire.data, kind.order(wire.data), artifact, stage);
 }
 
 /**
@@ -235,9 +314,9 @@ export async function runVideoStage(
  * otherwise a bug in the validator would be billable.
  */
 async function resume(
-  call: VideoCall,
-  provider: VideoProvider,
-  artifact: VideoArtifact,
+  call: JobCall,
+  wire: JobWire,
+  artifact: JobArtifact,
   stage: StageFile,
   record: StageFile["artifacts"][string]
 ): Promise<Result<VideoAttempt> | null> {
@@ -299,7 +378,7 @@ async function resume(
     );
   }
 
-  const finished = await awaitJob(call, provider, artifact, run, record.jobId);
+  const finished = await awaitJob(call, wire, artifact, run, record.jobId);
 
   if (!finished.ok) {
     return finished;
@@ -312,7 +391,7 @@ async function resume(
     return null;
   }
 
-  return await publish(call, provider, artifact, stage, {
+  return await publish(call, wire, artifact, stage, {
     instruction: record.instruction,
     jobId: record.jobId,
     producer: record.producer,
@@ -332,9 +411,9 @@ async function resume(
  * somebody accepted, even when the difference is a name.
  */
 async function fromArchive(
-  call: VideoCall,
-  provider: VideoProvider,
-  artifact: VideoArtifact,
+  call: JobCall,
+  wire: JobWire,
+  artifact: JobArtifact,
   stage: StageFile,
   record: StageFile["artifacts"][string]
 ): Promise<Result<VideoAttempt>> {
@@ -350,7 +429,7 @@ async function fromArchive(
     );
   }
 
-  const task = provider.readTask(saved.data.bytes.toString("utf8"));
+  const task = wire.readTask(saved.data.bytes.toString("utf8"));
 
   if (!task.ok) {
     return task;
@@ -364,7 +443,7 @@ async function fromArchive(
     );
   }
 
-  return await publish(call, provider, artifact, stage, {
+  return await publish(call, wire, artifact, stage, {
     instruction: record.instruction,
     jobId: record.jobId,
     producer: record.producer,
@@ -376,30 +455,20 @@ async function fromArchive(
 }
 
 async function attempt(
-  call: VideoCall,
-  provider: VideoProvider,
-  artifact: VideoArtifact,
+  call: JobCall,
+  wire: JobWire,
+  order: Order,
+  artifact: JobArtifact,
   stage: StageFile
 ): Promise<Result<VideoAttempt>> {
   const runId = newRunId();
   const run = videoRunPaths(call, runId);
-  const request: VideoRequest = {
-    duration: artifact.seconds,
-    endpoint: provider.endpoint(call.model),
-    firstFrame: artifact.firstFrame,
-    model: call.model,
-    prompt: artifact.prompt,
-  };
   const producer = modelProducer({
-    endpoint: request.endpoint,
+    endpoint: order.endpoint,
     model: call.model,
     promptVersion: artifact.promptVersion,
   });
-  const prepared = await prepare(run, artifact, {
-    archive: provider.archive(request),
-    request,
-    runId,
-  });
+  const prepared = await prepare(run, artifact, { model: call.model, order, runId });
 
   if (!prepared.ok) {
     return prepared;
@@ -434,9 +503,9 @@ async function attempt(
 
   const transport = await submitVideo({
     apiKey: call.apiKey,
-    body: provider.body(request),
+    body: order.body,
     fetch: call.fetch,
-    url: request.endpoint,
+    url: order.endpoint,
   });
 
   // Nothing reached the provider, so there is nothing to archive.
@@ -452,7 +521,7 @@ async function attempt(
     return err(refused);
   }
 
-  const jobId = provider.readSubmit(transport.data.body);
+  const jobId = wire.readSubmit(transport.data.body);
 
   if (!jobId.ok) {
     return jobId;
@@ -476,7 +545,7 @@ async function attempt(
 
   await write(artifact.stagePath, serialize(started));
 
-  const finished = await awaitJob(call, provider, artifact, run, jobId.data);
+  const finished = await awaitJob(call, wire, artifact, run, jobId.data);
 
   if (!finished.ok) {
     return finished;
@@ -491,7 +560,7 @@ async function attempt(
     );
   }
 
-  return await publish(call, provider, artifact, started, {
+  return await publish(call, wire, artifact, started, {
     instruction: call.instruction ?? null,
     jobId: jobId.data,
     producer,
@@ -524,9 +593,9 @@ type Ending = { readonly failed: string } | { readonly done: Succeeded };
  * command picks the clip up where this one left it.
  */
 async function awaitJob(
-  call: VideoCall,
-  provider: VideoProvider,
-  artifact: VideoArtifact,
+  call: JobCall,
+  wire: JobWire,
+  artifact: JobArtifact,
   run: VideoRunPaths,
   jobId: string
 ): Promise<Result<Ending>> {
@@ -538,7 +607,7 @@ async function awaitJob(
     const transport = await pollVideo({
       apiKey: call.apiKey,
       fetch: call.fetch,
-      url: provider.pollUrl(jobId),
+      url: wire.pollUrl(jobId),
     });
 
     if (!transport.ok) {
@@ -551,7 +620,7 @@ async function awaitJob(
       return err(refused);
     }
 
-    const task = provider.readTask(transport.data.body);
+    const task = wire.readTask(transport.data.body);
 
     if (!task.ok) {
       return task;
@@ -589,16 +658,17 @@ async function archiveAnswer(run: VideoRunPaths, transport: Transport): Promise<
 
 async function prepare(
   run: VideoRunPaths,
-  artifact: VideoArtifact,
-  data: { readonly archive: unknown; readonly request: VideoRequest; readonly runId: string }
+  artifact: JobArtifact,
+  data: { readonly model: string; readonly order: Order; readonly runId: string }
 ): Promise<Result<true>> {
-  const prompt = await writeNew(run.prompt, data.request.prompt);
+  const prompt =
+    data.order.prompt === null ? ok(true) : await writeNew(run.prompt, data.order.prompt);
 
   if (!prompt.ok) {
     return prompt;
   }
 
-  const request = await writeNew(run.request, serialize(data.archive));
+  const request = await writeNew(run.request, serialize(data.order.archive));
 
   if (!request.ok) {
     return request;
@@ -609,9 +679,9 @@ async function prepare(
     run.run,
     serialize({
       artifact: artifact.key,
-      endpoint: data.request.endpoint,
+      endpoint: data.order.endpoint,
       inputs: artifact.inputs,
-      model: data.request.model,
+      model: data.model,
       promptVersion: artifact.promptVersion,
       runId: data.runId,
       seconds: artifact.seconds,
@@ -629,7 +699,7 @@ async function prepare(
  * clip has passed for an MP4.
  */
 async function collect(
-  call: VideoCall,
+  call: JobCall,
   run: VideoRunPaths,
   task: Succeeded
 ): Promise<Result<{ endFrame: Buffer | null; video: Buffer }>> {
@@ -698,10 +768,16 @@ async function collect(
  * resumable: the clip is bought and archived, and cutting again costs nothing.
  */
 async function cut(
-  call: VideoCall,
-  artifact: VideoArtifact,
+  call: JobCall,
+  artifact: JobArtifact,
   run: VideoRunPaths
 ): Promise<Result<Buffer>> {
+  if (call.mux === undefined) {
+    return err(
+      artifact.blocked([`${artifact.key}: nie wskazano silnika, który wytnie ostatnią klatkę`])
+    );
+  }
+
   const made = await call.mux.lastFrame({ target: run.endFramePng, video: run.video });
   const frame = made.ok ? await readDigest(run.endFramePng) : null;
 
@@ -718,9 +794,9 @@ async function cut(
 }
 
 async function publish(
-  call: VideoCall,
-  provider: VideoProvider,
-  artifact: VideoArtifact,
+  call: JobCall,
+  wire: JobWire,
+  artifact: JobArtifact,
   stage: StageFile,
   data: {
     readonly instruction: string | null;
@@ -738,10 +814,7 @@ async function publish(
     return collected;
   }
 
-  const verdict = validateVideo(collected.data.video, {
-    aspectRatio: artifact.aspectRatio,
-    seconds: artifact.seconds,
-  });
+  const verdict = artifact.verdict(collected.data.video);
 
   if (!verdict.ok) {
     await writeNew(
@@ -769,7 +842,7 @@ async function publish(
   // re-encoded into the one the rest of the tree happens to use.
   let returned = collected.data.endFrame;
 
-  if (returned === null && provider.endFrame === "cut") {
+  if (returned === null && wire.endFrame === "cut") {
     const cutOut = await cut(call, artifact, data.run);
 
     if (!cutOut.ok) {
@@ -833,7 +906,7 @@ async function publish(
       toWorkspacePath(call.workspace.root, data.run.root),
     ],
     endFrame: endFrame !== null,
-    note: note(verdict.data, endFrame !== null, data.resumed),
+    note: note(verdict.data, endFrame !== null || wire.endFrame === "none", data.resumed),
     runId: data.runId,
     stage: published,
     state: data.resumed ? "resumed" : "published",

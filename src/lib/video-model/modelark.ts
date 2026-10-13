@@ -186,6 +186,8 @@ function readTaskResponse(body: string): Result<VideoTask> {
   return ok({
     endFrameUrl: endFrame.ok ? endFrame.data : null,
     kind: "succeeded",
+    // ModelArk names no result a later call could address it by.
+    videoId: null,
     videoUrl: video.data,
   });
 }

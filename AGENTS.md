@@ -267,16 +267,20 @@ src/
     │   ├── review.ts     # Internal: verification and approval of the one frame
     │   └── index.test.ts    # Gate per track/resume/regenerate/approve, through the entry
     ├── video-model/   # Folder form: one billed video job, shared by stage 7 and on
-    │   ├── index.ts       # Public: runVideoStage, clipDuration, clipPrompt, videoModel,
-    │   │                  #         validateVideo
+    │   ├── index.ts       # Public: runVideoStage, identifyFaces, runLipSync,
+    │   │                  #         clipDuration, clipPrompt, videoModel, validateVideo
     │   ├── provider.ts    # Internal: the closed table, model id → provider, and limits
     │   ├── modelark.ts    # Internal: ModelArk's wire: body, poll URL, answer readers
-    │   ├── kling.ts       # Internal: Kling's wire, the same five things
+    │   ├── kling.ts       # Internal: Kling's wires: the render, the face call, lip-sync
     │   ├── client.ts      # Internal: submit, poll, download; redaction
     │   ├── attempt.ts     # Internal: submitted + jobId before the poll, archive,
-    │   │                  #            resume by asking, cut or fetch the end, publish
-    │   ├── validate.ts    # Internal: the MP4 verdict and the task's three shapes
-    │   └── index.test.ts  # The order of operations around a paid job, on both wires
+    │   │                  #            resume by asking, cut or fetch the end, publish;
+    │   │                  #            once, for both kinds of job
+    │   ├── lip-sync.ts    # Internal: the faces, the clip's source (its id or a lent
+    │   │                  #            URL), and one face moved to one sound
+    │   ├── validate.ts    # Internal: the MP4 verdicts and the task's three shapes
+    │   ├── index.test.ts  # The order of operations around a paid job, on both wires
+    │   └── lip-sync.test.ts # The face call's source, the lent clip, the lip-sync job
     ├── clips/        # Folder form: index.ts is the only entry (stage 7)
     │   ├── index.ts      # Public: generateClips, checkClips, approveClips
     │   ├── plan.ts       # Internal: the chain, and the one refusal that is
@@ -296,11 +300,12 @@ src/
     │   └── index.test.ts    # Gate/derived plan/drift/no-engine, through the entry
     ├── voice-model/   # Folder form: one billed speech call (stage 9)
     │   ├── index.ts       # Public: runVoiceStage, validateSpeech, billedCharacters,
-    │   │                  #         utteranceLength
+    │   │                  #         utteranceLength, speechTrack
     │   ├── client.ts      # Internal: the endpoint, the container, redaction
     │   ├── attempt.ts     # Internal: submitted, archive, resume, publish
     │   ├── validate.ts    # Internal: the WAV verdict, pure and offline
-    │   └── index.test.ts  # The verdict, the bill, the limit, through the entry
+    │   ├── track.ts       # Internal: one character's lines in one clip, as one WAV
+    │   └── index.test.ts  # The verdict, the bill, the limit, the track, through the entry
     ├── narration/    # Folder form: index.ts is the only entry (stage 9)
     │   ├── index.ts      # Public: generateNarration, generateMix, checkNarration,
     │   │                 #         checkMix, approveNarration, approveMix,

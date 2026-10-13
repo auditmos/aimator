@@ -136,7 +136,7 @@ type HostingVariable = (typeof VARIABLES)[number];
  * a refusal can name what is missing in the words a person fixes it with. The
  * caller reads them on the paid path only, the way every key here is read.
  */
-type HostingVariables = Readonly<Record<HostingVariable, string | undefined>>;
+export type HostingVariables = Readonly<Record<HostingVariable, string | undefined>>;
 
 /** A file the provider may fetch until `expiresAt`. */
 interface HostedFile {

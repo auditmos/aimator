@@ -70,7 +70,7 @@ class VideoError extends Error {
  */
 export function validateVideo(
   bytes: Buffer,
-  expected: { readonly aspectRatio: string; readonly seconds: number | null }
+  expected: { readonly aspectRatio: string | null; readonly seconds: number | null }
 ): Result<VideoVerdict> {
   if (bytes.length > MAX_BYTES) {
     return err(
@@ -111,7 +111,7 @@ export function validateVideo(
     );
   }
 
-  const wanted = readRatio(expected.aspectRatio);
+  const wanted = expected.aspectRatio === null ? null : readRatio(expected.aspectRatio);
 
   if (wanted !== null && Math.abs(frame.width / frame.height - wanted) > RATIO_TOLERANCE) {
     return err(
@@ -132,6 +132,90 @@ export function validateVideo(
 
 function round(seconds: number): number {
   return Math.round(seconds * 100) / 100;
+}
+
+/**
+ * Whether a lip-synced result is the clip it was made from with new lips: the
+ * same frame to the pixel and the same length within a frame's remainder. A
+ * provider that scaled the picture handed back a different film, and nothing
+ * here scales it back.
+ */
+export function validateLipSyncResult(
+  bytes: Buffer,
+  input: { readonly height: number; readonly seconds: number; readonly width: number }
+): Result<VideoVerdict> {
+  const verdict = validateVideo(bytes, { aspectRatio: null, seconds: input.seconds });
+
+  if (!verdict.ok) {
+    return verdict;
+  }
+
+  const { height, width } = verdict.data;
+
+  return width === input.width && height === input.height
+    ? verdict
+    : err(
+        new VideoError(
+          "ratio",
+          `wynik lip-syncu ma kadr ${width}x${height}, a klip wejściowy ${input.width}x${input.height}, zachowano oryginał, niczego nie przeskalowuję`
+        )
+      );
+}
+
+/** What Kling's lip-sync takes as a video, by its own documentation. */
+const LIP_SYNC_INPUT = {
+  maxBytes: 100_000_000,
+  maxSeconds: 60,
+  maxSide: 2160,
+  minSeconds: 2,
+  minSide: 512,
+};
+
+/**
+ * Whether lip-sync will take this clip, judged here rather than by the
+ * provider, because the face call that would discover it is paid for.
+ *
+ * The limits are the provider's, stated with the numbers that broke them. No
+ * clip is cut or scaled to fit: a clip out of range is a plan out of range,
+ * and the remedy is upstream.
+ */
+export function validateLipSyncInput(bytes: Buffer): Result<VideoVerdict> {
+  if (bytes.length > LIP_SYNC_INPUT.maxBytes) {
+    return err(
+      new VideoError(
+        "malformed",
+        `klip ma ${bytes.length} bajtów, a lip-sync przyjmuje najwyżej ${LIP_SYNC_INPUT.maxBytes}`
+      )
+    );
+  }
+
+  const verdict = validateVideo(bytes, { aspectRatio: null, seconds: null });
+
+  if (!verdict.ok) {
+    return verdict;
+  }
+
+  const { height, seconds, width } = verdict.data;
+
+  if (seconds < LIP_SYNC_INPUT.minSeconds || seconds > LIP_SYNC_INPUT.maxSeconds) {
+    return err(
+      new VideoError(
+        "duration",
+        `klip trwa ${seconds}s, a lip-sync przyjmuje od ${LIP_SYNC_INPUT.minSeconds} do ${LIP_SYNC_INPUT.maxSeconds}s`
+      )
+    );
+  }
+
+  return [width, height].every(
+    (side) => side >= LIP_SYNC_INPUT.minSide && side <= LIP_SYNC_INPUT.maxSide
+  )
+    ? verdict
+    : err(
+        new VideoError(
+          "ratio",
+          `klip ma kadr ${width}x${height}, a lip-sync przyjmuje boki od ${LIP_SYNC_INPUT.minSide} do ${LIP_SYNC_INPUT.maxSide} px`
+        )
+      );
 }
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -280,11 +364,18 @@ function readJpeg(bytes: Buffer): { format: StillFormat; height: number; width: 
  * `modelark.ts` or `kling.ts`, so the lifecycle around a job never learns
  * which wire it came over. `endFrameUrl` is `null` when the provider handed no
  * final frame back, which for Kling is always and for ModelArk is a surprise.
+ * `videoId` is the provider's own name for the result, by which a later call
+ * can address it without the bytes; `null` when the provider gives none.
  */
 export type VideoTask =
   | { readonly kind: "failed"; readonly message: string }
   | { readonly kind: "running"; readonly status: string }
-  | { readonly endFrameUrl: string | null; readonly kind: "succeeded"; readonly videoUrl: string };
+  | {
+      readonly endFrameUrl: string | null;
+      readonly kind: "succeeded";
+      readonly videoId: string | null;
+      readonly videoUrl: string;
+    };
 
 export class TaskError extends Error {
   readonly reason: "empty" | "malformed" | "provider" | "url";

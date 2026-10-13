@@ -26,6 +26,7 @@
 export { runVoiceStage } from "./attempt.js";
 export type { SpeechContext, SpeechDelivery } from "./client.js";
 export { DEFAULT_DELIVERY } from "./client.js";
+export { speechTrack } from "./track.js";
 export {
   billedCharacters,
   contextCharacters,

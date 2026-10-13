@@ -22,5 +22,6 @@
  */
 
 export { runVideoStage } from "./attempt.js";
+export { identifyFaces, runLipSync } from "./lip-sync.js";
 export { clipDuration, clipPrompt, videoModel } from "./provider.js";
 export { hasSound, validateEndFrame, validateVideo } from "./validate.js";

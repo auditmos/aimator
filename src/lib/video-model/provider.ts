@@ -24,15 +24,30 @@ import type { VideoTask } from "./validate.js";
 /** The environment variable each provider's key lives in. */
 export type VideoKey = "BYTEPLUS_MODELARK" | "KLING_API_KEY";
 
-export interface VideoProvider {
+/**
+ * What differs between two kinds of asynchronous job on the wire: how the
+ * receipt reads, where the job is asked after, how an answer reads, and where
+ * the frame the result ends on comes from. The order of operations around a
+ * job is not here, because it does not differ; it is `attempt.ts`, once.
+ */
+export interface JobWire {
+  /**
+   * Where the frame the result ends on comes from: handed back beside it, cut
+   * out of the download on this machine, which needs ffmpeg, or nowhere, for a
+   * kind of job nothing continues out of.
+   */
+  readonly endFrame: "cut" | "none" | "returned";
+  readonly pollUrl: (jobId: string) => string;
+  readonly readSubmit: (body: string) => Result<string>;
+  readonly readTask: (body: string) => Result<VideoTask>;
+}
+
+export interface VideoProvider extends JobWire {
   /** The request as archived: every setting sent, the frame by digest only. */
   readonly archive: (request: VideoRequest) => unknown;
   /** The request as sent. */
   readonly body: (request: VideoRequest) => unknown;
-  /**
-   * Where the frame the clip ends on comes from: handed back beside the clip,
-   * or cut out of the downloaded clip on this machine, which needs ffmpeg.
-   */
+  /** A clip always ends on a frame the next clip may continue from. */
   readonly endFrame: "cut" | "returned";
   readonly endpoint: (model: string) => string;
   readonly key: VideoKey;
@@ -40,11 +55,8 @@ export interface VideoProvider {
   readonly matches: (model: string) => boolean;
   /** How the id is written in a refusal: what a person may type instead. */
   readonly pattern: string;
-  readonly pollUrl: (jobId: string) => string;
   /** The longest prompt the provider takes, in characters; `null` for no stated limit. */
   readonly promptLimit: number | null;
-  readonly readSubmit: (body: string) => Result<string>;
-  readonly readTask: (body: string) => Result<VideoTask>;
   /** What the provider renders, in whole seconds, inclusive. */
   readonly seconds: { readonly max: number; readonly min: number };
 }

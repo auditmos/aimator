@@ -200,6 +200,41 @@ function round(seconds: number): number {
   return Math.round(seconds * 1000) / 1000;
 }
 
+/** A line's samples and the format they are in, for laying it on a track. */
+export interface Pcm {
+  readonly bitsPerSample: number;
+  /** Bytes per frame: one sample of every channel. */
+  readonly blockAlign: number;
+  readonly channels: number;
+  readonly data: Buffer;
+  readonly sampleRate: number;
+}
+
+/**
+ * The samples of a line that passes the verdict above, with the two fields of
+ * its format the verdict does not report. Internal to the module: a track is
+ * laid out of these, and nothing outside needs the bytes split.
+ */
+export function readPcm(bytes: Buffer): Result<Pcm> {
+  const verdict = validateSpeech(bytes);
+  const format = findChunk(bytes, "fmt ");
+  const data = findChunk(bytes, "data");
+
+  if (!verdict.ok) {
+    return verdict;
+  }
+
+  return format === null || data === null
+    ? err(new SpeechError("malformed", "WAV jest niekompletny, brak bloku fmt albo bloku data"))
+    : ok({
+        bitsPerSample: bytes.readUInt16LE(format.body + 14),
+        blockAlign: bytes.readUInt16LE(format.body + 12),
+        channels: verdict.data.channels,
+        data: bytes.subarray(data.body, data.end),
+        sampleRate: verdict.data.sampleRate,
+      });
+}
+
 interface Chunk {
   /** Where the payload starts, past this chunk's own eight-byte header. */
   readonly body: number;

@@ -1,6 +1,6 @@
 import { err, ok, type Result } from "../result.js";
 import type { VideoRequest } from "./client.js";
-import type { VideoProvider } from "./provider.js";
+import type { JobWire, VideoProvider } from "./provider.js";
 import { parseAnswer, readUrl, TaskError, type VideoTask } from "./validate.js";
 
 /**
@@ -167,7 +167,223 @@ function readTask(body: string): Result<VideoTask> {
     return ok({ kind: "running", status: task.status ?? "unknown" });
   }
 
-  const video = readUrl(task.outputs?.find((one) => one.type === "video")?.url, "wideo");
+  const output = task.outputs?.find((one) => one.type === "video");
+  const video = readUrl(output?.url, "wideo");
 
-  return video.ok ? ok({ endFrameUrl: null, kind: "succeeded", videoUrl: video.data }) : video;
+  return video.ok
+    ? ok({
+        endFrameUrl: null,
+        kind: "succeeded",
+        videoId: output?.id ?? null,
+        videoUrl: video.data,
+      })
+    : video;
 }
+
+/**
+ * The other two calls Kling sells for a clip it did not necessarily render:
+ * finding the faces in it, and moving one face's lips to a sound. Both live
+ * under `/v1/videos/`, unlike the 3.0 render above, and the lip-sync job is
+ * polled at its own path rather than through `/tasks`.
+ */
+export const LIP_SYNC_ENDPOINT = `${BASE}/v1/videos/advanced-lip-sync`;
+
+export const IDENTIFY_FACE = `${BASE}/v1/videos/identify-face`;
+
+/** What a face call is handed: the provider's own id for the clip, or an address to fetch. */
+export type FaceSource = { readonly videoId: string } | { readonly videoUrl: string };
+
+export function identifyBody(source: FaceSource): unknown {
+  return "videoId" in source ? { video_id: source.videoId } : { video_url: source.videoUrl };
+}
+
+/** A face as found: the provider's id for it, its picture, and when it is on screen, in ms. */
+export interface Face {
+  readonly end: number;
+  readonly id: string;
+  readonly image: string;
+  readonly start: number;
+}
+
+interface IdentifiedFace {
+  readonly end_time?: number;
+  readonly face_id?: string;
+  readonly face_image?: string;
+  readonly start_time?: number;
+}
+
+/** The session a later job is addressed by, and every face in it. */
+export function readFaces(
+  body: string
+): Result<{ readonly faces: readonly Face[]; readonly sessionId: string }> {
+  const answer =
+    parseAnswer<
+      Envelope<{ readonly face_data?: readonly IdentifiedFace[]; readonly session_id?: string }>
+    >(body);
+
+  if (!answer.ok) {
+    return answer;
+  }
+
+  const refused = declined(answer.data, "rozpoznania twarzy");
+
+  if (refused !== null) {
+    return err(refused);
+  }
+
+  const sessionId = answer.data.data?.session_id;
+
+  if (typeof sessionId !== "string" || sessionId === "") {
+    return err(new TaskError("empty", "API nie zwróciło identyfikatora sesji rozpoznania twarzy"));
+  }
+
+  const faces: Face[] = [];
+
+  for (const face of answer.data.data?.face_data ?? []) {
+    const image = readUrl(face.face_image, "obrazka twarzy");
+
+    if (!image.ok) {
+      return image;
+    }
+
+    if (
+      typeof face.face_id !== "string" ||
+      typeof face.start_time !== "number" ||
+      typeof face.end_time !== "number"
+    ) {
+      return err(new TaskError("malformed", "API zwróciło twarz bez id albo bez przedziału czasu"));
+    }
+
+    faces.push({ end: face.end_time, id: face.face_id, image: image.data, start: face.start_time });
+  }
+
+  return ok({ faces, sessionId });
+}
+
+/** One face moved to one sound, every time in ms, the sound as sent. */
+interface LipSyncOrder {
+  readonly faceId: string;
+  /** Where on the clip's clock the sound goes in. */
+  readonly insertAt: number;
+  readonly sessionId: string;
+  readonly sound: Buffer;
+  /** The sound's own length: the whole of it is used, never a crop. */
+  readonly soundLength: number;
+}
+
+/**
+ * The job as sent. `face_choose` holds one face, because the provider moves one
+ * face per job and a second character in the same clip is a second job, run on
+ * the first one's result.
+ */
+export function lipSyncBody(order: LipSyncOrder): unknown {
+  return {
+    face_choose: [
+      {
+        face_id: order.faceId,
+        sound_end_time: order.soundLength,
+        // Raw Base64, the spelling the clip's first frame travels in.
+        sound_file: order.sound.toString("base64"),
+        sound_insert_time: order.insertAt,
+        sound_start_time: 0,
+      },
+    ],
+    session_id: order.sessionId,
+    watermark_info: { enabled: false },
+  };
+}
+
+/** The job as archived: the sound by digest only, everything else as sent. */
+export function lipSyncArchive(order: LipSyncOrder, sha256: string): unknown {
+  return {
+    endpoint: LIP_SYNC_ENDPOINT,
+    faceChoose: [
+      {
+        faceId: order.faceId,
+        sound: { bytes: order.sound.length, sha256, type: "audio/wav" },
+        soundEndTime: order.soundLength,
+        soundInsertTime: order.insertAt,
+        soundStartTime: 0,
+      },
+    ],
+    sessionId: order.sessionId,
+    watermark: false,
+  };
+}
+
+interface LipSyncTask {
+  readonly task_id?: string;
+  readonly task_result?: {
+    readonly videos?: readonly { readonly id?: string; readonly url?: string }[];
+  };
+  readonly task_status?: string;
+  readonly task_status_msg?: string;
+}
+
+/**
+ * The lip-sync job on the wire: a different receipt (`task_id`), a different
+ * poll and a different spelling of success (`succeed`). No frame is handed
+ * back and none is cut, because nothing continues out of a lip-synced clip.
+ */
+export const klingLipSync: JobWire = {
+  endFrame: "none",
+  pollUrl: (jobId) => `${LIP_SYNC_ENDPOINT}/${encodeURIComponent(jobId)}`,
+  readSubmit: (body) => {
+    const answer = parseAnswer<Envelope<LipSyncTask>>(body);
+
+    if (!answer.ok) {
+      return answer;
+    }
+
+    const refused = declined(answer.data, "uruchomienia lip-syncu");
+    const id = answer.data.data?.task_id;
+
+    if (refused !== null) {
+      return err(refused);
+    }
+
+    return typeof id === "string" && id !== ""
+      ? ok(id)
+      : err(new TaskError("empty", "API nie zwróciło identyfikatora zadania"));
+  },
+  readTask: (body) => {
+    const answer = parseAnswer<Envelope<LipSyncTask>>(body);
+
+    if (!answer.ok) {
+      return answer;
+    }
+
+    const refused = declined(answer.data, "odpowiedzi o lip-sync");
+
+    if (refused !== null) {
+      return err(refused);
+    }
+
+    const task = answer.data.data;
+
+    if (task?.task_status === "failed") {
+      const message = task.task_status_msg ?? "";
+
+      return ok({
+        kind: "failed",
+        message: `lip-sync zakończył się statusem "failed"${message === "" ? "" : `: ${message}`}`,
+      });
+    }
+
+    if (task?.task_status !== "succeed") {
+      return ok({ kind: "running", status: task?.task_status ?? "unknown" });
+    }
+
+    const [output] = task.task_result?.videos ?? [];
+    const video = readUrl(output?.url, "wideo");
+
+    return video.ok
+      ? ok({
+          endFrameUrl: null,
+          kind: "succeeded",
+          videoId: output?.id ?? null,
+          videoUrl: video.data,
+        })
+      : video;
+  },
+};

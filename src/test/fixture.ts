@@ -161,15 +161,17 @@ export function mp4(options: {
  * chunk stating the rate, the channels and the depth, and a `data` chunk whose
  * size is the whole of the duration. `junk` puts an unknown chunk in front of
  * the ones that matter, because a real encoder does and a reader that assumes
- * a fixed layout would work here and fail there.
+ * a fixed layout would work here and fail there. `fill` is the byte every sample
+ * is made of, so a test can tell where a line sits and where silence does.
  */
 export function wav(options: {
   readonly channels?: number;
+  readonly fill?: number;
   readonly junk?: boolean;
   readonly sampleRate?: number;
   readonly seconds: number;
 }): Buffer {
-  const { channels = 1, junk = false, sampleRate = 24_000, seconds } = options;
+  const { channels = 1, fill = 0, junk = false, sampleRate = 24_000, seconds } = options;
   const blockAlign = channels * 2;
   const byteRate = sampleRate * blockAlign;
   const format = Buffer.alloc(16);
@@ -185,7 +187,7 @@ export function wav(options: {
     Buffer.from("WAVE", "ascii"),
     ...(junk ? [chunk("LIST", Buffer.from("INFOhand-rolled", "ascii"))] : []),
     chunk("fmt ", format),
-    chunk("data", Buffer.alloc(Math.round(seconds * byteRate), 0)),
+    chunk("data", Buffer.alloc(Math.round(seconds * byteRate), fill)),
   ]);
 
   return Buffer.concat([chunk("RIFF", body)]);
