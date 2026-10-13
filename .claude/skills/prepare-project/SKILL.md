@@ -5,156 +5,80 @@ description: Run stage 0 of the animation pipeline — establish a project's sha
 
 # Stage 0 — prepare a project and an episode
 
-A guided preparation step, not a generation step. You ask for creative decisions and
-save the approved ones. **Nothing here calls a paid API.** Talk to the user in their
-language; these instructions stay in English.
-
-The mechanical work belongs to the CLI, the conversation belongs to you. Never
-hand-write `project.json`, `episode.json` or `prepare.stage.json` — those carry digests
-and provenance the tool computes. You author exactly one file by hand: `project.md`.
+A guided preparation step: you ask for creative decisions and save the approved ones.
+**Nothing here calls a paid API.** Talk to the user in their language; these instructions
+stay in English. Never hand-write a JSON file: the CLI computes their digests and provenance.
+**You author exactly one file by hand: `project.md`.**
 
 ## 1. Read before you ask
 
-Read `docs/pipeline.md` for the stage contract. Then ask the CLI what already exists; it
-has a read for every part of stage 0, none of them writes anything, and each prints an
-object under `--json`:
-
 ```sh
 aimator list --json                                     # projects and their episodes
-aimator project show <project-id> --json                # title, aspect ratio, narrator,
-                                                        # cast with each basis and photo
+aimator project show <project-id> --json                # cast, narrator, style images
 aimator episode show <project-id> <episode-id> --json   # source and its six decisions
 aimator check <project-id> --stage prepare --json       # the verdict on stage 0 alone
 ```
 
-`project show` and `episode show` are **descriptions, not verdicts**: an undecided field
-comes back as `null`, never missing and never guessed. `check` is the verdict. When stage 0
-is incomplete it refuses, and the refusal lists every missing piece in the stage's own
-words. That list is your agenda. Once the files hold together it answers `ready: true`
-with `approved`, and with `changedSinceApproval` naming any accepted file edited since the
-yes (in practice `project.md`). Keep `--stage prepare`: with an episode id and no flag,
-`check` glues the verdicts of stages 0, 1, 3 and 4 into one text.
-
-Read `project.md` and the episode's `source.md` as files. They are prose, and there is no
-command that says more about them than their text. Do **not** open `project.json`,
-`episode.json` or `prepare.stage.json` to find out what was decided: those files record
-digests and provenance, and the commands above are the contract that reads them.
-
-Do not infer facts from other conversations, and do not borrow another project's story,
-character, setting or runtime. If the user has not named the project or the episode
-source, ask.
+None of these writes anything. `show` is a description: an undecided field comes back as
+`null`, a question to ask and never a value to fill in. `check` is the verdict, and its
+`problems` are your agenda. Keep `--stage prepare`: with an episode id and no flag, `check`
+glues stages 0, 1, 3 and 4. Read `project.md` and the episode's `source.md` as files, but
+never the JSON files: the commands above are the contract that reads them. Borrow nothing
+from another project or conversation, and if the project or the episode source is unnamed, ask.
 
 ## 2. Collect decisions
 
-First summarise what is **already** decided, from the reads above and this conversation:
-the cast and each basis, the narrator, each episode's decisions, and whether stage 0 is
-approved. Then ask only about what is missing or contradictory, in small groups. A `null`
-in `project show` or `episode show` is a question to ask, not a value to fill in.
-
-Label every suggestion of yours as a proposal. A proposal the user has not answered is
-not a decision, and writing it into `project.md` as though it were is the one failure
-this stage exists to prevent.
-
-For a new project establish:
+Summarise what is already decided, then ask only about what is missing or contradictory, in
+small groups. Label every suggestion a proposal: one written into `project.md` as though the
+user had answered it is the failure this stage exists to prevent. For a new project:
 
 1. the premise, and what a single episode tells relative to the others;
 2. the shared world, period, tone and audience;
-3. the protagonist's role and recurring appearance, any recurring cast, and the Style
-   Bible (below). Ask where the character's look comes from — **photographs of a real person**, or
-   **the description in `project.md`**. There is no third answer and no default, and the
-   readiness gate blocks until one is recorded. Record real paths and the **actual**
-   review status: never claim an approval or an inspection that did not happen;
-
-   When the answer is the description, this prose is the only input the character stage
-   will ever receive, so finish it here rather than leaving it to a later stage that has
-   nowhere to look. Keep asking until each of these names something a renderer can act on:
-   the protagonist's proportions — head-to-body ratio and how deformed the figure is, asked
-   separately from the aspect ratio because in Polish both are "proporcje" — their face and
-   body, the recurring wardrobe, every recurring character, each recurring prop, the
-   recurring setting, and the four Style Bible fields.
-
-   Once there is more than one character, also record how they relate: how they scale
-   against each other, whether their heads are the same size, and what is drawn identically
-   across all of them. Two independent proportions never fix a relation, and the character
-   stage draws each figure separately, so what nobody stated it will invent. `project.md`
-   has a row for exactly this, and `aimator check` blocks while its marker is unfilled.
-
-   Keep a running list of every recurring character, object and place the answers surface,
-   and describe each entry on it. The list is whatever this interview produced — one series
-   has several recurring characters and no objects, another the reverse — so never ask for
-   an element the user has not introduced, and never let one they did introduce go
-   unspecified. **Naming a recurring element is not describing it:** an object still needs
-   its shape, size against the character, material, colour and wear, and one the story
-   leans on earns as much detail as a character because it will be in as many frames.
-   Before you write anything, re-read the list; an entry named but not described is an
-   unasked question.
-
-   What recurs across episodes belongs in the rules; this episode's own locations, one-off
-   props and shots do not — those are derived from the screenplay several stages later. If
-   something stays open, write it in the open section and say out loud that the character
-   stage will otherwise invent it differently on every run;
-4. the aspect ratio, and any binding opening-composition or continuity requirement;
+3. the protagonist's role, every recurring character, the source of each one's look
+   (**photographs** or **the description** in `project.md`, never a default), the Style Bible;
+4. the aspect ratio, any opening composition, and what stays constant between scenes;
 5. any other binding creative constraint.
 
-### The Style Bible
+When the conversation reaches the look of the series, read [docs/styl.md](../../../docs/styl.md)
+and ask its questions rather than recite its method. Before naming a style or cast concept,
+read [docs/slownik.md](../../../docs/slownik.md) and use its word, in conversation and in the
+file. Before writing the Style Bible, read [its section](../../../docs/stages/00-przygotowanie.md#style-bible).
+**Never record a studio, film or artist name**: it reaches the image provider verbatim.
 
-`project.md` carries one English block, **Style Bible**, with four fields: the style line,
-the palette, the linework rule and the always / never list. English is rule 9, not taste:
-every image call receives the block verbatim as an instruction to the model. `aimator check`
-blocks while any of its four markers is unfilled.
+<important if="a character's look comes from photographs">
+Record them with `character add`. Nobody has inspected them yet: never write that anyone did.
+</important>
 
-When the conversation reaches the look of the series, read `docs/styl.md` and work from it
-rather than from memory: it holds the Style Stack, the nine questions of the style
-fingerprint, how to write a style line, a catalogue of lines to offer as proposals, and what
-each style family costs in regenerations. Ask its questions; do not recite the method. Name
-every concept with the word `docs/slownik.md` gives it, in the conversation as well as in
-the file, because a synonym in the conversation becomes a synonym in the prompt.
+<important if="a character's look comes from the description">
+Record it with `character describe`: the prose in `project.md` is all the character stage gets.
+</important>
 
-**Never record a studio, film or artist name; record its decomposition.** A name is not a
-decision, and it reaches the image provider verbatim, which may refuse it and stop the
-stage. When the user answers with a name, ask which film and which features they mean, and
-offer the matching line from the "instead → use" table in `docs/styl.md` as a proposal.
+Before writing `project.md`, check that each of these is closed in it, or sits in its open
+section with a sentence saying the character stage will invent it differently every run:
 
-The block describes the drawing as a whole. Whatever stops being true when the cast is
-swapped, such as figure proportions or how the characters scale against each other, belongs
-to the character rows and never to the Style Bible. In the always / never field, `none` is
-an answer only when the user said there are no hard rules; it is never a way to skip the
-question.
+- the roster holds every recurring character, under the word the rules use for it;
+- every character has figure proportions, never confused with the aspect ratio, and a
+  recurring wardrobe; one drawn from the description also has a face and a body;
+- every recurring prop has shape, size against a character, material, colour and wear, and
+  every recurring setting its fixed furnishings, palette and light, or the row says „brak";
+- across characters: relative scale, whether their heads match, what is drawn the same on all;
+- no entry is only named, and nothing on the list belongs to this episode alone.
 
-For each episode establish:
+When the conversation reaches an episode, read [the table of its
+decisions](../../../docs/stages/00-przygotowanie.md#sześć-decyzji-odcinka) and establish each.
+An idea alone is a valid source: the story is stage 1's job. If the user wants sound no
+`--audio` mode covers, say so; never map it onto the nearest one. `--subtitles` is decided
+apart from `--language`, and in a speechless film `none` also rules out title cards.
 
-1. the source file and its nature — `law-or-idea`, `synopsis` or `screenplay`. An idea
-   alone is enough; developing the story is stage 1's job, not the user's;
-2. `durationSeconds` — a whole number from 1 to 3600;
-3. `audio` — `music-and-effects`, `dialogue`, `narration` or `dialogue-and-narration`.
-   All four include music and effects. If the user asks for something none of these
-   covers, say so; **never silently map it onto the nearest mode**;
-4. `language` — the code for the screenplay and any spoken lines. Required even for a
-   film with no speech, because the screenplay document still has a language;
-5. `subtitles` — a language code, or `none`. Decided **independently** of `language`.
-   Explain that in a speechless film on-screen text means short captions, and that
-   `none` also excludes title cards and any text the plot needs to be understood.
+Once the Style Bible is settled, ask about style images, a project decision that stages 5 to 7
+wait for; read [what each answer means](../../../docs/stages/00-przygotowanie.md#obrazy-stylu) first.
 
-### The narrator's voice, when an episode asks for one
-
-An `audio` mode of `narration` or `dialogue-and-narration` puts a narrator in the film, and
-that narrator has to be cast. Whether one is cast already is `narratorVoiceId` in
-`project show`. **Who reads the series is casting, not configuration** — the
-same reader comes back in episode seven exactly as the characters do — so it belongs to the
-project, beside the roster, and a later stage reads it from there.
-
-Ask for the provider's voice id and record it verbatim. You cannot derive it from a
-description of how the narrator should sound, and a voice nobody chose is not a decision,
-so **never invent one and never pick a plausible default**: ask, or leave it unset and say
-it is unset.
-
-Two things this is not. It is not *how* the narrator reads — stability, style and pace are
-direction, they live in their own file, and they are dialled in by ear once there is
-something to hear, which is stage 9's business and not yours. And it is not gated here:
-`aimator check` passes without a voice, because a film with no narration never has to make
-this decision. That makes it the one stage-0 decision a green check does not cover, so if
-an episode asks for narration and no voice is set, say so in your report — otherwise the
-user meets it as a refusal several paid stages later.
+<important if="an episode's audio is narration or dialogue-and-narration">
+**Who reads the series is casting**, recorded once per project as `narratorVoiceId`. Ask for
+the provider's voice id and record it verbatim; never invent one or pick a default. How the
+narrator reads is stage 9's direction, not yours. `aimator check` passes without a voice, so
+if it is missing, say so in your report, or the user meets it several paid stages later.
+</important>
 
 ## 3. Save
 
@@ -163,69 +87,34 @@ aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9
 aimator character new <project-id> <character-id> --name "<nazwa>"
 aimator character add <project-id> <character-id> --source <zdjęcie> [--source <zdjęcie>...]
 aimator character describe <project-id> <character-id>
+aimator project style <project-id> --source <obraz.png>   # or --generated --count <n>, or --none
 aimator episode add <project-id> --source <NN-tytul.md>
 aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-effects \
-  --language pl --subtitles pl --nature law-or-idea
+  --language pl --subtitles pl --nature law-or-idea --max-clip 6
 aimator project voice <project-id> --voice-id <id głosu>   # only when an episode narrates
 ```
 
-Add `--dry-run` to any of these to see what would be written without writing it.
+`--dry-run` shows what any of them would write. `episode set` changes only the flags it is
+given, so pass exactly what the user changed, then read the result back with `show`.
 
-`episode set` changes only the flags it is given and leaves every other decision as it
-stands, so pass exactly what the user changed. After saving, read the result back with
-`project show` or `episode show` rather than repeating what you meant to write: the
-command's output is the evidence, your intention is not.
+`project init` scaffolds `project.md` with `TODO(etap-0)` markers: replace each with an
+approved decision, delete the leading quote block, and keep what is open in its own section.
+An episode source's file name starts with its number, unique in the project: `01-tytul.md`.
+Model choice and API keys never belong in `project.md`, in a prompt or in any artifact.
 
-**Declare every recurring character, not just the lead.** The roster is an explicit
-decision and an empty one blocks the gate — a project with nobody in it used to mean
-"exactly one, anonymous", which is how a series whose rules described two people produced
-one. The criterion is recurrence: a character whose identity has to survive between
-episodes belongs here; a face seen once is a stage-5 reference image instead. Ask the user
-who comes back, and name each one. The `--name` is what the image stage puts in its prompt,
-so it must be the word the rules use for that character.
-
-`character add` and `character describe` are the two ways to answer the same question for
-**one** character, and supplying a photograph counts as the answer. `character describe` is
-not a formality: it records that no photograph is coming, which is what lets the gate
-distinguish a decision from an omission. Different characters in one project may answer
-differently.
-
-`project init` scaffolds `project.md` with `TODO(etap-0)` markers. **Replace every marker
-with the approved decisions** and delete the leading quote block. Keep unresolved,
-non-blocking matters in their own section and clearly marked as open.
-
-The episode source keeps its bytes. `episode add` copies it and records its digest, so
-the file name must start with the episode number and a separator — `01-tytul.md`. The
-number decides the output directory and must be unique within the project.
-
-For an existing project, reuse its rules and create only the new episode. Do not replace
-approved material with a fresh template. If the user changes an input that a later stage
-already consumed, say which results now need re-checking — do not regenerate them.
-
-Model choice and API keys are not part of these decisions and never belong in
-`project.md`, in a prompt or in any artifact.
+<important if="the project already exists">
+Reuse its rules and create only the new episode; never replace approved material with a
+fresh template. If the user changes an input a later stage already consumed, read [the
+contract](../../../docs/pipeline.md) and say which results need re-checking; regenerate none.
+</important>
 
 ## 4. Hand off
 
-```sh
-aimator check <project-id> --stage prepare --json
-aimator approve <project-id> [--note "<co zostało przeczytane>"]
-```
-
-`check` passes when the rules carry no markers, the aspect ratio and the character basis
-are set, the recorded digests still match and every episode has all five decisions. That is
-a **file** check: it does not confirm that the rules make sense or that the ideas are good.
-It also says nothing about the narrator's voice, which gates stage 9 alone — a pass is not
-evidence that a narrated episode is ready to reach it.
-
-`approve` is where somebody says they do. Run it only after the user has read the rules and
-said yes — never on your own initiative, and never to make a report look finished. It
-refuses anything `check` rejects, and it binds the approval to the bytes as they stand,
-including `project.md`, which acquires its digest at this moment and at no earlier one.
-Editing an approved artifact afterwards revokes the approval, and `check` will say so: a
-sentence in `problems`, and the file itself in `changedSinceApproval`. When that happens
-after your own edit to `project.md`, tell the user the rules they approved have changed
-and must be read and approved again; never re-approve to make the lapse go away.
+Run `check` again, then `aimator approve <project-id> [--note "<co zostało przeczytane>"]`.
+A pass is a file check, not a verdict on the rules. **Run `approve` only after the user has
+read the rules and said yes**, never on your own initiative or to make a report look done.
+It binds the yes to the bytes, so a later edit to `project.md` revokes it: tell the user the
+rules they approved changed and must be read again, and never re-approve to clear the lapse.
 
 Report what was created, what was reused, what is still open, and the exact next command.
 Stage 0 ends there.

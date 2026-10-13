@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { run } from "../cli/index.js";
@@ -56,6 +56,10 @@ const MARKDOWN = COMMITTED.filter(
 const SKILLS = COMMITTED.filter((path) => path.startsWith(".claude/skills/")).map((file) =>
   join(repoRoot, file)
 );
+
+/** The skills that point the conversation at pages rather than copy them. */
+const STAGE_0_SKILLS = [".claude/skills/develop-series", ".claude/skills/prepare-project"];
+const QUOTED = /`([^`\s]+)`/g;
 
 function markdownUnder(path: string): string[] {
   const prefix = `${relative(repoRoot, path)}/`;
@@ -190,11 +194,37 @@ describe("documentation", () => {
    * Instructions like these arrive wrapped in a note that they may or may not
    * be relevant, and the longer the file, the more of it is read as optional.
    * What does not fit goes to a reference file the skill loads on a stated
-   * condition, which is the only way it stays short while it grows.
+   * condition, which is the only way it stays short while it grows. Saving is
+   * what `prepare-project` alone does, so its commands buy it twenty lines more.
    */
-  it("should keep the develop-series skill to a hundred lines", () => {
-    const skill = readRepoFile(".claude/skills/develop-series/SKILL.md");
-    expect(skill.trimEnd().split("\n").length).toBeLessThanOrEqual(100);
+  it.each([
+    ["develop-series", 100],
+    ["prepare-project", 120],
+  ])("should keep the %s skill to %i lines", (skill, limit) => {
+    const text = readRepoFile(`.claude/skills/${skill}/SKILL.md`);
+    expect(text.trimEnd().split("\n").length).toBeLessThanOrEqual(limit);
+  });
+
+  /**
+   * A path in backticks is a pointer the link check above cannot see, so it
+   * breaks in silence. Held to it are the two stage-0 skills, the ones that
+   * point the conversation at pages instead of copying them. A workspace file
+   * such as `project.md` is not in this repository and stays quoted.
+   */
+  it("should link, never quote, a repository file in the stage-0 skills", () => {
+    const files = SKILLS.filter((file) =>
+      STAGE_0_SKILLS.some((skill) => relative(repoRoot, file).startsWith(`${skill}/`))
+    );
+    const quoted: string[] = [];
+    for (const file of files) {
+      for (const [, token] of readFileSync(file, "utf8").matchAll(QUOTED)) {
+        if (token && statSync(join(repoRoot, token), { throwIfNoEntry: false })?.isFile()) {
+          quoted.push(`${relative(repoRoot, file)}: ${token}`);
+        }
+      }
+    }
+    expect(files.length).toBeGreaterThanOrEqual(STAGE_0_SKILLS.length);
+    expect(quoted).toEqual([]);
   });
 
   /**
