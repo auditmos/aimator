@@ -362,11 +362,15 @@ h1 {
   color: var(--color-neutral-400);
 }
 
-/* The five states, each in words and in a colour, never in the colour alone. */
+/* The six states, each in words and in a colour, never in the colour alone.
+   "Nie dotyczy" is the quietest: nobody waits on it. */
 .state {
   font-size: 0.8125rem;
   color: var(--color-neutral-400);
   white-space: nowrap;
+}
+.state-excluded {
+  color: var(--color-neutral-500);
 }
 .state-approved {
   color: var(--color-success-text);
@@ -519,7 +523,7 @@ h1 {
   justify-content: flex-end;
 }
 
-/* One stage close up: a strip of eleven marks, the stage's name, its tabs,
+/* One stage close up: a strip of thirteen marks, the stage's name, its tabs,
    and then nothing but its panel. */
 .stepper {
   margin-top: 1.5rem;
@@ -547,6 +551,11 @@ h1 {
 }
 .step-blocked {
   border-top-color: var(--color-warning-text);
+}
+/* A stage this episode does not need keeps the strip's neutral line, dashed,
+   so it reads as outside the film rather than as not started. */
+.step-excluded {
+  border-top-style: dashed;
 }
 .step-review,
 .step-running,
@@ -619,6 +628,14 @@ h1 {
 }
 .stage-reason::before {
   content: "! ";
+}
+/* The decision that rules a stage out is a report, not a refusal: the CLI
+   prints it after a dot, and so does this. */
+.stage-reason-excluded {
+  color: var(--color-neutral-400);
+}
+.stage-reason-excluded::before {
+  content: "· ";
 }
 .stage-body {
   margin-top: 1.5rem;
@@ -1356,7 +1373,7 @@ h1 {
     grid-column: 2 / -1;
     justify-content: flex-start;
   }
-  /* Eleven names do not fit a phone; eleven numbers do, and the page's own
+  /* Thirteen names do not fit a phone; thirteen numbers do, and the page's own
      heading names the one that is open. */
   .step-name {
     display: none;

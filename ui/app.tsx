@@ -17,7 +17,7 @@ import {
 } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
-import { Commands, plural, RunDock, SettledStage } from "./panel";
+import { Block, Commands, plural, RunDock, Said, SettledStage } from "./panel";
 import { NewEpisode, NewProject, PreparePanel, ProjectApproval } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
@@ -240,6 +240,13 @@ interface PanelProps {
  * there is a cell to open, so the episode screen places it itself.
  */
 function StagePanel(props: PanelProps): JSX.Element | null {
+  // A stage the episode rules out has nothing to buy or accept, so its page is
+  // its reason alone, said above the panel; a panel would offer a command the
+  // stage refuses. Stage 0 is never ruled out, which is why this lives here.
+  if (props.cell.state === "excluded") {
+    return null;
+  }
+
   if (props.cell.stage === 1) {
     return <ScreenplayPanel {...props} />;
   }
@@ -297,7 +304,24 @@ function StagePanel(props: PanelProps): JSX.Element | null {
     return props.cell.track === null ? <SoundDesignPanel {...props} /> : <MasterPanel {...props} />;
   }
 
-  return null;
+  return <TerminalStage cell={props.cell} />;
+}
+
+/**
+ * A stage this screen draws no panel for, which today is 11 and 12.
+ *
+ * Where it stands is on the ladder like any other; what moves it is the one
+ * command `status` composed for its cell, and the terminal is where that runs.
+ */
+function TerminalStage(props: { readonly cell: StatusCell }): JSX.Element {
+  const { cell } = props;
+
+  return (
+    <Block title="Polecenie w terminalu">
+      <p>Ten etap nie ma jeszcze panelu na ekranie; prowadzi go terminal.</p>
+      {cell.nextStep === null ? null : <Said text={cell.nextStep} />}
+    </Block>
+  );
 }
 
 /**
@@ -602,7 +626,7 @@ function OpenEpisode(props: { readonly project: ListedProject }): JSX.Element {
  *
  * It replaced a ladder of two dozen rows with a panel beside it, which asked a
  * person to read both at once. Here the strip at the top says where the
- * episode stands in eleven marks, the tabs under it choose a track or a
+ * episode stands in thirteen marks, the tabs under it choose a track or a
  * character when the stage has more than one, and the panel below is the whole
  * rest of the page. The address names the cell, so a reload, the back button
  * and a pasted link all land on the same tab.
@@ -652,7 +676,15 @@ function StageScreen(props: {
         Etap {stage.stage}: {stageName(stage.stage)}
       </h2>
       <Variants current={cell.id} hrefOf={hrefOf} stage={stage} />
-      {cell.reason === null ? null : <p className="stage-reason">{cell.reason}</p>}
+      {cell.reason === null ? null : (
+        <p
+          className={
+            cell.state === "excluded" ? "stage-reason stage-reason-excluded" : "stage-reason"
+          }
+        >
+          {cell.reason}
+        </p>
+      )}
       <Commands>
         <div className="stage-body">
           {/* An approved stage opens with every block folded: it is visited
@@ -692,7 +724,7 @@ function StageScreen(props: {
 /**
  * One episode, at the distance the address asks for.
  *
- * Without a stage it is the overview: the next step and eleven rows. With one
+ * Without a stage it is the overview: the next step and thirteen rows. With one
  * it is that stage's page. Both read one stream, opened once per episode, so
  * moving between stages re-asks nothing and loses no ladder.
  */

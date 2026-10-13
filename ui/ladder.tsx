@@ -8,20 +8,21 @@ import type { CellState, EpisodeStatus, Refusal, Stage0Report, StatusCell } from
  * `status` hands over one cell per stage, per character and per track: two
  * dozen rows for an episode with two characters. Shown at once, beside an open
  * panel, that was a wall a person had to read end to end to find the one row
- * they came for. So the ladder is read twice instead. From afar it is eleven
+ * they came for. So the ladder is read twice instead. From afar it is thirteen
  * stages, one row each, which is the question "where is this episode"; up
  * close it is one stage, with its tracks and characters as tabs over the one
  * panel that is open, which is the question "what do I do here".
  *
  * Every word still comes off the object the server handed over. Grouping by
  * stage and counting states is arithmetic over those cells, never a verdict:
- * the five states keep their text labels beside their colour, and the reason a
+ * the six states keep their text labels beside their colour, and the reason a
  * cell is blocked is the stage's own sentence, quoted rather than summarised.
  */
 
 const LABEL: Record<CellState, string> = {
   approved: "zatwierdzony",
   blocked: "zablokowany",
+  excluded: "nie dotyczy",
   ready: "gotowy do generowania",
   review: "do przeglądu",
   running: "w toku",
@@ -46,6 +47,8 @@ const STAGE_NAME: Readonly<Record<number, string>> = {
   8: "montaż",
   9: "narracja",
   10: "muzyka i efekty",
+  11: "dialog",
+  12: "wersje językowe",
 };
 
 export function stageName(stage: number): string {
@@ -77,9 +80,9 @@ export function stagesOf(status: EpisodeStatus): readonly Stage[] {
 /**
  * Which of a stage's cells this is, in as few words as tell them apart.
  *
- * Stage 2 differs by character and track, stages 5 to 8 by track, and stages 9
- * and 10 by level: the half after the comma in the cell's own title is what
- * separates the shared words from a track's mix.
+ * Stage 2 differs by character and track, stages 5 to 8 and 12 by track, and
+ * stages 9 and 10 by level: the half after the comma in the cell's own title is
+ * what separates the shared words from a track's mix.
  */
 function variantOf(cell: StatusCell): string {
   const level = cell.title.includes(", ") ? (cell.title.split(", ").at(-1) ?? null) : null;
@@ -87,8 +90,23 @@ function variantOf(cell: StatusCell): string {
   return [level, cell.character, cell.track].filter((part) => part !== null).join(" · ");
 }
 
-/** The order a person should look in: what moves first, what is finished last. */
-const URGENCY: readonly CellState[] = ["running", "review", "ready", "blocked", "approved"];
+/**
+ * The order a person should look in: what moves first, what is finished last,
+ * and last of all what the episode decided it does not need.
+ */
+const URGENCY: readonly CellState[] = [
+  "running",
+  "review",
+  "ready",
+  "blocked",
+  "approved",
+  "excluded",
+];
+
+/** Nobody waits on it: a person said yes, or the episode said it needs none. */
+function settled(cell: StatusCell): boolean {
+  return cell.state === "approved" || cell.state === "excluded";
+}
 
 /** How many cells of a stage stand in each state, most pressing first. */
 function tally(cells: readonly StatusCell[]): readonly { count: number; state: CellState }[] {
@@ -113,7 +131,7 @@ function leading(cells: readonly StatusCell[]): CellState {
 export function defaultCell(stage: Stage, next: string | null): StatusCell | null {
   return (
     stage.cells.find((cell) => cell.id === next) ??
-    stage.cells.find((cell) => cell.state !== "approved") ??
+    stage.cells.find((cell) => !settled(cell)) ??
     stage.cells[0] ??
     null
   );
@@ -179,7 +197,9 @@ function NextStep(props: { readonly hrefOf: HrefOf; readonly status: EpisodeStat
     return (
       <div className="next-card next-card-done">
         <p className="next-label">Następny krok</p>
-        <p className="next-what">Odcinek zamknięty: każdy etap zatwierdzony.</p>
+        <p className="next-what">
+          Odcinek zamknięty: każdy etap zatwierdzony albo odcinka nie dotyczy.
+        </p>
       </div>
     );
   }
@@ -233,8 +253,8 @@ const TRACKS: Unit = ["tor", "tory", "torów"];
 /**
  * What a stage's rows are, counted in their own axes.
  *
- * Stage 2 is characters times tracks, stages 5 to 8 are tracks, and stages 9
- * and 10 are one shared half plus a half per track.
+ * Stage 2 is characters times tracks, stages 5 to 8 and 12 are tracks, and
+ * stages 9 and 10 are one shared half plus a half per track.
  */
 function partsOf(cells: readonly StatusCell[]): string {
   const characters = new Set(cells.flatMap((cell) => cell.character ?? [])).size;
@@ -252,7 +272,7 @@ function partsOf(cells: readonly StatusCell[]): string {
  *
  * Each row is a link to that stage's own page, which is where its tracks,
  * characters, notes and actions are. Nothing else is on this screen, so the
- * eye reads down eleven rows and not twenty-three.
+ * eye reads down thirteen rows and not twenty-five.
  */
 export function EpisodeOverview(props: {
   readonly hrefOf: HrefOf;
@@ -398,9 +418,10 @@ export function Neighbours(props: {
 /**
  * The whole episode as one mark: finished, or still wanting work.
  *
- * Finished means every stage is approved, read off the same `status` the
- * ladder is drawn from, cell by cell; a stage with one track approved and the
- * other waiting is not finished, because the film it feeds is not. The number
+ * Finished means every stage is approved or ruled out by the episode's own
+ * decisions, read off the same `status` the ladder is drawn from, cell by
+ * cell; a stage with one track approved and the other waiting is not
+ * finished, because the film it feeds is not. The number
  * beside the unfinished mark counts stages rather than cells, since stages are
  * what the strip above an episode shows.
  */
@@ -418,7 +439,7 @@ export function Readiness(props: {
   }
 
   const stages = stagesOf(status);
-  const done = stages.filter((one) => one.cells.every((cell) => cell.state === "approved")).length;
+  const done = stages.filter((one) => one.cells.every(settled)).length;
   const finished = stages.length > 0 && done === stages.length;
 
   return finished ? (

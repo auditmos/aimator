@@ -8,7 +8,7 @@
  * the ones it was given, which is the whole arrangement this tool is built on.
  */
 
-export type CellState = "approved" | "blocked" | "ready" | "review" | "running";
+export type CellState = "approved" | "blocked" | "excluded" | "ready" | "review" | "running";
 
 /**
  * Stage 0's report, as all seven of its commands print it under `--json` and
@@ -540,11 +540,17 @@ export interface StatusCell {
   readonly character: string | null;
   readonly id: string;
   readonly nextStep: string | null;
-  /** Why the cell is blocked, in the stage's own words. */
+  /**
+   * Why the cell is blocked, in the stage's own words, or which decision of
+   * the episode rules it out.
+   */
   readonly reason: string | null;
   readonly stage: number;
   readonly state: CellState;
-  /** The stage's own check object. Read here for its reports, nothing else. */
+  /**
+   * The stage's own check object. Read here for its reports, nothing else;
+   * null when the stage refused to answer or the episode rules it out.
+   */
   readonly status: { readonly notices?: readonly string[] } | null;
   readonly title: string;
   readonly track: string | null;

@@ -73,10 +73,10 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   w chwili wysłania komendy, i przechodzi do tego, który po niej pojawił się w `list`.
 - **Wczytaj odcinek** (`#/projekt/<id>/odcinki`): odcinki projektu jako lista odnośników.
   Przy każdym stoi znak z jego `status`: zielone „gotowy”, gdy każdy etap jest zatwierdzony
-  na każdym torze, albo pierścień wypełniony w części z napisem „wymaga pracy · N z 11
-  etapów”. Stan czyta się raz, przy wejściu na listę, bo jeden `status` to kilka sekund
+  na każdym torze albo odcinka nie dotyczy, albo pierścień wypełniony w części z napisem
+  „wymaga pracy · N z 13 etapów”. Stan czyta się raz, przy wejściu na listę, bo jeden `status` to kilka sekund
   pracy, a ta lista jest przejściem, nie ekranem do obserwowania.
-- **Przegląd odcinka** (`#/projekt/<id>/odcinek/<odcinek>`): następny krok i jedenaście
+- **Przegląd odcinka** (`#/projekt/<id>/odcinek/<odcinek>`): następny krok i trzynaście
   etapów, opisane niżej. Odcinka się tu nie wybiera: wybrano go po drodze i nazywa go
   adres. Projekt albo odcinek, którego nie ma w `list`, dostaje komunikat zamiast ekranu
   zbudowanego na czymś, czego CLI i tak by odmówiło.
@@ -95,7 +95,10 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   składa („2 postacie × 2 tory”, „2 tory”, „wspólna część + 2 tory”), i ze stanem.
   Komórki jednego etapu w tym samym stanie dają jedną etykietę; różne dają liczniki
   („zatwierdzony 1/2”, „do przeglądu 1/2”). To arytmetyka na komórkach `status`, nie
-  werdykt: pięć stanów ma etykiety tekstowe, kolor nigdy nie niesie znaczenia sam.
+  werdykt: sześć stanów ma etykiety tekstowe, kolor nigdy nie niesie znaczenia sam.
+  „Nie dotyczy” to etap, którego odcinek według własnych decyzji nie potrzebuje, na
+  przykład dialog w odcinku z samą narracją; liczy się jako zamknięty i jest najcichszy:
+  szary napis, a na pasku przerywana kreska.
 - **Panel etapu 0**: to, co się tu zatwierdza, do przeczytania, czyli treść `project.md`
   („Zasady projektu”) i `source.md` („Źródło odcinka”, z numerem i ścieżką, z której plik
   skopiowano); sześć decyzji odcinka w polach wypełnionych tym, co mówi `episode show
@@ -159,13 +162,15 @@ Panel ma **własną stronę**, a nie miejsce obok drabiny. Wcześniej drabina (p
 dwadzieścia komórek przy dwóch postaciach) i panel otwartej komórki stały w dwóch
 kolumnach, i trzeba było czytać oba naraz: długie zdanie etapu obcinała kolumna, a
 odmowy panelu spychały to, co się ocenia, poza ekran. Teraz odcinek czyta się z dwóch
-odległości. Z daleka to jedenaście wierszy. Z bliska to jeden etap:
-- u góry pasek jedenastu znaczników; każdy ma kolor najpilniejszego stanu swoich komórek,
+odległości. Z daleka to trzynaście wierszy. Z bliska to jeden etap:
+- u góry pasek trzynastu znaczników; każdy ma kolor najpilniejszego stanu swoich komórek,
   a stan jest też w jego nazwie dostępnej dla czytnika;
 - pod nim nazwa etapu i zakładki jego torów, postaci albo poziomów, gdy jest ich więcej
   niż jeden;
-- powód blokady w słowach etapu;
-- i sam panel, na całą szerokość;
+- powód blokady w słowach etapu albo decyzja odcinka, która go wyklucza;
+- i sam panel, na całą szerokość. Etap, który odcinka nie dotyczy, panelu nie ma, bo nie
+  ma w nim czego kupić ani przyjąć. Etapy 11 i 12 nie mają jeszcze paneli: ich strona
+  pokazuje stan i polecenie, które złożył dla nich `status`, do uruchomienia w terminalu;
 - na dole odnośniki do etapu poprzedniego i następnego.
 
 Przejście do innego etapu albo zakładki to nowa strona. Ekran wraca wtedy na górę, a
