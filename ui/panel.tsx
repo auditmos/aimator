@@ -980,21 +980,39 @@ export function Drift(props: { readonly paths: readonly string[]; readonly title
 }
 
 /**
+ * Published files a person corrected by hand that nobody has accepted yet.
+ *
+ * The same kind of lapsed consent as drift, so it is drawn the same way, but
+ * it is about the stage's own result rather than what it was made from, and
+ * the title says which. Nothing on screen marks a correction already accepted:
+ * the report does not carry one, and the record's `amendments` is history.
+ */
+export function Amended(props: { readonly paths: readonly string[] }): JSX.Element | null {
+  return (
+    <Drift
+      paths={props.paths}
+      title="Poprawione ręcznie po generacji; tej wersji nikt jeszcze nie przyjął:"
+    />
+  );
+}
+
+/**
  * Whether a text stage's `approve` would take it, read off its own report.
  *
  * A file that validates and that nobody has accepted, with nothing to fix
  * first. Drift is not something to fix first: stages 1, 3 and 4 report it
  * among their problems, one sentence per path in `inputsChanged`, after every
  * blocking one, and `approve` is exactly what settles it, by binding the yes
- * to the inputs as they are now. So the problems beyond the drifted paths are
- * the blocking ones, and counting them is how the screen tells the two apart
- * without learning the sentences.
+ * to the inputs as they are now. A hand correction is the same kind of thing,
+ * one sentence per path in `amended`, and `approve` is what accepts it. So the
+ * problems beyond those two lists are the blocking ones, and counting them is
+ * how the screen tells them apart without learning the sentences.
  */
 export function approvable(status: TextStatus): boolean {
   return (
     status.status === "completed" &&
     !status.approved &&
-    status.problems.length === status.inputsChanged.length
+    status.problems.length === status.inputsChanged.length + status.amended.length
   );
 }
 
@@ -1018,6 +1036,7 @@ export function Review(props: {
   const { approve, check, note, onRun, running, status } = props;
   const acceptable = status !== null && approvable(status);
   const drifted = acceptable && status.inputsChanged.length > 0;
+  const corrected = acceptable && status.amended.length > 0;
 
   return (
     <>
@@ -1027,6 +1046,14 @@ export function Review(props: {
           {status.inputsChanged.map((path) => path.split("/").at(-1)).join(", ")}), więc
           wcześniejsza zgoda wygasła. Przeczytaj go jeszcze raz i jeśli nadal się zgadza, zatwierdź
           ponownie. Nic nie zostanie wygenerowane ani kupione.
+        </p>
+      ) : null}
+      {corrected ? (
+        <p className="actions-note decision-why">
+          Ktoś poprawił ręcznie {status.amended.map((path) => path.split("/").at(-1)).join(", ")} po
+          generacji, a poprawka przechodzi walidację. Przeczytaj poprawioną wersję i jeśli się
+          zgadza, zatwierdź: zgoda przyjmie te bajty i zapisze, kto je zmienił. Nic nie zostanie
+          wygenerowane ani kupione.
         </p>
       ) : null}
       <Action argv={check} disabled={running} label="Sprawdź" onRun={onRun} />

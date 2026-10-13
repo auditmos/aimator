@@ -1,6 +1,7 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import {
+  Amended,
   asCalls,
   Block,
   Drift,
@@ -111,6 +112,7 @@ export function ScreenplayPanel(props: PanelProps): JSX.Element {
             paths={status.inputsChanged}
             title="Dryf wejść: te pliki zmieniły się po napisaniu scenariusza"
           />
+          <Amended paths={status.amended} />
           <Problems problems={status.problems} />
         </Block>
       )}

@@ -2,6 +2,7 @@ import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState }
 import { INTENTS } from "../src/ui/commands.js";
 import {
   Action,
+  Amended,
   artifactUrl,
   type Billed,
   Block,
@@ -319,6 +320,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
             <Problems problems={status.problems} />
             <Notices notices={status.notices} />
             <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+            <Amended paths={status.amended} />
           </Block>
 
           <Block
@@ -346,6 +348,7 @@ export function NarrationPanel(props: PanelProps): JSX.Element {
             <p className="picture-state">
               {status.script.approved ? "zatwierdzony" : LINE_STATE[status.script.state]} ·{" "}
               {status.script.note}
+              {status.amended.length > 0 ? " · poprawiony ręcznie, czeka na przyjęcie" : ""}
             </p>
             {script === null ? null : <pre className="artifact-text">{script}</pre>}
           </Block>

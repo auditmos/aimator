@@ -185,7 +185,7 @@ nie żeby nad nim pracować, więc tytuły bloków służą za spis treści. Sta
 się raz, przy wejściu na stronę, bo blok zamykający się komuś pod ręką zabierałby coś w
 pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szukać:
 
-1. **Stan**: werdykt `check`, odmowy, meldunki i dryf wejść.
+1. **Stan**: werdykt `check`, odmowy, meldunki, dryf wejść i poprawki ręczne.
 2. **To, co etap wyprodukował**: tekst, obrazy, łańcuch klipów, film albo nagrania, pod
    nazwą tego etapu. Na liście z wyborem pozycja już zatwierdzona ma pole zaznaczone i
    zablokowane oraz zieloną ramkę, więc po powrocie na stronę widać, co przyjęto, a
@@ -351,10 +351,21 @@ roboczym, od której zdanie się zaczyna, skraca się do nazwy pliku, a pełna j
 podpowiedzi. Odmowy stoją w jednej spokojnej ramce z tytułem „Wymaga uwagi (N)” i akcentem
 z boku, zamiast barwić każde zdanie na żółto, tak samo jak ramka dryfu wejść.
 
-„Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów**, a artefakt
-czeka na przyjęcie. Przycisk, któremu CLI i tak by odmówiło, uczy człowieka, że ekran
-kłamie. Ten warunek jest napisany **raz**, w `ui/panel.tsx`, a nie w każdym panelu: trzy
-etapy tekstowe stosują go co do pola, więc trzy kopie zrobiłyby z reguły przypadek.
+„Zatwierdź" pojawia się **wyłącznie wtedy, gdy `check` nie zgłasza problemów blokujących**,
+a artefakt czeka na przyjęcie. Przycisk, któremu CLI i tak by odmówiło, uczy człowieka, że
+ekran kłamie. Dryf wejść i poprawka ręczna nie blokują, bo `approve` jest właśnie tym, co je
+rozstrzyga. Ekran liczy więc zdania etapu: po jednym na każdą ścieżkę w `inputsChanged` i w
+`amended`, a wszystko ponad to blokuje. Ten warunek jest napisany **raz**, w `ui/panel.tsx`,
+a nie w każdym panelu: trzy etapy tekstowe stosują go co do pola, więc trzy kopie zrobiłyby
+z reguły przypadek.
+
+**Poprawka ręczna** ma na ekranie własną ramkę w bloku „Stan” etapów 1, 3, 4, 9 i 10:
+„Poprawione ręcznie po generacji; tej wersji nikt jeszcze nie przyjął”, z listą plików z
+`amended`. Wygląda jak ramka dryfu, bo to ten sam rodzaj wygasłej zgody, ale tytuł mówi, że
+chodzi o wynik etapu, a nie o jego wejście. Nad „Zatwierdź” stoi zdanie, że zgoda przyjmie
+poprawione bajty i zapisze, kto je zmienił. W etapach 9 i 10 stan skryptu albo arkusza mówi
+dodatkowo „poprawiony ręcznie, czeka na przyjęcie”. Poprawki już przyjętej ekran nie
+oznacza, bo raport `check` jej nie niesie; zostaje w `amendments` rekordu.
 
 ## Zakup w dwóch krokach
 

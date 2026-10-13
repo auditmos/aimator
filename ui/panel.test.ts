@@ -111,6 +111,7 @@ describe("stage 7's reader", () => {
  */
 describe("a text stage's approval", () => {
   const DRIFTED: TextStatus = {
+    amended: [],
     approved: false,
     inputsChanged: ["projects/dzielna-ewa/project.json"],
     problems: [
@@ -132,5 +133,44 @@ describe("a text stage's approval", () => {
   it("should refuse what is absent or already approved", () => {
     expect(approvable({ ...DRIFTED, status: "absent" })).toBe(false);
     expect(approvable({ ...DRIFTED, approved: true })).toBe(false);
+  });
+
+  /**
+   * A file a person corrected by hand is the same kind of problem as drift: a
+   * lapsed consent, one sentence per path in `amended`, and `approve` is what
+   * accepts it. Counted as a refusal, it hid "Zatwierdź" on the one screen a
+   * correction is meant to be accepted from.
+   */
+  const AMENDED: TextStatus = {
+    amended: ["projects/dzielna-ewa/episodes/01-burza/screenplay.md"],
+    approved: false,
+    inputsChanged: [],
+    problems: [
+      "projects/dzielna-ewa/episodes/01-burza/screenplay.md: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: aimator approve dzielna-ewa 01-burza --stage screenplay",
+    ],
+    status: "completed",
+  };
+
+  it("should offer an approval whose only problem is a hand correction", () => {
+    expect(approvable(AMENDED)).toBe(true);
+    expect(
+      approvable({
+        ...AMENDED,
+        inputsChanged: DRIFTED.inputsChanged,
+        problems: [...DRIFTED.problems, ...AMENDED.problems],
+      })
+    ).toBe(true);
+  });
+
+  it("should refuse a hand correction that fails validation", () => {
+    expect(
+      approvable({
+        ...AMENDED,
+        problems: [
+          "screenplay.md: suma czasów scen to 32 s, a odcinek ma 30 s",
+          ...AMENDED.problems,
+        ],
+      })
+    ).toBe(false);
   });
 });

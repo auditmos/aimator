@@ -2,6 +2,7 @@ import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState }
 import { INTENTS } from "../src/ui/commands.js";
 import {
   Action,
+  Amended,
   artifactUrl,
   type Billed,
   Block,
@@ -317,6 +318,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
             <Problems problems={status.problems} />
             <Notices notices={status.notices} />
             <Drift paths={drifted} title="Wejścia zmieniły się po tej próbie:" />
+            <Amended paths={status.amended} />
           </Block>
 
           <Block
@@ -346,6 +348,7 @@ export function SoundDesignPanel(props: PanelProps): JSX.Element {
             <p className="picture-state">
               {status.sheet.approved ? "zatwierdzony" : CUE_STATE[status.sheet.state]} ·{" "}
               {status.sheet.note}
+              {status.amended.length > 0 ? " · poprawiony ręcznie, czeka na przyjęcie" : ""}
             </p>
             {sheet === null ? null : <pre className="artifact-text">{sheet}</pre>}
           </Block>

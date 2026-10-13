@@ -1,6 +1,7 @@
 import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { commandLine, INTENTS } from "../src/ui/commands.js";
 import {
+  Amended,
   artifactUrl,
   asCalls,
   Block,
@@ -592,6 +593,7 @@ export function PromptPackagePanel(props: PanelProps): JSX.Element {
             paths={status.inputsChanged}
             title="Dryf wejść: te pliki zmieniły się po napisaniu pakietu"
           />
+          <Amended paths={status.amended} />
           <Problems problems={status.problems} />
         </Block>
       )}

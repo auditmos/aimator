@@ -37,6 +37,8 @@ export interface Stage0Report {
  * decides whether "Zatwierdź" exists is written once rather than three times.
  */
 export interface TextStatus {
+  /** Published files a person corrected by hand that nobody has accepted yet. */
+  readonly amended: readonly string[];
   readonly approved: boolean;
   /** Inputs whose bytes no longer match what this stage was written from. */
   readonly inputsChanged: readonly string[];
@@ -257,6 +259,8 @@ export interface LineState {
 
 /** Stage 9's shared half: the script and every line, with no track anywhere. */
 export interface NarrationStatus {
+  /** The script, when a person corrected it by hand and nobody accepted that yet. */
+  readonly amended: readonly string[];
   readonly approved: boolean;
   readonly lines: readonly LineState[];
   readonly nextStep: string;
@@ -342,6 +346,8 @@ export interface CueState {
 
 /** Stage 10's shared half: the sheet and every stem, with no track anywhere. */
 export interface SoundDesignStatus {
+  /** The cue sheet, when a person corrected it by hand and nobody accepted that yet. */
+  readonly amended: readonly string[];
   readonly approved: boolean;
   readonly cues: readonly CueState[];
   readonly nextStep: string;
