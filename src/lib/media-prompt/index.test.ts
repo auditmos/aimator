@@ -2,7 +2,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EPISODE, makeHero, makeUpstream, PROJECT, RULES } from "../../test/fixture.js";
+import {
+  decideStyle,
+  EPISODE,
+  makeHero,
+  makeUpstream,
+  PROJECT,
+  png,
+  RULES,
+} from "../../test/fixture.js";
 import { type imageTracks, resolveWorkspace, type Workspace } from "../workspace.js";
 import { type PlannedArtifact, readSendPlan, type SendPlan } from "./index.js";
 
@@ -89,7 +97,12 @@ function answer(extraReferences = 0, clips: 2 | 3 = 2): string {
  * only reachable once somebody has accepted the package.
  */
 function upstream(
-  options: { approvePackage?: boolean; clips?: 2 | 3; extraReferences?: number } = {}
+  options: {
+    approvePackage?: boolean;
+    clips?: 2 | 3;
+    extraReferences?: number;
+    style?: "none" | "undecided" | readonly Buffer[];
+  } = {}
 ): Promise<void> {
   return makeUpstream({
     answer: answer(options.extraReferences ?? 0, options.clips ?? 2),
@@ -97,8 +110,14 @@ function upstream(
     root,
     scratch,
     shotList: options.clips === 3 ? "three-clips" : "two-clips",
+    ...(options.style === undefined ? {} : { style: options.style }),
     workspace,
   });
+}
+
+/** `count` distinct style frames, as somebody would bring them in. */
+function styleFrames(count: number): readonly Buffer[] {
+  return Array.from({ length: count }, (_, index) => png(64, 64, index + 1));
 }
 
 async function plan(
@@ -417,6 +436,116 @@ describe("readSendPlan", () => {
 
     expect(artifact(sent, "R01").inputs.map((one) => one.path)).not.toContain(shotListPath);
     expect(artifact(sent, "C01").inputs.map((one) => one.path)).toContain(shotListPath);
+  });
+
+  /**
+   * The style frames are a decision, and an absent decision is not "none":
+   * every frame waits for it, and the refusal names both answers.
+   */
+  it("should refuse every frame while nobody has decided the style frames", async () => {
+    await upstream({ style: "undecided" });
+    const sent = await plan();
+
+    expect(sent.problems.join("\n")).toContain(
+      `aimator project style ${PROJECT} --source <plik.png>`
+    );
+    expect(sent.problems.join("\n")).toContain(`aimator project style ${PROJECT} --none`);
+  });
+
+  it("should attach nothing and refuse nothing when the decision is none", async () => {
+    await upstream({ style: "none" });
+    const sent = await plan();
+
+    expect(sent.problems).toEqual([]);
+    expect(artifact(sent, "R02").attachments.map((one) => one.id)).toEqual(["hero:tata", "R01"]);
+  });
+
+  /** Rule 8: the style frames close the list, after everything the frame is of. */
+  it("should end every frame's list with the supplied style frames, and no clip's", async () => {
+    await upstream({ style: styleFrames(2) });
+    const sent = await plan("gpt-image", ["R02"]);
+    const ids = (name: string): readonly string[] =>
+      artifact(sent, name).attachments.map((one) => one.id);
+
+    expect(ids("R02")).toEqual(["hero:tata", "R01", "style:S01", "style:S02"]);
+    expect(ids("opening-frame")).toEqual(["hero:ewa", "R01", "style:S01", "style:S02"]);
+    expect(ids("entry:C02").slice(-2)).toEqual(["style:S01", "style:S02"]);
+    expect(ids("C01")).toEqual(["opening-frame"]);
+    expect(artifact(sent, "R02").text).toContain(
+      "Image 3 = style:S01 — style frame: medium, line, shading, palette, texture and lighting only; not content"
+    );
+    expect(artifact(sent, "R02").attachments[2]?.path).toBe(
+      `projects/${PROJECT}/style/sources/S01.png`
+    );
+  });
+
+  /**
+   * The block above the task forbids taking texture, shading or lighting from
+   * any attachment, which is exactly what a style frame is for. Without the
+   * exception said in words, the request would contradict itself.
+   */
+  it("should tell the model a style frame lends its look and nothing else", async () => {
+    await upstream({ style: styleFrames(1) });
+    const { text } = artifact(await plan("gpt-image", ["R01"]), "R01");
+    const plain = await readSendPlan({
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      targets: ["R01"],
+      track: "seedream",
+      workspace,
+    });
+
+    expect(text).toContain("STYLE FRAMES");
+    expect(text).toContain("The images whose role above is a style frame are the one exception");
+    expect(plain.ok && artifact(plain.data, "R01").text).toContain("STYLE FRAMES");
+  });
+
+  it("should say nothing about style frames to a frame that carries none", async () => {
+    await upstream({ style: "none" });
+    const { text } = artifact(await plan("gpt-image", ["R01"]), "R01");
+
+    expect(text).not.toContain("STYLE FRAMES");
+  });
+
+  it("should accept a supplied style frame on stage 0's approval", async () => {
+    await upstream({ style: styleFrames(1) });
+    const r01 = artifact(await plan(), "R01");
+
+    expect(r01.attachments.find((one) => one.id === "style:S01")?.state).toBe("approved");
+    expect(r01.blockers).toEqual([]);
+  });
+
+  it("should block frames on a style frame stage 0 has not accepted yet", async () => {
+    await upstream({ style: styleFrames(1) });
+    await decideStyle([png(64, 64, 9)], scratch, workspace);
+    const r01 = artifact(await plan(), "R01");
+
+    expect(r01.attachments.find((one) => one.id === "style:S02")?.state).toBe("pending");
+    expect(r01.blockers.join("\n")).toContain(`aimator approve ${PROJECT}`);
+  });
+
+  /** Decision: style frames count toward a track's limit and are never trimmed. */
+  it("should refuse, with the numbers, style frames that push seedream past its limit", async () => {
+    await upstream({ style: styleFrames(8) });
+    const seed = await plan("seedream");
+    const gpt = await plan("gpt-image");
+
+    expect(artifact(seed, "R01").blockers.join("\n")).not.toContain("najwyżej");
+    expect(artifact(seed, "entry:C02").blockers.join("\n")).toContain(
+      "entry:C02: 13 załączników (5 referencji i 8 obrazów stylu), a tor seedream przyjmuje najwyżej 10"
+    );
+    expect(artifact(gpt, "entry:C02").blockers.join("\n")).not.toContain("najwyżej");
+  });
+
+  it("should record style.json and every style frame a frame carries, and not on a clip", async () => {
+    await upstream({ style: styleFrames(1) });
+    const sent = await plan();
+    const style = `projects/${PROJECT}/style.json`;
+
+    expect(artifact(sent, "R01").inputs.map((one) => one.path)).toEqual(
+      expect.arrayContaining([style, `projects/${PROJECT}/style/sources/S01.png`])
+    );
+    expect(artifact(sent, "C01").inputs.map((one) => one.path)).not.toContain(style);
   });
 
   it("should refuse a name this package does not plan", async () => {

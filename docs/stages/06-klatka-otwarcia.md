@@ -4,9 +4,9 @@ Pierwsza klatka filmu. Jedno polecenie, jedno płatne wywołanie, jeden obraz do
 
 | | |
 |---|---|
-| **Wejście** | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** |
+| **Wejście** | `project.json`, `project.md`, `style.json` i [obrazy stylu](00-przygotowanie.md#obrazy-stylu), zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** |
 | **Wyjście** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` |
-| **Bramka** | zatwierdzony [etap 4](04-pakiet-promptow.md) i zatwierdzone `opening.referenceIds`; potem ocena kadru |
+| **Bramka** | decyzja o obrazach stylu, zatwierdzony [etap 4](04-pakiet-promptow.md) i zatwierdzone `opening.referenceIds`; potem ocena kadru |
 | **Koszt** | dokładnie jedno płatne wywołanie obrazowe |
 
 ## Komendy

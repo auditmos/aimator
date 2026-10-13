@@ -5,8 +5,8 @@ polecenie tego etapu nie woła płatnego API.**
 
 | | |
 |---|---|
-| **Wejście** | Twój pomysł, plik źródłowy odcinka, opcjonalnie zdjęcia postaci |
-| **Wyjście** | `project.json`, `project.md`, `source.md`, `episode.json`, `characters/<id>/sources/` |
+| **Wejście** | Twój pomysł, plik źródłowy odcinka, opcjonalnie zdjęcia postaci i obrazy stylu |
+| **Wyjście** | `project.json`, `project.md`, `style.json`, `style/sources/`, `source.md`, `episode.json`, `characters/<id>/sources/` |
 | **Bramka** | `check`, potem `approve`; otwiera etapy 1 i 2 |
 | **Koszt** | darmowy |
 
@@ -52,6 +52,17 @@ w `project.json` obok postaci, a nie w zmiennej środowiskowej, która dałaby d
 odcinkowi innego lektora bez śladu na dysku. Bramkuje wyłącznie
 [etap 9](09-narracja.md); film bez narracji nigdy nie musi tej decyzji podejmować.
 
+Obrazy stylu też można rozstrzygnąć później, ale nie da się ich pominąć, bo czekają na nie
+etapy 5, 6 i 7:
+
+```bash
+pnpm dev project style dzielna-ewa --source ~/Styl/kadr-1.png --source ~/Styl/kadr-2.png
+# albo jawnie bez obrazów stylu:
+pnpm dev project style dzielna-ewa --none
+```
+
+Co to zmienia i czego nie, opisuje sekcja [Obrazy stylu](#obrazy-stylu).
+
 Każde polecenie zapisujące przyjmuje `--dry-run`: pokazuje, co powstanie, i nie zapisuje
 niczego. `--workspace <ścieżka>` nadpisuje `AIMATOR_WORKSPACE` dla jednego wywołania.
 
@@ -65,6 +76,7 @@ pnpm dev project show dzielna-ewa
 Projekt "dzielna-ewa": Dzielna Ewa
   Proporcje: 16:9
   Narrator: 21m00Tcm4TlvDq8ikWAM
+  Obrazy stylu: wnoszone (2)
   Obsada:
     ewa   Ewa   ze zdjęć (1)
     tata  Tata  z opisu w project.md
@@ -73,8 +85,9 @@ Projekt "dzielna-ewa": Dzielna Ewa
 To **opis, nie werdykt**: czy obsada, proporcje i zasady wystarczają, odpowiada `check`.
 Pole, którego nikt nie rozstrzygnął, pokazuje się jako nierozstrzygnięte, a nie znika.
 Pod `--json` wypisuje ten sam opis jako obiekt (`command`, `projectId`, `title`,
-`aspectRatio`, `narratorVoiceId`, `cast` z `id`, `name`, `basis` i `sources`), bez pola
-`stage`, bo nie jest raportem etapu.
+`aspectRatio`, `narratorVoiceId`, `style` z `basis`, `images` i `sources`, `cast` z `id`,
+`name`, `basis` i `sources`), bez pola `stage`, bo nie jest raportem etapu. Styl, którego
+nikt nie rozstrzygnął, ma `basis: null` i w tekście „nierozstrzygnięte”.
 
 To samo o poziom niżej, dla jednego odcinka:
 
@@ -129,7 +142,7 @@ o tym samym zostaje w `problems`; pole jest dla czytelnika, który zdań nie par
 przykład dla panelu etapu 0, który po nim odróżnia „zasady się zmieniły, przeczytaj je
 jeszcze raz” od „nikt ich jeszcze nie przeczytał”.
 
-`stage` brzmi `prepare` dla wszystkich siedmiu poleceń, bo wszystkie piszą jeden artefakt.
+`stage` brzmi `prepare` dla wszystkich ośmiu poleceń, bo wszystkie piszą jeden artefakt.
 `command` ma tu **dwa słowa**, i to nie jest niekonsekwencja wobec etapu 1: tam `stage`
 i `command` składają się w całe wywołanie (`screenplay generate`), a tutaj jeden etap
 zapisują trzy gramatyki, więc pole mówiące `add` dla `character add` i dla `episode add`
@@ -153,7 +166,9 @@ jest" przestałaby istnieć.
 $AIMATOR_WORKSPACE/projects/dzielna-ewa/
 ├── project.json        identyfikator, tytuł, proporcje, obsada, narratorVoiceId
 ├── project.md          zasady wspólne, pisane ręcznie
+├── style.json          decyzja o obrazach stylu: supplied albo none
 ├── prepare.stage.json  pochodzenie i ocena
+├── style/sources/      obrazy stylu, skopiowane jako S01.png, S02.png… i zahashowane
 ├── characters/ewa/sources/   zdjęcia tej postaci, skopiowane i zahashowane
 └── episodes/01-burza/
     ├── source.md       kopia bajtowa Twojego opisu
@@ -222,6 +237,42 @@ Szkielet `project.md` powstaje wyłącznie przy `project init`, więc istniejąc
 nie dostaje tego bloku sam i jego zgoda nie wygasa. Dopisanie bloku ręcznie to zwykła
 edycja zasad, która wygasza zgodę etapu 0 jak każda inna.
 
+## Obrazy stylu
+
+Style Bible mówi modelowi słowami, jak wygląda seria. **Obrazy stylu** pokazują mu to:
+kilka kadrów w docelowym medium, które etapy 5, 6 i 7 dołączają do każdego kadru filmu.
+To decyzja projektu bez wartości domyślnej: obrazy wnoszone (`supplied`) albo jawnie
+żadne (`none`).
+
+| Polecenie | Co zapisuje |
+|---|---|
+| `project style <id> --source <plik.png>` | kopiuje obraz do `style/sources/S01.png` (kolejne S02, S03…) z sha256 i ustawia `supplied`; można powtarzać, te same bajty drugi raz to ten sam obraz |
+| `project style <id> --none` | jawne „bez obrazów stylu”; obrazy już wniesione zostają na dysku, ale nie są dołączane |
+
+Przyjmowany jest wyłącznie PNG, bo plik ląduje w katalogu roboczym jako `Snn.png`.
+
+**Decyzja mieszka w `style.json`, nie w `project.json`.** `project.json` jest zapisanym
+wejściem niemal każdego artefaktu, więc zmiana stylu w nim cofałaby zgody na scenariusze
+i listy ujęć, na które styl nie wpływa. `style.json` i obrazy stylu są wejściami wyłącznie
+kadrów etapów 5, 6 i 7 (referencji, klatki otwarcia i klatek wejściowych), więc ich zmiana
+cofa zgody na te kadry i na nic innego. Klip nie dostaje obrazów stylu: zaczyna się od
+klatki, która już je niosła.
+
+**Wnoszenie plików z zewnątrz to monopol etapu 0**, więc obraz wniesiony jest wyjściem
+tego etapu, zapisanym w `prepare.stage.json` projektu obok `project.json`. Nie ma własnej
+oceny: przyjmuje go `approve` etapu 0, a dodanie obrazu po zatwierdzeniu cofa tę zgodę
+dokładnie tak jak `character add`. Do tego czasu kadry etapów 5–7 czekają z powodem
+w `note`.
+
+**Brak decyzji to nie „bez stylu”.** Bez `style.json` etapy 5, 6 i 7 odmawiają z
+poleceniem, które ją podejmuje; etapy 0–4 działają bez niej. Odcinek w toku zatrzyma się
+więc na etapie 5, dopóki ktoś nie zdecyduje, a `project style <id> --none` to jedna linia.
+
+Obrazy stylu idą **po** załącznikach treści, jako `Image N = style:S01 — style frame:
+medium, line, shading, palette, texture and lighting only; not content`, i liczą się do
+limitu referencji toru. Przekroczenie limitu to odmowa przed wysyłką, z liczbami, nigdy
+ciche obcięcie.
+
 ## Sześć decyzji odcinka
 
 Pięć z nich blokuje bramkę tego etapu. Szósta, `--max-clip`, jest wymagana dopiero przez
@@ -244,7 +295,8 @@ z zasad projektu.
 
 `check` przepuszcza, gdy zasady nie zawierają już żadnego `TODO(etap-0)`, obie decyzje
 projektu są ustalone, wyniki zgadzają się z zapisanymi hashami i żadna z pięciu decyzji
-odcinka nie jest pusta. To kontrola **plików**. Nie potwierdza, że zasady mają sens ani
+odcinka nie jest pusta. Obrazy stylu nie bramkują etapu 0, tylko etapy 5–7, ale wniesione
+obrazy są jego wynikami i ich hashe są sprawdzane jak każde inne. To kontrola **plików**. Nie potwierdza, że zasady mają sens ani
 że pomysł jest dobry, i mówi to wprost zamiast udawać, że przeszło znaczy przyjęte.
 
 Przyjęcie zapisuje osobne polecenie:

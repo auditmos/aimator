@@ -14,6 +14,8 @@ import { err, ok, type Result } from "./result.js";
 const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 /** `R01`, `C01`: a numbered artifact of one episode, and its own file name. */
 const ARTIFACT_ID = /^[A-Z]\d{2,}$/;
+/** `S01`: one style frame of a project, and its own file name. */
+const STYLE_ID = /^S\d{2,}$/;
 /** One path segment that cannot escape the directory it is joined onto. */
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /**
@@ -77,6 +79,15 @@ export interface ProjectPaths {
   readonly prepareStage: string;
   readonly root: string;
   readonly rules: string;
+  /**
+   * Which style frames every film frame carries, a stage-0 decision with a file
+   * of its own for the reason `narration.json` has one: `project.json` is a
+   * recorded input of nearly everything, and a style frame is an input of film
+   * frames alone, so changing it must lapse those and leave a screenplay be.
+   */
+  readonly style: string;
+  /** Style frames somebody brought in, `Snn.png`, stage 0's copies. */
+  readonly styleSources: string;
 }
 
 export interface CharacterPaths {
@@ -550,7 +561,19 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
     prepareStage: join(root, "prepare.stage.json"),
     root,
     rules: join(root, "project.md"),
+    style: join(root, "style.json"),
+    styleSources: join(root, "style", "sources"),
   });
+}
+
+/**
+ * One style frame brought in at stage 0. The id is the file name, so it is
+ * checked here rather than trusted into a path, as a reference id is.
+ */
+export function styleSource(project: ProjectPaths, id: string): Result<string> {
+  return STYLE_ID.test(id)
+    ? ok(join(project.styleSources, `${id}.png`))
+    : err(new IdentifierError(id, `invalid style frame id "${id}": expected a form like S01`));
 }
 
 /**

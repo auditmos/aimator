@@ -157,6 +157,63 @@ afterEach(async () => {
   await rm(scratch, { force: true, recursive: true });
 });
 
+/**
+ * The style frames are the series', decided at stage 0 and carried by every
+ * reference. Undecided is refused, not read as "none"; brought images close
+ * the list; and a list the track cannot carry is refused before a call.
+ */
+describe("style frames", () => {
+  function styled(style: "undecided" | readonly Buffer[]): Promise<void> {
+    return makeUpstream({
+      answer: answer(),
+      approvePackage: true,
+      root,
+      scratch,
+      style,
+      workspace,
+    });
+  }
+
+  it("should refuse to spend while nobody has decided the style frames", async () => {
+    await styled("undecided");
+    const call = recorder();
+    const result = await generate({ fetch: call.fetch });
+
+    expect(call.calls).toHaveLength(0);
+    expect(result.ok ? null : result.error.message).toContain(
+      `aimator project style ${PROJECT} --none`
+    );
+  });
+
+  it("should show the style frames in a dry run, after what the reference is of", async () => {
+    await styled([png(64, 64, 1)]);
+    const result = await generate({ mode: "dry-run" });
+    const r01 = result.ok ? result.data.artifacts.find((one) => one.id === "R01") : undefined;
+
+    expect(r01?.prompt).toContain("Image 2 = style:S01 — style frame");
+    expect(r01?.attachments.map((one) => one.path)).toEqual([
+      `projects/${PROJECT}/characters/ewa/gpt-image/hero.png`,
+      `projects/${PROJECT}/style/sources/S01.png`,
+    ]);
+  });
+
+  it("should refuse before sending style frames seedream cannot carry", async () => {
+    await styled(Array.from({ length: 10 }, (_, index) => png(64, 64, index + 1)));
+    const call = recorder();
+    const result = await generate({
+      artifacts: ["R01"],
+      fetch: call.fetch,
+      model: "seedream-5-0",
+      track: "seedream",
+    });
+
+    expect(call.calls).toHaveLength(0);
+    expect(result.ok ? result.data.problems.join("\n") : result.error.message).toContain(
+      "R01: 11 załączników (1 referencji i 10 obrazów stylu), a tor seedream przyjmuje najwyżej 10"
+    );
+  });
+});
+
 describe("generateReferences gates", () => {
   it("should refuse to spend until the package carries an approval", async () => {
     await upstream();

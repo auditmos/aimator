@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "./cli/index.js";
 import { resolveWorkspace, type Workspace } from "./lib/workspace.js";
-import { EPISODE, makeCut, makeUpstream, PROJECT } from "./test/fixture.js";
+import { EPISODE, makeCut, makeUpstream, PROJECT, png } from "./test/fixture.js";
 
 /**
  * The CLI's behaviour, frozen.
@@ -477,6 +477,15 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--dry-run",
   ],
   "  project show <id> [--json]": ["project", "show", PROJECT],
+  "  project style <id> --none [--json]": ["project", "style", PROJECT, "--none", "--dry-run"],
+  "  project style <id> --source <plik.png> [--source <plik.png>...] [--json]": [
+    "project",
+    "style",
+    PROJECT,
+    "--source",
+    "<scratch>/styl.png",
+    "--dry-run",
+  ],
   "  project voice <id> --voice-id <id głosu> [--json]": [
     "project",
     "voice",
@@ -577,6 +586,7 @@ beforeAll(async () => {
   await makeCut({ root, track: "gpt-image", workspace });
   await writeFile(join(scratch, "02-Slonce.md"), "# Słońce\n\nEwa czeka na słońce.\n", "utf8");
   await writeFile(join(scratch, "ewa-2.png"), "not really a png", "utf8");
+  await writeFile(join(scratch, "styl.png"), png(64, 64, 3));
 
   const help = await run(["--help"]);
   if (!help.ok) {

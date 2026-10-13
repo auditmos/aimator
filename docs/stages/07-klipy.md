@@ -5,9 +5,9 @@ Pierwszy etap, który kupuje **dwa rodzaje mediów**: klatki wejściowe (obraz) 
 
 | | |
 |---|---|
-| **Wejście** | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna |
+| **Wejście** | `project.json`, `project.md`, `style.json` i [obrazy stylu](00-przygotowanie.md#obrazy-stylu) (przy klatkach wejściowych), zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna |
 | **Wyjście** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg`, `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` |
-| **Bramka** | łańcuch zgód, patrz niżej; potem ocena klipu i klatek z osobna |
+| **Bramka** | decyzja o obrazach stylu i łańcuch zgód, patrz niżej; potem ocena klipu i klatek z osobna |
 | **Koszt** | płatny w **dwóch walutach**: wywołania obrazowe i wideo, liczone osobno |
 
 ## Komendy

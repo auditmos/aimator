@@ -1101,6 +1101,7 @@ describe("showProject", () => {
       cast: [],
       narratorVoiceId: null,
       projectId: "demo",
+      style: { basis: null, images: 0, sources: [] },
       title: "Demo",
     });
   });
@@ -1140,6 +1141,7 @@ describe("showProject", () => {
       ],
       narratorVoiceId: "voice-1",
       projectId: "demo",
+      style: { basis: null, images: 0, sources: [] },
       title: "Demo",
     });
   });

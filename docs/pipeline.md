@@ -19,6 +19,9 @@ $AIMATOR_WORKSPACE/
     ├── mix.json                      jak głośno siedzi podkład i jak ustępuje pod mową
     │                                 (etap 10), osobno od narration.json, bo unieważnia
     │                                 miks, a nie nagrania
+    ├── style.json                    obrazy stylu: supplied albo none (etap 0), osobno od
+    │                                 project.json, bo jego zmiana cofa zgody tylko na kadry
+    ├── style/sources/Snn.png         obrazy stylu wniesione w etapie 0
     ├── prepare.stage.json
     ├── characters/<character-id>/
     │   ├── sources/                  zdjęcia użytkownika (etap 0)
@@ -253,7 +256,14 @@ Obowiązują we wszystkich etapach.
   zapisana rozjechałaby się z pozycją, którą żądanie faktycznie niesie. Identyfikator
   rozwiązuje się na plik dopiero u składającego: `hero:<id>` na
   `characters/<id>/<tor>/hero.png`, `Rnn` na `<tor>/references/Rnn.png`, i to jest cały
-  powód, dla którego pakiet promptów może być wspólny dla obu torów.
+  powód, dla którego pakiet promptów może być wspólny dla obu torów. Każdy kadr filmu
+  (referencja, klatka otwarcia, klatka wejściowa) kończy listę obrazami stylu projektu,
+  `style:Snn` z rolą `style frame: medium, line, shading, palette, texture and lighting
+  only; not content`, po wszystkich załącznikach treści; przy wniesionych rozwiązują się na
+  `style/sources/Snn.png`. Etap 4 ich nie zna i nie pisze, dopina je składający, a blok nad
+  zadaniem mówi wtedy wprost, że obraz stylu jest jedynym wyjątkiem od zakazu przenoszenia
+  tekstury, cieniowania i światła. Klip ich nie dostaje: zaczyna się od klatki, która już je
+  niosła.
 - **Archiwum próby nie kopiuje wejść.** `runs/<runId>/` przechowuje tylko to, czego nie
   da się odtworzyć: wysłany request, dokładny prompt, odpowiedź, wynik walidacji, status
   HTTP i identyfikator zadania. Wejścia są referowane przez ścieżkę i sha256. Poprzedni
@@ -263,14 +273,14 @@ Obowiązują we wszystkich etapach.
 
 | Etap | Konsumuje | Produkuje | Bramka | Stan |
 |---|---|---|---|---|
-| 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci | `project.md`, `project.json`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
+| 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci, obrazy stylu | `project.md`, `project.json`, `style.json`, `style/sources/`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
 | 1 scenariusz | `project.json`, `project.md`, `source.md`, `episode.json` | `screenplay.md`, `screenplay.stage.json`, `runs/<runId>/` | zatwierdzony etap 0 przed wywołaniem; potem `aimator check`, `aimator approve … --stage screenplay` | **zaimplementowany** |
 | 2 postać | `project.json`, `project.md` i, przy podstawie `photographs`, `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 3 lista ujęć | `project.json`, `project.md`, `episode.json`, zatwierdzony `screenplay.md` | `shot-list.md`, `shot-list.stage.json`, `runs/<runId>/` | zatwierdzony etap 1 przed wywołaniem; potem `aimator check`, `aimator approve … --stage shot-list` | **zaimplementowany** |
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
-| 5 obrazy referencyjne | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
-| 6 klatka otwarcia | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
-| 7 klipy | `project.json`, `project.md`, zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i, przy `previous-end-frame`, zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` albo `end.png` (format oddaje dostawca; przy Klingu wycina ją ffmpeg), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; model z tabeli dostawców, jego klucz i, przy Klingu, ffmpeg; potem ocena klipu i klatek z osobna | **zaimplementowany** |
+| 5 obrazy referencyjne | `project.json`, `project.md`, `style.json` i obrazy stylu, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | decyzja o obrazach stylu, zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
+| 6 klatka otwarcia | `project.json`, `project.md`, `style.json` i obrazy stylu, zatwierdzony `prompt-package.json` i `prompts/opening-frame.md`, zatwierdzona `shot-list.md`, zatwierdzone `opening.referenceIds` **na tym torze** | `<tor>/opening-frame.png`, `<tor>/opening-frame.stage.json`, `<tor>/runs/<runId>/` | decyzja o obrazach stylu, zatwierdzony etap 4 i zatwierdzone `opening.referenceIds` przed wywołaniem; potem ocena kadru | **zaimplementowany** |
+| 7 klipy | `project.json`, `project.md`, `style.json` i obrazy stylu (przy klatkach wejściowych), zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i, przy `previous-end-frame`, zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` albo `end.png` (format oddaje dostawca; przy Klingu wycina ją ffmpeg), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | decyzja o obrazach stylu, zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; model z tabeli dostawców, jego klucz i, przy Klingu, ffmpeg; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
@@ -425,6 +435,20 @@ nie ma ani jednego zdjęcia tej postaci. Przy `description` jedynym wejściem et
 jest opis wyglądu w `project.md`, i wtedy to on musi być konkretny, bo nic dalej go nie
 uzupełni. Dodanie zdjęcia przez `character add` samo w sobie jest deklaracją i przestawia
 podstawę tej postaci na `photographs`.
+
+**Obrazy stylu to decyzja projektu w osobnym pliku, `style.json`.** Pole `basis` przyjmuje
+`supplied` (obrazy wniesione przez `project style <id> --source <plik.png>`, kopiowane do
+`style/sources/Snn.png` z sha256 w `style.json`) albo `none` (`project style <id> --none`).
+Brak pliku znaczy „nikt nie zdecydował” i nie jest tym samym co `none`. Plik leży obok
+`project.json`, a nie w nim, bo `project.json` jest zapisanym wejściem niemal każdego
+artefaktu: gdzie mieszka decyzja, to decyduje, co unieważnia jej zmiana, a styl wpływa
+wyłącznie na kadry. Wniesione obrazy są **wyjściami etapu 0**, bo wciąganie plików
+z zewnątrz to jego monopol: `prepare.stage.json` projektu trzyma osobny rekord `style`
+z hashami `style.json` i każdego obrazu, weryfikowany i zatwierdzany razem z resztą etapu.
+Nie mają własnej oceny, więc wniesiony obraz jest przyjęty dokładnie wtedy, gdy etap 0
+projektu jest zatwierdzony, a jego dodanie po zatwierdzeniu cofa zgodę jak `character
+add`. Decyzji nie wymaga etap 0, tylko etapy 5, 6 i 7, każdy etap bramkuje to, co sam
+konsumuje.
 
 Plik `project.json` sprzed obsady czyta się jako **pustą obsadę**, nie jako jedną bezimienną
 postać: zapisana w nim podstawa opisywała kogoś, kogo nikt nie nazwał, więc przeniesienie
@@ -946,7 +970,15 @@ tam plan napisał kod; tutaj listę napisał model, a przyjął ją człowiek, w
 znaczyłoby, że proza promptu adresuje załącznik, którego żądanie nie niesie, czyli
 dokładnie to, przed czym broni niezmiennik o prompcie z załącznikami. Kontrola siedzi
 u składającego, więc jedna reguła obsługuje referencje, klatkę otwarcia, klipy i klatki
-wejściowe naraz.
+wejściowe naraz. Obrazy stylu liczą się do tego limitu i odmowa wymienia je osobno, na
+przykład `entry:C02: 13 załączników (5 referencji i 8 obrazów stylu), a tor seedream
+przyjmuje najwyżej 10`, bo jadą do każdego kadru, więc ich mniejsza liczba jest odpowiedzią,
+której mniejszy pakiet nie daje.
+
+**Bez decyzji o obrazach stylu etap nie wydaje pieniędzy.** Brak `style.json` trafia do
+`problems` planu wysyłki, więc etapy 5, 6 i 7 odmawiają z poleceniem, które tę decyzję
+podejmuje. `style.json` i każdy dołączony obraz stylu są zapisanymi wejściami kadru, więc
+ich zmiana cofa zgodę na kadry, a scenariusza, listy ujęć ani pakietu nie dotyka.
 
 **Prompt powstaje przy wywołaniu i jest tym samym tekstem, który pokazuje podgląd.**
 `aimator prompt-package show <project-id> <episode-id> --track <tor>

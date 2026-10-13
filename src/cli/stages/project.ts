@@ -5,6 +5,7 @@ import {
   initProject,
   type ProjectOverview,
   setNarratorVoice,
+  setStyle,
   showProject,
 } from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
@@ -32,7 +33,13 @@ export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>
     Obsadza narratora serii. Głos jest obsadą, nie konfiguracją: powraca między
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
-    etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.`;
+    etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
+  project style <id> --source <plik.png> [--source <plik.png>...] [--json]
+  project style <id> --none [--json]
+    Obrazy stylu: PNG kopiowane do style/sources/Snn.png albo jawne "bez obrazów
+    stylu". Decyzja mieszka w style.json, nie w project.json, więc jej zmiana
+    cofa zgody wyłącznie na kadry. Wymagają jej dopiero etapy 5, 6 i 7, które
+    dołączają obrazy stylu po załącznikach treści, jako style:Snn.`;
 
 /**
  * Casts the narrator. A stage-0 command because a voice recurs between episodes
@@ -81,6 +88,75 @@ async function runProjectVoice(argv: readonly string[]): Promise<Result<string>>
     : result;
 }
 
+/**
+ * Decides the style frames. One answer per call, brought images or none: both
+ * at once, or neither, is a decision nobody made, so it is refused as usage.
+ */
+async function runProjectStyle(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, {
+    json: { type: "boolean" },
+    none: { type: "boolean" },
+    source: { multiple: true, type: "string" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const sources = parsed.data.values.source;
+  const supplied = Array.isArray(sources) && sources.length > 0;
+  const none = parsed.data.values.none === true;
+
+  if (supplied === none) {
+    return err(
+      new UsageError(
+        "project style przyjmuje dokładnie jedną decyzję: --source <plik.png> [--source <plik.png>...] albo --none"
+      )
+    );
+  }
+
+  const mode = modeOf(parsed.data);
+  const result = await setStyle({
+    decision: supplied ? { basis: "supplied", sourcePaths: sources } : { basis: "none" },
+    mode,
+    projectId: projectId.data,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(
+        answerStage0(
+          answerFlag(parsed.data),
+          "project style",
+          supplied
+            ? `Obrazy stylu projektu "${projectId.data}" są wnoszone`
+            : `Projekt "${projectId.data}" nie ma obrazów stylu`,
+          result.data,
+          mode
+        )
+      )
+    : result;
+}
+
+/** Where the style frames come from, in the words a person decides it in. */
+function styleOf(style: ProjectOverview["style"]): string {
+  if (style.basis === "supplied") {
+    return `wnoszone (${style.images})`;
+  }
+
+  return style.basis === "none" ? "bez obrazów stylu" : "nierozstrzygnięte";
+}
+
 /** Where one character is drawn from, in the words a person decides it in. */
 function basisOf(entry: CastEntry): string {
   if (entry.basis === "photographs") {
@@ -97,6 +173,7 @@ function renderProject(overview: ProjectOverview): string {
     `Projekt "${overview.projectId}": ${overview.title}`,
     `  Proporcje: ${overview.aspectRatio ?? "nierozstrzygnięte"}`,
     `  Narrator: ${overview.narratorVoiceId ?? "nieobsadzony"}`,
+    `  Obrazy stylu: ${styleOf(overview.style)}`,
   ];
 
   if (overview.cast.length === 0) {
@@ -160,6 +237,10 @@ export async function runProject(argv: readonly string[]): Promise<Result<string
 
   if (argv[0] === "show") {
     return runProjectShow(argv.slice(1));
+  }
+
+  if (argv[0] === "style") {
+    return runProjectStyle(argv.slice(1));
   }
 
   if (argv[0] !== "init") {

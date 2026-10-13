@@ -447,6 +447,46 @@ describe("generateClips", () => {
  * any money moves: a model nobody listed, a key that is missing, a prompt Kling
  * will not take, and an engine that is not there to cut the end frame.
  */
+/**
+ * An entry frame is a film frame and carries the series' style frames; a clip
+ * is not drawn, it continues from a frame that already carried them.
+ */
+describe("style frames", () => {
+  function styled(style: "undecided" | readonly Buffer[]): Promise<void> {
+    return makeUpstream({
+      answer: answer(["C01", "C02", "C03"]),
+      approvePackage: true,
+      root,
+      scratch,
+      shotList: "three-clips",
+      style,
+      workspace,
+    });
+  }
+
+  it("should refuse to buy anything while nobody has decided the style frames", async () => {
+    await styled("undecided");
+    const api = provider();
+    const result = await generate({ fetch: api.fetch });
+
+    expect(api.calls).toHaveLength(0);
+    expect(result.ok ? result.data.problems.join("\n") : reason(result)).toContain(
+      `aimator project style ${PROJECT} --none`
+    );
+  });
+
+  it("should show them on an entry frame in a dry run, and never on a clip", async () => {
+    await styled([png(64, 64, 1)]);
+    await makeOpeningFrame("gpt-image");
+    const result = await generate({ artifacts: ["C01", "entry:C02"], mode: "dry-run" });
+    const prompt = (id: string): string | null | undefined =>
+      result.ok ? result.data.artifacts.find((one) => one.id === id)?.prompt : null;
+
+    expect(prompt("entry:C02")).toContain("= style:S01 — style frame");
+    expect(prompt("C01")).not.toContain("style:S01");
+  });
+});
+
 describe("generateClips on Kling", () => {
   const KLING = "kling-3.0";
 

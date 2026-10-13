@@ -6,9 +6,9 @@ widziane raz, czyli wszystko, co nie należy do obsady.
 
 | | |
 |---|---|
-| **Wejście** | `project.json`, `project.md`, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** |
+| **Wejście** | `project.json`, `project.md`, `style.json` i [obrazy stylu](00-przygotowanie.md#obrazy-stylu), zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** |
 | **Wyjście** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` |
-| **Bramka** | zatwierdzony [etap 4](04-pakiet-promptow.md) i zatwierdzone `dependsOn`; potem ocena każdego obrazu z osobna |
+| **Bramka** | decyzja o obrazach stylu, zatwierdzony [etap 4](04-pakiet-promptow.md) i zatwierdzone `dependsOn`; potem ocena każdego obrazu z osobna |
 | **Koszt** | płatny; **jedno polecenie może kupić kilka obrazów** |
 
 ## Komendy

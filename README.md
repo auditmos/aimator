@@ -62,7 +62,7 @@ plików stanu i szczegóły walidacji, jest w [docs/pipeline.md](docs/pipeline.m
 
 | Etap | Na wejściu | Na wyjściu | Koszt |
 |---|---|---|---|
-| [0. przygotowanie](docs/stages/00-przygotowanie.md) | Twój pomysł, plik źródłowy odcinka, zdjęcia postaci | zasady projektu, obsada, decyzje odcinka | darmowy |
+| [0. przygotowanie](docs/stages/00-przygotowanie.md) | Twój pomysł, plik źródłowy odcinka, zdjęcia postaci, obrazy stylu | zasady projektu, obsada, obrazy stylu, decyzje odcinka | darmowy |
 | [1. scenariusz](docs/stages/01-scenariusz.md) | zasady projektu + plik źródłowy | `screenplay.md`: sceny z czasami | 1 wywołanie tekstowe |
 | [2. postać](docs/stages/02-postac.md) | zasady projektu, zdjęcia albo opis postaci | karta, 8 widoków, `hero.png` per postać i tor | do 10 obrazów |
 | [3. lista ujęć](docs/stages/03-lista-ujec.md) | zatwierdzony scenariusz | `shot-list.md`: sceny, ujęcia i klipy | 1 wywołanie tekstowe |

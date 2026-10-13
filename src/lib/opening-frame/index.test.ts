@@ -207,6 +207,44 @@ describe("generateOpeningFrame gates", () => {
   });
 });
 
+/** The opening frame is a film frame, so it carries the series' style frames. */
+describe("style frames", () => {
+  function styled(style: "undecided" | readonly Buffer[]): Promise<void> {
+    return makeUpstream({
+      answer: answer(),
+      approvePackage: true,
+      root,
+      scratch,
+      style,
+      workspace,
+    });
+  }
+
+  it("should refuse to spend while nobody has decided the style frames", async () => {
+    await styled("undecided");
+    const call = recorder();
+    const result = await generate({ fetch: call.fetch });
+
+    expect(call.calls).toHaveLength(0);
+    expect(result.ok ? null : result.error.message).toContain(
+      `aimator project style ${PROJECT} --none`
+    );
+  });
+
+  it("should show the style frames in a dry run, at the end of the list", async () => {
+    await styled([png(64, 64, 1)]);
+    await makeReferences("gpt-image");
+    const result = await generate({ mode: "dry-run" });
+
+    expect(result.ok ? result.data.artifact.prompt : null).toContain(
+      "Image 3 = style:S01 — style frame"
+    );
+    expect(result.ok ? result.data.artifact.attachments.at(-1)?.path : null).toBe(
+      `projects/${PROJECT}/style/sources/S01.png`
+    );
+  });
+});
+
 describe("generateOpeningFrame --dry-run", () => {
   it("should show the whole prompt, count one call and spend nothing", async () => {
     await upstream();

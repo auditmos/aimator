@@ -48,6 +48,9 @@ const EPISODE = "01-burza";
 /** How `project show` lays out one cast row: id, name, basis, in columns. */
 const EWA_FROM_PHOTOS = /ewa\s+Ewa\s+ze zdjęć \(1\)/;
 const TATA_FROM_DESCRIPTION = /tata\s+Tata\s+z opisu w project\.md/;
+/** How `project show` states the style frames: the basis, then how many. */
+const STYLE_SUPPLIED_1 = /Obrazy stylu:\s+wnoszone \(1\)/;
+const STYLE_UNDECIDED = /Obrazy stylu:\s+nierozstrzygnięte/;
 
 /** How `episode show` lays out a decision: the label, then the value. */
 const DURATION_30 = /Długość:\s+30 s/;
@@ -58,6 +61,7 @@ const MAX_CLIP_15 = /Najdłuższy klip:\s+15 s/;
 const COMMANDS = [
   "project init",
   "project voice",
+  "project style",
   "character new",
   "character add",
   "character describe",
@@ -70,6 +74,8 @@ const COMMANDS = [
 let root = "";
 let scratch = "";
 let source = "";
+/** A style frame somebody brings in, outside the workspace like every source. */
+let frame = "";
 let workspace: Workspace = { root: "" };
 
 const reports = new Map<string, unknown>();
@@ -103,8 +109,10 @@ beforeAll(async () => {
 
   const photo = join(scratch, "ewa.png");
 
+  frame = join(scratch, "styl.png");
   await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
   await writeFile(photo, png(64, 64));
+  await writeFile(frame, png(64, 64, 7));
 
   // The whole ladder of stage 0, climbed through `run` and nothing else, in
   // the order a person climbs it: the project, its cast, its narrator, the
@@ -143,6 +151,10 @@ beforeAll(async () => {
   reports.set(
     "project voice",
     await object("project", "voice", PROJECT, "--voice-id", "voice-1", "--json")
+  );
+  reports.set(
+    "project style",
+    await object("project", "style", PROJECT, "--source", frame, "--json")
   );
   reports.set("episode add", await object("episode", "add", PROJECT, "--source", source, "--json"));
   reports.set(
@@ -283,12 +295,46 @@ describe("project show", () => {
     expect(text).toMatch(EWA_FROM_PHOTOS);
     expect(text).toMatch(TATA_FROM_DESCRIPTION);
     expect(text).toContain("voice-1");
+    expect(text).toMatch(STYLE_SUPPLIED_1);
+  });
+
+  it("should say a style nobody decided is undecided, in text and under --json", async () => {
+    await cli("project", "init", "bez-stylu", "--title", "Bez stylu");
+
+    const text = await cli("project", "show", "bez-stylu");
+    const printed = await object("project", "show", "bez-stylu", "--json");
+
+    expect(text).toMatch(STYLE_UNDECIDED);
+    expect(printed).toMatchObject({ style: { basis: null, images: 0 } });
   });
 
   it("should refuse a project that does not exist rather than print an empty one", async () => {
     const result = await run(["project", "show", "nie-ma", "--workspace", root]);
 
     expect(result.ok ? null : result.error.message).toContain('projekt "nie-ma" nie istnieje');
+  });
+});
+
+/**
+ * The style decision has two answers here, and a command must carry exactly
+ * one: brought images, or none. Both, or neither, is a decision nobody made.
+ */
+describe("project style", () => {
+  it("should refuse --none together with --source, and a call with neither", async () => {
+    const both = await run([
+      "project",
+      "style",
+      PROJECT,
+      "--none",
+      "--source",
+      frame,
+      "--workspace",
+      root,
+    ]);
+    const neither = await run(["project", "style", PROJECT, "--workspace", root]);
+
+    expect(both.ok ? null : both.error.name).toBe("UsageError");
+    expect(neither.ok ? null : neither.error.name).toBe("UsageError");
   });
 });
 

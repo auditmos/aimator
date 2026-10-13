@@ -11,6 +11,12 @@ Etap 0. Przygotowanie projektu i odcinka:
     odcinkami, więc mieszka w project.json obok postaci, a nie w zmiennej, która
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
     etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
+  project style <id> --source <plik.png> [--source <plik.png>...] [--json]
+  project style <id> --none [--json]
+    Obrazy stylu: PNG kopiowane do style/sources/Snn.png albo jawne "bez obrazów
+    stylu". Decyzja mieszka w style.json, nie w project.json, więc jej zmiana
+    cofa zgody wyłącznie na kadry. Wymagają jej dopiero etapy 5, 6 i 7, które
+    dołączają obrazy stylu po załącznikach treści, jako style:Snn.
   character new <id> <character-id> --name <nazwa> [--json]
   character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
   character describe <id> <character-id> [--json]

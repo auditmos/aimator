@@ -14,7 +14,12 @@ import {
   previousId,
   referenceLimit,
 } from "../image-model/index.js";
-import { type CastMember, readStage0Inputs } from "../project/index.js";
+import {
+  type CastMember,
+  readStage0Inputs,
+  readStage0Style,
+  type Stage0Style,
+} from "../project/index.js";
 import { checkPromptPackage, type PromptPackage } from "../prompt-package/index.js";
 import { err, ok, type Result } from "../result.js";
 import { checkShotList, type ShotList } from "../shot-list/index.js";
@@ -36,7 +41,14 @@ import {
   type Workspace,
   workspacePath,
 } from "../workspace.js";
-import { type AttachmentSlot, composePrompt, PROMPT_VERSION, retake } from "./prompt.js";
+import {
+  type AttachmentSlot,
+  composePrompt,
+  PROMPT_VERSION,
+  retake,
+  STYLE_PREFIX,
+  STYLE_ROLE,
+} from "./prompt.js";
 
 /**
  * Internal to the media-prompt module: what one future paid call carries, and
@@ -190,6 +202,16 @@ interface Scope {
     readonly clips: StageFile | null;
     readonly openingFrame: StageFile | null;
     readonly references: StageFile | null;
+  };
+  /**
+   * The style frames every film frame of this run ends with, resolved once, and
+   * `style.json` itself, which every frame records: changing the decision lapses
+   * frames, and only frames. A clip carries neither, it starts from a frame
+   * that already carried them.
+   */
+  readonly style: {
+    readonly attachments: readonly Attachment[];
+    readonly file: RecordedFile | null;
   };
 }
 
@@ -429,6 +451,40 @@ async function resolveHero(
   });
 }
 
+/**
+ * The style frames stage 0 brought in, as this run will attach them.
+ *
+ * A brought image has no review of its own: it is a stage-0 output, accepted
+ * when stage 0 is, so its state is that approval, bound to the digest stage 0
+ * recorded rather than to whatever sits on disk now.
+ */
+async function resolveStyle(scope: Scope, style: Stage0Style): Promise<readonly Attachment[]> {
+  const attachments: Attachment[] = [];
+
+  for (const source of style.sources) {
+    // biome-ignore lint/performance/noAwaitInLoops: ordered, and the order is the request
+    const digest = await digestOf(scope, source.path);
+    let state: Attachment["state"] = style.approved ? "approved" : "pending";
+
+    if (digest === null) {
+      state = "absent";
+    } else if (digest.sha256 !== source.sha256) {
+      state = "changed";
+    }
+
+    attachments.push({
+      bytes: digest?.bytes ?? null,
+      id: `${STYLE_PREFIX}${source.id}`,
+      path: toWorkspacePath(scope.input.workspace.root, source.path),
+      role: STYLE_ROLE,
+      sha256: digest?.sha256 ?? null,
+      state,
+    });
+  }
+
+  return attachments;
+}
+
 /** Why one attachment cannot be carried yet, in the words a person reads. */
 function attachmentBlocker(scope: Scope, attachment: Attachment): string | null {
   if (attachment.state === "approved") {
@@ -436,6 +492,12 @@ function attachmentBlocker(scope: Scope, attachment: Attachment): string | null 
   }
 
   const where = `${attachment.id} (${attachment.path})`;
+
+  if (attachment.id.startsWith(STYLE_PREFIX) && attachment.state !== "changed") {
+    return attachment.state === "absent"
+      ? `${where}: obrazu stylu nie ma w katalogu roboczym, wnieś go ponownie: aimator project style ${scope.input.projectId} --source <plik.png>`
+      : `${where}: obraz stylu nie jest przyjęty, etap 0 projektu czeka na akceptację: aimator approve ${scope.input.projectId}`;
+  }
 
   if (attachment.id.startsWith(HERO)) {
     const characterId = attachment.id.slice(HERO.length);
@@ -673,14 +735,37 @@ function blockersOf(
   // nothing here for that limit to be about. A corrected image counts: it is
   // one more image in the same request, and nothing is silently dropped.
   if (artifact.kind !== "clip" && attachments.length > scope.limit) {
-    blockers.push(
-      previous === null
-        ? `${artifact.name}: ${attachments.length} referencji, a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}, zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
-        : `${artifact.name}: ${attachments.length} załączników (poprawiany obraz i ${planned.length} referencji), a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}; --instruction dokłada poprzedni obraz jako Image 1, więc tu się nie zmieści, zaplanuj w pakiecie mniej referencji`
-    );
+    blockers.push(overLimit(scope, artifact, attachments, previous));
   }
 
   return blockers;
+}
+
+/**
+ * The refusal for a list a track cannot carry, with every number in it. Style
+ * frames are named apart: they ride on every frame, so fewer of them is an
+ * answer that a smaller package is not.
+ */
+function overLimit(
+  scope: Scope,
+  artifact: Artifact,
+  attachments: readonly Attachment[],
+  previous: Attachment | null
+): string {
+  const style = attachments.filter((attachment) => attachment.id.startsWith(STYLE_PREFIX)).length;
+  const content = attachments.length - style - (previous === null ? 0 : 1);
+  const head = `${artifact.name}: ${attachments.length}`;
+  const limit = `a tor ${scope.input.track} przyjmuje najwyżej ${scope.limit}`;
+
+  if (style > 0) {
+    const corrected = previous === null ? "" : "poprawiany obraz, ";
+
+    return `${head} załączników (${corrected}${content} referencji i ${style} obrazów stylu), ${limit}; obrazy stylu idą do każdego kadru, więc wnieś ich mniej (aimator project style) albo zaplanuj w pakiecie mniej referencji, zamiast liczyć na to, że narzędzie wybierze za ciebie`;
+  }
+
+  return previous === null
+    ? `${head} referencji, ${limit}, zaplanuj ich mniej w pakiecie zamiast liczyć na to, że narzędzie wybierze za ciebie`
+    : `${head} załączników (poprawiany obraz i ${content} referencji), ${limit}; --instruction dokłada poprzedni obraz jako Image 1, więc tu się nie zmieści, zaplanuj w pakiecie mniej referencji`;
 }
 
 async function planOne(
@@ -714,6 +799,15 @@ async function planOne(
     attachments.push(resolved.data);
   }
 
+  // A frame is drawn in the series' style, so its list ends with the style
+  // frames, after everything it is *of*. A clip is not drawn: it continues from
+  // a frame that already carried them, and its request takes one image only.
+  const framed = artifact.kind !== "clip";
+
+  if (framed) {
+    attachments.push(...scope.style.attachments);
+  }
+
   const direction = await digestOf(scope, path.data);
   const relative = toWorkspacePath(scope.input.workspace.root, path.data);
   const planned = attachments.filter((attachment) => attachment !== previous.data);
@@ -731,6 +825,7 @@ async function planOne(
     id: artifact.id,
     inputs: [
       ...scope.shared,
+      ...(framed && scope.style.file !== null ? [scope.style.file] : []),
       ...shotListInput,
       ...(direction === null ? [] : [{ path: relative, sha256: direction.sha256 }]),
       ...planned
@@ -796,6 +891,12 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     return frame;
   }
 
+  const style = await readStage0Style(input);
+
+  if (!style.ok) {
+    return style;
+  }
+
   const plan = await checkShotList(input);
 
   if (!plan.ok) {
@@ -847,13 +948,18 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
       openingFrame: openingFrame.ok ? openingFrame.data : null,
       references: references.ok ? references.data : null,
     },
+    style: { attachments: [], file: style.data.file },
   };
   const shared = [
     ...(await recordFile(scope, paths.data.project.file)),
     ...(await recordFile(scope, paths.data.project.rules)),
     ...(await recordFile(scope, paths.data.episode.promptPackage)),
   ];
-  const withShared: Scope = { ...scope, shared };
+  const withShared: Scope = {
+    ...scope,
+    shared,
+    style: { attachments: await resolveStyle(scope, style.data), file: style.data.file },
+  };
   const planned = enumerate(withShared);
   const known = new Set(planned.map((artifact) => artifact.name));
   const unknown = input.targets.filter((name) => !known.has(name));
@@ -895,12 +1001,21 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     artifacts,
     aspectRatio: stage0.data.aspectRatio,
     limit: withShared.limit,
-    problems: status.data.approved
-      ? []
-      : [
-          ...status.data.problems,
-          `etap 4 musi mieć review.status = "approved" zanim którykolwiek etap obrazowy wyda pieniądze: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`,
-        ],
+    problems: [
+      ...(status.data.approved
+        ? []
+        : [
+            ...status.data.problems,
+            `etap 4 musi mieć review.status = "approved" zanim którykolwiek etap obrazowy wyda pieniądze: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`,
+          ]),
+      // Rule 7: no decision is not "no style frames". Every frame would carry
+      // them, so every stage that draws one waits for the answer.
+      ...(style.data.basis === null
+        ? [
+            `projekt "${input.projectId}" nie ma decyzji o obrazach stylu (style.json), a etapy 5, 6 i 7 dołączają je do każdego kadru; zdecyduj: aimator project style ${input.projectId} --source <plik.png> albo aimator project style ${input.projectId} --none`,
+          ]
+        : []),
+    ],
     promptVersion: PROMPT_VERSION,
     size: frame.data,
     track: input.track,

@@ -19,6 +19,7 @@ import {
   setCharacterBasis,
   setEpisodeSettings,
   setNarratorVoice,
+  setStyle,
 } from "../lib/project/index.js";
 import { approvePromptPackage, generatePromptPackage } from "../lib/prompt-package/index.js";
 import { approveReferences, generateReferences } from "../lib/references/index.js";
@@ -742,6 +743,15 @@ interface UpstreamOptions {
   readonly scratch: string;
   readonly shotList?: ShotListShape;
   /**
+   * The style frames, decided before stage 0 is approved, for the reason the
+   * narrator is: an image brought in later lapses stage 0.
+   *
+   * An explicit "none" unless a test brings images, because stages 5 to 7
+   * refuse an undecided style and almost no test is about that refusal; the
+   * one that is says `"undecided"`, and nothing is decided for it.
+   */
+  readonly style?: "none" | "undecided" | readonly Buffer[];
+  /**
    * Which voice reads the series, cast before stage 0 is approved.
    *
    * Cast here rather than by the test, because that is when a real series casts
@@ -751,6 +761,37 @@ interface UpstreamOptions {
    */
   readonly voiceId?: string;
   readonly workspace: Workspace;
+}
+
+/**
+ * Brings the style frames in through stage 0's own command, or decides none.
+ * The images are written outside the workspace first, where a person keeps them.
+ */
+export async function decideStyle(
+  style: "none" | "undecided" | readonly Buffer[],
+  scratch: string,
+  workspace: Workspace
+): Promise<void> {
+  if (style === "undecided") {
+    return;
+  }
+
+  const sourcePaths = await Promise.all(
+    (style === "none" ? [] : style).map(async (bytes, index) => {
+      const path = join(scratch, `styl-${sha256Of(bytes).slice(0, 8)}-${index}.png`);
+
+      await writeFile(path, bytes);
+
+      return path;
+    })
+  );
+
+  await setStyle({
+    decision: style === "none" ? { basis: "none" } : { basis: "supplied", sourcePaths },
+    mode: "apply",
+    projectId: PROJECT,
+    workspace,
+  });
 }
 
 /** Stages 0 to 4, with a canonical image for every character on every track. */
@@ -824,6 +865,7 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
     },
     workspace,
   });
+  await decideStyle(options.style ?? "none", scratch, workspace);
   await approveStage0({
     mode: "apply",
     note: null,

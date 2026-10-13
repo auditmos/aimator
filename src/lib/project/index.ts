@@ -46,8 +46,10 @@ import {
   type ReadySettings,
   readySettingsSchema,
   STAGE0_DECISIONS,
+  type StyleFile,
   sourceNatures,
 } from "./schema.js";
+import { planStyle, readStyleFile, type StyleDecision, styleOutputs } from "./style.js";
 import { PLACEHOLDER, renderRules } from "./template.js";
 
 /** The five episode decisions, all made. A later stage reads them, never the draft. */
@@ -106,6 +108,13 @@ export interface ProjectOverview {
   readonly cast: readonly CastEntry[];
   readonly narratorVoiceId: string | null;
   readonly projectId: string;
+  /** The style frames: where they come from, null until decided, and how many. */
+  readonly style: {
+    readonly basis: StyleBasis | null;
+    readonly images: number;
+    /** The images brought in, workspace-relative, whatever the basis now is. */
+    readonly sources: readonly string[];
+  };
   readonly title: string;
 }
 
@@ -198,6 +207,7 @@ type SetSettingsInput = ProjectInput & {
   readonly settings: Partial<DraftSettings>;
 };
 type AddSourcesInput = CharacterInput & { readonly sourcePaths: readonly string[] };
+type SetStyleInput = ProjectInput & { readonly decision: StyleDecision };
 interface CheckInput {
   readonly projectId: string;
   readonly workspace: Workspace;
@@ -322,33 +332,48 @@ function castSources(file: ProjectFile): readonly RecordedFile[] {
 }
 
 /**
+ * The project's stage file with one record replaced and every other one kept.
+ *
+ * The project record and the style record are written by different commands,
+ * and neither may erase the other: a style frame added after the cast was
+ * declared is still a stage-0 output, verified like every other one.
+ */
+async function prepareStageWith(
+  paths: ProjectPaths,
+  key: string,
+  value: StageFile["artifacts"][string]
+): Promise<StageFile> {
+  const current = await readJson(paths.prepareStage, stageFileSchema);
+  const artifacts = current.ok ? current.data.artifacts : {};
+
+  return prepareStageFile({ ...artifacts, [key]: value });
+}
+
+/**
  * `project.json` and the stage record carrying its digest, which are never
  * written apart: a project file whose recorded hash describes older bytes is
  * the one state every later stage is entitled to treat as tampering.
  */
-function projectWrites(
+async function projectWrites(
   workspace: Workspace,
   paths: ProjectPaths,
   file: ProjectFile
-): readonly WriteOp[] {
+): Promise<readonly WriteOp[]> {
   const text = serialize(file);
+  const stage = await prepareStageWith(
+    paths,
+    "project",
+    record(castSources(file), [
+      {
+        path: toWorkspacePath(workspace.root, paths.file),
+        sha256: sha256Of(Buffer.from(text)),
+      },
+    ])
+  );
 
   return [
     { kind: "text", text, to: paths.file },
-    {
-      kind: "text",
-      text: serialize(
-        prepareStageFile({
-          project: record(castSources(file), [
-            {
-              path: toWorkspacePath(workspace.root, paths.file),
-              sha256: sha256Of(Buffer.from(text)),
-            },
-          ]),
-        })
-      ),
-      to: paths.prepareStage,
-    },
+    { kind: "text", text: serialize(stage), to: paths.prepareStage },
   ];
 }
 
@@ -449,7 +474,7 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
   };
   const lapsed = await approvalLapses(project.data.prepareStage);
   const written = await applyWrites(
-    [...projectWrites(input.workspace, project.data, file)],
+    [...(await projectWrites(input.workspace, project.data, file))],
     input.mode
   );
 
@@ -884,7 +909,7 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
     },
   };
 
-  ops.push(...projectWrites(input.workspace, project, file));
+  ops.push(...(await projectWrites(input.workspace, project, file)));
 
   const lapsed = await approvalLapses(project.prepareStage);
   const written = await applyWrites(ops, input.mode);
@@ -947,7 +972,10 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
     },
   };
   const lapsed = await approvalLapses(project.prepareStage);
-  const written = await applyWrites([...projectWrites(input.workspace, project, file)], input.mode);
+  const written = await applyWrites(
+    [...(await projectWrites(input.workspace, project, file))],
+    input.mode
+  );
 
   return written.ok
     ? ok({
@@ -994,7 +1022,7 @@ export async function setNarratorVoice(input: SetVoiceInput): Promise<Result<Sta
   const file: ProjectFile = { ...current.data, narratorVoiceId: input.voiceId };
   const lapsed = await approvalLapses(project.data.prepareStage);
   const written = await applyWrites(
-    [...projectWrites(input.workspace, project.data, file)],
+    [...(await projectWrites(input.workspace, project.data, file))],
     input.mode
   );
 
@@ -1011,6 +1039,67 @@ export async function setNarratorVoice(input: SetVoiceInput): Promise<Result<Sta
           : [],
         ready: false,
         reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+      })
+    : written;
+}
+
+/**
+ * Decides the project's style frames: images brought in, or none.
+ *
+ * A stage-0 command because bringing a file in from outside the workspace is
+ * stage 0's monopoly, so a supplied image is recorded as this stage's output,
+ * beside `project.json`, and an addition after approval lapses it exactly as
+ * `character add` does. The decision itself sits in `style.json`, which only
+ * film frames record, so changing it lapses those and nothing above them.
+ */
+export async function setStyle(input: SetStyleInput): Promise<Result<Stage0Report>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const current = await readStyleFile(project.data.style);
+
+  if (!current.ok) {
+    return current;
+  }
+
+  const planned = await planStyle(input.workspace, project.data, current.data, input.decision);
+
+  if (!planned.ok) {
+    return planned;
+  }
+
+  const text = serialize(planned.data.file);
+  const stage = await prepareStageWith(
+    project.data,
+    "style",
+    record([], styleOutputs(input.workspace, project.data, planned.data.file, text))
+  );
+  const lapsed = await approvalLapses(project.data.prepareStage);
+  const written = await applyWrites(
+    [
+      ...planned.data.copies,
+      { kind: "text", text, to: project.data.style },
+      { kind: "text", text: serialize(stage), to: project.data.prepareStage },
+    ],
+    input.mode
+  );
+
+  return written.ok
+    ? ok({
+        approved: false,
+        changedSinceApproval: [],
+        created: planned.data.created,
+        nextStep: `aimator check ${input.projectId}`,
+        problems: lapsed
+          ? [
+              `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+            ]
+          : [],
+        ready: false,
+        reused: planned.data.reused,
       })
     : written;
 }
@@ -1141,6 +1230,14 @@ export async function showProject(input: CheckInput): Promise<Result<ProjectOver
     return file;
   }
 
+  const style = await readStyleFile(project.data.style);
+
+  if (!style.ok) {
+    return style;
+  }
+
+  const sources = style.data?.sources.map((one) => one.path) ?? [];
+
   return ok({
     aspectRatio: file.data.aspectRatio,
     cast: Object.entries(file.data.characters).map(([id, entry]) => ({
@@ -1151,6 +1248,11 @@ export async function showProject(input: CheckInput): Promise<Result<ProjectOver
     })),
     narratorVoiceId: file.data.narratorVoiceId,
     projectId: input.projectId,
+    style: {
+      basis: style.data?.basis ?? null,
+      images: style.data?.basis === "supplied" ? sources.length : 0,
+      sources,
+    },
     title: file.data.title,
   });
 }
@@ -1609,6 +1711,9 @@ async function checkEpisode(
 /** Where one character's appearance comes from, decided and never defaulted. */
 export type CharacterBasis = NonNullable<CharacterEntry["basis"]>;
 
+/** Where the style frames come from, decided and never defaulted. */
+export type StyleBasis = StyleFile["basis"];
+
 /** Everything stage 2 may read from stage 0, for one character, in one call. */
 export interface Stage0Character {
   /** Whether a human accepted stage 0 for this project. */
@@ -1693,6 +1798,80 @@ export async function readStage0Character(
     problems: approval.problems,
     rules: rules.data.bytes.toString("utf8"),
     sources,
+  });
+}
+
+/** Everything a film-frame stage may read about the style frames, in one call. */
+export interface Stage0Style {
+  /**
+   * Whether stage 0 of this project holds as it stands. A brought image has no
+   * review of its own: it is a stage-0 output, accepted with the rest of it.
+   */
+  readonly approved: boolean;
+  /** Null while nobody has decided, which is not the same as "none". */
+  readonly basis: StyleBasis | null;
+  /** `style.json` with the digest of the bytes read; null while undecided. */
+  readonly file: RecordedFile | null;
+  /** Why the approval does not hold, when it does not. */
+  readonly problems: readonly string[];
+  /**
+   * The images this decision attaches, in id order: absolute, with the digest
+   * stage 0 recorded. Empty unless the basis is `supplied`.
+   */
+  readonly sources: readonly {
+    readonly id: string;
+    readonly path: string;
+    readonly sha256: string;
+  }[];
+}
+
+/**
+ * The style decision as stages 5 to 7 consume it. It reads no episode: the
+ * style belongs to the series, as the cast does. An undecided style is not an
+ * error here, it comes back as `basis: null`, so a dry run can still show what
+ * would be sent while the stages refuse.
+ */
+export async function readStage0Style(input: CheckInput): Promise<Result<Stage0Style>> {
+  const project = await resolveProject({ ...input, mode: "dry-run" });
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const style = await readStyleFile(project.data.style);
+
+  if (!style.ok) {
+    return style;
+  }
+
+  if (style.data === null) {
+    return ok({ approved: false, basis: null, file: null, problems: [], sources: [] });
+  }
+
+  const digest = await readDigest(project.data.style);
+
+  if (!digest.ok) {
+    return digest;
+  }
+
+  const approval = await projectApproval(input.workspace, project.data);
+
+  return ok({
+    approved: approval.approved,
+    basis: style.data.basis,
+    file: {
+      path: toWorkspacePath(input.workspace.root, project.data.style),
+      sha256: digest.data.sha256,
+    },
+    problems: approval.problems,
+    sources:
+      style.data.basis === "supplied"
+        ? style.data.sources.map((one) => ({
+            id: one.id,
+            path: join(input.workspace.root, one.path),
+            sha256: one.sha256,
+          }))
+        : [],
   });
 }
 

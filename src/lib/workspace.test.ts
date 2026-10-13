@@ -20,6 +20,7 @@ import {
   resolveWorkspace,
   runPaths,
   soundStem,
+  styleSource,
   videoRunPaths,
   voiceRunPaths,
 } from "./workspace.js";
@@ -76,7 +77,25 @@ describe("projectPaths", () => {
       prepareStage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
       root: "/srv/aimator/projects/48-praw-wladzy",
       rules: "/srv/aimator/projects/48-praw-wladzy/project.md",
+      style: "/srv/aimator/projects/48-praw-wladzy/style.json",
+      styleSources: "/srv/aimator/projects/48-praw-wladzy/style/sources",
     });
+  });
+
+  it("should name a style frame by its id, and refuse anything that is not one", () => {
+    const project = projectPaths(workspace, "48-praw-wladzy");
+
+    if (!project.ok) {
+      throw project.error;
+    }
+
+    const frame = styleSource(project.data, "S01");
+
+    expect(frame.ok ? frame.data : null).toBe(
+      "/srv/aimator/projects/48-praw-wladzy/style/sources/S01.png"
+    );
+    expect(styleSource(project.data, "../S01").ok).toBe(false);
+    expect(styleSource(project.data, "R01").ok).toBe(false);
   });
 
   it("should accept an id starting with a digit", () => {

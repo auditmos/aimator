@@ -140,6 +140,22 @@ exports[`every stage-0 command under --json > should print the stage's report fo
 }
 `;
 
+exports[`every stage-0 command under --json > should print the stage's report for project style 1`] = `
+{
+  "approved": false,
+  "changedSinceApproval": [],
+  "command": "project style",
+  "created": [
+    "projects/dzielna-ewa/style/sources/S01.png",
+  ],
+  "nextStep": "aimator check dzielna-ewa",
+  "problems": [],
+  "ready": false,
+  "reused": [],
+  "stage": "prepare",
+}
+`;
+
 exports[`every stage-0 command under --json > should print the stage's report for project voice 1`] = `
 {
   "approved": false,

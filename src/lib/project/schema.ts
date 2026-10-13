@@ -172,7 +172,33 @@ export const episodeFileSchema = z.strictObject({
   source: assetSchema,
 });
 
+/**
+ * Where the style frames every film frame carries come from. Recorded as a
+ * decision for the reason a character's basis is: an empty `style/sources/`
+ * does not tell "deliberately none" from "not brought yet".
+ */
+const styleBases = ["none", "supplied"] as const;
+
+const styleSourceSchema = z.strictObject({
+  id: z.string().regex(/^S\d{2,}$/, "expected a style frame id such as S01"),
+  originPath: z.string().min(1),
+  path: z.string().min(1),
+  sha256: sha256Schema,
+});
+
+/**
+ * `style.json`, a file of its own beside `project.json` rather than a field in
+ * it: `project.json` is a recorded input of nearly every artifact, and style
+ * frames are an input of film frames alone. Its absence is the undecided state.
+ */
+export const styleFileSchema = z.strictObject({
+  basis: z.enum(styleBases),
+  schemaVersion: z.literal(1),
+  sources: z.array(styleSourceSchema),
+});
+
 export type CharacterEntry = z.infer<typeof characterSchema>;
+export type StyleFile = z.infer<typeof styleFileSchema>;
 export type DraftSettings = z.infer<typeof draftSettingsSchema>;
 export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;

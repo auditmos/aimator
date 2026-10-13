@@ -862,9 +862,25 @@ exports[`every command >   project show <id> [--json] 1`] = `
 Projekt "ewa": Dzielna Ewa
   Proporcje: 16:9
   Narrator: nieobsadzony
+  Obrazy stylu: bez obrazów stylu
   Obsada:
     ewa   Ewa   z opisu w project.md
     tata  Tata  z opisu w project.md"
+`;
+
+exports[`every command >   project style <id> --none [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Projekt "ewa" nie ma obrazów stylu
+  ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
+Dalej: aimator check ewa"
+`;
+
+exports[`every command >   project style <id> --source <plik.png> [--source <plik.png>...] [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Obrazy stylu projektu "ewa" są wnoszone
+  + projects/ewa/style/sources/S01.png
+  ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
+Dalej: aimator check ewa"
 `;
 
 exports[`every command >   project voice <id> --voice-id <id głosu> [--json] 1`] = `
@@ -1148,7 +1164,7 @@ Sprawdzono sumy czasów. Plan wymaga oceny.
 exports[`every command >   prompt-package show <id> <episode-id> --track <tor> [--json] 1`] = `
 "ok
 Pakiet promptów ewa/01-burza, tor gpt-image, nic nie wysłano, nic nie zapisano
-  kadr 2816x1584 (16:9); tor przyjmuje najwyżej 16 referencji; składacz w wersji 1
+  kadr 2816x1584 (16:9); tor przyjmuje najwyżej 16 referencji; składacz w wersji 2
   R01 (reference): gotowy, 1 referencji
       Image 1 = hero:ewa → projects/ewa/characters/ewa/gpt-image/hero.png, zatwierdzony
   opening-frame (opening): gotowy, 2 referencji
