@@ -225,3 +225,45 @@ describe("versions bind and lip-sync", () => {
     expect(text).toContain("C01: zatwierdzony");
   });
 });
+
+/**
+ * Runs after the clip above is accepted: C01 is lip-synced, C02 still waits
+ * for its version and the episode has no stems yet, so the film is a preview
+ * of its own obstacles.
+ */
+describe("versions final", () => {
+  it("should state the cut and every obstacle before making anything", async () => {
+    const text = await cli("versions", "final", ...ON, "--language", "en", "--dry-run");
+
+    expect(text).toContain("Próba na sucho: nic nie zapisano, nic nie złożono. Film en");
+    expect(text).toContain("obraz: C01 (lip-sync), C02 (lip-sync)");
+    expect(text).toContain("! C02: klip wymaga lip-syncu");
+  });
+
+  it("should refuse a film without a language rather than pick one", async () => {
+    await expect(cli("versions", "final", ...ON, "--dry-run")).rejects.toThrow(
+      "--language jest wymagane"
+    );
+  });
+
+  it("should list each film and the checklist its yes is given against in check", async () => {
+    const text = await cli("check", ...ON, "--stage", "versions");
+
+    expect(text).toContain(
+      "  film en: absent, jeszcze nie powstał: aimator versions final ewa 01-burza --track gpt-image --language en; checklista: animation, timing, acting, lip-sync, continuity"
+    );
+    expect(text).toContain("  film pl: absent");
+  });
+
+  /** A film's checklist is a film's: a frame's criteria are not words it knows. */
+  it("should take --checks on versions in a film's vocabulary only", async () => {
+    await expect(
+      cli("approve", ...ON, "--stage", "versions", "--artifact", "en", "--checks", "anatomy")
+    ).rejects.toThrow(
+      '--checks "anatomy", dozwolone: animation, timing, acting, lip-sync, continuity'
+    );
+    await expect(
+      cli("approve", ...ON, "--stage", "versions", "--artifact", "en", "--checks", "all")
+    ).rejects.toThrow("nie ma czego zatwierdzić: en");
+  });
+});

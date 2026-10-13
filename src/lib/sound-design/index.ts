@@ -52,6 +52,7 @@
 export { generateSoundDesign, type SoundDesignReport } from "./generate.js";
 export { type LevelsReport, setLevels } from "./levels.js";
 export { generateMaster, type MasterReport } from "./mix.js";
+export { placeStems } from "./plan.js";
 export {
   approveMaster,
   approveSoundDesign,

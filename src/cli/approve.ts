@@ -1,5 +1,5 @@
-import type { Checklist } from "../lib/checklist.js";
-import { err, type Result } from "../lib/result.js";
+import { type Check, type Checklist, FILM_CHECKS, FRAME_CHECKS } from "../lib/checklist.js";
+import { err, ok, type Result } from "../lib/result.js";
 import {
   type Approval,
   answerOf,
@@ -47,29 +47,42 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
   approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]
                [--json]
-  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02] [--json]`;
+  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]|<kod>
+               [--checks <kryteria>|all] [--json]`;
 
-/** The stages whose frames are accepted against the QC checklist. */
-const CHECKLIST_STAGES = ["opening-frame", "clips"] as const;
+/**
+ * The stages accepted against a QC checklist, and whose: the frames a clip
+ * starts on are walked through as frames, stage 12's film whose mouths moved
+ * as a film.
+ */
+const CHECKLISTS: Readonly<Record<string, readonly Check[]>> = {
+  clips: FRAME_CHECKS,
+  "opening-frame": FRAME_CHECKS,
+  versions: FILM_CHECKS,
+};
 
 /**
  * `--checks`, refused on a stage that has no checklist. It belongs to the
- * frames a clip starts on; anywhere else it would be recorded nowhere, and a
- * flag that silently does nothing reads as a check somebody did.
+ * frames a clip starts on and to the film whose mouths moved; anywhere else it
+ * would be recorded nowhere, and a flag that silently does nothing reads as a
+ * check somebody did.
  */
 function checksFor(parsed: Parsed): Result<Checklist | null> {
-  const checks = checksOf(parsed);
-  const { stage } = parsed.values;
+  const { checks, stage } = parsed.values;
+  const vocabulary =
+    typeof stage === "string" && Object.hasOwn(CHECKLISTS, stage) ? CHECKLISTS[stage] : undefined;
 
-  if (!checks.ok || checks.data === null || CHECKLIST_STAGES.some((one) => one === stage)) {
-    return checks;
+  if (vocabulary !== undefined) {
+    return checksOf(parsed, vocabulary);
   }
 
-  return err(
-    new UsageError(
-      `--checks dotyczy tylko klatek gotowych do animacji: --stage ${CHECKLIST_STAGES.join(" albo --stage ")}`
-    )
-  );
+  return checks === undefined
+    ? ok(null)
+    : err(
+        new UsageError(
+          `--checks dotyczy tylko klatek gotowych do animacji i filmu wersji: --stage ${Object.keys(CHECKLISTS).join(" albo --stage ")}`
+        )
+      );
 }
 
 /**

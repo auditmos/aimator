@@ -618,7 +618,8 @@ const MASTER_ROW: TrackRow = {
  * Its "Dalej:" is its `check`, as stage 0's is, because what moves the next
  * clip is one of three things and only the stage knows which: a paid face
  * call, a person saying which face is whom, or the paid lip-sync itself. The
- * check names that one, per clip, as a command.
+ * check names that one, per clip, as a command. A finished film is a part like
+ * a clip's version, so one nobody has watched holds the cell for review.
  */
 const VERSIONS_ROW: TrackRow = {
   file: (paths) => paths.versionsStage,
@@ -632,7 +633,7 @@ const VERSIONS_ROW: TrackRow = {
     return result.ok
       ? ok({
           approved: result.data.approved,
-          parts: result.data.clips,
+          parts: [...result.data.clips, ...result.data.finals],
           problems: result.data.problems,
           status: result.data,
         })

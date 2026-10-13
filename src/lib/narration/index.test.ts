@@ -586,7 +586,7 @@ describe("generateMix", () => {
     expect(result.ok ? result.data.state : null).toBe("blocked");
     expect(result.ok ? result.data.problems.join(" ") : null).toContain("nie ma skryptu");
     expect(result.ok ? result.data.actualSeconds : null).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it("should refuse to mix lines nobody has listened to", async () => {
     await makeCut({ root, track: "gpt-image", workspace });

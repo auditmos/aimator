@@ -1,7 +1,7 @@
 import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import type { Correction } from "../lib/artifact/index.js";
-import { CHECKS, type Check, type Checklist } from "../lib/checklist.js";
+import { type Check, type Checklist, FRAME_CHECKS } from "../lib/checklist.js";
 import { env } from "../lib/env.js";
 import type { Stage0Report } from "../lib/project/index.js";
 import { err, ok, type Result } from "../lib/result.js";
@@ -343,41 +343,50 @@ export function trackOf(parsed: Parsed): Result<ImageTrack> {
  *
  * A name outside the vocabulary is refused here rather than ignored, because a
  * misspelt `anatmy` would otherwise surface as "anatomy is missing" one step
- * later, which blames the person for a check they did.
+ * later, which blames the person for a check they did. The vocabulary is the
+ * one checklist the stage accepts against: a frame's, or a film's.
  */
-export function checksOf(parsed: Parsed): Result<Checklist | null> {
+export function checksOf(parsed: Parsed, vocabulary: readonly Check[]): Result<Checklist | null> {
   const flag = parsed.values.checks;
 
   if (typeof flag !== "string") {
     return ok(null);
   }
 
-  return flag.trim() === "all" ? ok("all") : criteriaOf("checks", flag, " albo all");
+  return flag.trim() === "all" ? ok("all") : criteriaOf("checks", flag, " albo all", vocabulary);
 }
 
 /**
  * `--fail`: the QC criteria a rejection names as failed, or `null` when absent.
- * A list only: "everything failed" is a note, not a criterion.
+ * A list only: "everything failed" is a note, not a criterion. Only a frame is
+ * rejected against a checklist, so it is a frame's vocabulary.
  */
 export function failedOf(parsed: Parsed): Result<readonly Check[] | null> {
   const flag = parsed.values.fail;
 
-  return typeof flag === "string" ? criteriaOf("fail", flag, "") : ok(null);
+  return typeof flag === "string" ? criteriaOf("fail", flag, "", FRAME_CHECKS) : ok(null);
 }
 
-/** A comma list from the QC vocabulary, in vocabulary order; anything else is refused. */
-function criteriaOf(name: string, flag: string, also: string): Result<readonly Check[]> {
+/** A comma list from one checklist's vocabulary, in vocabulary order; anything else is refused. */
+function criteriaOf(
+  name: string,
+  flag: string,
+  also: string,
+  vocabulary: readonly Check[]
+): Result<readonly Check[]> {
   const names = flag
     .split(",")
     .map((one) => one.trim())
     .filter((one) => one !== "");
-  const unknown = names.filter((one) => !CHECKS.some((check) => check === one));
+  const unknown = names.filter((one) => !vocabulary.some((check) => check === one));
 
   return unknown.length > 0
     ? err(
-        new UsageError(`--${name} "${unknown.join(", ")}", dozwolone: ${CHECKS.join(", ")}${also}`)
+        new UsageError(
+          `--${name} "${unknown.join(", ")}", dozwolone: ${vocabulary.join(", ")}${also}`
+        )
       )
-    : ok(CHECKS.filter((check) => names.includes(check)));
+    : ok(vocabulary.filter((check) => names.includes(check)));
 }
 
 /**

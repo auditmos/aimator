@@ -130,6 +130,7 @@ const mux: Muxer = {
   },
   master: () => Promise.resolve(err(new Error("nieużywane"))),
   mix: () => Promise.resolve(err(new Error("nieużywane"))),
+  picture: () => Promise.resolve(err(new Error("nieużywane"))),
   version: () => Promise.resolve(ok("ffmpeg 9.0.2")),
 };
 

@@ -97,7 +97,13 @@ with one face), and only then are mouths moved. Which clips need it is derived f
 shot list and the translation, never stored. The provider moves one face per job and a job
 is addressed by a session opened on exactly one video, so a second speaker in a clip is a
 second face call on the first job's result, by its `video_id`, under the face id the person
-bound. It produces each clip's version; the two finished films come after it.
+bound. It produces each clip's version, and then the two finished films of the track,
+which buy nothing: one picture, cut once from the lip-synced clips and stage 7's others,
+and over it either language's lines beside the same stems of stage 10. The film in the
+language of the mouths is the second yes in this pipeline given against a QC checklist,
+a film's rather than a frame's. A stream copy across a lip-synced clip and a rendered one
+cannot read its precondition off `producer.model`, as stage 8 does, because the two differ
+by construction, so the frame, the codec and the frame rate are read off the boxes.
 
 ## Project Structure
 
@@ -136,7 +142,7 @@ src/
 │       ├── narration.ts      # Etap 9
 │       ├── sound-design.ts   # Etap 10
 │       ├── dialogue.ts       # Etap 11, the script
-│       └── versions.ts       # Etap 12: faces, who they are, lip-sync per clip
+│       └── versions.ts       # Etap 12: faces, who they are, lip-sync per clip, the films
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form: the published page; not a pipeline domain
@@ -358,18 +364,21 @@ src/
     │   ├── review.ts      # Internal: verification and approval of the script and each line
     │   └── index.test.ts  # The lift both ways, the voice gate, the bill, through the entry
     ├── versions/      # Folder form: index.ts is the only entry (stage 12)
-    │   ├── index.ts       # Public: findFaces, bindFaces, generateLipSync, checkVersions,
-    │   │                  #         approveVersions
+    │   ├── index.ts       # Public: findFaces, bindFaces, generateLipSync, generateFinal,
+    │   │                  #         checkVersions, approveVersions
     │   ├── plan.ts        # Internal: the gate, which clips (derived), the faces read back
     │   ├── faces.ts       # Internal: the paid face call, and the binding a person gives
     │   ├── generate.ts    # Internal: one job per speaker, each on the one before it
-    │   ├── review.ts      # Internal: verification and approval, clip by clip
-    │   └── index.test.ts  # Gate/which clips/faces/bind/duet/approve, through the entry
-    ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
+    │   ├── final.ts       # Internal: one picture, cut once; a film per language over it
+    │   ├── review.ts      # Internal: verification and approval, clip by clip and film by film
+    │   ├── index.test.ts  # Gate/which clips/faces/bind/duet/approve, through the entry
+    │   └── final.test.ts  # The picture, each film's speech, the refusals, the checklist
+    ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10 and 12
     ├── muxer.test.ts
     ├── instruction.ts # Single-file form: the marked block a person's note travels in
     ├── checklist.ts  # Single-file form: the QC criteria a frame ready for animation
-    │                 #                   is accepted against, stages 6 and 7
+    │                 #                   is accepted against, stages 6 and 7, and a film
+    │                 #                   whose mouths moved, stage 12
     ├── timeline.ts   # Single-file form: the plan's clock as one film's, and where speech
     │                 #                   lands on it without colliding, stages 9 and 10
     ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
@@ -565,6 +574,15 @@ human listens to in order to judge **placement**, with nothing else in the way, 
 produces the film with everything in it. Collapsing them would delete the only artifact in
 the pipeline where the narration can be heard on its own, which is also the artifact stage
 10's gate reads a yes from.
+
+`picture` is stage 12's, and it is `concat` with the sound left behind rather than `concat`
+with a flag: a lip-synced clip comes back carrying the speech it was synced to, and what a
+language version needs of each clip is its picture alone. A stage says which it wants; the
+`-map` that makes the difference stays inside, which is the line drawn above. Stage 12 also
+lays its films through `master` unchanged, so both versions of a track are mixed by the
+same graph as `mixed.mp4`, and what stage 10 says about its stems (which are accepted,
+where each lands, how loud) reaches stage 12 through `placeStems` on its entry, the
+`readAcceptedLines` move one row on.
 
 `sound-design/levels.ts` is `narration/delivery.ts` one row down, and the interesting part
 is why it is not *inside* it. Delivery is a recorded input of the bought recordings; levels

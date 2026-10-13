@@ -15,7 +15,9 @@ scenariusz i assety, po gotowy film sklejony z klipów.
 - **Oddaje film w trzech wersjach**, z których każda nosi własną zgodę: `episode.mp4` to
   nieme cięcie obrazu, `narrated.mp4` dokłada narrację i jest jedynym miejscem, gdzie
   słychać samo jej umieszczenie, a `mixed.mp4` ma wszystko: narrację, kwestie postaci,
-  muzykę i efekty.
+  muzykę i efekty. Odcinek z dialogiem i językiem ust dostaje jeszcze dwa filmy, też każdy
+  z własną zgodą: `versions/en.mp4` z ustami poruszonymi do angielskich kwestii
+  i `versions/pl.mp4`, czyli ten sam obraz z polskimi kwestiami jak w dubbingu.
 - **Nigdy nie wydaje pieniędzy po cichu.** Każde płatne polecenie ma `--dry-run`, który
   pokazuje pełny prompt bez sięgania po klucz, i mówi, ile wywołań wykona, zanim je
   wykona.
@@ -24,7 +26,9 @@ Proces obsługuje w całości wszystkie cztery tryby dźwięku: `music-and-effec
 `dialogue` i `dialogue-and-narration`. Kwestie postaci kupuje
 [etap 11: dialog](docs/stages/11-dialog.md), każdą głosem swojej postaci, a pełna ścieżka
 etapu 10 kładzie je obok narracji, muzyki i efektów. Usta postaci w drugim języku porusza
-klip po klipie [etap 12: wersje językowe](docs/stages/12-wersje-jezykowe.md).
+klip po klipie [etap 12: wersje językowe](docs/stages/12-wersje-jezykowe.md), a potem składa
+z nich dwa filmy na tor: FINAL w języku ust i FINAL w języku filmu, na jednym obrazie,
+z tymi samymi muzyką i efektami.
 
 **„Krótka" znaczy tu kilkanaście minut.** `--duration` przyjmuje formalnie do 3600 s, ale
 praktyczna granica leży niżej i bierze się stąd, że etapy 1, 3 i 4 mieszczą **cały film
@@ -80,7 +84,7 @@ plików stanu i szczegóły walidacji, jest w [docs/pipeline.md](docs/pipeline.m
 | [9. narracja](docs/stages/09-narracja.md) | zatwierdzona lista ujęć, obsadzony głos, zatwierdzony montaż | `narration/Nnn.wav` + `narrated.mp4` | rozliczany w znakach |
 | [10. muzyka i efekty](docs/stages/10-muzyka-i-efekty.md) | zatwierdzona lista ujęć, zatwierdzony `narrated.mp4` (z narracją), przyjęte kwestie etapu 11 (z dialogiem) | `sound/*.mp3` + `mixed.mp4`: film ze wszystkim | rozliczany w sekundach |
 | [11. dialog](docs/stages/11-dialog.md) | zatwierdzona lista ujęć z kwestiami przypisanymi postaciom, przyjęte próbki głosów obsady | `dialogue.md` + `dialogue/<język>/Dnn.wav`, kładzione w `mixed.mp4` przez etap 10; przekład `dialogue.<język ust>.md` z kwestiami w tym języku | skrypt i przekład: po 1 wywołaniu tekstowym + kwestie rozliczane w znakach |
-| [12. wersje językowe](docs/stages/12-wersje-jezykowe.md) | `lip-sync.json` odcinka, przyjęte klipy tego toru, przyjęty przekład i kwestie etapu 11 w języku ust | `versions/faces/Cnn/`: twarze i ich przypisanie do postaci; `versions/clips/Cnn.mp4`: klip z ustami w drugim języku | 1 rozpoznanie twarzy na klip + 1 zadanie lip-sync na mówiącą postać |
+| [12. wersje językowe](docs/stages/12-wersje-jezykowe.md) | `lip-sync.json` odcinka, przyjęte klipy tego toru, przyjęty przekład i kwestie etapu 11 w obu językach, przyjęte stemy etapu 10 | `versions/faces/Cnn/`: twarze i ich przypisanie do postaci; `versions/clips/Cnn.mp4`: klip z ustami w drugim języku; `versions/<język ust>.mp4` i `versions/<język filmu>.mp4`: dwa filmy na jednym obrazie, z tą samą muzyką | 1 rozpoznanie twarzy na klip + 1 zadanie lip-sync na mówiącą postać; filmy darmowe (ffmpeg) |
 
 Etapy tekstowe (1, 3, 4) są **wspólne dla obu torów**, bo opisują historię, a nie obrazy.
 Rozejście zaczyna się przy pierwszym obrazie odcinka i kończy dwiema niezależnymi

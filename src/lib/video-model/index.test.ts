@@ -22,10 +22,46 @@ describe("validateVideo", () => {
 
     expect(result.ok ? result.data : null).toEqual({
       bytes: expect.any(Number),
+      codec: "hvc1",
+      frameRate: 24,
       height: 1080,
       seconds: 14,
       width: 1920,
     });
+  });
+
+  /**
+   * What a stream copy needs to agree on, read from the picture's own sample
+   * tables: 30000/1001 is how a camera spells 29.97, and the format is the
+   * sample entry's four letters.
+   */
+  it("should read the picture's frame rate and codec from its sample tables", () => {
+    const result = validateVideo(
+      mp4({
+        audio: true,
+        codec: "avc1",
+        fps: 30_000 / 1001,
+        height: 1080,
+        seconds: 14,
+        width: 1920,
+      }),
+      FRAME
+    );
+
+    expect(result.ok ? [result.data.frameRate, result.data.codec] : reason(result)).toEqual([
+      29.97,
+      "avc1",
+    ]);
+  });
+
+  /** A header without sample tables still has a length and a frame; it has no rate to compare. */
+  it("should report no frame rate and no codec where the sample tables are missing", () => {
+    const result = validateVideo(mp4({ fps: null, height: 1080, seconds: 14, width: 1920 }), FRAME);
+
+    expect(result.ok ? [result.data.frameRate, result.data.codec] : reason(result)).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it("should refuse an answer that is not an MP4 at all", () => {
@@ -307,6 +343,7 @@ describe("runVideoStage", () => {
         },
         master: refuse,
         mix: refuse,
+        picture: refuse,
         version: () =>
           Promise.resolve(
             options.absent === true ? err(new Error("nie znaleziono ffmpeg")) : ok("ffmpeg 9.0.2")

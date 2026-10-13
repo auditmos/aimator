@@ -259,6 +259,13 @@ export interface EpisodeTrackPaths {
    */
   readonly versions: string;
   readonly versionsLock: string;
+  /**
+   * The picture both language versions share: every clip in the plan's order,
+   * lip-synced where a face moved, as stage 7 left it elsewhere, sound left
+   * behind. One file rather than one per language, so the two films cannot
+   * differ in a single frame.
+   */
+  readonly versionsPicture: string;
   readonly versionsStage: string;
 }
 
@@ -863,6 +870,7 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
     soundtrackStage: join(root, "soundtrack.stage.json"),
     versions: join(root, "versions"),
     versionsLock: join(root, "versions.lock"),
+    versionsPicture: join(root, "versions", "episode.mp4"),
     versionsStage: join(root, "versions.stage.json"),
   };
 }
@@ -965,6 +973,22 @@ export function versionClip(paths: EpisodeTrackPaths, clipId: string): Result<st
   return ARTIFACT_ID.test(clipId)
     ? ok(join(paths.versions, "clips", `${clipId}.mp4`))
     : err(new IdentifierError(clipId, `invalid clip id "${clipId}": expected a form like C01`));
+}
+
+/**
+ * One finished film of stage 12: the picture both versions share, with one
+ * language's lines over it. The language is the file name, so it is checked
+ * here rather than trusted into a path.
+ */
+export function versionFilm(paths: EpisodeTrackPaths, language: string): Result<string> {
+  return LANGUAGE_CODE.test(language)
+    ? ok(join(paths.versions, `${language}.mp4`))
+    : err(
+        new IdentifierError(
+          language,
+          `invalid language "${language}": expected a code like pl, en or pt-BR`
+        )
+      );
 }
 
 /**

@@ -308,7 +308,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02] [--json]": [
+  "  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]|<kod>": [
     "approve",
     ...ON,
     "--stage",
@@ -814,6 +814,16 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     T,
     "--artifact",
     "C01",
+    "--dry-run",
+  ],
+  "  versions final <id> <episode-id> --track <tor> --language <kod>": [
+    "versions",
+    "final",
+    ...ON,
+    "--track",
+    T,
+    "--language",
+    "en",
     "--dry-run",
   ],
   "  versions lip-sync <id> <episode-id> --track <tor> [--artifact C01[,C02]]": [

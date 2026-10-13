@@ -139,15 +139,23 @@ export function jpeg(width: number, height: number): Buffer {
  * timescale and duration, and one `trak` whose `tkhd` holds the frame. `audio`
  * adds a second, frameless track, which is what a real clip with a soundtrack
  * looks like and what stops the parser from reading `0x0` as the picture.
+ *
+ * The picture's track also carries the sample tables a stream copy has to
+ * agree on: the sample entry's format and the time between frames. Both default
+ * to what a real Seedance clip says, HEVC at 24 frames a second; `fps: null`
+ * leaves the tables out.
  */
 export function mp4(options: {
   readonly audio?: boolean;
+  readonly codec?: string;
+  readonly fps?: number | null;
   readonly height: number;
   readonly seconds: number;
   readonly width: number;
 }): Buffer {
-  const { audio = false, height, seconds, width } = options;
-  const tracks = [trak(width, height), ...(audio ? [trak(0, 0)] : [])];
+  const { audio = false, codec = "hvc1", fps = 24, height, seconds, width } = options;
+  const stream = fps === null ? Buffer.alloc(0) : media(codec, fps, seconds);
+  const tracks = [trak(width, height, stream), ...(audio ? [trak(0, 0)] : [])];
 
   return Buffer.concat([
     box("ftyp", Buffer.concat([Buffer.from("isomiso2mp41", "ascii")])),
@@ -350,12 +358,43 @@ function mvhd(seconds: number): Buffer {
 }
 
 /** A version-0 track header, with the frame in the 16.16 fields at the end. */
-function trak(width: number, height: number): Buffer {
+function trak(width: number, height: number, stream: Buffer = Buffer.alloc(0)): Buffer {
   const payload = Buffer.alloc(84);
   payload.writeUInt32BE(width * 0x1_00_00, 76);
   payload.writeUInt32BE(height * 0x1_00_00, 80);
 
-  return box("trak", box("tkhd", payload));
+  return box("trak", Buffer.concat([box("tkhd", payload), stream]));
+}
+
+/**
+ * A picture track's media: its own timescale, one sample entry naming the
+ * format, and a time-to-sample table with one frame every `1001` ticks. The
+ * timescale is `fps * 1001`, which is how 30000/1001 spells 29.97 and how
+ * 24024/1001 spells 24 exactly.
+ */
+function media(codec: string, fps: number, seconds: number): Buffer {
+  const timescale = Math.round(fps * 1001);
+  const header = Buffer.alloc(24);
+  header.writeUInt32BE(timescale, 12);
+  header.writeUInt32BE(Math.round(seconds * timescale), 16);
+
+  const entry = Buffer.alloc(16);
+  entry.writeUInt32BE(16, 0);
+  entry.write(codec, 4, "ascii");
+
+  const descriptions = Buffer.concat([Buffer.from([0, 0, 0, 0, 0, 0, 0, 1]), entry]);
+  const times = Buffer.alloc(16);
+  times.writeUInt32BE(1, 4);
+  times.writeUInt32BE(Math.round(seconds * fps), 8);
+  times.writeUInt32BE(1001, 12);
+
+  return box(
+    "mdia",
+    Buffer.concat([
+      box("mdhd", header),
+      box("minf", box("stbl", Buffer.concat([box("stsd", descriptions), box("stts", times)]))),
+    ])
+  );
 }
 
 /** The canonical image of a character: what stage 2 hands to stages 4 and on. */
@@ -1341,6 +1380,14 @@ export function muxer(): Muxer {
 
       return ok({ argv: ["ffmpeg", "-filter_complex"], engine: ENGINE, stderr: "" });
     },
+    picture: async (input) => {
+      const { writeFile: write } = await import("node:fs/promises");
+
+      // The clips' pictures end to end and nothing else: a silent cut.
+      await write(input.target, mp4({ height: 1080, seconds: CUT_SECONDS, width: 1920 }));
+
+      return ok({ argv: ["ffmpeg", "-f", "concat", "-map", "0:v:0"], engine: ENGINE, stderr: "" });
+    },
     version: () => Promise.resolve(ok(ENGINE)),
   };
 }
@@ -1582,8 +1629,14 @@ export async function makeNarration(options: {
  * shorter than it claims to be. The prose is the model's to write here: stage
  * 10 is where "lifted, not invented" runs out, so there is nothing to copy
  * out of the shot list and nothing to compare this against.
+ *
+ * The shots are read off the approved plan, so the sheet wires whichever cut
+ * the episode was built with: the bed names every shot, and the thunder sits
+ * at 16s in whichever shot holds that second.
  */
-function cueSheet(): string {
+function cueSheet(shots: readonly { end: number; id: string; start: number }[]): string {
+  const thunder = shots.find((planned) => planned.start <= 16 && planned.end > 16)?.id ?? "";
+
   return [
     "## Plan",
     "",
@@ -1591,13 +1644,13 @@ function cueSheet(): string {
     "",
     "## Music",
     "",
-    "### M01 | U01,U02,U03,U04 | 0-30s",
+    `### M01 | ${shots.map((planned) => planned.id).join(",")} | 0-30s`,
     "",
     "A warm, unhurried acoustic theme for a quiet evening room.",
     "",
     "## Effects",
     "",
-    "### E01 | U03 | 16s | 3s",
+    `### E01 | ${thunder} | 16s | 3s`,
     "",
     "Soft low thunder rolling in the distance.",
     "",
@@ -1618,7 +1671,7 @@ function cueSheet(): string {
  * effect, and a fixture that answered one length for both would hide the
  * difference the bill is counted in.
  */
-function soundProvider(): typeof fetch {
+function soundProvider(sheet: string): typeof fetch {
   return ((url: string | URL, init?: RequestInit) => {
     if (!String(url).includes("elevenlabs")) {
       return Promise.resolve(
@@ -1626,7 +1679,7 @@ function soundProvider(): typeof fetch {
           id: "resp_fixture",
           output: [
             {
-              content: [{ text: cueSheet(), type: "output_text" }],
+              content: [{ text: sheet, type: "output_text" }],
               role: "assistant",
               type: "message",
             },
@@ -1670,12 +1723,13 @@ export async function makeSoundDesign(options: {
   readonly workspace: Workspace;
 }): Promise<void> {
   const { tracks = [], workspace } = options;
+  const plan = await checkShotList({ episodeId: EPISODE, projectId: PROJECT, workspace });
   const paid = {
     artifacts: [],
     audioKey: API_KEY,
     effectsModel: "eleven_text_to_sound_v2",
     episodeId: EPISODE,
-    fetch: soundProvider(),
+    fetch: soundProvider(cueSheet(plan.ok ? (plan.data.verdict?.shots ?? []) : [])),
     maxOutputTokens: 8000,
     mode: "apply",
     model: "gpt-6-astra",
@@ -1798,14 +1852,18 @@ function scriptOf(sections: readonly string[], lines: readonly ScriptLine[]): st
  * The script is read off the approved plan rather than written here, so it
  * lifts exactly the lines the episode's shot list attributes, whichever cut it
  * was built with.
+ *
+ * `filmLines` also buys and accepts every line in the film's own language, in
+ * the film's voices: what the film-language version of stage 12 speaks.
  */
 export async function makeDialogue(options: {
+  readonly filmLines?: boolean;
   readonly language?: string;
   readonly lineSeconds?: number;
   readonly pending?: readonly string[];
   readonly workspace: Workspace;
 }): Promise<void> {
-  const { language = "en", lineSeconds = 1, pending = [], workspace } = options;
+  const { filmLines = false, language = "en", lineSeconds = 1, pending = [], workspace } = options;
   const lines = await liftedLines(workspace);
   const scope = { episodeId: EPISODE, projectId: PROJECT, workspace } as const;
   const text = {
@@ -1841,7 +1899,8 @@ export async function makeDialogue(options: {
   });
   await accept([`script-${language}`]);
   await makeVoices({ language, workspace });
-  await generateDialogue({
+
+  const voiced = {
     ...text,
     artifacts: [],
     fetch: (() =>
@@ -1851,14 +1910,21 @@ export async function makeDialogue(options: {
           status: 200,
         })
       )) as unknown as typeof fetch,
-    language,
     voiceKey: API_KEY,
     voiceModel: "eleven_multilingual_v2",
-  });
+  } as const;
 
-  const bought = lines
-    .map((line) => `${language}:${line.id}`)
-    .filter((key) => !pending.includes(key));
+  await generateDialogue({ ...voiced, language });
+
+  if (filmLines) {
+    await makeVoices({ workspace });
+    await generateDialogue(voiced);
+  }
+
+  const bought = [
+    ...lines.map((line) => `${language}:${line.id}`),
+    ...(filmLines ? lines.map((line) => line.id) : []),
+  ].filter((key) => !pending.includes(key));
 
   if (bought.length > 0) {
     await accept(bought);
@@ -1879,9 +1945,10 @@ const LIP_SYNC = "/v1/videos/advanced-lip-sync";
  * Kling's face call and lip-sync job, and the bucket a clip is lent from,
  * answering the way their documentation says: every face call opens a new
  * session and finds faces `0` and `1` on screen for the whole clip, and every
- * job is finished at its first poll.
+ * job is finished at its first poll, handing back a clip `seconds` long, the
+ * length of the clip it was given, at `fps` frames a second.
  */
-function lipSyncProvider(): typeof fetch {
+function lipSyncProvider(seconds: number, fps: number): typeof fetch {
   let sessions = 0;
   let jobs = 0;
 
@@ -1944,7 +2011,7 @@ function lipSyncProvider(): typeof fetch {
 
     if (href.hostname === "synced") {
       return Promise.resolve(
-        new Response(mp4({ height: 1080, seconds: 15, width: 1920 }), { status: 200 })
+        new Response(mp4({ fps, height: 1080, seconds, width: 1920 }), { status: 200 })
       );
     }
 
@@ -1965,16 +2032,20 @@ function lipSyncProvider(): typeof fetch {
 export async function makeVersions(options: {
   /** Clip, then face, then the character a person says it is. */
   readonly faces: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /** The frame rate each lip-synced clip comes back at: the track's own unless a test says not. */
+  readonly fps?: number;
   readonly pending?: readonly string[];
+  /** How long each lip-synced clip comes back: the clips' own length in the cut used. */
+  readonly seconds?: number;
   readonly track?: ImageTrack;
   readonly workspace: Workspace;
 }): Promise<void> {
-  const { faces, pending = [], track = "gpt-image", workspace } = options;
+  const { faces, fps = 24, pending = [], seconds = 15, track = "gpt-image", workspace } = options;
   const scope = { episodeId: EPISODE, projectId: PROJECT, track, workspace } as const;
   const paid = {
     ...scope,
     apiKey: API_KEY,
-    fetch: lipSyncProvider(),
+    fetch: lipSyncProvider(seconds, fps),
     hosting: LENDING,
     mode: "apply",
     regenerate: false,

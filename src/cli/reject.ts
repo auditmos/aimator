@@ -60,8 +60,8 @@ export const USAGE = `  reject <id> <episode-id> --stage <etap> [--track <tor>] 
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
     artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
     i sound-design bez --track, dialogue i versions --artifact jest wymagane,
-    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze ani
-    kroki pośrednie.`;
+    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze, kroki
+    pośrednie ani filmy.`;
 
 /** A stage that has produced nothing here yet: there is no result to say no to. */
 class NothingToRejectError extends Error {
@@ -200,6 +200,9 @@ function twoLevels(episode: Locate, track: Locate): Locate {
 }
 
 const artifactFlag = (keys: readonly string[]): string => `--artifact ${keys.join(",")}`;
+
+/** A clip of stage 12, `C01`: the one key there a no may name. */
+const CLIP_VERSION = /^C\d{2,}$/;
 
 /**
  * Stage 11's keys, each sent back to the command that buys it again: the
@@ -375,9 +378,11 @@ const STAGES: Readonly<Record<string, Locate>> = {
   versions: trackStage({
     check: checkVersions,
     file: (paths) => paths.versionsStage,
-    // A clip's version is all a person watches here: `faces:C01` is what the
-    // provider found, and `C01:ewa` a step with one face moved and not the next.
-    named: { allowed: "C01[,C02] (wersja klipu)", takes: (key) => !key.includes(":") },
+    // A clip's version is all a person rejects here: `faces:C01` is what the
+    // provider found, `C01:ewa` a step with one face moved and not the next,
+    // and a film (`en`) or the picture under both (`episode`) is not remade by
+    // lip-sync, which is the remedy a no here points at.
+    named: { allowed: "C01[,C02] (wersja klipu)", takes: (key) => CLIP_VERSION.test(key) },
     regenerate: (on, keys) =>
       `aimator versions lip-sync ${on.projectId} ${on.episodeId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
   }),

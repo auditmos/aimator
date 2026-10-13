@@ -177,6 +177,78 @@ describe("ffmpeg mix", () => {
 });
 
 /**
+ * `picture` against the real engine, because whether the concat demuxer keeps
+ * one picture stream across clips that disagree about sound is a question only
+ * the program can answer. A lip-synced clip comes back with the speech it was
+ * synced to, the clip beside it is silent, and the cut has to be neither.
+ */
+describe("ffmpeg picture", () => {
+  let scratch = "";
+
+  beforeEach(async () => {
+    scratch = await mkdtemp(join(tmpdir(), "aimator-mux-"));
+  });
+
+  afterEach(async () => {
+    await rm(scratch, { force: true, recursive: true });
+  });
+
+  /** A clip of two seconds, its picture the engine's test pattern, with or without a tone. */
+  function clip(name: string, sound: boolean): string {
+    const path = join(scratch, `${name}.mp4`);
+
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=size=320x180:rate=24:duration=2",
+      ...(sound ? ["-f", "lavfi", "-i", "sine=frequency=440:duration=2"] : []),
+      "-pix_fmt",
+      "yuv420p",
+      "-c:v",
+      "libx264",
+      ...(sound ? ["-c:a", "aac", "-shortest"] : []),
+      path,
+    ]);
+
+    return path;
+  }
+
+  it.runIf(installed())(
+    "should cut a speaking clip and a silent one into one silent picture, in either order",
+    async () => {
+      const speaking = clip("C01", true);
+      const silent = clip("C02", false);
+      const cuts = [
+        [speaking, silent],
+        [silent, speaking],
+      ];
+
+      for (const [index, clips] of cuts.entries()) {
+        const target = join(scratch, `episode-${index}.mp4`);
+        // biome-ignore lint/performance/noAwaitInLoops: one cut at a time, each read back
+        const result = await ffmpeg("ffmpeg").picture({
+          clips,
+          listPath: join(scratch, `concat-${index}.txt`),
+          target,
+        });
+        const bytes = await readFile(target);
+        const verdict = validateVideo(bytes, { aspectRatio: "16:9", seconds: 4 });
+
+        expect(result.ok ? null : result.error.message).toBe(null);
+        expect(hasSound(bytes)).toBe(false);
+        expect(verdict.ok ? verdict.data.frameRate : null).toBe(24);
+        expect(verdict.ok ? verdict.data.seconds : null).toBeCloseTo(4, 1);
+      }
+    }
+  );
+});
+
+/**
  * `lastFrame` against the real engine, on a clip the engine made itself, read
  * back with the same PNG reader the clip verdict uses on a provider's still.
  */

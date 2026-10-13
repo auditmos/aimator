@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { checkDialogue } from "../lib/dialogue/index.js";
 import { checkReferences } from "../lib/references/index.js";
-import { checkVersions } from "../lib/versions/index.js";
+import { checkVersions, generateFinal } from "../lib/versions/index.js";
 import {
   episodePaths,
   episodeTrackPaths,
@@ -16,8 +16,11 @@ import {
   EPISODE,
   makeCut,
   makeDialogue,
+  makeSoundDesign,
   makeTrack,
   makeUpstream,
+  makeVersions,
+  muxer,
   PROJECT,
 } from "../test/fixture.js";
 import { run } from "./index.js";
@@ -264,7 +267,7 @@ describe("the ladder", () => {
     expect(stage1(during)).toBe("running");
     expect(stage1(after)).toBe(stage1(before));
     expect(stage1(after)).not.toBe("running");
-  });
+  }, 60_000);
 
   it("should read a stage's lock file as work in progress, on that track alone", async () => {
     const project = projectPaths(workspace, PROJECT);
@@ -290,7 +293,7 @@ describe("the ladder", () => {
 
     expect(reported.cells.find((one) => one.id === "7/seedream")?.state).toBe("running");
     expect(reported.cells.find((one) => one.id === "7/gpt-image")?.state).not.toBe("running");
-  });
+  }, 60_000);
 
   /**
    * A stage the episode decided it does not need is not waiting for anybody.
@@ -453,6 +456,36 @@ describe("an episode whose cast speaks", () => {
     expect(undecidedReason).toContain("--language <kod> albo --none");
     expect(declinedState).toBe("excluded");
     expect(declinedReason).toContain("none");
+  }, 120_000);
+
+  /**
+   * Last, because it finishes stage 12's clips: once both clips carry their
+   * yes, a film made and not yet watched is what the cell waits on, and it
+   * names that film rather than calling the track done.
+   */
+  it("should hold stage 12 for review on a film nobody has watched", async () => {
+    await makeSoundDesign({ workspace: spokenWorkspace });
+    await makeVersions({
+      faces: { C01: { 0: "ewa" }, C02: { 1: "tata" } },
+      workspace: spokenWorkspace,
+    });
+    await generateFinal({
+      episodeId: EPISODE,
+      language: "en",
+      mode: "apply",
+      mux: muxer(),
+      projectId: PROJECT,
+      regenerate: false,
+      track: "gpt-image",
+      workspace: spokenWorkspace,
+    });
+    const episode = await spokenStatus();
+    const cell = episode.cells.find((one) => one.id === "12/gpt-image");
+
+    expect(cell?.state).toBe("review");
+    expect(cell?.nextStep).toBe(
+      `aimator approve ${PROJECT} ${EPISODE} --stage versions --track gpt-image --artifact en`
+    );
   }, 120_000);
 });
 

@@ -72,7 +72,7 @@ nie ma czego zatwierdzić: narracji nie położono na torze gpt-image
   - nie ma skryptu narracji, uruchom najpierw: narration generate"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02] [--json] 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]|<kod> 1`] = `
 "VersionsStateError
 nie ma czego zatwierdzić: C01
   - odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
@@ -2235,6 +2235,15 @@ exports[`every command >   versions faces <id> <episode-id> --track <gpt-image|s
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Twarze ewa/01-burza, tor gpt-image, klip C01
   płatnych rozpoznań do wykonania: 0
+  ! odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  ! odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
+Dalej: odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none"
+`;
+
+exports[`every command >   versions final <id> <episode-id> --track <tor> --language <kod> 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie złożono. Film en ewa/01-burza, tor gpt-image
+  blocked, obraz trwa 0s, silnik nieznany
   ! odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
   ! odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
 Dalej: odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none"

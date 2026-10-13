@@ -25,6 +25,7 @@ import {
   soundStem,
   type Workspace,
 } from "../workspace.js";
+import { type MixLevels, readLevels } from "./levels.js";
 import { buildPrompt } from "./prompt.js";
 import { validateSoundDesign } from "./validate.js";
 
@@ -617,6 +618,60 @@ export function placeSounds(input: {
 /** Seconds, to the thousandth, the precision an audio delay is spelled in. */
 function round(seconds: number): number {
   return Math.round(seconds * 1000) / 1000;
+}
+
+/** Stage 10's accepted stems, laid on another stage's film, and how loud they sit there. */
+interface PlacedStems {
+  /** The cue sheet, every stem and `mix.json` when there is one: what the film was made of. */
+  readonly inputs: readonly RecordedFile[];
+  readonly levels: MixLevels;
+  /** What is said without refusing: a bed that stops short of the film. */
+  readonly notices: readonly string[];
+  readonly placed: readonly PlacedSound[];
+  /** Why they may not be laid down: a stem nobody accepted, an effect past the end. */
+  readonly problems: readonly string[];
+}
+
+/**
+ * The music and effects of this episode, accepted, placed on a film this stage
+ * did not make, at the levels this series is mixed at.
+ *
+ * Exported for `readAcceptedLines`' reason: stage 12 lays the same stems under
+ * both of its language versions, and which stems a human accepted, where each
+ * lands and how loud it sits are this stage's answers, given here through the
+ * same gate and the same placement the full mix uses rather than by a copy of
+ * them one row down. The film is the caller's, so the clock and its length are
+ * handed in; the refusals stay in this stage's words, because the remedy for
+ * an effect too long is in this stage's cue sheet.
+ */
+export async function placeStems(
+  input: Stage10Scope & { readonly actualSeconds: number; readonly clock: PlanClock }
+): Promise<Result<PlacedStems>> {
+  const stems = await readAcceptedStems(input);
+
+  if (!stems.ok) {
+    return stems;
+  }
+
+  const levels = await readLevels(input);
+
+  if (!levels.ok) {
+    return levels;
+  }
+
+  const placement = placeSounds({
+    actualSeconds: input.actualSeconds,
+    clock: input.clock,
+    sounds: stems.data.stems,
+  });
+
+  return ok({
+    inputs: [...stems.data.inputs, ...(levels.data.input === null ? [] : [levels.data.input])],
+    levels: levels.data.levels,
+    notices: musicGap(placement.placed, input.actualSeconds),
+    placed: placement.placed,
+    problems: [...stems.data.gate, ...placement.problems],
+  });
 }
 
 /**

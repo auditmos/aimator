@@ -76,8 +76,11 @@ $AIMATOR_WORKSPACE/
                                         binding.json, obrazek każdej twarzy),
                                         versions/clips/Cxx.mp4, versions/clips/
                                         Cxx/<postać>.mp4 (krok przed ostatnią
-                                        twarzą), versions.stage.json,
-                                        versions.lock, runs/
+                                        twarzą), versions/episode.mp4 (obraz
+                                        obu filmów), versions/<język>.mp4
+                                        (film w każdym z dwóch języków),
+                                        versions.stage.json, versions.lock,
+                                        runs/
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -196,8 +199,8 @@ Obowiązują we wszystkich etapach.
   0, którego rekordy są decyzjami samego człowieka. Gdzie jeden plik etapu trzyma
   artefakty różnych rodzajów (etapy 9 i 10 na poziomie odcinka: skrypt albo arkusz cue
   i nagrania; etap 11: skrypt, przekład i kwestie; etap 12: klip wersji obok twarzy
-  i kroków), `--artifact` jest wymagane jak w `approve`, a etap 12 odrzuca wyłącznie klip
-  wersji. Wymaga `--note`, bo odrzucenie bez powodu
+  i kroków, a także dwa filmy i obraz pod nimi), `--artifact` jest wymagane jak
+  w `approve`, a etap 12 odrzuca wyłącznie klip wersji. Wymaga `--note`, bo odrzucenie bez powodu
   nie ma czym zasilić poprawki, i zapisuje w rekordzie `review.status = "rejected"`,
   `review.note`, `reviewer` i `reviewedAt`. Na klatkach z checklistą QC (klatka otwarcia,
   `entry:Cnn`) `--fail` dopisuje niezaliczone kryteria do `review.failed`; gdzie indziej
@@ -327,7 +330,7 @@ Obowiązują we wszystkich etapach.
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, przy narracji zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9, przy dialogu przyjęte kwestie etapu 11 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json`; do przekładu `lip-sync.json` | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.<język ust>.md`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; przyjęty skrypt i przyjęta próbka głosu postaci przed kupnem jej kwestii; przyjęty skrypt i język ust przed przekładem; potem ocena skryptu, przekładu i każdej kwestii | **zaimplementowany** |
-| 12 wersje językowe | `lip-sync.json`, przyjęty `dialogue.<język ust>.md` i przyjęte kwestie `dialogue/<język ust>/Dnn.wav`, zatwierdzona `shot-list.md`, przyjęte klipy **na tym torze** | `<tor>/versions/faces/Cxx/faces.json`, obrazki twarzy, `binding.json`, `<tor>/versions/clips/Cxx.mp4`, `<tor>/versions.stage.json`, `<tor>/runs/<runId>/` | `lip-sync.json` z językiem i `audio` równe `dialogue` przed każdym poleceniem; per klip przyjęty klip, przyjęty przekład i kwestie tego klipu, rozpoznane twarze i przypisanie każdej postaci mówiącej w kadrze przed lip-syncem; potem ocena każdego klipu z osobna | **zaimplementowany**: twarze, przypisanie i lip-sync per klip |
+| 12 wersje językowe | `lip-sync.json`, przyjęty `dialogue.<język ust>.md` i przyjęte kwestie `dialogue/<język ust>/Dnn.wav`, zatwierdzona `shot-list.md`, przyjęte klipy **na tym torze**; do filmów przyjęte kwestie obu języków, przyjęte stemy etapu 10 i `mix.json` | `<tor>/versions/faces/Cxx/faces.json`, obrazki twarzy, `binding.json`, `<tor>/versions/clips/Cxx.mp4`, `<tor>/versions/episode.mp4`, `<tor>/versions/<język>.mp4`, `<tor>/versions.stage.json`, `<tor>/runs/<runId>/` | `lip-sync.json` z językiem i `audio` równe `dialogue` przed każdym poleceniem; per klip przyjęty klip, przyjęty przekład i kwestie tego klipu, rozpoznane twarze i przypisanie każdej postaci mówiącej w kadrze przed lip-syncem; potem ocena każdego klipu z osobna; film czeka na zgodę każdego klipu wersji, kwestie swojego języka i stemy, potem ocena filmu, w języku ust z checklistą | **zaimplementowany**: twarze, przypisanie, lip-sync per klip, FINAL w języku ust i w języku filmu |
 
 **Wiersz 10 zmienił się przy implementacji i to jest zapisane tutaj, a nie przemilczane.**
 Mówił, że muzyka i efekty są **wejściem** wnoszonym przez człowieka, i sam przyznawał, że
@@ -401,7 +404,9 @@ potem przekład (`dialogue translate`), potem kwestie w języku ust (`dialogue g
 --language <kod>`). „Dalej:" etapu 12 to jego `check`, tak jak etapu 0: kolejny klip rusza
 płatne rozpoznanie twarzy, decyzja człowieka, która twarz jest którą postacią, albo płatny
 lip-sync, a który z tych trzech kroków, wie tylko etap i nazywa go w `check` poleceniem dla
-każdego klipu.
+każdego klipu. Gdy każdy klip ma zgodę, „Dalej:" prowadzi do `versions final` najpierw
+w języku ust, potem w języku filmu, a po każdym do zgody na ten film; komórka jest
+zatwierdzona dopiero ze zgodą na oba filmy.
 
 **Sześć stanów**, wykluczających się w tej kolejności:
 
@@ -2255,11 +2260,46 @@ rozpoznania i zadania osobno.
 | `faces:Cxx` | `model` | `kling-identify-face` | klip z etapu 7 |
 | `Cxx:<postać>` | `model` | `kling-lip-sync` | klip z etapu 7 (pierwsze zadanie) albo wynik poprzedniego, `faces.json` (pierwsze zadanie), `binding.json`, nagranie każdej kwestii tej postaci w klipie |
 | `Cxx` | `model` | `kling-lip-sync` | jak wyżej; to zadanie ostatniej postaci i jedyne, które publikuje `versions/clips/Cxx.mp4` |
+| `episode` | `local` | `ffmpeg <wersja>` | każdy klip obrazu: wersja z lip-synciem albo klip z etapu 7 |
+| `<język>` | `local` | `ffmpeg <wersja>` | `versions/episode.mp4` i jego klipy, skrypt albo przekład i każda kwestia tego języka, `sound-design.md`, każdy stem, `mix.json`, gdy istnieje |
+
+### Dwa filmy
+
+`versions final <id> <episode-id> --track <tor> --language <kod>` niczego nie kupuje.
+Lokalny silnik skleja **jeden obraz dla obu filmów**, `versions/episode.mp4`: klipy w
+kolejności listy ujęć, wersję z lip-synciem tam, gdzie twarz się ruszyła, przyjęty klip
+etapu 7 wszędzie indziej. Plan montażu jest wyprowadzony z listy ujęć jak w etapie 8.
+Obraz to sam strumień obrazu każdego klipu, kopiowany (`picture` w `lib/muxer`), bo klip po
+lip-syncu wraca z mową, do której go dopasowano, a każdy film kładzie własną. Kopia
+strumienia wymaga wspólnego kadru, kodeka i tempa klatek, a wersja z lip-synciem to
+przekodowanie dostawcy, więc te trzy parametry są czytane z boksów każdego klipu (`mdhd`,
+`stsd`, `stts` w `lib/video-model`), a różnica to odmowa przed uruchomieniem silnika.
+Model z rekordu niczego tu nie mówi: klip po lip-syncu ma inny model z samej definicji.
+Obraz jest składany ponownie tylko wtedy, gdy zmienił się któryś jego klip, więc oba filmy
+leżą na tych samych bajtach. Nie ma zgody, bo nikt nie ogląda niemego obrazu.
+
+Na obrazie `lib/muxer.master` kładzie mowę jednego języka i **te same** przyjęte stemy etapu
+10 na poziomach z `mix.json` (`placeStems` z wejścia etapu 10, z jego odmowami i meldunkami).
+Język ust daje `versions/<kod>.mp4` z kwestiami przekładu `<kod>:Dnn`, także tymi spoza
+kadru; język filmu daje `versions/<kod>.mp4` z kwestiami `Dnn`, czyli klasyczny dubbing:
+usta pasują do drugiego języka. Kwestie czyta `readAcceptedDialogue` etapu 11 z
+`language`. Umieszczenie liczy `lib/timeline` na zegarze obrazu wersji (`readPlanClock`
+z `replaced`), a dwie wypowiedzi naraz albo wypowiedź za końcem filmu to odmowa, która
+wskazuje przekład albo skrypt. `--language` spoza tych dwóch języków to odmowa. Gotowy film
+zostaje bez zmian bez `--regenerate`; z nim poprzedni trafia do archiwum próby, zanim
+silnik ruszy, i wraca na miejsce, gdy próba się nie uda.
 
 ### Zgoda
 
-`approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]`;
-`--artifact` jest wymagane. Przyjmuje się wyłącznie klucz klipu, nigdy krok
-`Cxx:<postać>`. Zgoda wiąże się z sha256 klipu wersji i z jego wejściami, więc nowe
-przypisanie, nowe rozpoznanie albo nowe nagranie kwestii ją cofa, a `check` wymienia plik
-w `inputsChanged`.
+`approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]|<kod>`;
+`--artifact` jest wymagane. Przyjmuje się klucz klipu albo język filmu, nigdy krok
+`Cxx:<postać>` ani obraz `episode`. Zgoda wiąże się z sha256 klipu wersji albo filmu
+i z ich wejściami, więc nowe przypisanie, nowe rozpoznanie albo nowe nagranie kwestii ją
+cofa, a `check` wymienia plik w `inputsChanged`. Film cofa także zmiana dowolnego klipu
+obrazu i `mix.json`, który pojawił się po złożeniu filmu, jak w etapie 10.
+
+Film w języku ust przyjmuje się z checklistą QC (`--checks animation,timing,acting,lip-sync,continuity`
+albo `all`), bo to w nim ruszono usta; bez niej albo z niepełną listą `approve` odmawia
+i wymienia brakujące kryteria. Film w języku filmu przyjmuje się bez checklisty.
+`approved` w obiekcie `check` oznacza każdy klip wersji i oba filmy, a `finals` niesie stan
+każdego filmu z jego `checks`.

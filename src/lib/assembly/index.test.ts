@@ -115,6 +115,9 @@ function muxer(options: { absent?: boolean; seconds?: number } = {}): Fake {
       /** Stage 8 never lays speech down; being asked to is a bug, not a fallback. */
       mix: (): Promise<Result<ConcatReport>> =>
         Promise.resolve(err(new Error("etap 8 nie miksuje dźwięku"))),
+      /** Stage 8 cuts every stream; the picture alone is stage 12's. */
+      picture: (): Promise<Result<ConcatReport>> =>
+        Promise.resolve(err(new Error("etap 8 nie skleja obrazu wersji"))),
       version: () =>
         Promise.resolve(
           absent ? err(new Error("nie znaleziono ffmpeg w PATH ani w AIMATOR_FFMPEG")) : ok(ENGINE)

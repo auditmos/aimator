@@ -83,6 +83,12 @@ export async function readPlanClock(input: {
   readonly aspectRatio: string;
   readonly episodeId: string;
   readonly projectId: string;
+  /**
+   * Clip id to the absolute path of the file that stands in its place, for a
+   * film cut from other files than stage 7's: stage 12 swaps a clip for its
+   * lip-synced version, and a film's clock is the clock of the clips it has.
+   */
+  readonly replaced?: Readonly<Record<string, string>>;
   readonly track: ImageTrack;
   readonly workspace: Workspace;
 }): Promise<Result<PlanClock>> {
@@ -112,7 +118,8 @@ export async function readPlanClock(input: {
   const drift: ClipDrift[] = [];
 
   for (const clip of plan.data.verdict.clips) {
-    const file = clipVideo(track, clip.id);
+    const swapped = input.replaced?.[clip.id];
+    const file = swapped === undefined ? clipVideo(track, clip.id) : ok(swapped);
     // biome-ignore lint/performance/noAwaitInLoops: one clip read at a time, in the plan's order
     const bytes = file.ok ? await readDigest(file.data) : null;
     const verdict =

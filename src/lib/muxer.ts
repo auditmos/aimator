@@ -154,12 +154,18 @@ export interface MasterInput {
  * than a film. A provider that hands back no final frame still sold a clip
  * whose last instant the next clip has to continue out of, so the frame is cut
  * out of the downloaded bytes, losslessly, as a PNG in the clip's own size.
+ *
+ * `picture` is stage 12's, and `concat` with the sound left behind. A
+ * lip-synced clip comes back carrying the speech it was synced to, and a
+ * language version lays its own over the cut, so what the cut keeps of each
+ * clip is its picture, copied, and nothing else.
  */
 export interface Muxer {
   readonly concat: (input: ConcatInput) => Promise<Result<ConcatReport>>;
   readonly lastFrame: (input: FrameInput) => Promise<Result<ConcatReport>>;
   readonly master: (input: MasterInput) => Promise<Result<ConcatReport>>;
   readonly mix: (input: MixInput) => Promise<Result<ConcatReport>>;
+  readonly picture: (input: ConcatInput) => Promise<Result<ConcatReport>>;
   readonly version: () => Promise<Result<string>>;
 }
 
@@ -182,10 +188,11 @@ interface ProcessResult {
 /** The engine as found on this machine. `binary` is a name on PATH or a path. */
 export function ffmpeg(binary: string): Muxer {
   return {
-    concat: (input) => concat(binary, input),
+    concat: (input) => concat(binary, input, "all"),
     lastFrame: (input) => lastFrame(binary, input),
     master: (input) => master(binary, input),
     mix: (input) => mix(binary, input),
+    picture: (input) => concat(binary, input, "picture"),
     version: () => version(binary),
   };
 }
@@ -209,7 +216,16 @@ async function version(binary: string): Promise<Result<string>> {
     : ok(`ffmpeg ${found[1]}`);
 }
 
-async function concat(binary: string, input: ConcatInput): Promise<Result<ConcatReport>> {
+/**
+ * The clips, end to end, every stream copied. `picture` keeps the first
+ * picture stream of each and drops the rest, which is how a clip that came
+ * back with sound and one that came back silent end up in one silent cut.
+ */
+async function concat(
+  binary: string,
+  input: ConcatInput,
+  streams: "all" | "picture"
+): Promise<Result<ConcatReport>> {
   const engine = await version(binary);
 
   if (!engine.ok) {
@@ -238,6 +254,7 @@ async function concat(binary: string, input: ConcatInput): Promise<Result<Concat
     "0",
     "-i",
     input.listPath,
+    ...(streams === "picture" ? ["-map", "0:v:0"] : []),
     "-c",
     "copy",
     // The index up front, so the file plays before it has finished downloading
@@ -258,7 +275,7 @@ async function concat(binary: string, input: ConcatInput): Promise<Result<Concat
     : err(
         new MuxError(
           "failed",
-          `ffmpeg zakończył się kodem ${run.data.code} i nie skleił odcinka:\n${run.data.stderr.trim()}`
+          `ffmpeg zakończył się kodem ${run.data.code} i nie skleił ${streams === "picture" ? "obrazu wersji" : "odcinka"}:\n${run.data.stderr.trim()}`
         )
       );
 }

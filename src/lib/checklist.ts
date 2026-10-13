@@ -12,14 +12,45 @@ import { err, ok, type Result } from "./result.js";
  * Which criteria apply is derived from what the frame was drawn from, never
  * asked: `master` compares the drawing with a cast member's canonical image,
  * so a frame that attaches none has nothing to compare it with.
+ *
+ * The same vocabulary carries the checklist of a finished film whose mouths
+ * were moved, stage 12's version in the language of the mouths: the video
+ * verdict reads boxes, so whether the lips land on the words is a person's
+ * judgement too, and it is the one yes in that stage given against a list.
  */
 
-/** The vocabulary, in the order a person walks through a frame. */
-export const CHECKS = ["anatomy", "master", "style", "continuity", "props"] as const;
+/**
+ * Every criterion either checklist names, in one order that walks both the way
+ * a person does. Every list printed or recorded is read in this order, so the
+ * frame's and the film's below each keep their own.
+ */
+export const CHECKS = [
+  "anatomy",
+  "master",
+  "style",
+  "animation",
+  "timing",
+  "acting",
+  "lip-sync",
+  "continuity",
+  "props",
+] as const;
 
 export type Check = (typeof CHECKS)[number];
 
-/** What `--checks` says: the criteria named, or every one the frame requires. */
+/** A frame ready for animation: the drawing, the cast member, the look, the clip before, the room. */
+export const FRAME_CHECKS: readonly Check[] = ["anatomy", "master", "style", "continuity", "props"];
+
+/** A film whose mouths moved: the motion, where lines fall, the performance, the lips, the cuts. */
+export const FILM_CHECKS: readonly Check[] = [
+  "animation",
+  "timing",
+  "acting",
+  "lip-sync",
+  "continuity",
+];
+
+/** What `--checks` says: the criteria named, or every one the frame or the film requires. */
 export type Checklist = readonly Check[] | "all";
 
 class ChecklistError extends Error {

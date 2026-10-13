@@ -638,6 +638,16 @@ describe("reject --stage dialogue and --stage versions", () => {
     );
   });
 
+  /** A no on a film, or on the picture under both, would send it to lip-sync, which made neither. */
+  it("should refuse a no about a finished film or the picture it is laid over", async () => {
+    expect(said(await rejectVersion("--artifact", "en"))).toContain(
+      "nie da się odrzucić en w --stage versions"
+    );
+    expect(said(await rejectVersion("--artifact", "episode"))).toContain(
+      "nie da się odrzucić episode w --stage versions"
+    );
+  });
+
   it("should reject a clip's version and send it back to lip-sync", async () => {
     const result = await rejectVersion("--artifact", "C02");
     const path = join(

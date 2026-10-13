@@ -117,6 +117,8 @@ export interface Stage12 {
   readonly aspectRatio: string;
   /** The roster's ids: who a face may be bound to. */
   readonly cast: readonly string[];
+  /** The language the film was written in, which its own version speaks over the moved mouths. */
+  readonly filmLanguage: string;
   /** Why nothing in this stage may happen yet. Empty means it may. */
   readonly gate: readonly string[];
   /** The language of the mouths, or null while the episode names none. */
@@ -171,6 +173,7 @@ export async function readStage12(input: Stage12Scope): Promise<Result<Stage12>>
   const base = {
     aspectRatio: stage0.data.aspectRatio,
     cast: stage0.data.cast.map((member) => member.id),
+    filmLanguage: stage0.data.settings.language,
     language: lipSync.data.kind === "language" ? lipSync.data.language : null,
     paths: paths.data,
     stage: read.ok ? read.data : emptyStage(STAGE),

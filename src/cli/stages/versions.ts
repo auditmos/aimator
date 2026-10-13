@@ -1,4 +1,5 @@
 import { env } from "../../lib/env.js";
+import { ffmpeg } from "../../lib/muxer.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import {
   approveVersions,
@@ -6,7 +7,9 @@ import {
   bindFaces,
   checkVersions,
   type FacesReport,
+  type FinalReport,
   findFaces,
+  generateFinal,
   generateLipSync,
   type LipSyncReport,
   type VersionsStatus,
@@ -55,7 +58,20 @@ export const USAGE = `Etap 12. Wersje językowe (płatny; per tor, klip po klipi
     każdej postaci mówiącej w kadrze. Podgląd podaje zadania per postać z oknem
     w ms oraz rachunek osobno: rozpoznania i zadania lip-sync. Postać mówiąca
     spoza kadru zostaje bez lip-syncu, z meldunkiem. Wynik:
-    versions/clips/C01.mp4, zatwierdzany per klip.`;
+    versions/clips/C01.mp4, zatwierdzany per klip.
+  versions final <id> <episode-id> --track <tor> --language <kod>
+                 [--dry-run] [--json] [--regenerate]
+    Nic nie kupuje. Skleja versions/episode.mp4, jeden obraz dla obu wersji:
+    klipy po lip-syncu tam, gdzie są, przyjęte klipy etapu 7 wszędzie indziej,
+    w kolejności listy ujęć, sam obraz kopią strumienia, bez dźwięku lip-syncu.
+    Na nim kładzie przyjęte kwestie jednego języka i te same stemy etapu 10 na
+    poziomach z mix.json: język ust daje versions/<kod>.mp4 z kwestiami
+    <kod>:Dnn, język filmu daje versions/<kod>.mp4 z kwestiami Dnn, czyli
+    dubbing. Czeka na zgodę na lip-sync każdego klipu, który go wymaga, na
+    kwestie tego języka i na stemy. Klipy o różnym kadrze, kodeku albo tempie
+    klatek oraz kwestie nachodzące na siebie albo wychodzące poza film dostają
+    odmowę. Potrzebuje ffmpeg (PATH albo AIMATOR_FFMPEG). Gotowego filmu nie
+    składa ponownie bez --regenerate.`;
 
 function renderFaces(
   report: FacesReport,
@@ -145,6 +161,40 @@ function renderLipSync(
   return finish(lines, report);
 }
 
+/** The cut, what is laid over it and where, and how loud: everything the engine would be told. */
+function renderFinal(
+  report: FinalReport,
+  scope: { readonly episodeId: string; readonly projectId: string; readonly track: string },
+  mode: "apply" | "dry-run"
+): string {
+  const named = `Film ${report.language} ${scope.projectId}/${scope.episodeId}, tor ${scope.track}`;
+  const { levels } = report;
+  const lines = [
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano, nic nie złożono. ${named}` : named,
+    `  ${report.state}, obraz trwa ${report.actualSeconds}s, silnik ${report.engine ?? "nieznany"}`,
+  ];
+
+  if (report.picture.length > 0) {
+    lines.push(
+      `  obraz: ${report.picture.map((clip) => `${clip.id} (${clip.source === "lip-sync" ? "lip-sync" : "etap 7"})`).join(", ")}`
+    );
+  }
+
+  if (levels !== null) {
+    lines.push(
+      `  poziomy: muzyka ${levels.musicDb} dB, efekty ${levels.effectsDb} dB, ducking ${levels.duckDb} dB / ${levels.duckReleaseMs} ms`
+    );
+  }
+
+  for (const sound of report.sounds) {
+    lines.push(
+      `      ${sound.id} (${sound.kind}): ${sound.plannedSeconds}s planu → ${sound.atSeconds}s filmu, ${sound.seconds}s`
+    );
+  }
+
+  return finish(lines, report);
+}
+
 function renderStatus(headline: string, status: VersionsStatus): string {
   const lines = [headline];
 
@@ -166,6 +216,12 @@ function renderStatus(headline: string, status: VersionsStatus): string {
 
   if (status.untouched.length > 0) {
     lines.push(`  bez zmian: ${status.untouched.join(", ")}`);
+  }
+
+  for (const film of status.finals) {
+    lines.push(
+      `  film ${film.id}: ${film.approved ? "zatwierdzony" : film.state}, ${film.note}${film.checks.length > 0 ? `; checklista: ${film.checks.join(", ")}` : ""}`
+    );
   }
 
   return finish(lines, { ...status, created: [] });
@@ -373,6 +429,51 @@ async function runLipSync(argv: readonly string[]): Promise<Result<string>> {
   );
 }
 
+async function runFinal(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, {
+    json: { type: "boolean" },
+    language: { type: "string" },
+    regenerate: { type: "boolean" },
+    track: { type: "string" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const scope = scopeOf(parsed.data);
+  const { language } = parsed.data.values;
+
+  if (!scope.ok) {
+    return scope;
+  }
+
+  if (typeof language !== "string" || language === "") {
+    return err(
+      new UsageError("--language jest wymagane: język ust z lip-sync.json albo język filmu")
+    );
+  }
+
+  const mode = modeOf(parsed.data);
+  const result = await generateFinal({
+    ...scope.data,
+    language,
+    mode,
+    mux: ffmpeg(env.AIMATOR_FFMPEG ?? "ffmpeg"),
+    regenerate: parsed.data.values.regenerate === true,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("final", STAGE, result.data)
+      : renderFinal(result.data, scope.data, mode)
+  );
+}
+
 export async function runVersions(argv: readonly string[]): Promise<Result<string>> {
   const [command, ...rest] = argv;
 
@@ -386,6 +487,10 @@ export async function runVersions(argv: readonly string[]): Promise<Result<strin
 
   if (command === "lip-sync") {
     return await runLipSync(rest);
+  }
+
+  if (command === "final") {
+    return await runFinal(rest);
   }
 
   return err(new UsageError(`nieznane polecenie: versions ${command ?? ""}`.trim()));

@@ -34,6 +34,14 @@ const RATIO = /^(\d{1,4}):(\d{1,4})$/;
 
 export interface VideoVerdict {
   readonly bytes: number;
+  /**
+   * The picture's sample entry format, `avc1` or `hvc1`, or null where its
+   * sample tables are missing. With the frame and the frame rate, what a
+   * stream copy of several clips has to agree on.
+   */
+  readonly codec: string | null;
+  /** Pictures a second, to the thousandth, from the picture's own sample tables; null without them. */
+  readonly frameRate: number | null;
   readonly height: number;
   /** The clip's own duration, as its movie header states it. */
   readonly seconds: number;
@@ -124,6 +132,7 @@ export function validateVideo(
 
   return ok({
     bytes: bytes.length,
+    ...readStream(bytes, frame.trak),
     height: frame.height,
     seconds: round(seconds),
     width: frame.width,
@@ -508,7 +517,7 @@ function readDuration(bytes: Buffer, moov: Box): number | null {
  * so the first track is not necessarily the picture, and taking it on faith
  * would report a clip with audio as having no frame at all.
  */
-function readFrame(bytes: Buffer, moov: Box): { height: number; width: number } | null {
+function readFrame(bytes: Buffer, moov: Box): { height: number; trak: Box; width: number } | null {
   let at = moov.body;
 
   while (at < moov.end) {
@@ -521,13 +530,71 @@ function readFrame(bytes: Buffer, moov: Box): { height: number; width: number } 
     const frame = readTrackFrame(bytes, trak);
 
     if (frame !== null) {
-      return frame;
+      return { ...frame, trak };
     }
 
     at = trak.end;
   }
 
   return null;
+}
+
+/** The box of a type under a chain of containers, each looked for inside the last. */
+function descend(bytes: Buffer, from: Box, path: readonly string[]): Box | null {
+  let box: Box | null = from;
+
+  for (const type of path) {
+    box = box === null ? null : findBox(bytes, box.body, box.end, type);
+  }
+
+  return box;
+}
+
+/**
+ * The picture track's format and frame rate.
+ *
+ * The format is the first sample entry's four letters. The rate is the media
+ * timescale over the time between frames, and the time taken is the one most
+ * frames have: an encoder may give the last frame a different duration, and
+ * that one frame is not the rate of the film.
+ */
+function readStream(bytes: Buffer, trak: Box): { codec: string | null; frameRate: number | null } {
+  const mdhd = descend(bytes, trak, ["mdia", "mdhd"]);
+  const stsd = descend(bytes, trak, ["mdia", "minf", "stbl", "stsd"]);
+  const stts = descend(bytes, trak, ["mdia", "minf", "stbl", "stts"]);
+  const codec =
+    stsd !== null && stsd.body + 16 <= stsd.end
+      ? bytes.toString("ascii", stsd.body + 12, stsd.body + 16)
+      : null;
+
+  if (mdhd === null || stts === null || stts.body + 8 > stts.end) {
+    return { codec, frameRate: null };
+  }
+
+  const long = bytes.readUInt8(mdhd.body) === 1;
+  const timescaleAt = mdhd.body + (long ? 20 : 12);
+  const timescale = timescaleAt + 4 <= mdhd.end ? bytes.readUInt32BE(timescaleAt) : 0;
+  let delta = 0;
+  let most = 0;
+
+  for (let index = 0; index < bytes.readUInt32BE(stts.body + 4); index += 1) {
+    const at = stts.body + 8 + index * 8;
+
+    if (at + 8 > stts.end) {
+      break;
+    }
+
+    if (bytes.readUInt32BE(at) > most) {
+      most = bytes.readUInt32BE(at);
+      delta = bytes.readUInt32BE(at + 4);
+    }
+  }
+
+  return {
+    codec,
+    frameRate:
+      timescale === 0 || delta === 0 ? null : Math.round((timescale / delta) * 1000) / 1000,
+  };
 }
 
 function readTrackFrame(bytes: Buffer, trak: Box): { height: number; width: number } | null {

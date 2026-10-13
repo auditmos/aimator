@@ -7,7 +7,7 @@ import {
   toWorkspacePath,
 } from "../artifact/index.js";
 import { checkCharacter } from "../character/index.js";
-import { CHECKS, type Check } from "../checklist.js";
+import { type Check, FRAME_CHECKS } from "../checklist.js";
 import {
   correction,
   frameSize,
@@ -855,7 +855,7 @@ function checklistOf(artifact: Artifact): readonly Check[] {
 
   const cast = artifact.referenceIds.some((id) => id.startsWith(HERO));
 
-  return CHECKS.filter((check) => cast || check !== "master");
+  return FRAME_CHECKS.filter((check) => cast || check !== "master");
 }
 
 async function planOne(

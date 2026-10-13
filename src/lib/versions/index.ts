@@ -10,5 +10,6 @@
  */
 
 export { type BindingReport, bindFaces, type FacesReport, findFaces } from "./faces.js";
+export { type FinalReport, generateFinal } from "./final.js";
 export { generateLipSync, type LipSyncReport } from "./generate.js";
 export { approveVersions, checkVersions, type VersionsStatus } from "./review.js";

@@ -722,6 +722,7 @@ interface AcceptedLine {
   /** Where the plan puts it, before any track's drift is applied. */
   readonly atSeconds: number;
   readonly cast: string;
+  /** Its record key: `D01`, or `en:D01` in a second language. */
   readonly id: string;
   /** Absolute, for a mixer. */
   readonly path: string;
@@ -745,8 +746,14 @@ interface AcceptedDialogue {
  * rather than by a second copy of it one row down. Every line of the script
  * has to be accepted, not merely the ones that are: a film missing a line is a
  * film saying less than the script a person approved.
+ *
+ * `language` asks the same of the translation instead, for stage 12's film in
+ * the language of the mouths: every translated line, under its own key
+ * `en:D01`, and the translation's own yes in place of the script's.
  */
-export async function readAcceptedDialogue(input: Stage11Scope): Promise<Result<AcceptedDialogue>> {
+export async function readAcceptedDialogue(
+  input: Stage11Scope & { readonly language?: string }
+): Promise<Result<AcceptedDialogue>> {
   const inspection = await inspect(input);
 
   if (!inspection.ok) {
@@ -755,6 +762,11 @@ export async function readAcceptedDialogue(input: Stage11Scope): Promise<Result<
 
   const { stage11, status } = inspection.data;
   const scope = `${input.projectId} ${input.episodeId}`;
+  const language = input.language ?? stage11.language;
+
+  if (language !== stage11.language) {
+    return await acceptedTranslation(input, stage11, status, language);
+  }
 
   if (status.script.state !== "completed") {
     return ok({
@@ -765,36 +777,124 @@ export async function readAcceptedDialogue(input: Stage11Scope): Promise<Result<
   }
 
   const script = await readDigest(stage11.episode.dialogueScript);
-  const gate: string[] = status.script.approved
-    ? []
-    : [`skrypt dialogu nie ma ważnej zgody: ${status.nextStep}`];
-  const inputs: RecordedFile[] = script.ok
-    ? [
-        {
-          path: toWorkspacePath(input.workspace.root, stage11.episode.dialogueScript),
-          sha256: script.data.sha256,
-        },
-      ]
-    : [];
+  const accepted = await acceptedLines(input, stage11, status.lines, null);
+
+  if (!accepted.ok) {
+    return accepted;
+  }
+
+  return ok({
+    gate: [
+      ...(status.script.approved ? [] : [`skrypt dialogu nie ma ważnej zgody: ${status.nextStep}`]),
+      ...accepted.data.gate,
+    ],
+    inputs: [
+      ...(script.ok
+        ? [
+            {
+              path: toWorkspacePath(input.workspace.root, stage11.episode.dialogueScript),
+              sha256: script.data.sha256,
+            },
+          ]
+        : []),
+      ...accepted.data.inputs,
+    ],
+    lines: accepted.data.lines,
+  });
+}
+
+/** The translation's lines, accepted, for the film in the language of the mouths. */
+async function acceptedTranslation(
+  input: Stage11Scope,
+  stage11: Stage11Inputs,
+  status: DialogueStatus,
+  language: string
+): Promise<Result<AcceptedDialogue>> {
+  const scope = `${input.projectId} ${input.episodeId}`;
+  const { translation } = status;
+
+  if (translation === null || translation.language !== language) {
+    return ok({
+      gate: [
+        `odcinek nie ma przekładu na ${language}: język ust zapisuje aimator episode lip-sync ${scope} --language ${language}`,
+      ],
+      inputs: [],
+      lines: [],
+    });
+  }
+
+  if (translation.state !== "completed") {
+    return ok({
+      gate: [`nie ma przekładu skryptu dialogu: aimator dialogue translate ${scope}`],
+      inputs: [],
+      lines: [],
+    });
+  }
+
+  const path = dialogueTranslation(stage11.episode, language);
+
+  if (!path.ok) {
+    return path;
+  }
+
+  const text = await readDigest(path.data);
+  const accepted = await acceptedLines(input, stage11, translation.lines, language);
+
+  if (!accepted.ok) {
+    return accepted;
+  }
+
+  return ok({
+    gate: [
+      ...(translation.approved
+        ? []
+        : [
+            `${translation.id}: przekład nie ma ważnej zgody, szczegóły: aimator check ${scope} --stage ${STAGE}`,
+          ]),
+      ...accepted.data.gate,
+    ],
+    inputs: [
+      ...(text.ok
+        ? [{ path: toWorkspacePath(input.workspace.root, path.data), sha256: text.data.sha256 }]
+        : []),
+      ...accepted.data.inputs,
+    ],
+    lines: accepted.data.lines,
+  });
+}
+
+/**
+ * Each line with the recording somebody accepted, under its own key, and why
+ * any is not. `translated` is the language of a translation's lines, or null
+ * for the script's, which is what decides the command that buys one.
+ */
+async function acceptedLines(
+  input: Stage11Scope,
+  stage11: Stage11Inputs,
+  states: readonly LineState[],
+  translated: string | null
+): Promise<Result<AcceptedDialogue>> {
+  const scope = `${input.projectId} ${input.episodeId}`;
+  const buy = `aimator dialogue generate ${scope}${translated === null ? "" : ` --language ${translated}`}`;
+  const gate: string[] = [];
+  const inputs: RecordedFile[] = [];
   const lines: AcceptedLine[] = [];
 
-  for (const line of status.lines) {
-    const file = dialogueAudio(stage11.episode, stage11.language, line.id);
+  for (const line of states) {
+    const file = dialogueAudio(stage11.episode, translated ?? stage11.language, line.id);
 
     if (!file.ok) {
       return file;
     }
 
     if (line.state !== "completed") {
-      gate.push(
-        `${line.id}: kwestia dialogu nie została kupiona: aimator dialogue generate ${scope}`
-      );
+      gate.push(`${line.key}: kwestia dialogu nie została kupiona: ${buy}`);
       continue;
     }
 
     if (!line.approved || line.seconds === null) {
       gate.push(
-        `${line.id}: kwestia dialogu nie ma ważnej zgody, szczegóły: aimator check ${scope} --stage ${STAGE}`
+        `${line.key}: kwestia dialogu nie ma ważnej zgody, szczegóły: aimator check ${scope} --stage ${STAGE}`
       );
       continue;
     }
@@ -813,7 +913,7 @@ export async function readAcceptedDialogue(input: Stage11Scope): Promise<Result<
     lines.push({
       atSeconds: line.atSeconds,
       cast: line.cast,
-      id: line.id,
+      id: line.key,
       path: file.data,
       seconds: line.seconds,
     });

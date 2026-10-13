@@ -270,6 +270,19 @@ Etap 12. Wersje językowe (płatny; per tor, klip po klipie):
     w ms oraz rachunek osobno: rozpoznania i zadania lip-sync. Postać mówiąca
     spoza kadru zostaje bez lip-syncu, z meldunkiem. Wynik:
     versions/clips/C01.mp4, zatwierdzany per klip.
+  versions final <id> <episode-id> --track <tor> --language <kod>
+                 [--dry-run] [--json] [--regenerate]
+    Nic nie kupuje. Skleja versions/episode.mp4, jeden obraz dla obu wersji:
+    klipy po lip-syncu tam, gdzie są, przyjęte klipy etapu 7 wszędzie indziej,
+    w kolejności listy ujęć, sam obraz kopią strumienia, bez dźwięku lip-syncu.
+    Na nim kładzie przyjęte kwestie jednego języka i te same stemy etapu 10 na
+    poziomach z mix.json: język ust daje versions/<kod>.mp4 z kwestiami
+    <kod>:Dnn, język filmu daje versions/<kod>.mp4 z kwestiami Dnn, czyli
+    dubbing. Czeka na zgodę na lip-sync każdego klipu, który go wymaga, na
+    kwestie tego języka i na stemy. Klipy o różnym kadrze, kodeku albo tempie
+    klatek oraz kwestie nachodzące na siebie albo wychodzące poza film dostają
+    odmowę. Potrzebuje ffmpeg (PATH albo AIMATOR_FFMPEG). Gotowego filmu nie
+    składa ponownie bez --regenerate.
 
 Wspólne:
   list [--json]
@@ -323,7 +336,8 @@ Wspólne:
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
   approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]
                [--json]
-  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02] [--json]
+  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]|<kod>
+               [--checks <kryteria>|all] [--json]
   reject <id> <episode-id> --stage <etap> [--track <tor>] [--artifact <klucz>[,...]]
               --note <uwaga> [--fail <kryteria>] [--reviewer <kto>] [--json]
   reject <id> <character-id> --stage character --track <tor> --artifact <klucz>
@@ -335,8 +349,8 @@ Wspólne:
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
     artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
     i sound-design bez --track, dialogue i versions --artifact jest wymagane,
-    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze ani
-    kroki pośrednie.
+    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze, kroki
+    pośrednie ani filmy.
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay

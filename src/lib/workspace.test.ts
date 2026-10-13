@@ -353,6 +353,7 @@ describe("episodeTrackPaths", () => {
       soundtrackStage: `${root}/soundtrack.stage.json`,
       versions: `${root}/versions`,
       versionsLock: `${root}/versions.lock`,
+      versionsPicture: `${root}/versions/episode.mp4`,
       versionsStage: `${root}/versions.stage.json`,
     });
   });
