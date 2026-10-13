@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import type { Check } from "../checklist.js";
+import { err, ok, type Result } from "../result.js";
 import { archivedBy, type Workspace } from "../workspace.js";
-import type { RecordedFile, StageFile } from "./schema.js";
+import type { ArtifactRecord, RecordedFile, StageFile } from "./schema.js";
 import { nowIso, readDigest } from "./store.js";
 
 /**
@@ -156,6 +157,136 @@ export function approveArtifacts(
   }
 
   return { ...stage, artifacts };
+}
+
+interface Rejection {
+  /** The QC criteria that failed, by artifact key, for the ones judged against a checklist. */
+  readonly failed?: Readonly<Record<string, readonly Check[]>>;
+  /** Why. Required: a no without a reason has nothing to feed a correction. */
+  readonly note: string;
+  readonly reviewer: string;
+}
+
+class RejectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RejectionError";
+  }
+}
+
+/**
+ * Records a human saying no, with the reason, on the named artifacts.
+ *
+ * The mirror of `approveArtifacts`, with one difference that matters: a key the
+ * file does not hold, or an attempt that never finished, is refused rather than
+ * skipped, because there is nothing there to say no to and a silent skip would
+ * read as a rejection that happened. Every gate already treats anything but
+ * `approved` as unaccepted, so a rejected artifact blocks exactly what a
+ * pending one does; what it adds is the reason, which the next `--regenerate`
+ * corrects by.
+ */
+export function rejectArtifacts(
+  stage: StageFile,
+  keys: readonly string[],
+  rejection: Rejection
+): Result<StageFile> {
+  const missing = keys.filter((key) => stage.artifacts[key]?.status !== "completed");
+
+  if (keys.length === 0) {
+    return err(new RejectionError("nie ma czego odrzucić: etap nie ma jeszcze żadnego wyniku"));
+  }
+
+  if (missing.length > 0) {
+    return err(
+      new RejectionError(
+        `nie ma czego odrzucić: ${missing.map((key) => `${key} (${stage.artifacts[key]?.status ?? "brak"})`).join(", ")}; w pliku etapu są: ${Object.keys(stage.artifacts).join(", ") || "żadne"}`
+      )
+    );
+  }
+
+  const reviewedAt = nowIso();
+  const artifacts = { ...stage.artifacts };
+
+  for (const key of keys) {
+    const artifact = artifacts[key];
+    const failed = rejection.failed?.[key];
+
+    if (artifact !== undefined) {
+      artifacts[key] = {
+        ...artifact,
+        review: {
+          ...(failed === undefined ? {} : { failed: [...failed] }),
+          note: rejection.note,
+          reviewedAt,
+          reviewer: rejection.reviewer,
+          status: "rejected",
+        },
+      };
+    }
+  }
+
+  return ok({ ...stage, artifacts });
+}
+
+/** The note a regeneration corrects by, and where it came from. */
+export interface Correction {
+  /** The rejected artifact it came from, `null` for `--instruction`. */
+  readonly from: string | null;
+  /** `instruction` is `--instruction`; `rejection` is a person's recorded no. */
+  readonly source: "instruction" | "rejection";
+  /** The note as the model receives it, verbatim inside its marked block. */
+  readonly text: string;
+}
+
+/**
+ * What a regeneration corrects by, or `null` for an ordinary new attempt.
+ *
+ * An explicit `--instruction` always wins. Without one, a rejected artifact's
+ * note is the correction, with the failed QC criteria under it, because that
+ * reason is exactly what the next attempt should fix and making a person type
+ * it twice would lose it on the way. Like `--instruction`, it has one
+ * addressee: a regeneration of several artifacts where any of them carries a
+ * no is refused, since each no is about one result and sending it to the
+ * others would ask them to change something nobody looked at them for.
+ */
+export function correctionOf(input: {
+  readonly instruction: string | null;
+  readonly regenerate: boolean;
+  readonly targets: readonly {
+    readonly key: string;
+    readonly record: ArtifactRecord | undefined;
+  }[];
+}): Result<Correction | null> {
+  if (input.instruction !== null) {
+    return ok({ from: null, source: "instruction", text: input.instruction });
+  }
+
+  const rejected = input.regenerate
+    ? input.targets.filter((one) => one.record?.review.status === "rejected")
+    : [];
+  const [only] = rejected;
+
+  if (only === undefined) {
+    return ok(null);
+  }
+
+  if (input.targets.length > 1) {
+    return err(
+      new RejectionError(
+        `uwaga z odrzucenia ma jednego adresata, a --regenerate wskazuje ${input.targets.length}: ${input.targets.map((one) => one.key).join(", ")}; regeneruj odrzucone osobno (${rejected.map((one) => `--artifact ${one.key}`).join(", ")}) albo podaj --instruction przy jednym`
+      )
+    );
+  }
+
+  const { failed = [], note } = only.record?.review ?? {};
+
+  return ok({
+    from: only.key,
+    source: "rejection",
+    text: [note ?? "", ...(failed.length > 0 ? [`Failed QC criteria: ${failed.join(", ")}`] : [])]
+      .join("\n\n")
+      .trim(),
+  });
 }
 
 /**

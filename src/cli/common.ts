@@ -1,6 +1,7 @@
 import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
-import { CHECKS, type Checklist } from "../lib/checklist.js";
+import type { Correction } from "../lib/artifact/index.js";
+import { CHECKS, type Check, type Checklist } from "../lib/checklist.js";
 import { env } from "../lib/env.js";
 import type { Stage0Report } from "../lib/project/index.js";
 import { err, ok, type Result } from "../lib/result.js";
@@ -348,21 +349,49 @@ export function checksOf(parsed: Parsed): Result<Checklist | null> {
     return ok(null);
   }
 
-  if (flag.trim() === "all") {
-    return ok("all");
-  }
+  return flag.trim() === "all" ? ok("all") : criteriaOf("checks", flag, " albo all");
+}
 
+/**
+ * `--fail`: the QC criteria a rejection names as failed, or `null` when absent.
+ * A list only: "everything failed" is a note, not a criterion.
+ */
+export function failedOf(parsed: Parsed): Result<readonly Check[] | null> {
+  const flag = parsed.values.fail;
+
+  return typeof flag === "string" ? criteriaOf("fail", flag, "") : ok(null);
+}
+
+/** A comma list from the QC vocabulary, in vocabulary order; anything else is refused. */
+function criteriaOf(name: string, flag: string, also: string): Result<readonly Check[]> {
   const names = flag
     .split(",")
-    .map((name) => name.trim())
-    .filter((name) => name !== "");
-  const unknown = names.filter((name) => !CHECKS.some((check) => check === name));
+    .map((one) => one.trim())
+    .filter((one) => one !== "");
+  const unknown = names.filter((one) => !CHECKS.some((check) => check === one));
 
   return unknown.length > 0
     ? err(
-        new UsageError(`--checks "${unknown.join(", ")}", dozwolone: ${CHECKS.join(", ")} albo all`)
+        new UsageError(`--${name} "${unknown.join(", ")}", dozwolone: ${CHECKS.join(", ")}${also}`)
       )
     : ok(CHECKS.filter((check) => names.includes(check)));
+}
+
+/**
+ * Where the note an attempt corrects by came from, said before the prompt that
+ * carries it: a rejection's note travels without anybody typing it this time,
+ * so the preview is the one place a person can see that it will.
+ */
+export function correctionLines(correction: Correction | null): readonly string[] {
+  if (correction === null) {
+    return [];
+  }
+
+  return correction.source === "rejection"
+    ? [
+        `  uwaga z odrzucenia ${correction.from ?? ""} (review.note); jawne --instruction ma pierwszeństwo`,
+      ]
+    : ["  uwaga z --instruction"];
 }
 
 /** Reference ids, as `--artifact` writes them: `R01` or `R01,R02`. */

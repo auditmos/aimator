@@ -1,4 +1,6 @@
 import {
+  type Correction,
+  correctionOf,
   nowIso,
   type RecordedFile,
   removeFile,
@@ -69,6 +71,8 @@ export interface CharacterReport {
   /** Whether stage 0 is approved for this project. */
   readonly approved: boolean;
   readonly artifacts: readonly ArtifactOutcome[];
+  /** The note this attempt corrects by, and where it came from; `null` for a plain drawing. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly name: string;
   readonly nextStep: string;
@@ -86,6 +90,9 @@ export interface CharacterReport {
   readonly ready: boolean;
   readonly track: ImageTrack;
 }
+
+/** A report before the command says what it corrected by, which only it knows. */
+type Draft = Omit<CharacterReport, "correction">;
 
 interface GenerateCharacterInput {
   readonly apiKey: string | null;
@@ -201,12 +208,27 @@ export async function generateCharacter(
     );
   }
 
-  const problems = blockers(input, stage0.data);
-  const targets = input.artifacts.length > 0 ? input.artifacts : nextGroup(stage);
+  const correction = correctionOf({
+    instruction: input.instruction ?? null,
+    regenerate: input.regenerate,
+    targets: input.artifacts.map((key) => ({ key, record: stage.artifacts[key] })),
+  });
+
+  if (!correction.ok) {
+    return correction;
+  }
+
+  // One note from here on, whichever way it arrived, so the prompt composed and
+  // the attempt recorded carry the same words.
+  const corrected = { ...input, instruction: correction.data?.text ?? null };
+  const problems = blockers(corrected, stage0.data);
+  const targets = corrected.artifacts.length > 0 ? corrected.artifacts : nextGroup(stage);
   const scope: Scope = { paths, stage, stage0: stage0.data };
 
-  if (input.mode === "dry-run") {
-    return await preview(input, scope, targets, problems);
+  if (corrected.mode === "dry-run") {
+    const planned = await preview(corrected, scope, targets, problems);
+
+    return planned.ok ? ok({ ...planned.data, correction: correction.data }) : planned;
   }
 
   if (problems.length > 0) {
@@ -214,7 +236,7 @@ export async function generateCharacter(
   }
 
   if (targets.length === 0) {
-    return ok(idle(input, scope));
+    return ok({ ...idle(corrected, scope), correction: null });
   }
 
   const lock = await writeNew(paths.lock, serialize({ pid: process.pid, startedAt: nowIso() }));
@@ -224,14 +246,16 @@ export async function generateCharacter(
   }
 
   try {
-    return await runAll(input, scope, targets);
+    const drawn = await runAll(corrected, scope, targets);
+
+    return drawn.ok ? ok({ ...drawn.data, correction: correction.data }) : drawn;
   } finally {
     await removeFile(paths.lock);
   }
 }
 
 /** Nothing to do: every runnable step is done and the rest waits on a human. */
-function idle(input: GenerateCharacterInput, scope: Scope): CharacterReport {
+function idle(input: GenerateCharacterInput, scope: Scope): Draft {
   const waiting = CHARACTER_ARTIFACTS.filter(
     (artifact) =>
       scope.stage.artifacts[artifact]?.status === "completed" && !accepted(scope.stage, artifact)
@@ -264,7 +288,7 @@ async function preview(
   scope: Scope,
   targets: readonly CharacterArtifact[],
   problems: readonly string[]
-): Promise<Result<CharacterReport>> {
+): Promise<Result<Draft>> {
   const outcomes: ArtifactOutcome[] = [];
 
   for (const artifact of targets) {
@@ -343,7 +367,7 @@ async function runAll(
   input: GenerateCharacterInput,
   scope: Scope,
   targets: readonly CharacterArtifact[]
-): Promise<Result<CharacterReport>> {
+): Promise<Result<Draft>> {
   const outcomes: ArtifactOutcome[] = [];
   const created: string[] = [];
   let { stage } = scope;

@@ -14,6 +14,7 @@ import {
   type Answer,
   type Approval,
   asJson,
+  correctionLines,
   keyFor,
   MODEL_ID,
   modeOf,
@@ -69,6 +70,7 @@ function renderClips(
     mode === "dry-run"
       ? `  płatnych wywołań do wykonania, ${bill}`
       : `  płatnych wywołań wykonanych, ${bill}`,
+    ...correctionLines(report.correction),
   ];
 
   for (const outcome of report.artifacts) {

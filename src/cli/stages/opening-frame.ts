@@ -11,6 +11,7 @@ import {
   type Answer,
   type Approval,
   asJson,
+  correctionLines,
   imageModelOf,
   instructionOf,
   keyFor,
@@ -59,6 +60,7 @@ function renderOpeningFrame(
     mode === "dry-run"
       ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
       : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+    ...correctionLines(report.correction),
     `  ${report.artifact.id}: ${report.artifact.state}, ${report.artifact.note}`,
   ];
 

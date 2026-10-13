@@ -11,6 +11,7 @@ import {
   type Answer,
   type Approval,
   asJson,
+  correctionLines,
   type EpisodeScope,
   instructionOf,
   MODEL_ID,
@@ -61,6 +62,8 @@ function renderShotListGenerate(
           `Lista ujęć ${projectId}/${episodeId}, próba ${report.runId ?? ""}`,
           `  płatnych wywołań wykonanych: ${report.paidCalls}`,
         ];
+
+  lines.push(...correctionLines(report.correction));
 
   for (const path of report.created) {
     lines.push(`  + ${path}`);

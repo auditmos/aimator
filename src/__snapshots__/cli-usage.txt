@@ -233,6 +233,16 @@ Wspólne:
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
+  reject <id> <episode-id> --stage <etap> [--track <tor>] [--artifact <klucz>[,...]]
+              --note <uwaga> [--fail <kryteria>] [--reviewer <kto>] [--json]
+  reject <id> <character-id> --stage character --track <tor> --artifact <klucz>
+              --note <uwaga> [--json]
+  reject <id> --stage style --track <tor> --artifact S01[,S02] --note <uwaga> [--json]
+    Zapisuje "nie" z powodem: review.status "rejected", uwagę, kto i kiedy, z tymi
+    samymi zakresami co approve (bez etapu 0). Bramki traktują odrzucony artefakt
+    jak niezatwierdzony; approve może go potem przyjąć. --fail tylko na klatkach
+    z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
+    artefaktu bez --instruction poprawia go według tej uwagi.
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay

@@ -21,6 +21,7 @@ import {
   type Approval,
   answerFlag,
   asJson,
+  correctionLines,
   instructionOf,
   maxOutputTokensOf,
   modeOf,
@@ -349,6 +350,7 @@ function renderNarration(
   const lines = [
     mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
     `  skrypt: ${report.script.state}, ${report.script.note}`,
+    ...correctionLines(report.correction),
     `  do kupienia: ${report.calls} wywołań, ${report.characters} znaków`,
   ];
 

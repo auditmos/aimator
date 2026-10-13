@@ -1,4 +1,6 @@
 import {
+  type Correction,
+  correctionOf,
   nowIso,
   type RecordedFile,
   removeFile,
@@ -65,6 +67,8 @@ export interface OpeningFrameReport {
   /** Whether the package this frame is planned by is accepted. */
   readonly approved: boolean;
   readonly artifact: OpeningFrameOutcome;
+  /** The note this attempt corrects by, and where it came from; `null` for a plain drawing. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
@@ -78,6 +82,9 @@ export interface OpeningFrameReport {
   readonly size: string;
   readonly track: ImageTrack;
 }
+
+/** A report before the command says what it corrected by, which only it knows. */
+type Draft = Omit<OpeningFrameReport, "correction">;
 
 interface GenerateInput {
   readonly apiKey: string | null;
@@ -158,16 +165,35 @@ export async function generateOpeningFrame(
   // Unlike stage 5, `--regenerate` needs no target: there is exactly one image
   // it could mean, so demanding that it be named would be asking a question
   // with a single possible answer.
-  const stage6 = await readStage6Inputs(input, true);
+  const survey = await readStage6Inputs(input);
+
+  if (!survey.ok) {
+    return survey;
+  }
+
+  const correction = correctionOf({
+    instruction: input.instruction ?? null,
+    regenerate: input.regenerate,
+    targets: [{ key: OPENING_FRAME, record: survey.data.stage.artifacts[OPENING_FRAME] }],
+  });
+
+  if (!correction.ok) {
+    return correction;
+  }
+
+  // One note from here on, whichever way it arrived, so the prompt composed and
+  // the attempt recorded carry the same words.
+  const corrected = { ...input, instruction: correction.data?.text ?? null };
+  const stage6 = await readStage6Inputs(corrected, true);
 
   if (!stage6.ok) {
     return stage6;
   }
 
-  const problems = blockers(input, stage6.data);
+  const problems = blockers(corrected, stage6.data);
 
-  if (input.mode === "dry-run") {
-    return ok(preview(input, stage6.data, problems));
+  if (corrected.mode === "dry-run") {
+    return ok({ ...preview(corrected, stage6.data, problems), correction: correction.data });
   }
 
   if (problems.length > 0) {
@@ -178,8 +204,8 @@ export async function generateOpeningFrame(
     return err(new Stage6BlockedError(stage6.data.opening.blockers));
   }
 
-  if (!isDrawable(stage6.data, input.regenerate)) {
-    return ok(idle(input, stage6.data));
+  if (!isDrawable(stage6.data, corrected.regenerate)) {
+    return ok({ ...idle(corrected, stage6.data), correction: null });
   }
 
   const lock = await writeNew(
@@ -192,14 +218,16 @@ export async function generateOpeningFrame(
   }
 
   try {
-    return await runOne(input, stage6.data);
+    const drawn = await runOne(corrected, stage6.data);
+
+    return drawn.ok ? ok({ ...drawn.data, correction: correction.data }) : drawn;
   } finally {
     await removeFile(stage6.data.paths.track.openingFrameLock);
   }
 }
 
 /** The frame is already drawn and this invocation is not allowed to redraw it. */
-function idle(input: GenerateInput, stage6: Stage6Inputs): OpeningFrameReport {
+function idle(input: GenerateInput, stage6: Stage6Inputs): Draft {
   const record = stage6.stage.artifacts[OPENING_FRAME];
   const waiting = record?.review.status !== "approved";
 
@@ -260,11 +288,7 @@ function verdictOf(
  * finished results as purchases and overstating the bill on the one command a
  * person runs to find out what something costs.
  */
-function preview(
-  input: GenerateInput,
-  stage6: Stage6Inputs,
-  problems: readonly string[]
-): OpeningFrameReport {
+function preview(input: GenerateInput, stage6: Stage6Inputs, problems: readonly string[]): Draft {
   const record = stage6.stage.artifacts[OPENING_FRAME];
   const finished = record?.status === "completed" && !input.regenerate;
   const blocked = stage6.opening.blockers.length > 0;
@@ -298,10 +322,7 @@ function preview(
   };
 }
 
-async function runOne(
-  input: GenerateInput,
-  stage6: Stage6Inputs
-): Promise<Result<OpeningFrameReport>> {
+async function runOne(input: GenerateInput, stage6: Stage6Inputs): Promise<Result<Draft>> {
   const target = stage6.opening;
 
   if (target.text === null) {

@@ -3,6 +3,7 @@ import { runApprove } from "./approve.js";
 import { runCheck } from "./check.js";
 import { UsageError } from "./common.js";
 import { runList } from "./list.js";
+import { runReject } from "./reject.js";
 import { runAssembly } from "./stages/assembly.js";
 import { runCharacter } from "./stages/character.js";
 import { runClip } from "./stages/clips.js";
@@ -97,6 +98,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "approve") {
     return await runApprove(rest);
+  }
+
+  if (command === "reject") {
+    return await runReject(rest);
   }
 
   return err(new UsageError(`unknown command: ${command}`));

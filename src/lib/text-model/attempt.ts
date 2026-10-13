@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   applyWrites,
+  type Correction,
+  correctionOf,
   driftableInputs,
   emptyStage,
   modelProducer,
@@ -137,6 +139,8 @@ export interface TextStage<T> {
 }
 
 interface TextAttempt<T> {
+  /** The note this attempt corrected by, and where it came from; `null` for none. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly runId: string;
   readonly value: T;
@@ -236,6 +240,25 @@ async function attempt<T>(call: TextCall, stage: TextStage<T>): Promise<Result<T
     }
   }
 
+  const correction = correctionOf({
+    instruction: call.instruction,
+    regenerate: call.regenerate,
+    targets: [{ key: stage.key ?? stage.artifact, record }],
+  });
+
+  if (!correction.ok) {
+    return correction;
+  }
+
+  // A rejected result corrects by its own note when nobody typed another, so
+  // from here on the note is one value whichever way it arrived.
+  const bought = await buy({ ...call, instruction: correction.data?.text ?? null }, stage);
+
+  return bought.ok ? ok({ ...bought.data, correction: correction.data }) : bought;
+}
+
+/** A new paid attempt: archive, `submitted`, the POST, the verdict. */
+async function buy<T>(call: TextCall, stage: TextStage<T>): Promise<Result<TextAttempt<T>>> {
   const runId = newRunId();
   const archive = runPaths(call.episode, runId);
   // Read before anything is written: under `--instruction` these are both
@@ -358,14 +381,25 @@ function nothingToRevise(what: string): readonly string[] {
  */
 export async function textPrompt<T>(
   stage: TextStage<T>,
-  instruction: string | null
-): Promise<{ readonly problems: readonly string[]; readonly prompt: string }> {
+  ask: { readonly instruction: string | null; readonly regenerate: boolean }
+): Promise<{
+  readonly correction: Correction | null;
+  readonly problems: readonly string[];
+  readonly prompt: string;
+}> {
+  const file = await readJson(stage.stagePath, stageFileSchema);
+  const key = stage.key ?? stage.artifact;
+  const correction = correctionOf({
+    ...ask,
+    targets: [{ key, record: file.ok ? file.data.artifacts[key] : undefined }],
+  });
+  const instruction = correction.ok ? (correction.data?.text ?? null) : null;
   const replaced = instruction === null ? [] : await stage.replaced();
   const revised = revision(stage, replaced, instruction);
 
   return revised.ok
-    ? { problems: [], prompt: revised.data }
-    : { problems: nothingToRevise(stage.what), prompt: stage.prompt };
+    ? { correction: correction.ok ? correction.data : null, problems: [], prompt: revised.data }
+    : { correction: null, problems: nothingToRevise(stage.what), prompt: stage.prompt };
 }
 
 /** Where each replaced file lands in `previous/`, and what it is as an input. */
@@ -628,6 +662,7 @@ async function publish<T>(
   );
 
   return ok({
+    correction: null,
     created: [
       ...published.data.created,
       toWorkspacePath(call.workspace.root, stage.stagePath),

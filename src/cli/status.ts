@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import { readJson, stageFileSchema } from "../lib/artifact/index.js";
 import { checkAssembly } from "../lib/assembly/index.js";
 import { checkCharacter } from "../lib/character/index.js";
 import { checkClips } from "../lib/clips/index.js";
@@ -101,6 +102,32 @@ async function held(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * What a person said no to, and why, read from the stage file itself.
+ *
+ * The second thing here read off the disk rather than off `check`, and for the
+ * lock's reason: a no is not a verdict on bytes, so no stage reports it, and
+ * the cell it belongs to looks exactly like one nobody has looked at yet. One
+ * rejection reads as its note; several name the artifact each is about.
+ */
+async function rejectedIn(path: string): Promise<string | null> {
+  const file = await readJson(path, stageFileSchema);
+  const notes = file.ok
+    ? Object.entries(file.data.artifacts)
+        .filter(([, record]) => record.review.status === "rejected")
+        .map(([key, record]) => ({ key, note: record.review.note ?? "" }))
+    : [];
+  const [only] = notes;
+
+  if (only === undefined) {
+    return null;
+  }
+
+  return notes.length === 1
+    ? `odrzucone: ${only.note}`
+    : `odrzucone: ${notes.map((one) => `${one.key}: ${one.note}`).join("; ")}`;
+}
+
 /** Artifacts that validated and are waiting for a person, in the stage's ids. */
 function pending(parts: readonly Reviewed[]): readonly string[] {
   return parts
@@ -117,6 +144,8 @@ interface CellInput {
   readonly problems: readonly string[];
   /** What to run when the cell is ready to produce. */
   readonly produce: string;
+  /** Why a person said no, when one did; the reason of a cell waiting for review. */
+  readonly rejected: string | null;
   /** What to run when the cell has something a person must look at. */
   readonly review: (waiting: readonly string[]) => string;
   readonly stage: number;
@@ -161,13 +190,22 @@ function cellOf(input: CellInput): StatusCell {
     character: input.character ?? null,
     id: input.id,
     nextStep,
-    reason: state === "blocked" ? input.problems.join("; ") : null,
+    reason: reasonOf(state, input),
     stage: input.stage,
     state,
     status: input.status,
     title: input.title,
     track: input.track ?? null,
   };
+}
+
+/** Why a blocked cell is blocked, or why a cell waiting for review was turned down. */
+function reasonOf(state: CellState, input: CellInput): string | null {
+  if (state === "blocked") {
+    return input.problems.join("; ");
+  }
+
+  return state === "review" ? input.rejected : null;
 }
 
 /** A stage that refused to answer at all: its refusal is the blockade. */
@@ -211,12 +249,13 @@ function textCell(
     readonly accepts: string;
     readonly locked: boolean;
     readonly produce: string;
+    readonly rejected: string | null;
     readonly stage: number;
     readonly status: TextStatus;
     readonly title: string;
   }
 ): StatusCell {
-  const { accepts, episodeId, locked, produce, projectId, stage, status, title } = input;
+  const { accepts, episodeId, locked, produce, projectId, rejected, stage, status, title } = input;
   const id = String(stage);
 
   return cellOf({
@@ -226,6 +265,7 @@ function textCell(
     parts: [{ approved: status.approved, id, state: status.status }],
     problems: status.problems,
     produce,
+    rejected,
     review: () => `aimator approve ${projectId} ${episodeId} --stage ${accepts}`,
     stage,
     status,
@@ -255,6 +295,8 @@ async function stage0Cell(scope: Scope): Promise<Result<StatusCell>> {
       parts: [{ approved: report.approved, id: "0", state: report.ready ? "completed" : "absent" }],
       problems: report.problems,
       produce: `aimator check ${scope.projectId} ${scope.episodeId}`,
+      // Stage 0 is a person's own decisions; `reject` takes no stage-0 scope.
+      rejected: null,
       review: () => `aimator approve ${scope.projectId} ${scope.episodeId} --stage prepare`,
       stage: 0,
       status: report,
@@ -296,7 +338,9 @@ async function characterCells(
         continue;
       }
 
-      const locked = paths.ok ? await held(characterTrackPaths(paths.data, track).lock) : false;
+      const files = paths.ok ? characterTrackPaths(paths.data, track) : null;
+      const locked = files === null ? false : await held(files.lock);
+      const rejected = files === null ? null : await rejectedIn(files.stage);
 
       cells.push(
         cellOf({
@@ -311,6 +355,7 @@ async function characterCells(
           })),
           problems: result.data.problems,
           produce: `aimator character generate ${scope.projectId} ${characterId} --track ${track}`,
+          rejected,
           review: (waiting) =>
             named(
               `aimator approve ${scope.projectId} ${characterId} --stage character --track ${track}`,
@@ -336,6 +381,8 @@ interface On {
 }
 
 interface TrackRow {
+  /** The stage file a rejection is written into, read for its reason. */
+  readonly file: (paths: EpisodeTrackPaths) => string;
   readonly id: string;
   readonly lock: (paths: EpisodeTrackPaths) => string;
   readonly produce: (on: On) => string;
@@ -355,6 +402,7 @@ interface TrackRow {
 /** Every row whose artifacts live under a track directory, in ladder order. */
 const TRACK_ROWS: readonly TrackRow[] = [
   {
+    file: (paths) => paths.referencesStage,
     id: "5",
     lock: (paths) => paths.referencesLock,
     produce: (on) =>
@@ -376,6 +424,7 @@ const TRACK_ROWS: readonly TrackRow[] = [
     title: "referencje",
   },
   {
+    file: (paths) => paths.openingFrameStage,
     id: "6",
     lock: (paths) => paths.openingFrameLock,
     produce: (on) =>
@@ -397,6 +446,7 @@ const TRACK_ROWS: readonly TrackRow[] = [
     title: "klatka otwarcia",
   },
   {
+    file: (paths) => paths.clipsStage,
     id: "7",
     lock: (paths) => paths.clipsLock,
     produce: (on) => `aimator clip generate ${on.projectId} ${on.episodeId} --track ${on.track}`,
@@ -417,6 +467,7 @@ const TRACK_ROWS: readonly TrackRow[] = [
     title: "klipy",
   },
   {
+    file: (paths) => paths.assemblyStage,
     id: "8",
     lock: (paths) => paths.assemblyLock,
     produce: (on) =>
@@ -448,6 +499,7 @@ const TRACK_ROWS: readonly TrackRow[] = [
  * have put the ladder's order in a filter.
  */
 const MIX_ROW: TrackRow = {
+  file: (paths) => paths.soundtrackStage,
   id: "9",
   lock: (paths) => paths.soundtrackLock,
   produce: (on) => `aimator narration mix ${on.projectId} ${on.episodeId} --track ${on.track}`,
@@ -469,6 +521,7 @@ const MIX_ROW: TrackRow = {
 };
 
 const MASTER_ROW: TrackRow = {
+  file: (paths) => paths.soundDesignStage,
   id: "10",
   lock: (paths) => paths.soundDesignLock,
   produce: (on) => `aimator sound-design mix ${on.projectId} ${on.episodeId} --track ${on.track}`,
@@ -519,6 +572,7 @@ async function trackCells(
           projectId: scope.projectId,
           track,
         }),
+        rejected: await rejectedIn(row.file(episodeTrackPaths(episode, track))),
         review: (waiting) =>
           named(
             `aimator approve ${scope.projectId} ${scope.episodeId} --stage ${row.reviewStage} --track ${track}`,
@@ -583,6 +637,7 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
       accepts: "screenplay",
       locked: await held(paths.screenplayLock),
       produce: `aimator screenplay generate ${scope.projectId} ${scope.episodeId}`,
+      rejected: await rejectedIn(paths.screenplayStage),
       stage: 1,
       status: screenplay.data,
       title: "scenariusz",
@@ -608,6 +663,7 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
       accepts: "shot-list",
       locked: await held(paths.shotListLock),
       produce: `aimator shot-list generate ${scope.projectId} ${scope.episodeId}`,
+      rejected: await rejectedIn(paths.shotListStage),
       stage: 3,
       status: shotList.data,
       title: "lista ujęć",
@@ -626,6 +682,7 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
       accepts: "prompt-package",
       locked: await held(paths.promptPackageLock),
       produce: `aimator prompt-package generate ${scope.projectId} ${scope.episodeId}`,
+      rejected: await rejectedIn(paths.promptPackageStage),
       stage: 4,
       status: promptPackage.data,
       title: "pakiet promptów",
@@ -648,6 +705,7 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
           parts: [narration.data.script, ...narration.data.lines],
           problems: narration.data.problems,
           produce: `aimator narration generate ${scope.projectId} ${scope.episodeId}`,
+          rejected: await rejectedIn(paths.soundtrackStage),
           review: (waiting) =>
             named(
               `aimator approve ${scope.projectId} ${scope.episodeId} --stage soundtrack`,
@@ -672,6 +730,7 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
           parts: [design.data.sheet, ...design.data.cues],
           problems: design.data.problems,
           produce: `aimator sound-design generate ${scope.projectId} ${scope.episodeId}`,
+          rejected: await rejectedIn(paths.soundDesignStage),
           review: (waiting) =>
             named(
               `aimator approve ${scope.projectId} ${scope.episodeId} --stage sound-design`,
@@ -711,8 +770,10 @@ function renderStatus(episode: EpisodeStatus): string {
     const where = cell.track === null ? "" : `, tor ${cell.track}`;
     lines.push(`  ${cell.stage}. ${cell.title}${where}: ${LABEL[cell.state]}`);
 
+    // A blockade is a refusal; a rejection's reason is said about a cell that
+    // waits for a person, so it is a report, and reads as one.
     if (cell.reason !== null) {
-      lines.push(`      ! ${cell.reason}`);
+      lines.push(`      ${cell.state === "blocked" ? "!" : "·"} ${cell.reason}`);
     }
   }
 

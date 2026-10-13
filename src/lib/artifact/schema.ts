@@ -55,6 +55,11 @@ const reviewSchema = z.strictObject({
    * else, and on every approval older than the field.
    */
   checks: z.array(z.enum(CHECKS)).optional(),
+  /**
+   * The QC criteria a rejection names as failed, on the same frames. Absent on
+   * every other rejection, and on everything that was not rejected.
+   */
+  failed: z.array(z.enum(CHECKS)).optional(),
   note: z.string().nullable(),
   reviewedAt: z.iso.datetime().nullable(),
   reviewer: z.string().nullable(),

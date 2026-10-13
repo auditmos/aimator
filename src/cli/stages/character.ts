@@ -18,6 +18,7 @@ import {
   answerFlag,
   answerStage0,
   asJson,
+  correctionLines,
   imageModelOf,
   keyFor,
   modeOf,
@@ -291,6 +292,7 @@ function renderCharacter(
     mode === "dry-run"
       ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
       : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+    ...correctionLines(report.correction),
   ];
 
   for (const outcome of report.artifacts) {

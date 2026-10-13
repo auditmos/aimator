@@ -1,4 +1,6 @@
 import {
+  type Correction,
+  correctionOf,
   nowIso,
   type RecordedFile,
   removeFile,
@@ -78,6 +80,8 @@ export interface ClipsReport {
   /** Whether the package these clips are planned by is accepted. */
   readonly approved: boolean;
   readonly artifacts: readonly ClipOutcome[];
+  /** The note this attempt corrects by, and where it came from; `null` for a plain purchase. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
@@ -99,6 +103,9 @@ export interface ClipsReport {
   readonly size: string;
   readonly track: ImageTrack;
 }
+
+/** A report before the command says what it corrected by, which only it knows. */
+type Draft = Omit<ClipsReport, "correction">;
 
 interface GenerateInput {
   /** Narrows the run; empty means "everything the gates allow". */
@@ -297,19 +304,35 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
 
   const wanted =
     input.artifacts.length > 0 ? input.artifacts : readyTargets(survey.data).map((one) => one.name);
+  const correction = correctionOf({
+    instruction: input.instruction ?? null,
+    regenerate: input.regenerate,
+    targets: wanted.map((key) => ({ key, record: survey.data.stage.artifacts[key] })),
+  });
+
+  if (!correction.ok) {
+    return correction;
+  }
+
+  // One note from here on, whichever way it arrived, so the prompt composed and
+  // the attempt recorded carry the same words.
+  const corrected = { ...input, instruction: correction.data?.text ?? null };
   // Read again with the targets named, so the prompts are composed, and the
   // attachments hashed, in the same pass that is about to send them.
-  const stage7 = await readStage7Inputs(input, wanted, knownVideoModel(input));
+  const stage7 = await readStage7Inputs(corrected, wanted, knownVideoModel(corrected));
 
   if (!stage7.ok) {
     return stage7;
   }
 
   const targets = stage7.data.targets.filter((one) => wanted.includes(one.name));
-  const problems = await blockers(input, stage7.data, targets);
+  const problems = await blockers(corrected, stage7.data, targets);
 
-  if (input.mode === "dry-run") {
-    return ok(preview(input, stage7.data, targets, problems));
+  if (corrected.mode === "dry-run") {
+    return ok({
+      ...preview(corrected, stage7.data, targets, problems),
+      correction: correction.data,
+    });
   }
 
   if (problems.length > 0) {
@@ -317,7 +340,7 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
   }
 
   if (targets.length === 0) {
-    return ok(idle(input, stage7.data));
+    return ok({ ...idle(corrected, stage7.data), correction: null });
   }
 
   const lock = await writeNew(
@@ -330,7 +353,9 @@ export async function generateClips(input: GenerateInput): Promise<Result<ClipsR
   }
 
   try {
-    return await runAll(input, stage7.data, targets);
+    const bought = await runAll(corrected, stage7.data, targets);
+
+    return bought.ok ? ok({ ...bought.data, correction: correction.data }) : bought;
   } finally {
     await removeFile(stage7.data.paths.track.clipsLock);
   }
@@ -344,7 +369,7 @@ function attachmentsOf(artifact: PlannedArtifact): readonly RecordedFile[] {
 }
 
 /** Nothing to buy: everything runnable is done and the rest waits on a human. */
-function idle(input: GenerateInput, stage7: Stage7Inputs): ClipsReport {
+function idle(input: GenerateInput, stage7: Stage7Inputs): Draft {
   const waiting = stage7.targets.filter(
     (one) =>
       stage7.stage.artifacts[one.name]?.status === "completed" &&
@@ -389,7 +414,7 @@ function preview(
   stage7: Stage7Inputs,
   targets: readonly Stage7Target[],
   problems: readonly string[]
-): ClipsReport {
+): Draft {
   const artifacts = targets.map((target): ClipOutcome => {
     const record = stage7.stage.artifacts[target.name];
     // A preview answers "what would this command do", so a result the real run
@@ -504,7 +529,7 @@ async function runAll(
   input: GenerateInput,
   stage7: Stage7Inputs,
   targets: readonly Stage7Target[]
-): Promise<Result<ClipsReport>> {
+): Promise<Result<Draft>> {
   const artifacts: ClipOutcome[] = [];
   const created: string[] = [];
 

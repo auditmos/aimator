@@ -1,4 +1,6 @@
 import {
+  type Correction,
+  correctionOf,
   nowIso,
   type RecordedFile,
   removeFile,
@@ -65,6 +67,8 @@ export interface ReferencesReport {
   /** Whether the package these references are planned by is accepted. */
   readonly approved: boolean;
   readonly artifacts: readonly ReferenceOutcome[];
+  /** The note this attempt corrects by, and where it came from; `null` for a plain drawing. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
@@ -78,6 +82,9 @@ export interface ReferencesReport {
   readonly size: string;
   readonly track: ImageTrack;
 }
+
+/** A report before the command says what it corrected by, which only it knows. */
+type Draft = Omit<ReferencesReport, "correction">;
 
 interface GenerateInput {
   readonly apiKey: string | null;
@@ -164,19 +171,35 @@ export async function generateReferences(input: GenerateInput): Promise<Result<R
     input.artifacts.length > 0
       ? input.artifacts
       : readyReferences(survey.data).map((one) => one.id);
+  const correction = correctionOf({
+    instruction: input.instruction ?? null,
+    regenerate: input.regenerate,
+    targets: wanted.map((key) => ({ key, record: survey.data.stage.artifacts[key] })),
+  });
+
+  if (!correction.ok) {
+    return correction;
+  }
+
+  // One note from here on, whichever way it arrived, so the prompt composed and
+  // the attempt recorded carry the same words.
+  const corrected = { ...input, instruction: correction.data?.text ?? null };
   // Read again with the targets named, so the prompts are composed, and the
   // attachments hashed, in the same pass that is about to send them.
-  const stage5 = await readStage5Inputs(input, wanted);
+  const stage5 = await readStage5Inputs(corrected, wanted);
 
   if (!stage5.ok) {
     return stage5;
   }
 
   const targets = stage5.data.references.filter((one) => wanted.includes(one.id));
-  const problems = blockers(input, stage5.data);
+  const problems = blockers(corrected, stage5.data);
 
-  if (input.mode === "dry-run") {
-    return ok(preview(input, stage5.data, targets, problems));
+  if (corrected.mode === "dry-run") {
+    return ok({
+      ...preview(corrected, stage5.data, targets, problems),
+      correction: correction.data,
+    });
   }
 
   if (problems.length > 0) {
@@ -184,7 +207,7 @@ export async function generateReferences(input: GenerateInput): Promise<Result<R
   }
 
   if (targets.length === 0) {
-    return ok(idle(input, stage5.data));
+    return ok({ ...idle(corrected, stage5.data), correction: null });
   }
 
   const lock = await writeNew(
@@ -197,14 +220,16 @@ export async function generateReferences(input: GenerateInput): Promise<Result<R
   }
 
   try {
-    return await runAll(input, stage5.data, targets);
+    const drawn = await runAll(corrected, stage5.data, targets);
+
+    return drawn.ok ? ok({ ...drawn.data, correction: correction.data }) : drawn;
   } finally {
     await removeFile(stage5.data.paths.track.referencesLock);
   }
 }
 
 /** Nothing to draw: every runnable reference is done and the rest waits. */
-function idle(input: GenerateInput, stage5: Stage5Inputs): ReferencesReport {
+function idle(input: GenerateInput, stage5: Stage5Inputs): Draft {
   const waiting = stage5.references.filter(
     (one) =>
       stage5.stage.artifacts[one.id]?.status === "completed" &&
@@ -242,7 +267,7 @@ function preview(
   stage5: Stage5Inputs,
   targets: readonly PlannedArtifact[],
   problems: readonly string[]
-): ReferencesReport {
+): Draft {
   const artifacts = targets.map((one): ReferenceOutcome => {
     const record = stage5.stage.artifacts[one.id];
     // A preview answers the question "what would this command do", so a result
@@ -305,7 +330,7 @@ async function runAll(
   input: GenerateInput,
   stage5: Stage5Inputs,
   targets: readonly PlannedArtifact[]
-): Promise<Result<ReferencesReport>> {
+): Promise<Result<Draft>> {
   const artifacts: ReferenceOutcome[] = [];
   const created: string[] = [];
 

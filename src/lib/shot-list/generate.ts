@@ -1,5 +1,6 @@
 import {
   applyWrites,
+  type Correction,
   nowIso,
   type RecordedFile,
   readDigest,
@@ -38,6 +39,8 @@ const ARTIFACT = "shot-list";
 export interface ShotListReport {
   /** Whether the screenplay this plan is drawn from carries an approval. */
   readonly approved: boolean;
+  /** The note this attempt corrects by, and where it came from; `null` for a new plan. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
@@ -118,12 +121,16 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
     const { prompt } = stage3.data;
     const sent =
       prompt === null
-        ? { problems: [], prompt: null }
-        : await textPrompt(stage(input, stage3.data, prompt), input.instruction ?? null);
+        ? { correction: null, problems: [], prompt: null }
+        : await textPrompt(stage(input, stage3.data, prompt), {
+            instruction: input.instruction ?? null,
+            regenerate: input.regenerate,
+          });
     const blocked = [...problems, ...sent.problems];
 
     return ok({
       approved: stage3.data.gate.length === 0,
+      correction: sent.correction,
       created: [],
       nextStep:
         blocked.length === 0
@@ -173,6 +180,7 @@ export async function generateShotList(input: GenerateInput): Promise<Result<Sho
 
   return ok({
     approved: false,
+    correction: attempt.data.correction,
     created: attempt.data.created,
     nextStep: `oceń listę ujęć, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage shot-list`,
     // One, including a resumed attempt: its answer was already on disk and

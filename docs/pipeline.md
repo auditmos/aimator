@@ -175,6 +175,21 @@ Obowiązują we wszystkich etapach.
 - **Ocena kreatywna jest osobna od walidacji.** Plik, który powstał, nie jest plikiem
   przyjętym. Przejście walidacji nie jest akceptacją; akceptację zapisuje wyłącznie jawne
   `aimator approve`, z zakresem etapu w `--stage`, nigdy polecenie kontrolne.
+- **„Nie" też jest oceną i ma powód.** `aimator reject` przyjmuje te same zakresy co
+  `approve` (odcinek, postać albo projekt, `--stage`, `--track`, `--artifact`), poza etapem
+  0, którego rekordy są decyzjami samego człowieka. Wymaga `--note`, bo odrzucenie bez powodu
+  nie ma czym zasilić poprawki, i zapisuje w rekordzie `review.status = "rejected"`,
+  `review.note`, `reviewer` i `reviewedAt`. Na klatkach z checklistą QC (klatka otwarcia,
+  `entry:Cnn`) `--fail` dopisuje niezaliczone kryteria do `review.failed`; gdzie indziej
+  `--fail` to odmowa. Nie sprawdza bajtów, bo „nie" nie potrzebuje dowodu, że wynik jest
+  cały, ale odmawia artefaktu, którego plik etapu nie ma, i próby, która nie dobiegła końca.
+  Każda bramka traktuje odrzucony artefakt jak niezatwierdzony, a `approve` może go potem
+  przyjąć jak każdy oczekujący. `--regenerate` odrzuconego artefaktu bez `--instruction`
+  poprawia go według `review.note` (z niezaliczonymi kryteriami pod spodem), w tym samym
+  trybie edycji co `--instruction`, a podgląd mówi, skąd uwaga pochodzi; jawne
+  `--instruction` ma pierwszeństwo. Uwaga z odrzucenia ma jednego adresata, więc
+  `--regenerate` kilku artefaktów, z których któryś jest odrzucony, to odmowa. W `status`
+  taka komórka zostaje „do przeglądu", z powodem „odrzucone: <uwaga>”.
 - **Akceptacja jest związana z bajtami.** `review.status` dotyczy konkretnych
   `outputs[].sha256`. Zmiana pliku unieważnia akceptację; nie ma sposobu, by przeniosła
   się na inny wynik. Ponowny zapis pliku etapu przywraca `pending` i mówi o tym wprost.

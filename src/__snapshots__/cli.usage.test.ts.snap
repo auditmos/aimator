@@ -1206,6 +1206,23 @@ Próba na sucho: nic nie zapisano, nic nie wysłano. Obrazy referencyjne ewa/01-
 Dalej: usuń powyższe przeszkody przed płatnym wywołaniem"
 `;
 
+exports[`every command >   reject <id> <character-id> --stage character --track <tor> --artifact <klucz> 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Odrzucono hero (character, postać ewa, tor gpt-image): uszy za duże
+Dalej: popraw z tą uwagą: aimator character generate ewa ewa --track gpt-image --regenerate --artifact hero"
+`;
+
+exports[`every command >   reject <id> <episode-id> --stage <etap> [--track <tor>] [--artifact <klucz>[,...]] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Odrzucono R01 (references, tor gpt-image): za ciemno
+Dalej: popraw z tą uwagą: aimator reference generate ewa 01-burza --track gpt-image --regenerate --artifact R01"
+`;
+
+exports[`every command >   reject <id> --stage style --track <tor> --artifact S01[,S02] --note <uwaga> [--json] 1`] = `
+"NothingToRejectError
+nie ma czego odrzucić: etap style nie ma tu jeszcze wyników"
+`;
+
 exports[`every command >   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Scenariusz ewa/01-burza

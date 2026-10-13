@@ -1,5 +1,6 @@
 import {
   applyWrites,
+  type Correction,
   nowIso,
   type RecordedFile,
   readDigest,
@@ -79,6 +80,8 @@ export interface NarrationReport {
    * screen and labelled as the one to add if that reading turns out wrong.
    */
   readonly contextCharacters: number;
+  /** The note the script is corrected by, and where it came from; `null` for none. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly lines: readonly LineOutcome[];
   readonly nextStep: string;
@@ -182,19 +185,23 @@ export async function generateNarration(input: GenerateInput): Promise<Result<Na
     // under `--instruction` is the correction of the script on disk.
     const sent =
       prompt === null || !lifting
-        ? { problems: [], prompt }
-        : await textPrompt(textStage(input, stage9.data, prompt), input.instruction ?? null);
+        ? { correction: null, problems: [], prompt }
+        : await textPrompt(textStage(input, stage9.data, prompt), {
+            instruction: input.instruction ?? null,
+            regenerate: input.regenerate,
+          });
 
-    return ok(
-      preview(
+    return ok({
+      ...preview(
         input,
         { ...stage9.data, prompt: sent.prompt },
         planned,
         [...problems, ...sent.problems],
         record !== undefined,
         approved
-      )
-    );
+      ),
+      correction: sent.correction,
+    });
   }
 
   if (problems.length > 0) {
@@ -304,6 +311,7 @@ function preview(
     calls: buying.length,
     characters: buying.reduce((total, line) => total + line.characters, 0),
     contextCharacters: buying.reduce((total, line) => total + line.contextCharacters, 0),
+    correction: null,
     created: [],
     lines,
     nextStep: blocked
@@ -331,6 +339,7 @@ function waiting(
     calls: 0,
     characters: 0,
     contextCharacters: 0,
+    correction: null,
     created: [],
     lines,
     nextStep: `przeczytaj skrypt i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${SCRIPT}`,
@@ -378,6 +387,7 @@ async function lift(input: GenerateInput, stage9: Stage9Inputs): Promise<Result<
     calls: 0,
     characters: 0,
     contextCharacters: 0,
+    correction: attempt.data.correction,
     created: attempt.data.created,
     lines: attempt.data.value.lines.map((line, index) => ({
       characters: line.characters,
@@ -610,6 +620,7 @@ async function buy(
     calls: paid.length,
     characters: paid.reduce((total, one) => total + one.characters, 0),
     contextCharacters: paid.reduce((total, one) => total + one.contextCharacters, 0),
+    correction: null,
     created,
     lines: bought,
     nextStep: pending

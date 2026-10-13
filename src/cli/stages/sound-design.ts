@@ -21,6 +21,7 @@ import {
   type Approval,
   answerFlag,
   asJson,
+  correctionLines,
   instructionOf,
   maxOutputTokensOf,
   modeOf,
@@ -345,6 +346,7 @@ function renderSoundDesign(
   const lines = [
     mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
     `  arkusz: ${report.sheet.state}, ${report.sheet.note}`,
+    ...correctionLines(report.correction),
     `  do kupienia: ${report.calls} wywołań, ${report.seconds}s dźwięku`,
   ];
 

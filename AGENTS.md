@@ -100,6 +100,7 @@ src/
 │   ├── common.ts     # Internal: the grammar under every command
 │   ├── check.ts      # Internal: the cross-stage command that writes nothing
 │   ├── approve.ts    # Internal: the cross-stage command that records a yes
+│   ├── reject.ts     # Internal: the cross-stage command that records a no, and why
 │   ├── status.ts     # Internal: the ladder of one episode, and the one "Dalej:"
 │   ├── list.ts       # Internal: what is in the workspace, before any id is known
 │   ├── list.test.ts
@@ -708,6 +709,15 @@ they sit beside the entry and call into the stage files. That direction is the o
 allowed: a dispatcher may know its stages, a stage may never know its siblings. The usage
 text is assembled the same way, from the fragments the stages own, so a stage that grows a
 flag writes it in its own file and `usage.ts` does not change.
+
+`reject` is the fifth, and it is the one that calls into **no stage's writer**: a no
+verifies no bytes, so there is nothing stage-specific to run before recording it. It finds
+the stage file through `workspace.ts`, writes the rejection through `lib/artifact`, whose
+shape the file is, and prints the stage's own `check` object afterwards, the way `status`
+reads one. What a stage does with a no is the stage's: every gate already treats anything
+but `approved` as unaccepted, and the stages with an edit mode correct by the note through
+`correctionOf` in `lib/artifact`, so `lib/text-model` resolves it once for the five text
+stages.
 
 `list` is the only one of the four that calls into **no** stage at all, and the only one
 that takes no identifier, because it answers the question before every other one: what is

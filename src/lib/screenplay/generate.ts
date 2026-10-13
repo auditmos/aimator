@@ -1,5 +1,6 @@
 import {
   applyWrites,
+  type Correction,
   nowIso,
   type RecordedFile,
   readDigest,
@@ -38,6 +39,8 @@ const ARTIFACT = "screenplay";
 export interface ScreenplayReport {
   /** Whether stage 0 is approved for this project and episode. */
   readonly approved: boolean;
+  /** The note this attempt corrects by, and where it came from; `null` for a new draft. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly minimumScenes: number;
   readonly nextStep: string;
@@ -145,14 +148,15 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
   const required = minimumScenes(stage0.data.settings.durationSeconds);
 
   if (input.mode === "dry-run") {
-    const sent = await textPrompt(
-      stage(input, paths.data, stage0.data, prompt),
-      input.instruction ?? null
-    );
+    const sent = await textPrompt(stage(input, paths.data, stage0.data, prompt), {
+      instruction: input.instruction ?? null,
+      regenerate: input.regenerate,
+    });
     const blocked = [...problems, ...sent.problems];
 
     return ok({
       approved: stage0.data.approved,
+      correction: sent.correction,
       created: [],
       minimumScenes: required,
       nextStep:
@@ -196,6 +200,7 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
 
   return ok({
     approved: false,
+    correction: attempt.data.correction,
     created: attempt.data.created,
     minimumScenes: required,
     nextStep: `oceń scenariusz, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`,

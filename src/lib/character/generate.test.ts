@@ -2,6 +2,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readJson, rejectArtifacts, serialize, stageFileSchema } from "../artifact/index.js";
 import {
   addCharacter,
   addCharacterSources,
@@ -446,6 +447,42 @@ describe("generateCharacter --instruction", () => {
     expect(record.inputs.map((entry: { path: string }) => entry.path)).toContainEqual(
       `projects/${PROJECT}/characters/${CHARACTER}/gpt-image/runs/${record.runId}/previous.png`
     );
+  });
+
+  /**
+   * A rejection's note is the correction when nobody types another: the same
+   * edit, the same block, with the source in the report. Recorded through the
+   * artifact module's own rejection, which is exactly what `reject` writes.
+   */
+  it("should correct a rejected card by the rejection's note", async () => {
+    await makeStage0();
+    await generate();
+    const file = await readJson(stagePath(), stageFileSchema);
+    const rejected = file.ok
+      ? rejectArtifacts(file.data, ["card"], { note: NOTE, reviewer: "qc" })
+      : file;
+
+    if (!rejected.ok) {
+      throw rejected.error;
+    }
+
+    await writeFile(stagePath(), serialize(rejected.data), "utf8");
+
+    const preview = await generate({
+      apiKey: null,
+      artifacts: ["card"],
+      mode: "dry-run",
+      regenerate: true,
+    });
+    const prompt = preview.ok ? (preview.data.artifacts[0]?.prompt ?? "") : "";
+
+    expect(prompt).toContain("Image 1: previous:card, the image to correct");
+    expect(prompt).toContain(`----- BEGIN NOTE -----\n${NOTE}\n----- END NOTE -----`);
+    expect(preview.ok ? preview.data.correction : null).toEqual({
+      from: "card",
+      source: "rejection",
+      text: NOTE,
+    });
   });
 
   it("should refuse one note addressed to several images", async () => {

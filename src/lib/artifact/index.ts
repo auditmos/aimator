@@ -15,8 +15,11 @@ import { newRunId, nowIso } from "./store.js";
 export {
   approveAll,
   approveArtifacts,
+  type Correction,
+  correctionOf,
   driftableInputs,
   isApproved,
+  rejectArtifacts,
   verifyOutputs,
   withAmendments,
   withInputs,

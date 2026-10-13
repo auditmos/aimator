@@ -1,5 +1,6 @@
 import {
   applyWrites,
+  type Correction,
   nowIso,
   type RecordedFile,
   readDigest,
@@ -50,6 +51,8 @@ const ARTIFACT = "prompt-package";
 export interface PromptPackageReport {
   /** Whether the plan and the faces this package is drawn from are accepted. */
   readonly approved: boolean;
+  /** The note this attempt corrects by, and where it came from; `null` for a new package. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly nextStep: string;
   /**
@@ -154,12 +157,16 @@ export async function generatePromptPackage(
     const previous = await previousOutputs(stage4.data.paths.episode.promptPackageStage);
     const sent =
       prompt === null
-        ? { problems: [], prompt: null }
-        : await textPrompt(stage(input, stage4.data, prompt, previous), input.instruction ?? null);
+        ? { correction: null, problems: [], prompt: null }
+        : await textPrompt(stage(input, stage4.data, prompt, previous), {
+            instruction: input.instruction ?? null,
+            regenerate: input.regenerate,
+          });
     const blocked = [...problems, ...sent.problems];
 
     return ok({
       approved: stage4.data.gate.length === 0,
+      correction: sent.correction,
       created: [],
       nextStep:
         blocked.length === 0
@@ -211,6 +218,7 @@ export async function generatePromptPackage(
 
   return ok({
     approved: false,
+    correction: attempt.data.correction,
     created: attempt.data.created,
     nextStep: `oceń pakiet, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`,
     paidCalls: 1,

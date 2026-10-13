@@ -1,5 +1,6 @@
 import {
   applyWrites,
+  type Correction,
   nowIso,
   type RecordedFile,
   readDigest,
@@ -69,6 +70,8 @@ export interface SoundDesignReport {
   readonly approved: boolean;
   /** How many paid audio calls this run would make. */
   readonly calls: number;
+  /** The note the cue sheet is corrected by, and where it came from; `null` for none. */
+  readonly correction: Correction | null;
   readonly created: readonly string[];
   readonly cues: readonly CueOutcome[];
   readonly nextStep: string;
@@ -191,19 +194,23 @@ export async function generateSoundDesign(
     // under `--instruction` is the correction of the sheet on disk.
     const sent =
       prompt === null || !writing
-        ? { problems: [], prompt }
-        : await textPrompt(textStage(input, stage10.data, prompt), input.instruction ?? null);
+        ? { correction: null, problems: [], prompt }
+        : await textPrompt(textStage(input, stage10.data, prompt), {
+            instruction: input.instruction ?? null,
+            regenerate: input.regenerate,
+          });
 
-    return ok(
-      preview(
+    return ok({
+      ...preview(
         input,
         { ...stage10.data, prompt: sent.prompt },
         planned,
         [...problems, ...sent.problems],
         record !== undefined,
         approved
-      )
-    );
+      ),
+      correction: sent.correction,
+    });
   }
 
   if (problems.length > 0) {
@@ -295,6 +302,7 @@ function preview(
   return {
     approved,
     calls: buying.length,
+    correction: null,
     created: [],
     cues,
     nextStep: blocked
@@ -321,6 +329,7 @@ function waiting(
   return {
     approved: false,
     calls: 0,
+    correction: null,
     created: [],
     cues,
     nextStep: `przeczytaj arkusz i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${CUES}`,
@@ -376,6 +385,7 @@ async function write(
   return ok({
     approved: false,
     calls: 0,
+    correction: attempt.data.correction,
     created: attempt.data.created,
     cues: cues.map((cue) => ({
       id: cue.id,
@@ -586,6 +596,7 @@ async function buy(
   return ok({
     approved: true,
     calls: bought.length,
+    correction: null,
     created,
     cues: done,
     nextStep: pending

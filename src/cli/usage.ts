@@ -1,6 +1,7 @@
 import { USAGE as APPROVE } from "./approve.js";
 import { USAGE as CHECK } from "./check.js";
 import { USAGE as LIST } from "./list.js";
+import { USAGE as REJECT } from "./reject.js";
 import { USAGE as ASSEMBLY } from "./stages/assembly.js";
 import { CAST_USAGE as CAST, USAGE as CHARACTER } from "./stages/character.js";
 import { USAGE as CLIPS } from "./stages/clips.js";
@@ -84,7 +85,7 @@ export const USAGE = [
   ASSEMBLY,
   NARRATION,
   SOUND_DESIGN,
-  ["Wspólne:", LIST, STATUS, CHECK, APPROVE].join("\n"),
+  ["Wspólne:", LIST, STATUS, CHECK, APPROVE, REJECT].join("\n"),
   FLAGS,
   CAST_NOTE,
   GLOBAL,

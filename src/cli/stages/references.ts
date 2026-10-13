@@ -11,6 +11,7 @@ import {
   type Answer,
   type Approval,
   asJson,
+  correctionLines,
   imageModelOf,
   keyFor,
   modeOf,
@@ -55,6 +56,7 @@ function renderReferences(
     mode === "dry-run"
       ? `  płatnych wywołań do wykonania: ${report.paidCalls}`
       : `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+    ...correctionLines(report.correction),
   ];
 
   for (const one of report.artifacts) {
