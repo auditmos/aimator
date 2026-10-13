@@ -10,6 +10,7 @@ import {
   characterVoicePaths,
   clipFrame,
   clipVideo,
+  dialogueAudio,
   episodeIdFromSource,
   episodePaths,
   episodeTrackPaths,
@@ -274,6 +275,7 @@ describe("episodePaths", () => {
   it("should place every episode artifact under the episode directory", () => {
     const result = project.ok ? episodePaths(project.data, "01-arrival") : null;
     expect(result?.ok ? result.data : null).toEqual({
+      dialogue: `${episode}/dialogue`,
       dialogueLock: `${episode}/dialogue.lock`,
       dialogueScript: `${episode}/dialogue.md`,
       dialogueStage: `${episode}/dialogue.stage.json`,
@@ -538,6 +540,21 @@ describe("stage 9 paths", () => {
   it("should reject an utterance id that is not a numbered artifact", () => {
     const line = paths?.ok ? narrationAudio(paths.data, "../escape") : null;
     expect(line?.ok).toBe(false);
+  });
+
+  /**
+   * A character's line is shared by the tracks for the narrator's reason, and
+   * has a language level the narration lacks: stage 11 buys the same script
+   * again in a second language, and the two recordings of D01 are not one file.
+   */
+  it("should give a character's line its own file under the language it is spoken in", () => {
+    const line = paths?.ok ? dialogueAudio(paths.data, "pl", "D03") : null;
+    expect(line?.ok ? line.data : null).toBe(`${episode}/dialogue/pl/D03.wav`);
+  });
+
+  it("should reject a line id or a language that would walk out of the directory", () => {
+    expect(paths?.ok ? dialogueAudio(paths.data, "pl", "../D03").ok : null).toBe(false);
+    expect(paths?.ok ? dialogueAudio(paths.data, "../pl", "D03").ok : null).toBe(false);
   });
 
   /**

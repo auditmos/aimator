@@ -29,15 +29,21 @@ import {
 const STAGE = "dialogue";
 
 /** Stage 11: the lines the characters speak, shared by both tracks. */
-export const USAGE = `Etap 11. Dialog (płatny; skrypt wspólny dla obu torów):
-  dialogue generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+export const USAGE = `Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla obu torów):
+  dialogue generate <id> <episode-id> [--model <id>] [--voice-model <id>]
+                    [--max-output-tokens <n>] [--artifact script|D01[,D02]]
                     [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
     Podnosi skrypt dialogu z zatwierdzonej listy ujęć: kto, w którym ujęciu
     i od której sekundy planu. Kwestii nie pisze: etap 3 zapisał każdą jako
     <id>: "…", a walidator sprawdza w obie strony, że żadnej nie wymyślono
     i żadnej nie pominięto. Tylko przy --audio dialogue albo
     dialogue-and-narration; w innym trybie odcinek nie ma dialogu.
-    Model: --model albo AIMATOR_DIALOGUE_MODEL.`;
+    Po przyjętym skrypcie kupuje kwestie w języku filmu, każdą głosem jej
+    postaci; postać bez przyjętej próbki głosu czeka, reszta jest kupowana.
+    ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
+    Model skryptu: --model albo AIMATOR_DIALOGUE_MODEL; model mowy:
+    --voice-model albo AIMATOR_DIALOGUE_VOICE_MODEL.
+    --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.`;
 
 /**
  * The script is a list of short lines under four-field headings, well under
@@ -45,10 +51,9 @@ export const USAGE = `Etap 11. Dialog (płatny; skrypt wspólny dla obu torów):
  */
 const DEFAULT_DIALOGUE_MAX_OUTPUT_TOKENS = 8000;
 
-/** `--model` wins over the environment; neither has a default. */
-function dialogueModelOf(parsed: Parsed): Result<string | null> {
-  const flag = parsed.values.model;
-  const value = typeof flag === "string" ? flag : (env.AIMATOR_DIALOGUE_MODEL ?? null);
+/** A model flag wins over the environment; neither has a default. */
+function modelOf(flag: unknown, fallback: string | undefined): Result<string | null> {
+  const value = typeof flag === "string" ? flag : (fallback ?? null);
 
   if (value !== null && !MODEL_ID.test(value)) {
     return err(new UsageError(`niepoprawny identyfikator modelu "${value}"`));
@@ -59,7 +64,9 @@ function dialogueModelOf(parsed: Parsed): Result<string | null> {
 
 /**
  * `--dry-run` prints the prompt itself, the promise every text stage makes: the
- * preview exists so a person can read what a paid call would send.
+ * preview exists so a person can read what a paid call would send. Once the
+ * script is accepted the bill is two numbers, calls and characters, per line
+ * and in total, because the speech provider charges for the characters.
  */
 function renderGenerate(
   report: DialogueReport,
@@ -67,6 +74,7 @@ function renderGenerate(
   episodeId: string,
   mode: "apply" | "dry-run"
 ): string {
+  const speaking = report.lines.length > 0;
   const lines =
     mode === "dry-run"
       ? [
@@ -74,9 +82,13 @@ function renderGenerate(
           `  płatnych wywołań do wykonania: ${report.paidCalls}`,
         ]
       : [
-          `Dialog ${projectId}/${episodeId}, próba ${report.runId ?? ""}`,
+          `Dialog ${projectId}/${episodeId}${report.runId === null ? "" : `, próba ${report.runId}`}`,
           `  płatnych wywołań wykonanych: ${report.paidCalls}`,
         ];
+
+  if (speaking) {
+    lines.push(`  znaków do rozliczenia: ${report.characters}`);
+  }
 
   lines.push(...correctionLines(report.correction));
 
@@ -86,6 +98,12 @@ function renderGenerate(
 
   for (const line of report.verdict?.lines ?? []) {
     lines.push(`      ${line.id}: ${line.shot}, ${line.cast}, ${line.atSeconds}s planu`);
+  }
+
+  for (const line of report.lines) {
+    lines.push(
+      `      ${line.id}: ${line.cast}, ${line.state}, ${line.note}, ${line.characters} znaków${line.seconds === null ? "" : `, ${line.seconds}s`}`
+    );
   }
 
   for (const problem of report.problems) {
@@ -113,7 +131,9 @@ function renderStatus(headline: string, status: DialogueStatus): string {
   ];
 
   for (const line of status.lines) {
-    lines.push(`      ${line.id}: ${line.shot}, ${line.cast}, ${line.atSeconds}s planu`);
+    lines.push(
+      `      ${line.id}: ${line.shot}, ${line.cast}, ${line.atSeconds}s planu, ${line.approved ? "zatwierdzona" : line.state}, ${line.note}`
+    );
   }
 
   for (const problem of status.problems) {
@@ -131,27 +151,40 @@ function renderStatus(headline: string, status: DialogueStatus): string {
 
 async function runDialogueGenerate(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
+    artifact: { type: "string" },
     instruction: { type: "string" },
     json: { type: "boolean" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
+    "voice-model": { type: "string" },
   });
 
   if (!parsed.ok) {
     return parsed;
   }
 
+  const artifacts = referenceIdsOf(parsed.data);
   const instruction = instructionOf(parsed.data);
   const projectId = requirePositional(parsed.data, 0, "project-id");
   const episodeId = requirePositional(parsed.data, 1, "episode-id");
   const workspace = workspaceOf(parsed.data);
-  const model = dialogueModelOf(parsed.data);
+  const model = modelOf(parsed.data.values.model, env.AIMATOR_DIALOGUE_MODEL);
+  const voiceModel = modelOf(parsed.data.values["voice-model"], env.AIMATOR_DIALOGUE_VOICE_MODEL);
   const tokens = maxOutputTokensOf(parsed.data, DEFAULT_DIALOGUE_MAX_OUTPUT_TOKENS);
 
   if (!instruction.ok) {
     return instruction;
   }
+
+  // A note is read by a text model, and here only the script is written by
+  // one: a line is bought from the script's own words, never from a note.
+  if (instruction.data !== null && artifacts.join(",") !== "script") {
+    return err(
+      new UsageError("--instruction poprawia skrypt, więc ma jednego adresata: --artifact script")
+    );
+  }
+
   if (!projectId.ok) {
     return projectId;
   }
@@ -164,14 +197,18 @@ async function runDialogueGenerate(argv: readonly string[]): Promise<Result<stri
   if (!model.ok) {
     return model;
   }
+  if (!voiceModel.ok) {
+    return voiceModel;
+  }
   if (!tokens.ok) {
     return tokens;
   }
 
   const mode = modeOf(parsed.data);
-  // The key is read only on the paid path: a dry run must never need a secret.
+  // Keys are read only on the paid path: a dry run must never need a secret.
   const result = await generateDialogue({
     apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    artifacts,
     episodeId: episodeId.data,
     fetch,
     instruction: instruction.data,
@@ -180,6 +217,8 @@ async function runDialogueGenerate(argv: readonly string[]): Promise<Result<stri
     model: model.data,
     projectId: projectId.data,
     regenerate: parsed.data.values.regenerate === true,
+    voiceKey: mode === "dry-run" ? null : (env.ELEVENLABS_API_KEY ?? null),
+    voiceModel: voiceModel.data,
     workspace: workspace.data,
   });
 
@@ -223,7 +262,7 @@ export async function checkDialogueStage(
   );
 }
 
-/** `approve --stage dialogue --artifact script`: a human read the script. */
+/** `approve --stage dialogue --artifact script|D01[,D02]`: a human read the script, or heard lines. */
 export async function approveDialogueStage(
   parsed: Parsed,
   approval: Approval
@@ -247,6 +286,9 @@ export async function approveDialogueStage(
   return ok(
     approval.answer === "json"
       ? asJson("approve", STAGE, result.data)
-      : renderStatus(`Odcinek "${episodeId.data}", zatwierdzono skrypt dialogu`, result.data)
+      : renderStatus(
+          `Odcinek "${episodeId.data}", etap 11, zatwierdzono: ${referenceIdsOf(parsed).join(", ")}`,
+          result.data
+        )
   );
 }

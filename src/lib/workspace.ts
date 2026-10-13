@@ -381,6 +381,14 @@ interface MixRunPaths {
 }
 
 export interface EpisodePaths {
+  /**
+   * Stage 11's spoken lines, one directory per language and one file per line.
+   *
+   * Shared between the tracks for the reason stage 9's lines are, and with a
+   * language level stage 9 lacks: the same script is bought again in a second
+   * language, and two recordings of one line are two files, never one.
+   */
+  readonly dialogue: string;
   readonly dialogueLock: string;
   /**
    * Stage 11's script: which line each character speaks, in which shot, and
@@ -770,6 +778,7 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
   const root = join(project.episodes, episodeId);
 
   return ok({
+    dialogue: join(root, "dialogue"),
     dialogueLock: join(root, "dialogue.lock"),
     dialogueScript: join(root, "dialogue.md"),
     dialogueStage: join(root, "dialogue.stage.json"),
@@ -962,6 +971,26 @@ export function narrationAudio(paths: EpisodePaths, id: string): Result<string> 
   return ARTIFACT_ID.test(id)
     ? ok(join(paths.narration, `${id}.wav`))
     : err(new IdentifierError(id, `invalid utterance id "${id}": expected a form like N01`));
+}
+
+/**
+ * One character's line, in the language it is spoken in. Both the language and
+ * the id become path segments, so both are checked here rather than trusted,
+ * and the container is WAV for the reason `narrationAudio` gives.
+ */
+export function dialogueAudio(paths: EpisodePaths, language: string, id: string): Result<string> {
+  if (!LANGUAGE_CODE.test(language)) {
+    return err(
+      new IdentifierError(
+        language,
+        `invalid language "${language}": expected a code like pl, en or pt-BR`
+      )
+    );
+  }
+
+  return ARTIFACT_ID.test(id)
+    ? ok(join(paths.dialogue, language, `${id}.wav`))
+    : err(new IdentifierError(id, `invalid line id "${id}": expected a form like D01`));
 }
 
 /**

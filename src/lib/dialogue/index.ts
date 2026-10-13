@@ -4,7 +4,9 @@
  * It consumes the approved `shot-list.md` and the stage-0 decisions every stage
  * reads, and produces `dialogue.md` under the episode, shared by both tracks,
  * with a `dialogue.stage.json` whose `script` record says what went in and who
- * accepted it.
+ * accepted it. Once the script is accepted it buys each line, one speech call
+ * apiece, into `dialogue/<language>/Dnn.wav`, in its speaker's voice, and each
+ * line gets a record of its own beside the script's.
  *
  * **A line is lifted, never invented, and none is left behind.** Stage 9 can
  * prove only the first half, because a narrator's sentence sits in prose.

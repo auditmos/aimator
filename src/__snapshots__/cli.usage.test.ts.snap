@@ -28,7 +28,7 @@ Odcinek "01-burza", tor gpt-image, zatwierdzono
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage dialogue --artifact script [--json] 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage dialogue --artifact script|D01[,D02] [--json] 1`] = `
 "DialogueStateError
 nie ma czego zatwierdzić: script
   - odcinek deklaruje audio: narration, ten odcinek nie ma dialogu, etap 11 nie ma czego podnosić"
@@ -569,7 +569,7 @@ Próba na sucho: nic nie zapisano, nic nie wysłano. Klipy ewa/01-burza, tor gpt
 Dalej: usuń powyższe przeszkody przed płatnym wywołaniem"
 `;
 
-exports[`every command >   dialogue generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
+exports[`every command >   dialogue generate <id> <episode-id> [--model <id>] [--voice-model <id>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Dialog ewa/01-burza
   płatnych wywołań do wykonania: 0

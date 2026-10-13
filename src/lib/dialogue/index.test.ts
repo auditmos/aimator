@@ -2,7 +2,18 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { API_KEY, DIALOGUE, EPISODE, makeUpstream, PROJECT } from "../../test/fixture.js";
+import {
+  API_KEY,
+  DIALOGUE,
+  EPISODE,
+  makeUpstream,
+  makeVoices,
+  PROJECT,
+  VOICES,
+  wav,
+} from "../../test/fixture.js";
+import { sha256Of } from "../artifact/index.js";
+import { setVoice } from "../character-voice/index.js";
 import { approveShotList } from "../shot-list/index.js";
 import {
   type EpisodePaths,
@@ -127,9 +138,13 @@ function transport(answered = ""): Calls {
   };
 }
 
-function generate(calls: Calls, overrides: Partial<Parameters<typeof generateDialogue>[0]> = {}) {
+function generate(
+  calls: { readonly fetch: typeof fetch },
+  overrides: Partial<Parameters<typeof generateDialogue>[0]> = {}
+) {
   return generateDialogue({
     apiKey: API_KEY,
+    artifacts: [],
     episodeId: EPISODE,
     fetch: calls.fetch,
     maxOutputTokens: 8000,
@@ -137,9 +152,54 @@ function generate(calls: Calls, overrides: Partial<Parameters<typeof generateDia
     model: "gpt-6-astra",
     projectId: PROJECT,
     regenerate: false,
+    voiceKey: API_KEY,
+    voiceModel: "eleven_multilingual_v2",
     workspace,
     ...overrides,
   });
+}
+
+function approve(artifacts: readonly string[]) {
+  return approveDialogue({
+    artifacts,
+    episodeId: EPISODE,
+    mode: "apply",
+    note: null,
+    projectId: PROJECT,
+    reviewer: "test",
+    workspace,
+  });
+}
+
+interface Speech {
+  readonly fetch: typeof fetch;
+  /** Every speech request: the voice it went to and the words it carried. */
+  readonly sent: { readonly text: string; readonly url: string }[];
+}
+
+/** A speech provider that answers every request with a WAV `seconds` long. */
+function speech(seconds = 1): Speech {
+  const sent: { text: string; url: string }[] = [];
+
+  return {
+    fetch: ((url: string | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
+
+      sent.push({ text: body.text ?? "", url: String(url) });
+
+      return Promise.resolve(
+        new Response(wav({ seconds }), { headers: { "content-type": "audio/wav" }, status: 200 })
+      );
+    }) as unknown as typeof fetch,
+    sent,
+  };
+}
+
+/** The script, bought and accepted, which is what opens the buying of its lines. */
+async function accepted(): Promise<void> {
+  await upstream();
+  await generate(transport(script(LIFTED)));
+  await approve(["script"]);
 }
 
 /** Where the episode's files are, which is `workspace.ts`'s business alone. */
@@ -334,26 +394,16 @@ describe("generateDialogue", () => {
 });
 
 describe("approveDialogue", () => {
-  function approve(artifacts: readonly string[]) {
-    return approveDialogue({
-      artifacts,
-      episodeId: EPISODE,
-      mode: "apply",
-      note: null,
-      projectId: PROJECT,
-      reviewer: "test",
-      workspace,
-    });
-  }
-
+  /** The stage as a whole waits for its lines too, as stage 9's does. */
   it("should accept the script a human read, bound to its bytes", async () => {
     await upstream();
     await generate(transport(script(LIFTED)));
     const before = await checkDialogue({ episodeId: EPISODE, projectId: PROJECT, workspace });
     const result = await approve(["script"]);
 
-    expect(before.ok ? before.data.approved : before.error.message).toBe(false);
-    expect(result.ok ? result.data.approved : result.error.message).toBe(true);
+    expect(before.ok ? before.data.script.approved : before.error.message).toBe(false);
+    expect(result.ok ? result.data.script.approved : result.error.message).toBe(true);
+    expect(result.ok ? result.data.approved : null).toBe(false);
     expect(result.ok ? result.data.script.state : null).toBe("completed");
   });
 
@@ -385,5 +435,210 @@ describe("approveDialogue", () => {
 
     expect(status.ok ? status.data.script.state : status.error.message).toBe("absent");
     expect(status.ok ? status.data.nextStep : null).toContain("aimator dialogue generate");
+  });
+});
+
+/**
+ * The second half of stage 11: the lines, bought one speech call each.
+ *
+ * Assumptions this block encodes, stated before its first test:
+ *
+ * - **The script's yes opens the buying, and nothing else does.** Before it,
+ *   `generate` lifts or waits; after it, every call is a line.
+ * - **A line is read in its speaker's voice in the film's language**, from
+ *   `characters/<c>/voices/pl/voice.json`, and only once that voice's sample is
+ *   accepted. A character nobody heard blocks its own lines and nobody else's.
+ * - **The bill is two numbers, never one**: calls, and the characters the
+ *   provider charges for, per line and in total.
+ * - **A line records exactly two inputs**, `dialogue.md` and its speaker's
+ *   `voice.json`, so changing one voice lapses that character's lines alone.
+ * - **The transport is the only thing faked**, and it remembers what it was
+ *   sent, because for a stage billed per character the request is the claim.
+ */
+describe("buying the lines", () => {
+  /** The billed length of a line, as the provider counts it. */
+  function billed(text: string): number {
+    return [...text].length;
+  }
+
+  it("should preview the bill per line and in total, in calls and characters", async () => {
+    await accepted();
+    await makeVoices({ workspace });
+    const calls = speech();
+    const result = await generate(calls, { mode: "dry-run" });
+
+    expect(
+      result.ok
+        ? result.data.lines.map(({ characters, id, state }) => ({ characters, id, state }))
+        : result.error.message
+    ).toEqual([
+      { characters: billed(DIALOGUE.U01.text), id: "D01", state: "planned" },
+      { characters: billed(DIALOGUE.U03.text), id: "D02", state: "planned" },
+      { characters: billed(DIALOGUE.U04.text), id: "D03", state: "planned" },
+    ]);
+    expect(result.ok ? [result.data.paidCalls, result.data.characters] : null).toEqual([
+      3,
+      billed(DIALOGUE.U01.text) + billed(DIALOGUE.U03.text) + billed(DIALOGUE.U04.text),
+    ]);
+    expect(calls.sent).toHaveLength(0);
+  });
+
+  it("should hold back the lines of a character nobody heard, and buy everybody else's", async () => {
+    await accepted();
+    await makeVoices({ cast: ["ewa"], workspace });
+    const calls = speech();
+    const result = await generate(calls);
+    const lines = result.ok ? result.data.lines : [];
+
+    expect(
+      result.ok ? lines.map(({ id, state }) => ({ id, state })) : result.error.message
+    ).toEqual([
+      { id: "D01", state: "published" },
+      { id: "D02", state: "published" },
+      { id: "D03", state: "blocked" },
+    ]);
+    expect(lines[2]?.note).toContain('głos postaci "tata" (pl) nie ma przyjętej próbki');
+    expect(calls.sent.map((one) => one.text)).toEqual([DIALOGUE.U01.text, DIALOGUE.U03.text]);
+    expect(calls.sent.every((one) => one.url.includes(VOICES.ewa))).toBe(true);
+  });
+
+  it("should record each line against the script and its own speaker's voice, nothing else", async () => {
+    await accepted();
+    await makeVoices({ workspace });
+    await generate(speech());
+    const stage = JSON.parse(await readFile(episode().dialogueStage, "utf8")) as {
+      readonly artifacts: Partial<
+        Record<
+          string,
+          {
+            readonly inputs: readonly { path: string; sha256: string }[];
+            readonly outputs: readonly { path: string }[];
+            readonly review: { status: string };
+          }
+        >
+      >;
+    };
+    const words = `projects/${PROJECT}/episodes/${EPISODE}/dialogue.md`;
+    const voice = (cast: string): string =>
+      `projects/${PROJECT}/characters/${cast}/voices/pl/voice.json`;
+
+    expect(stage.artifacts.D01?.inputs.map((one) => one.path)).toEqual([words, voice("ewa")]);
+    expect(stage.artifacts.D03?.inputs.map((one) => one.path)).toEqual([words, voice("tata")]);
+    expect(stage.artifacts.D03?.inputs[1]?.sha256).toBe(
+      sha256Of(await readFile(join(root, voice("tata"))))
+    );
+    expect(stage.artifacts.D03?.outputs.map((one) => one.path)).toEqual([
+      `projects/${PROJECT}/episodes/${EPISODE}/dialogue/pl/D03.wav`,
+    ]);
+    expect(stage.artifacts.D03?.review.status).toBe("pending");
+  });
+
+  it("should lapse the lines of a character whose voice changed, and nobody else's", async () => {
+    await accepted();
+    await makeVoices({ workspace });
+    await generate(speech());
+    await approve(["D01", "D02", "D03"]);
+    await setVoice({
+      characterId: "ewa",
+      language: "pl",
+      mode: "apply",
+      projectId: PROJECT,
+      voiceId: "AZnzlk1XvdvUeBnXmlld",
+      workspace,
+    });
+    const status = await checkDialogue({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+    expect(
+      status.ok
+        ? status.data.lines.map(({ approved, id }) => ({ approved, id }))
+        : status.error.message
+    ).toEqual([
+      { approved: false, id: "D01" },
+      { approved: false, id: "D02" },
+      { approved: true, id: "D03" },
+    ]);
+    expect(status.ok ? status.data.problems.join("\n") : null).toContain(
+      `D01: projects/${PROJECT}/characters/ewa/voices/pl/voice.json zmienił się`
+    );
+  });
+
+  it("should accept named lines, and buy exactly one line again under --regenerate --artifact", async () => {
+    await accepted();
+    await makeVoices({ workspace });
+    await generate(speech());
+    const accepting = await approve(["D01", "D02"]);
+    const again = speech();
+    const result = await generate(again, { artifacts: ["D03"], regenerate: true });
+
+    expect(
+      accepting.ok
+        ? accepting.data.lines.map(({ approved, id }) => ({ approved, id }))
+        : accepting.error.message
+    ).toEqual([
+      { approved: true, id: "D01" },
+      { approved: true, id: "D02" },
+      { approved: false, id: "D03" },
+    ]);
+    expect(
+      result.ok ? [result.data.paidCalls, result.data.characters] : result.error.message
+    ).toEqual([1, billed(DIALOGUE.U04.text)]);
+    expect(again.sent.map((one) => one.text)).toEqual([DIALOGUE.U04.text]);
+    expect(again.sent[0]?.url).toContain(VOICES.tata);
+  });
+
+  it("should refuse a second charge that names no line", async () => {
+    await accepted();
+    const calls = speech();
+    const result = await generate(calls, { regenerate: true });
+
+    expect(result.ok ? null : result.error.message).toContain(
+      "--regenerate wymaga jawnego --artifact"
+    );
+    expect(calls.sent).toHaveLength(0);
+  });
+
+  it("should refuse to accept a line read in a voice that has since been replaced", async () => {
+    await accepted();
+    await makeVoices({ workspace });
+    await generate(speech());
+    await setVoice({
+      characterId: "ewa",
+      language: "pl",
+      mode: "apply",
+      projectId: PROJECT,
+      voiceId: "AZnzlk1XvdvUeBnXmlld",
+      workspace,
+    });
+    const result = await approve(["D01"]);
+
+    expect(result.ok ? null : result.error.message).toContain("--regenerate --artifact D01");
+  });
+
+  /** An attempt that died after the provider answered was paid for once already. */
+  it("should finish an interrupted line from its archive without paying again", async () => {
+    await accepted();
+    await makeVoices({ workspace });
+    await generate(speech());
+    const { dialogueStage } = episode();
+    const stage = JSON.parse(await readFile(dialogueStage, "utf8")) as {
+      artifacts: Record<string, { outputs: unknown[]; status: string }>;
+    };
+    const interrupted = { ...stage.artifacts.D02, outputs: [], status: "submitted" };
+    await writeFile(
+      dialogueStage,
+      JSON.stringify({ ...stage, artifacts: { ...stage.artifacts, D02: interrupted } }),
+      "utf8"
+    );
+    const calls = speech();
+    const result = await generate(calls);
+
+    expect(
+      result.ok ? result.data.lines.map(({ id, state }) => ({ id, state })) : result.error.message
+    ).toEqual([
+      { id: "D01", state: "skipped" },
+      { id: "D02", state: "resumed" },
+      { id: "D03", state: "skipped" },
+    ]);
+    expect(calls.sent).toHaveLength(0);
   });
 });

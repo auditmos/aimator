@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { sha256Of } from "../lib/artifact/index.js";
 import { approveAssembly, generateAssembly } from "../lib/assembly/index.js";
+import { approveVoice, generateSample, setVoice } from "../lib/character-voice/index.js";
 import { approveClips, generateClips } from "../lib/clips/index.js";
 import type { Muxer } from "../lib/muxer.js";
 import {
@@ -1360,6 +1361,53 @@ export async function makeCut(options: {
  * and a fixture that used `voice-1` would teach a reader the wrong thing.
  */
 export const VOICE = "21m00Tcm4TlvDq8ikWAM";
+
+/**
+ * The voice each cast member speaks Polish in. Real ElevenLabs id shapes, for
+ * `VOICE`'s reason, and two different ones, because a line bought in the wrong
+ * character's voice is exactly what a test of stage 11 has to be able to see.
+ */
+export const VOICES = { ewa: "pNInz6obpgDQGcFmaJgB", tata: "ErXwobaYiN019PkySvjV" } as const;
+
+/**
+ * Cast voices in the film's language, each heard through a bought sample and
+ * accepted: what stage 11 needs before it may buy a single line.
+ *
+ * Promoted for the threshold the rest of this file uses: the stage-11 module
+ * tests and its CLI tests both need a cast whose voices are decided, and
+ * neither is testing how a sample is bought. `cast` narrows it, because the
+ * refusal worth testing is the character whose voice nobody accepted.
+ */
+export async function makeVoices(options: {
+  readonly cast?: readonly (keyof typeof VOICES)[];
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { cast = CAST, workspace } = options;
+  const answer = (() =>
+    Promise.resolve(
+      new Response(wav({ seconds: 1 }), {
+        headers: { "content-type": "audio/wav" },
+        status: 200,
+      })
+    )) as unknown as typeof fetch;
+
+  for (const characterId of cast) {
+    const scope = { characterId, language: "pl", projectId: PROJECT, workspace } as const;
+
+    // biome-ignore lint/performance/noAwaitInLoops: one voice at a time, in roster order
+    await setVoice({ ...scope, mode: "apply", voiceId: VOICES[characterId] });
+    await generateSample({
+      ...scope,
+      apiKey: API_KEY,
+      fetch: answer,
+      mode: "apply",
+      model: "eleven_multilingual_v2",
+      regenerate: false,
+      text: "Nie boję się burzy.",
+    });
+    await approveVoice({ ...scope, mode: "apply", note: "ok", reviewer: "fixture" });
+  }
+}
 
 /** The two shots the fixture's narrator speaks over, and where each is anchored. */
 const SPOKEN = [

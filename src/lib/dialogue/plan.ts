@@ -7,10 +7,18 @@ import {
   stageFileSchema,
   toWorkspacePath,
 } from "../artifact/index.js";
+import { checkVoice } from "../character-voice/index.js";
 import { type CastMember, readStage0Inputs } from "../project/index.js";
 import { ok, type Result } from "../result.js";
 import { checkShotList, type ShotList } from "../shot-list/index.js";
-import { type EpisodePaths, episodePaths, projectPaths, type Workspace } from "../workspace.js";
+import {
+  characterPaths,
+  characterVoicePaths,
+  type EpisodePaths,
+  episodePaths,
+  projectPaths,
+  type Workspace,
+} from "../workspace.js";
 import { buildPrompt } from "./prompt.js";
 
 /**
@@ -21,8 +29,11 @@ import { buildPrompt } from "./prompt.js";
  * characters speak, because buying a dialogue script for a film without
  * dialogue would be paying to be told there is nothing to lift.
  *
- * The voices are not here. They gate buying a line, not reading which lines
- * exist, the same split stage 9 makes between its script and its recordings.
+ * The voices are a second gate, and a narrower one. They gate buying a line,
+ * not reading which lines exist, the same split stage 9 makes between its
+ * script and its recordings, and each voice gates only its own speaker's
+ * lines: a character nobody has heard yet holds back what that character says
+ * and nothing anybody else does.
  */
 
 /** The one stage name this module writes and reads. */
@@ -55,6 +66,8 @@ export interface Stage11Inputs {
   readonly gate: readonly string[];
   /** project.json, project.md, episode.json and shot-list.md, with digests. */
   readonly inputs: readonly RecordedFile[];
+  /** The film's language: what the lines are spoken in, and so which voice reads them. */
+  readonly language: string;
   /** The approved plan as data, or null while it does not validate. */
   readonly plan: ShotList | null;
   /** The exact text a paid call would send, or `null` when it cannot be built. */
@@ -139,6 +152,7 @@ export async function readStage11Inputs(input: Stage11Scope): Promise<Result<Sta
         ? [{ path: relative(episode.data.shotList), sha256: shotList.data.sha256 }]
         : []),
     ],
+    language: stage0.data.settings.language,
     plan,
     prompt: shotList.ok
       ? buildPrompt({
@@ -150,4 +164,67 @@ export async function readStage11Inputs(input: Stage11Scope): Promise<Result<Sta
       : null,
     stage: stage.ok ? stage.data : emptyStage(STAGE),
   });
+}
+
+/** One speaker's voice in the film's language, as far as buying a line in it goes. */
+export interface SpeakerVoice {
+  /** The `voice.json` a line bought in it records, or null while nobody chose one. */
+  readonly file: RecordedFile | null;
+  /** Why no line of this speaker may be bought yet; null when one may. */
+  readonly obstacle: string | null;
+  readonly voiceId: string | null;
+}
+
+/**
+ * The voice of every speaker, keyed by cast id.
+ *
+ * Answered through `checkVoice`, so a voice counts as accepted here exactly when
+ * its own check says so: a sample read in a voice that has since been replaced
+ * is a recording of somebody else, and buying lines on its approval would buy
+ * a voice nobody heard.
+ */
+export async function readVoices(
+  input: Stage11Scope,
+  speakers: readonly string[],
+  language: string
+): Promise<Result<ReadonlyMap<string, SpeakerVoice>>> {
+  const project = projectPaths(input.workspace, input.projectId);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  const voices = new Map<string, SpeakerVoice>();
+
+  for (const characterId of new Set(speakers)) {
+    const scope = { ...input, characterId, language };
+    // biome-ignore lint/performance/noAwaitInLoops: one speaker at a time, in the order they speak
+    const status = await checkVoice(scope);
+    const paths = characterPaths(project.data, characterId);
+    const voice = paths.ok ? characterVoicePaths(paths.data, language) : paths;
+
+    if (!status.ok) {
+      return status;
+    }
+    if (!voice.ok) {
+      return voice;
+    }
+
+    const digest = await readDigest(voice.data.file);
+
+    voices.set(characterId, {
+      file: digest.ok
+        ? {
+            path: toWorkspacePath(input.workspace.root, voice.data.file),
+            sha256: digest.data.sha256,
+          }
+        : null,
+      obstacle: status.data.approved
+        ? null
+        : `głos postaci "${characterId}" (${language}) nie ma przyjętej próbki: ${status.data.nextStep}`,
+      voiceId: status.data.voiceId,
+    });
+  }
+
+  return ok(voices);
 }

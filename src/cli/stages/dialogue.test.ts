@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { checkDialogue, generateDialogue } from "../../lib/dialogue/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
-import { API_KEY, DIALOGUE, EPISODE, makeUpstream, PROJECT } from "../../test/fixture.js";
+import {
+  API_KEY,
+  DIALOGUE,
+  EPISODE,
+  makeUpstream,
+  makeVoices,
+  PROJECT,
+} from "../../test/fixture.js";
 import { run } from "../index.js";
 
 /**
@@ -129,6 +136,7 @@ describe("check and approve --stage dialogue", () => {
   beforeAll(async () => {
     const bought = await generateDialogue({
       apiKey: API_KEY,
+      artifacts: [],
       episodeId: EPISODE,
       fetch: provider(),
       maxOutputTokens: 8000,
@@ -136,6 +144,8 @@ describe("check and approve --stage dialogue", () => {
       model: "gpt-6-astra",
       projectId: PROJECT,
       regenerate: false,
+      voiceKey: null,
+      voiceModel: null,
       workspace,
     });
 
@@ -179,6 +189,37 @@ describe("check and approve --stage dialogue", () => {
     );
 
     expect(unnamed.ok ? null : unnamed.error.message).toContain("--artifact jest wymagane");
-    expect(printed).toMatchObject({ approved: true, command: "approve", stage: "dialogue" });
+    expect(printed).toMatchObject({
+      command: "approve",
+      script: { approved: true },
+      stage: "dialogue",
+    });
+  });
+
+  it("should state the bill of the lines in calls and characters, line by line", async () => {
+    await makeVoices({ workspace });
+    const printed = await cli(
+      "dialogue",
+      "generate",
+      PROJECT,
+      EPISODE,
+      "--voice-model",
+      "eleven_multilingual_v2",
+      "--dry-run"
+    );
+    const characters = [DIALOGUE.U01, DIALOGUE.U03, DIALOGUE.U04].map(
+      (one) => [...one.text].length
+    );
+
+    expect(printed).toContain("płatnych wywołań do wykonania: 3");
+    expect(printed).toContain(`znaków do rozliczenia: ${characters.reduce((a, b) => a + b, 0)}`);
+    expect(printed).toContain(`D03: tata, planned, gotowa do kupienia, ${characters[2]} znaków`);
+  });
+
+  it("should name the speech model it was not given rather than guess one", async () => {
+    const printed = await cli("dialogue", "generate", PROJECT, EPISODE, "--dry-run");
+
+    expect(printed).toContain("AIMATOR_DIALOGUE_VOICE_MODEL");
+    expect(printed).toContain("płatnych wywołań do wykonania: 0");
   });
 });

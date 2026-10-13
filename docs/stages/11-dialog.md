@@ -1,38 +1,58 @@
 # Etap 11: dialog
 
-Kwestie, które mówią postacie, w języku filmu. Dziś etap kupuje **skrypt**: które kwestie,
-kto je mówi, w którym ujęciu i od której sekundy planu. Nagrania kwestii to jego następny
-krok i jeszcze nie istnieją.
+Kwestie, które mówią postacie, w języku filmu. Etap ma dwie połowy, tak jak etap 9: najpierw
+**skrypt**, czyli które kwestie, kto je mówi, w którym ujęciu i od której sekundy planu;
+potem **kwestie**, każda kupiona głosem swojej postaci.
 
 | | |
 |---|---|
-| **Wejście** | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, `project.json`, `project.md`, `episode.json` |
-| **Wyjście** | `dialogue.md`, `dialogue.stage.json`, `runs/<runId>/` (wspólne dla obu torów) |
-| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i `--audio dialogue` albo `dialogue-and-narration` |
-| **Koszt** | jedno płatne wywołanie tekstowe |
+| **Wejście** | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, `project.json`, `project.md`, `episode.json`, a do kwestii `characters/<c>/voices/<język filmu>/voice.json` każdej mówiącej postaci |
+| **Wyjście** | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.stage.json`, `runs/<runId>/` (wspólne dla obu torów) |
+| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i `--audio dialogue` albo `dialogue-and-narration`; kwestie czekają na przyjęty skrypt i przyjętą próbkę głosu swojej postaci |
+| **Koszt** | skrypt: jedno płatne wywołanie tekstowe; kwestie: jedno wywołanie mowy na kwestię, rachunek liczy się w **znakach** |
 
 ## Komendy
 
 ```bash
 pnpm dev dialogue generate dzielna-ewa 01-burza --dry-run
-pnpm dev dialogue generate dzielna-ewa 01-burza
+pnpm dev dialogue generate dzielna-ewa 01-burza          # najpierw sam skrypt
 pnpm dev check dzielna-ewa 01-burza --stage dialogue
 pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact script \
   --note "każda kwestia jest w swoim ujęciu"
+pnpm dev dialogue generate dzielna-ewa 01-burza --dry-run  # rachunek kwestii
+pnpm dev dialogue generate dzielna-ewa 01-burza          # dopiero teraz kupuje kwestie
+pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact D01,D02,D03
+pnpm dev dialogue generate dzielna-ewa 01-burza --regenerate --artifact D03
 ```
 
-Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>` (domyślnie 8 000),
-`--regenerate`, `--instruction <uwaga>` (tylko razem z `--regenerate`), `--json`.
+Dodatkowe flagi: `--model <id>`, `--voice-model <id>`, `--max-output-tokens <n>`
+(domyślnie 8 000), `--artifact script|D01[,D02]`, `--regenerate`, `--instruction <uwaga>`
+(tylko razem z `--regenerate --artifact script`), `--json`.
 
-Model to `--model` albo `AIMATOR_DIALOGUE_MODEL`, własna zmienna, nie ta od narracji: dwa
-miejsca wywołania, więc wybór modelu, który podnosi narrację, nie może po cichu wybrać
-modelu, który podnosi dialog. Wartości domyślnej nie ma ([konfiguracja](../konfiguracja.md)).
+Dwa modele, dwie zmienne, bez wartości domyślnych ([konfiguracja](../konfiguracja.md)):
+
+- skrypt podnosi `--model` albo `AIMATOR_DIALOGUE_MODEL`, własna zmienna, nie ta od
+  narracji: dwa miejsca wywołania, więc wybór modelu, który podnosi narrację, nie może po
+  cichu wybrać modelu, który podnosi dialog;
+- kwestie czyta `--voice-model` albo `AIMATOR_DIALOGUE_VOICE_MODEL`, ta sama zmienna co
+  próbki głosów postaci, bo próbka istnieje po to, żeby brzmieć tak, jak zabrzmią kwestie.
+
+`--regenerate` po powstaniu skryptu wymaga adresata, z powodu etapu 9: `--artifact script`
+podnosi skrypt od nowa, `--artifact D03` kupuje jedną kwestię jeszcze raz. Druga próba to
+druga opłata, więc bez nazwy pada odmowa. `--instruction` poprawia sam skrypt, bo kwestię
+kupuje się z jego własnych słów; przy `--artifact D01` to błąd użycia.
 
 ## `--json`
 
 `dialogue generate`, `check --stage dialogue` i `approve --stage dialogue` przyjmują
 `--json` i wypisują obiekt, który zwraca moduł etapu, plus `command` i `stage`. Raport
-`generate` niesie `paidCalls`: jeden albo zero, a zero to odpowiedź zablokowanej bramki.
+`generate` niesie rachunek w dwóch polach, `paidCalls` i `characters`, i nigdy się ich nie
+sumuje: przy skrypcie `paidCalls` to jeden albo zero, przy kwestiach liczba wywołań mowy,
+a `characters` to znaki, które dostawca policzy. `lines` mówi, co ten przebieg robi
+z każdą kwestią: `planned`, `blocked` z powodem, `skipped`, `published` albo `resumed`.
+
+Obiekt `check` niesie `approved` całego etapu, czyli skryptu **i** każdej kwestii, obok
+`script.approved`, które dotyczy samego skryptu.
 
 ## Skąd się biorą kwestie
 
@@ -72,7 +92,44 @@ Odpowiedź, która nie przechodzi walidacji, zostaje w `runs/<runId>/response.js
 Postać, której nie ma w `Cast` ujęcia, mówi zza kadru. To **meldunek**, nie odmowa:
 kwestia jest prawdziwa, tylko lip-sync nie będzie miał czyich ust poruszyć.
 
+## Kwestie: zakup i rachunek
+
+Po przyjętym skrypcie to samo `dialogue generate` przestaje podnosić i zaczyna kupować:
+**jedno wywołanie mowy na kwestię**, w kolejności skryptu, głosem postaci, która ją mówi,
+w języku filmu z `episode.json`. Głos to `voiceId` z
+`characters/<c>/voices/<język>/voice.json`, obsadzony i wysłuchany w
+[etapie 0](00-przygotowanie.md). Nagranie trafia do `dialogue/<język>/Dnn.wav` pod
+odcinkiem, wspólne dla obu torów, bo głos czytający kwestię nie wie, nad którym filmem
+usiądzie. Poziom języka jest po to, żeby ten sam skrypt kupiony w drugim języku nie
+nadpisał pierwszego.
+
+ElevenLabs rozlicza **znaki, nie wywołania**, więc podgląd podaje jedno i drugie, per
+kwestia i łącznie, i nigdy ich nie sumuje:
+
+```
+Próba na sucho: nic nie zapisano, nic nie wysłano. Dialog dzielna-ewa/01-burza
+  płatnych wywołań do wykonania: 3
+  znaków do rozliczenia: 63
+      D01: ewa, planned, gotowa do kupienia, 26 znaków
+      D02: ewa, planned, gotowa do kupienia, 19 znaków
+      D03: tata, planned, gotowa do kupienia, 18 znaków
+```
+
+Kwestia jedzie bez kontekstu sąsiadów (`previous_text`, `next_text`), inaczej niż zdanie
+narratora: ten kontekst służy jednemu głosowi ciągnącemu akapit, a kwestia przed tą jest
+zwykle kogoś innego. Sposób czytania to domyślne ustawienia dostawcy, wysłane jawnie, te
+same, na których przyjęto próbkę: kwestia ma brzmieć jak głos, który ktoś usłyszał.
+
+Bajty są publikowane **tak, jak przyszły**: bez rozciągania i bez przyspieszania. Gdzie
+kwestia usiądzie w filmie i co, jeśli nachodzi na następną, rozstrzyga miks, nie zakup.
+
+Przerwana próba zostawia rekord `submitted` przy tej jednej kwestii. Powtórzenie polecenia
+dokańcza ją z nagrania zapisanego w `runs/<runId>/`, **bez drugiej opłaty**. Nową płatną
+próbę zaczyna wyłącznie `--regenerate --artifact Dnn`.
+
 ## Bramka
+
+Skrypt:
 
 - Lista ujęć musi być zatwierdzona, bo każda kwestia z niej pochodzi.
 - Odcinek musi mieć dialog: przy `--audio narration` albo `music-and-effects` pada odmowa
@@ -81,16 +138,31 @@ kwestia jest prawdziwa, tylko lip-sync nie będzie miał czyich ust poruszyć.
   Etap 11 odmawia wtedy i wskazuje `shot-list generate --regenerate`, zamiast kupować skrypt,
   który powie, że nie ma czego podnosić.
 
-Głosy postaci, czyli `characters/<c>/voices/<język>/voice.json` z
-[etapu 0](00-przygotowanie.md), nie są bramką skryptu. Będą bramką kupowania kwestii.
+Kwestie:
+
+- Skrypt musi mieć ważną zgodę. Skrypt poprawiony ręcznie po zgodzie albo taki, którego lista
+  ujęć się zmieniła, nie otwiera zakupu, dopóki ktoś go nie przyjmie ponownie.
+- Głos każdej postaci jest **bramką tylko jej kwestii**. Postać bez `voice.json` w języku
+  filmu albo bez przyjętej próbki dostaje `blocked` z powodem i poleceniem, które go usuwa,
+  a kwestie pozostałych postaci są kupowane. Próbka przeczytana głosem, który potem
+  zmieniono, nie liczy się jako przyjęta.
 
 ## Zgoda
 
-`approve --stage dialogue` wymaga `--artifact script`, z powodu etapu 9: przyjęcie skryptu
-otworzy kupowanie każdej jego kwestii, a zgoda, której nikt nie nazwał, wydałaby pieniądze,
-na które nikt się nie zgodził. `dialogue.md` można poprawić ręcznie: `check` mówi wtedy
-„poprawiony ręcznie po generacji”, a `approve` przyjmuje poprawkę, o ile dalej przechodzi
-walidację względem listy ujęć.
+`approve --stage dialogue` wymaga `--artifact`, z powodu etapu 9: przyjęcie skryptu
+otwiera kupowanie każdej jego kwestii, a przyjęcie kwestii otwiera miks, więc zgoda, której
+nikt nie nazwał, wydałaby pieniądze, na które nikt się nie zgodził.
+
+- `--artifact script` przyjmuje skrypt. `dialogue.md` można poprawić ręcznie: `check` mówi
+  wtedy „poprawiony ręcznie po generacji”, a `approve` przyjmuje poprawkę, o ile dalej
+  przechodzi walidację względem listy ujęć.
+- `--artifact D01,D02` przyjmuje kwestie, każdą osobno, związane z bajtami nagrania.
+
+Kwestia zapisuje **dokładnie dwa wejścia**: `dialogue.md` i `voice.json` swojej postaci
+w tym języku. `project.json` nim nie jest, więc zmiana narratora nie cofa żadnej kwestii.
+Zmiana głosu `ewa` cofa zgody na kwestie `ewa` i nie rusza kwestii `tata`. Zgody na
+kwestię przeczytaną głosem, którego już nie ma, nie da się wydać ponownie: to nagranie
+kogoś innego, więc `approve` odmawia i wskazuje `--regenerate --artifact Dnn`.
 
 ---
 

@@ -10,6 +10,8 @@ import {
   withInputs,
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
+import { validateSpeech } from "../voice-model/index.js";
+import { dialogueAudio, workspacePath } from "../workspace.js";
 import { readStage11Inputs, SCRIPT, STAGE, type Stage11Inputs, type Stage11Scope } from "./plan.js";
 import { type DialogueLine, validateDialogue } from "./validate.js";
 
@@ -17,9 +19,15 @@ import { type DialogueLine, validateDialogue } from "./validate.js";
  * Internal to the dialogue module: verification, and the approval on top of it.
  *
  * `check` reads and reports; it writes nothing. `approve` repeats the whole
- * verification and only then records acceptance, bound to the script's bytes
- * as they now stand. A script corrected by hand is a lapsed consent rather than
- * an error, and is still held to "lifted, not invented, nothing left behind".
+ * verification and only then records acceptance, bound to the bytes as they
+ * now stand. A script corrected by hand is a lapsed consent rather than an
+ * error, and is still held to "lifted, not invented, nothing left behind".
+ *
+ * A bought line is accepted on its own, by a human who listened to it, and its
+ * yes is bound to the recording and to the two things it was read from: the
+ * script and its speaker's voice. A line whose voice has since been replaced
+ * is a recording of somebody else, so its approval lapses, and accepting it
+ * again is refused rather than recorded: the remedy is a new recording.
  */
 
 export interface ScriptState {
@@ -31,12 +39,25 @@ export interface ScriptState {
   readonly state: "absent" | "completed" | "submitted";
 }
 
+/** One line of the script, and where its recording stands. */
+export interface LineState extends DialogueLine {
+  /** True once a human accepted this recording and nothing it was read from changed. */
+  readonly approved: boolean;
+  /** Recorded inputs whose bytes on disk no longer match what this recording used. */
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  /** How long the recording runs, read from its own header; null without one. */
+  readonly seconds: number | null;
+  readonly state: "absent" | "completed" | "submitted";
+}
+
 export interface DialogueStatus {
   /** The script, when a person corrected it by hand and nobody accepted that yet. */
   readonly amended: readonly string[];
+  /** True once the script and every line carry a still-valid approval. */
   readonly approved: boolean;
   /** The script as data, once it validates against the plan as it stands. */
-  readonly lines: readonly DialogueLine[];
+  readonly lines: readonly LineState[];
   readonly nextStep: string;
   /** What this stage says without refusing: a voice from off screen. */
   readonly notices: readonly string[];
@@ -66,8 +87,10 @@ class DialogueStateError extends Error {
 interface Inspection {
   /** A hand-corrected script, with the digest it has now, what an approval accepts. */
   readonly amended: readonly RecordedFile[];
-  /** Problems an approval may not write over. Input drift is not among them. */
+  /** Problems an approval of the script may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
+  /** Per line, what an approval of that line may not write over. */
+  readonly lineBlocking: ReadonlyMap<string, readonly string[]>;
   readonly stage11: Stage11Inputs;
   readonly status: DialogueStatus;
 }
@@ -104,6 +127,7 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
   ): Inspection => ({
     amended: [],
     blocking: [...problems],
+    lineBlocking: new Map(),
     stage11: stage11.data,
     status: {
       amended: [],
@@ -159,24 +183,24 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
   }
 
   const inputsChanged = changedInputs(driftableInputs(record), stage11.data.inputs);
-  const approved =
+  const scriptApproved =
     record.review.status === "approved" &&
     blocking.length === 0 &&
     inputsChanged.length === 0 &&
     amended.length === 0;
   const script = verdict?.ok === true ? verdict.data : null;
+  const lines = await readLineStates(input, stage11.data, script?.lines ?? []);
 
   return ok({
     amended,
     blocking,
+    lineBlocking: lines.blocking,
     stage11: stage11.data,
     status: {
       amended: amended.map((one) => one.path),
-      approved,
-      lines: script?.lines ?? [],
-      nextStep: approved
-        ? "skrypt przyjęty; kwestie w języku filmu to kolejny krok etapu 11, jeszcze nie zaimplementowany"
-        : `przeczytaj skrypt i zatwierdź: ${approveCommand(input)}`,
+      approved: scriptApproved && lines.states.every((one) => one.approved),
+      lines: lines.states,
+      nextStep: nextStep(input, scriptApproved, lines.states),
       notices: script?.notices ?? [],
       problems: [
         ...gate,
@@ -189,9 +213,10 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
           (one) =>
             `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: ${approveCommand(input)}`
         ),
+        ...lines.problems,
       ],
       script: {
-        approved,
+        approved: scriptApproved,
         id: SCRIPT,
         inputsChanged,
         note: script === null ? "nie przechodzi walidacji" : `${script.lines.length} kwestii`,
@@ -199,6 +224,131 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
       },
     },
   });
+}
+
+function nextStep(
+  input: Stage11Scope,
+  scriptApproved: boolean,
+  lines: readonly LineState[]
+): string {
+  if (!scriptApproved) {
+    return `przeczytaj skrypt i zatwierdź: ${approveCommand(input)}`;
+  }
+
+  if (lines.some((one) => one.state !== "completed")) {
+    return `aimator dialogue generate ${input.projectId} ${input.episodeId}`;
+  }
+
+  const pending = lines.filter((one) => !one.approved);
+
+  return pending.length > 0
+    ? `odsłuchaj kwestie i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${pending.map((one) => one.id).join(",")}`
+    : "skrypt i wszystkie kwestie przyjęte";
+}
+
+interface LineStates {
+  /** Per line, what an approval of it may not write over. */
+  readonly blocking: ReadonlyMap<string, readonly string[]>;
+  readonly problems: readonly string[];
+  readonly states: readonly LineState[];
+}
+
+async function readLineStates(
+  input: Stage11Scope,
+  stage11: Stage11Inputs,
+  lines: readonly DialogueLine[]
+): Promise<LineStates> {
+  const blocking = new Map<string, readonly string[]>();
+  const problems: string[] = [];
+  const states: LineState[] = [];
+
+  for (const line of lines) {
+    // biome-ignore lint/performance/noAwaitInLoops: each line read once per check
+    const one = await readLineState(input, stage11, line);
+
+    blocking.set(line.id, one.blocking);
+    problems.push(...one.problems);
+    states.push(one.state);
+  }
+
+  return { blocking, problems, states };
+}
+
+/** The command that buys one line again, which is every lapsed recording's remedy. */
+function regenerateCommand(input: Stage11Scope, id: string): string {
+  return `aimator dialogue generate ${input.projectId} ${input.episodeId} --regenerate --artifact ${id}`;
+}
+
+/** One bought line: is the recording there, is it speech, and did anybody accept it. */
+async function readLineState(
+  input: Stage11Scope,
+  stage11: Stage11Inputs,
+  line: DialogueLine
+): Promise<{ blocking: readonly string[]; problems: readonly string[]; state: LineState }> {
+  const record = stage11.stage.artifacts[line.id];
+  const file = dialogueAudio(stage11.episode, stage11.language, line.id);
+  const absent = { ...line, approved: false, inputsChanged: [], seconds: null } as const;
+
+  if (record === undefined || !file.ok) {
+    return {
+      blocking: [],
+      problems: [],
+      state: { ...absent, note: "nie kupiona", state: "absent" },
+    };
+  }
+
+  if (record.status === "submitted") {
+    return {
+      blocking: [],
+      problems: [
+        `${line.id}: rekord "submitted" bez opublikowanego nagrania, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
+      ],
+      state: {
+        ...absent,
+        note: `próba ${record.runId} mogła zostać rozliczona`,
+        state: "submitted",
+      },
+    };
+  }
+
+  const digest = await readDigest(file.data);
+  const speech = digest.ok ? validateSpeech(digest.data.bytes) : null;
+  const [output] = record.outputs;
+  const bytes = [
+    ...(digest.ok ? [] : [`${line.id}: brakuje nagrania`]),
+    ...(digest.ok && output?.sha256 !== digest.data.sha256
+      ? [`${line.id}: nagranie nie zgadza się z zapisanym hashem`]
+      : []),
+    ...(speech !== null && !speech.ok ? [`${line.id}: ${speech.error.message}`] : []),
+  ];
+  const inputsChanged: string[] = [];
+
+  for (const entry of driftableInputs(record)) {
+    // biome-ignore lint/performance/noAwaitInLoops: each input read once per check
+    const now = await readDigest(workspacePath(input.workspace, entry.path));
+
+    if (!now.ok || now.data.sha256 !== entry.sha256) {
+      inputsChanged.push(entry.path);
+    }
+  }
+
+  const drift = inputsChanged.map(
+    (path) =>
+      `${line.id}: ${path} zmienił się od czasu nagrania, to nagranie czyta coś innego niż teraz; nowe kupuje: ${regenerateCommand(input, line.id)}`
+  );
+
+  return {
+    blocking: [...bytes, ...drift],
+    problems: [...bytes, ...drift],
+    state: {
+      ...line,
+      approved: record.review.status === "approved" && bytes.length === 0 && drift.length === 0,
+      inputsChanged,
+      note: speech?.ok === true ? `${speech.data.seconds}s` : "nie przechodzi walidacji",
+      seconds: speech?.ok === true ? speech.data.seconds : null,
+      state: "completed",
+    },
+  };
 }
 
 /** Reads and reports. Writes nothing; that is what makes it safe. */
@@ -209,26 +359,18 @@ export async function checkDialogue(input: Stage11Scope): Promise<Result<Dialogu
 }
 
 /**
- * Records that a human read the script.
+ * Records that a human read the script, or listened to named lines.
  *
- * `--artifact` is **required**, as in stage 9: accepting the script is what
- * will authorise buying every line in it, and an approval nobody wrote down
- * would spend money nobody agreed to.
+ * `--artifact` is **required**, as in stage 9: accepting the script authorises
+ * buying every line in it, and accepting a line opens the mix. An approval
+ * nobody wrote down would spend money nobody agreed to.
  */
 export async function approveDialogue(input: ApproveScope): Promise<Result<DialogueStatus>> {
   if (input.artifacts.length === 0) {
     return err(
       new DialogueStateError(
-        `--artifact jest wymagane: ${SCRIPT}, przyjęcie skryptu otwiera kupowanie każdej jego kwestii`
+        `--artifact jest wymagane: ${SCRIPT} albo D01[,D02], przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a przyjęcie kwestii otwiera miks`
       )
-    );
-  }
-
-  const unknown = input.artifacts.filter((id) => id !== SCRIPT);
-
-  if (unknown.length > 0) {
-    return err(
-      new DialogueStateError(`--artifact "${unknown.join(", ")}", etap 11 zna tutaj ${SCRIPT}`)
     );
   }
 
@@ -238,26 +380,48 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
     return inspection;
   }
 
-  const { amended, blocking, stage11, status } = inspection.data;
+  const { amended, blocking, lineBlocking, stage11, status } = inspection.data;
+  const known = [SCRIPT, ...status.lines.map((one) => one.id)];
+  const unknown = input.artifacts.filter((id) => !known.includes(id));
 
-  if (status.script.state !== "completed") {
-    return err(new DialogueStateError(`nie ma czego zatwierdzić: ${SCRIPT}`, status.problems));
-  }
-
-  if (blocking.length > 0) {
+  if (unknown.length > 0) {
     return err(
-      new DialogueStateError("nie akceptuje się tego, co nie przechodzi walidacji", blocking)
+      new DialogueStateError(
+        `--artifact "${unknown.join(", ")}", etap 11 zna tutaj ${known.join(", ")}`
+      )
     );
   }
 
-  // A hand correction that validated is accepted here: its digest is rebound
-  // and the record says who changed it from what.
-  const rebound = withInputs(
-    withAmendments(stage11.stage, amended, input.reviewer),
-    SCRIPT,
-    stage11.inputs
+  const notReady = input.artifacts.filter((id) =>
+    id === SCRIPT
+      ? status.script.state !== "completed"
+      : status.lines.find((one) => one.id === id)?.state !== "completed"
   );
-  const approved = approveArtifacts(rebound, [SCRIPT], {
+
+  if (notReady.length > 0) {
+    return err(
+      new DialogueStateError(`nie ma czego zatwierdzić: ${notReady.join(", ")}`, status.problems)
+    );
+  }
+
+  const refused = [
+    ...(input.artifacts.includes(SCRIPT) ? blocking : []),
+    ...input.artifacts.flatMap((id) => lineBlocking.get(id) ?? []),
+  ];
+
+  if (refused.length > 0) {
+    return err(
+      new DialogueStateError("nie akceptuje się tego, co nie przechodzi walidacji", refused)
+    );
+  }
+
+  // A hand correction that validated is accepted with the script, the one
+  // decision able to: its digest is rebound and the record says who changed it
+  // from what.
+  const rebound = input.artifacts.includes(SCRIPT)
+    ? withInputs(withAmendments(stage11.stage, amended, input.reviewer), SCRIPT, stage11.inputs)
+    : stage11.stage;
+  const approved = approveArtifacts(rebound, input.artifacts, {
     note: input.note,
     reviewer: input.reviewer,
   });

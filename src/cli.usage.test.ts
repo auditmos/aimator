@@ -227,7 +227,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage dialogue --artifact script [--json]": [
+  "  approve <id> <episode-id> --stage dialogue --artifact script|D01[,D02] [--json]": [
     "approve",
     ...ON,
     "--stage",
@@ -486,12 +486,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "seedance-2.0",
     "--dry-run",
   ],
-  "  dialogue generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]": [
+  "  dialogue generate <id> <episode-id> [--model <id>] [--voice-model <id>]": [
     "dialogue",
     "generate",
     ...ON,
     "--model",
     "gpt-6-astra",
+    "--voice-model",
+    "eleven-v4",
     "--dry-run",
   ],
   '  episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]': [
