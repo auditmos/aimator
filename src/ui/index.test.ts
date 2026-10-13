@@ -209,7 +209,15 @@ afterAll(async () => {
 });
 
 describe("the UI server", () => {
-  it("should answer the ladder with exactly what status --json prints", async () => {
+  /**
+   * Two full walks of a finished episode, every stage's check on both sides,
+   * and the first request after the fixture, so it pays the cold start. Alone
+   * it takes ~0.3 s; beside the whole suite it was measured at 5.0 s, which is
+   * the default limit, so it gets the headroom the file's other heavy tests do.
+   */
+  it("should answer the ladder with exactly what status --json prints", {
+    timeout: 45_000,
+  }, async () => {
     const response = await createUi({ workspace }).request(`/api/status/${PROJECT}/${EPISODE}`);
 
     expect(response.status).toBe(200);
