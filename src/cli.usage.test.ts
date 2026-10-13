@@ -441,7 +441,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "30",
     "--dry-run",
   ],
-  "  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]": [
+  "  episode add <id> --source <NN-tytul.md|katalog> [--duration <s>] [--audio <tryb>]": [
     "episode",
     "add",
     PROJECT,

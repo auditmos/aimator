@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -280,6 +280,128 @@ describe("episode add --idea", () => {
     expect(text.text).not.toContain("skopiowane z");
     expect(JSON.parse(json.text)).toMatchObject({
       source: { originPath: null, path: `${EPISODE_DIR}/source.md` },
+    });
+  });
+});
+
+/**
+ * A folder of screenplays prepared earlier, added in one command.
+ *
+ * Assumptions: only entries directly in the folder count, and each `.md` file
+ * is read by the rule a single `--source` meets. Anything else is skipped and
+ * named; a dotfile is the filesystem talking, as in `emptyDirectories`, so it
+ * is neither an episode nor worth a line. The whole batch is validated before
+ * anything is written, and one bad file refuses all of it. Not tested here:
+ * nested folders as episodes, which the issue rules out.
+ */
+describe("episode add --source <katalog>", () => {
+  let folder = "";
+
+  beforeEach(async () => {
+    await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
+    folder = join(scratch, "paczka");
+    await mkdir(folder);
+  });
+
+  async function put(name: string, text = `# ${name}\n`): Promise<string> {
+    const path = join(folder, name);
+    await writeFile(path, text, "utf8");
+    return path;
+  }
+
+  async function episodeFile(id: string): Promise<unknown> {
+    return JSON.parse(
+      await readFile(join(root, "projects/demo/episodes", id, "episode.json"), "utf8")
+    );
+  }
+
+  it("should make one episode of every NN-*.md file, each copied from its own file", async () => {
+    const first = await put("01-a.md");
+    const second = await put("02-b.md");
+
+    const result = await cli("episode", "add", "demo", "--source", folder);
+
+    expect(result.ok ? null : result.text).toBeNull();
+    expect(await episodeFile("01-a")).toMatchObject({ number: 1, source: { originPath: first } });
+    expect(await episodeFile("02-b")).toMatchObject({ number: 2, source: { originPath: second } });
+  });
+
+  it("should skip what is not a .md file and name it in the report", async () => {
+    await put("01-a.md");
+    await put("notes.txt");
+    await put(".DS_Store");
+
+    const text = await cli("episode", "add", "demo", "--source", folder, "--dry-run");
+    const json = await cli("episode", "add", "demo", "--source", folder, "--json");
+
+    expect(text.text).toContain("notes.txt");
+    expect(text.text).not.toContain(".DS_Store");
+    expect(JSON.parse(json.text)).toMatchObject({ skipped: ["notes.txt"] });
+  });
+
+  it("should refuse the whole folder for one bad file, naming every problem", async () => {
+    const existing = join(scratch, "02-burza.md");
+    await writeFile(existing, "Burza.\n", "utf8");
+    await cli("episode", "add", "demo", "--source", existing);
+    await put("01-a.md");
+    await put("02-c.md");
+    await put("03-x.md");
+    await put("03-y.md");
+    await put("intro.md");
+
+    const result = await cli("episode", "add", "demo", "--source", folder);
+
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain('02-c.md: numer odcinka 2 jest już zajęty przez "02-burza"');
+    expect(result.text).toContain("03-x.md, 03-y.md: ten sam numer 3 w jednej paczce");
+    expect(result.text).toContain("intro.md: invalid episode source");
+    expect(await readdir(join(root, "projects/demo/episodes"))).toEqual(["02-burza"]);
+  });
+
+  it("should give every episode of the folder the decisions passed with it", async () => {
+    await put("01-a.md");
+    await put("02-b.md");
+
+    await cli(
+      "episode",
+      "add",
+      "demo",
+      "--source",
+      folder,
+      "--duration",
+      "20",
+      "--audio",
+      "narration"
+    );
+
+    const decided = { settings: { audio: "narration", durationSeconds: 20 } };
+
+    expect(await episodeFile("01-a")).toMatchObject(decided);
+    expect(await episodeFile("02-b")).toMatchObject(decided);
+  });
+
+  it("should refuse a folder with no .md file in it", async () => {
+    await put("notes.txt");
+
+    const result = await cli("episode", "add", "demo", "--source", folder);
+
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("nie zawiera żadnego pliku .md");
+  });
+
+  it("should write nothing under --dry-run and list the episodes under --json", async () => {
+    const first = await put("01-a.md");
+    const second = await put("02-b.md");
+
+    const result = await cli("episode", "add", "demo", "--source", folder, "--dry-run", "--json");
+
+    expect(await readdir(join(root, "projects/demo"))).not.toContain("episodes");
+    expect(JSON.parse(result.text)).toMatchObject({
+      command: "episode add",
+      episodes: [
+        { episodeId: "01-a", number: 1, originPath: first },
+        { episodeId: "02-b", number: 2, originPath: second },
+      ],
     });
   });
 });

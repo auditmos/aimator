@@ -1,6 +1,7 @@
 import type { ParseArgsConfig } from "node:util";
 import {
   addEpisode,
+  type EpisodeAddReport,
   type EpisodeOverview,
   setEpisodeSettings,
   showEpisode,
@@ -19,9 +20,12 @@ import {
 } from "../common.js";
 
 /** Stage 0's episode half: the five production settings, stored or undecided. */
-export const USAGE = `  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
+export const USAGE = `  episode add <id> --source <NN-tytul.md|katalog> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
                    [--max-clip <s>] [--json]
+    Katalog to paczka: każdy NN-*.md wprost w nim staje się odcinkiem z tymi
+    samymi decyzjami, a jeden zły plik odrzuca całą paczkę, zanim cokolwiek
+    zapisze.
   episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]
     Pomysł wpisany w poleceniu zamiast pliku. --episode niesie to, co nazwa
     pliku bez .md: numer i slug. source.md to tekst pomysłu.
@@ -134,8 +138,33 @@ async function runEpisodeAdd(parsed: Parsed): Promise<Result<string>> {
   });
 
   return result.ok
-    ? ok(answerStage0(answerFlag(parsed), "episode add", "Dodano odcinek", result.data, mode))
+    ? ok(
+        answerStage0(
+          answerFlag(parsed),
+          "episode add",
+          addedHeadline(result.data),
+          result.data,
+          mode
+        )
+      )
     : result;
+}
+
+/**
+ * One episode keeps the headline it always had; a folder names what it made
+ * and what it left behind, the one place a skipped file becomes visible.
+ */
+function addedHeadline(report: EpisodeAddReport): string {
+  const ids = report.episodes.map((episode) => episode.episodeId);
+  const lines = [
+    ids.length === 1 ? "Dodano odcinek" : `Dodano odcinki (${ids.length}): ${ids.join(", ")}`,
+  ];
+
+  for (const name of report.skipped) {
+    lines.push(`  - pominięto ${name}: to nie plik .md`);
+  }
+
+  return lines.join("\n");
 }
 
 async function runEpisodeSet(parsed: Parsed): Promise<Result<string>> {

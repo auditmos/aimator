@@ -22,7 +22,8 @@ import { run } from "../index.js";
  *
  * - **Every stage-0 command prints `Stage0Report`, unchanged.** The seven of
  *   them already share one renderer, so they share one object; no second format
- *   is designed here and none may be.
+ *   is designed here and none may be. `episode add` extends it by `episodes` and
+ *   `skipped`, because one folder adds several episodes, and stays a superset.
  * - **`command` is two words for stage 0**, because `character add` and
  *   `episode add` are different commands writing the same stage, and a field
  *   that said `add` for both would answer "which command wrote this" with a
@@ -194,7 +195,10 @@ afterAll(async () => {
 
 describe("every stage-0 command under --json", () => {
   it.each(COMMANDS)("should print the stage's report for %s", (command) => {
-    expect(reports.get(command)).toMatchSnapshot();
+    // `episode add` names the file it copied, which sits in a fresh temp directory.
+    const report = JSON.stringify(reports.get(command)).replaceAll(scratch, "<scratch>");
+
+    expect(JSON.parse(report)).toMatchSnapshot();
   });
 
   it("should say which command wrote the object, and which stage", () => {

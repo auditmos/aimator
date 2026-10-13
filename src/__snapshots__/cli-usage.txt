@@ -23,9 +23,12 @@ Etap 0. Przygotowanie projektu i odcinka:
   character new <id> <character-id> --name <nazwa> [--json]
   character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
   character describe <id> <character-id> [--json]
-  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
+  episode add <id> --source <NN-tytul.md|katalog> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
                    [--max-clip <s>] [--json]
+    Katalog to paczka: każdy NN-*.md wprost w nim staje się odcinkiem z tymi
+    samymi decyzjami, a jeden zły plik odrzuca całą paczkę, zanim cokolwiek
+    zapisze.
   episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]
     Pomysł wpisany w poleceniu zamiast pliku. --episode niesie to, co nazwa
     pliku bez .md: numer i slug. source.md to tekst pomysłu.

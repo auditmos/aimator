@@ -528,7 +528,7 @@ Próba na sucho: nic nie zapisano. Dodano odcinek
 Dalej: uzupełnij decyzje: aimator episode set ewa 02-slonce --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>"
 `;
 
-exports[`every command >   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>] 1`] = `
+exports[`every command >   episode add <id> --source <NN-tytul.md|katalog> [--duration <s>] [--audio <tryb>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Dodano odcinek
   + projects/ewa/episodes/02-slonce/source.md

@@ -133,6 +133,32 @@ białe znaki to błąd użycia, a pozostałe flagi decyzji działają bez zmian.
 Nic nie zostało skopiowane, więc `episode.json` ma `source.originPath: null`, a
 `episode show` zamiast ścieżki pisze „pomysł wpisany w poleceniu”.
 
+## Paczka scenariuszy
+
+Scenariusze przygotowane wcześniej dodaje się jednym poleceniem, wskazując `--source`
+**katalog** zamiast pliku:
+
+```bash
+pnpm dev episode add dzielna-ewa --source ~/burza/odcinki --duration 20 --audio narration
+```
+
+Każdy plik `NN-*.md` leżący wprost w katalogu staje się jednym odcinkiem, z tą samą regułą
+nazwy co pojedynczy plik; podkatalogów narzędzie nie przegląda. Inne pliki i podkatalogi
+są pomijane i **wymienione w raporcie**, a pliki z kropką na początku (`.DS_Store`) to
+mowa systemu plików, nie odcinki, więc nie trafiają nawet tam. Flagi decyzji podane przy
+`add` obowiązują każdy odcinek paczki, a `originPath` każdego wskazuje jego własny plik.
+
+Paczka to **wszystko albo nic**. Najpierw walidowana jest cała: nazwy, kolizje numerów
+z istniejącymi odcinkami i między plikami paczki (dwa pliki `03-*`). Jeden zły plik
+odrzuca ją w całości, zanim cokolwiek się zapisze, a odmowa wymienia każdy problem, nie
+tylko pierwszy, bo poprawiając katalog, potrzebujesz całej listy. Katalog bez żadnego
+`.md` to błąd.
+
+`--dry-run` pokazuje, jakie odcinki powstaną, i niczego nie zapisuje. Pod `--json` raport
+`episode add` niesie `episodes` (`episodeId`, `number`, `originPath` każdego odcinka)
+i `skipped` (pominięte nazwy); przy pojedynczym pliku albo pomyśle `episodes` ma jedną
+pozycję, a `skipped` jest puste.
+
 ## Etap 0 jako obiekt
 
 Każde polecenie tego etapu przyjmuje `--json` i wypisuje **obiekt, który zwraca moduł

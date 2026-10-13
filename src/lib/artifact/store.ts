@@ -160,6 +160,31 @@ async function readEntries(root: string): Promise<readonly Dirent[]> {
   }
 }
 
+/**
+ * What one directory holds directly, files apart from everything else, both
+ * sorted. Null when `path` is not a directory, which is how a caller handed a
+ * path tells a folder from a file without reading either.
+ */
+export async function listDirectory(
+  path: string
+): Promise<{ readonly files: readonly string[]; readonly others: readonly string[] } | null> {
+  let entries: readonly Dirent[];
+
+  try {
+    entries = await readdir(path, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const names = (keep: boolean): string[] =>
+    entries
+      .filter((entry) => entry.isFile() === keep)
+      .map((entry) => entry.name)
+      .sort();
+
+  return { files: names(true), others: names(false) };
+}
+
 /** Returns the directory entries of `path`, or an empty list when it does not exist. */
 export async function listEntries(path: string): Promise<readonly string[]> {
   try {

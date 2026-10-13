@@ -95,10 +95,18 @@ exports[`every stage-0 command under --json > should print the stage's report fo
     "projects/dzielna-ewa/episodes/01-burza/episode.json",
     "projects/dzielna-ewa/episodes/01-burza/prepare.stage.json",
   ],
+  "episodes": [
+    {
+      "episodeId": "01-burza",
+      "number": 1,
+      "originPath": "<scratch>/01-Burza.md",
+    },
+  ],
   "nextStep": "uzupełnij decyzje: aimator episode set dzielna-ewa 01-burza --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>",
   "problems": [],
   "ready": false,
   "reused": [],
+  "skipped": [],
   "stage": "prepare",
 }
 `;

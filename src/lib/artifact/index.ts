@@ -36,6 +36,7 @@ export {
   applyWrites,
   emptyDirectories,
   exists,
+  listDirectory,
   listEntries,
   newRunId,
   nowIso,

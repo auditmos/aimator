@@ -6,6 +6,7 @@ import {
   emptyStage,
   exists,
   isApproved,
+  listDirectory,
   listEntries,
   manualProducer,
   newRecord,
@@ -181,6 +182,25 @@ export interface Stage0Report {
   readonly problems: readonly string[];
   readonly ready: boolean;
   readonly reused: readonly string[];
+}
+
+/** One episode `episode add` created, or under `--dry-run` would create. */
+export interface AddedEpisode {
+  readonly episodeId: string;
+  readonly number: number;
+  /** The file it was copied from; null for an idea typed into the command. */
+  readonly originPath: string | null;
+}
+
+/**
+ * Stage 0's report, plus which episodes one `episode add` produced: one for a
+ * file or an idea, every `NN-*.md` for a folder, which may also hold things
+ * that are not episodes and are named rather than silently left behind.
+ */
+export interface EpisodeAddReport extends Stage0Report {
+  readonly episodes: readonly AddedEpisode[];
+  /** A folder's entries that are not `.md` files, by name; empty for one file. */
+  readonly skipped: readonly string[];
 }
 
 interface ProjectInput {
@@ -581,21 +601,172 @@ export async function initProject(input: InitProjectInput): Promise<Result<Stage
     : written;
 }
 
-export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0Report>> {
+export async function addEpisode(input: AddEpisodeInput): Promise<Result<EpisodeAddReport>> {
   const project = await resolveProject(input);
 
   if (!project.ok) {
     return project;
   }
 
-  const material = await readSource(input);
+  const settings = mergeSettings(EMPTY_SETTINGS, input.settings);
 
-  if (!material.ok) {
-    return material;
+  if (!settings.ok) {
+    return settings;
   }
 
-  const { identity } = material.data;
-  const clash = await findNumberClash(project.data, identity.number, identity.id);
+  const context: EpisodeContext = {
+    project: project.data,
+    projectId: input.projectId,
+    settings: settings.data,
+    workspace: input.workspace,
+  };
+  const directory = "sourcePath" in input ? input.sourcePath : null;
+  const listing = directory === null ? null : await listDirectory(directory);
+  const batch =
+    directory === null || listing === null
+      ? await planSingle(input, context)
+      : await planFolder(directory, listing, context);
+
+  if (!batch.ok) {
+    return batch;
+  }
+
+  const { planned, skipped } = batch.data;
+  const [only] = planned;
+  const written = await applyWrites(
+    planned.flatMap((episode) => episode.ops),
+    input.mode
+  );
+
+  return written.ok
+    ? ok({
+        approved: false,
+        changedSinceApproval: [],
+        created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+        episodes: planned.map((episode) => episode.added),
+        nextStep:
+          missingSettings(settings.data).length === 0
+            ? `aimator check ${input.projectId}`
+            : `uzupełnij decyzje: aimator episode set ${input.projectId} ${planned.length === 1 && only !== undefined ? only.added.episodeId : "<episode-id>"} --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>`,
+        problems: [],
+        ready: false,
+        reused: [],
+        skipped,
+      })
+    : written;
+}
+
+/** What every episode of one `episode add` shares: the project and the decisions. */
+interface EpisodeContext {
+  readonly project: ProjectPaths;
+  readonly projectId: string;
+  readonly settings: DraftSettings;
+  readonly workspace: Workspace;
+}
+
+/** One episode checked against the project and ready to write. */
+interface PlannedEpisode {
+  readonly added: AddedEpisode;
+  readonly ops: readonly WriteOp[];
+}
+
+interface Batch {
+  readonly planned: readonly PlannedEpisode[];
+  readonly skipped: readonly string[];
+}
+
+async function planSingle(source: EpisodeSource, context: EpisodeContext): Promise<Result<Batch>> {
+  const material = await readSource(source);
+  const planned = material.ok ? await planEpisode(material.data, context) : material;
+
+  return planned.ok ? ok({ planned: [planned.data], skipped: [] }) : planned;
+}
+
+/**
+ * Every `NN-*.md` directly in a folder, as one batch written whole or not at
+ * all. Each file meets the rule a single `--source` does, and two files that
+ * claim one number clash exactly as a file and an existing episode would. Every
+ * problem is named, because a person fixing a folder needs the list, not its
+ * first entry. A dotfile is the filesystem talking, as in `emptyDirectories`,
+ * so it is neither an episode nor worth a line.
+ */
+async function planFolder(
+  directory: string,
+  listing: { readonly files: readonly string[]; readonly others: readonly string[] },
+  context: EpisodeContext
+): Promise<Result<Batch>> {
+  const visible = (name: string): boolean => !name.startsWith(".");
+  const sources = listing.files.filter((name) => visible(name) && name.endsWith(".md"));
+  const skipped = [
+    ...listing.files.filter((name) => visible(name) && !name.endsWith(".md")),
+    ...listing.others.filter(visible).map((name) => `${name}/`),
+  ].sort();
+
+  if (sources.length === 0) {
+    return err(
+      new InvalidInputError(
+        "source",
+        `katalog ${directory} nie zawiera żadnego pliku .md, więc nie ma w nim odcinka`
+      )
+    );
+  }
+
+  const read = await Promise.all(
+    sources.map(async (name) => {
+      const material = await readSource({ sourcePath: join(directory, name) });
+
+      return {
+        material,
+        name,
+        plan: material.ok ? await planEpisode(material.data, context) : material,
+      };
+    })
+  );
+  const problems: string[] = [];
+  const claims = new Map<number, string[]>();
+  const planned: PlannedEpisode[] = [];
+
+  for (const { material, name, plan } of read) {
+    if (material.ok) {
+      const { number } = material.data.identity;
+      claims.set(number, [...(claims.get(number) ?? []), name]);
+    }
+
+    if (plan.ok) {
+      planned.push(plan.data);
+    } else {
+      problems.push(`${name}: ${plan.error.message}`);
+    }
+  }
+
+  for (const [number, names] of claims) {
+    if (names.length > 1) {
+      problems.push(
+        `${names.join(", ")}: ten sam numer ${number} w jednej paczce, numer wyznacza katalog wyników, więc musi być unikalny`
+      );
+    }
+  }
+
+  return problems.length === 0
+    ? ok({ planned, skipped })
+    : err(
+        new InvalidInputError(
+          "source",
+          [
+            `paczka ${directory} odrzucona w całości, nic nie zapisano:`,
+            ...problems.map((problem) => `  ! ${problem}`),
+          ].join("\n")
+        )
+      );
+}
+
+/** One episode against the project: its number free, its directory new. */
+async function planEpisode(
+  material: SourceMaterial,
+  context: EpisodeContext
+): Promise<Result<PlannedEpisode>> {
+  const { identity } = material;
+  const clash = await findNumberClash(context.project, identity.number, identity.id);
 
   if (clash !== null) {
     return err(
@@ -606,7 +777,7 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
     );
   }
 
-  const paths = episodePaths(project.data, identity.id);
+  const paths = episodePaths(context.project, identity.id);
 
   if (!paths.ok) {
     return paths;
@@ -621,48 +792,23 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
     );
   }
 
-  const settings = mergeSettings(EMPTY_SETTINGS, input.settings);
-
-  if (!settings.ok) {
-    return settings;
-  }
-
   const episode: EpisodeFile = {
     id: identity.id,
     number: identity.number,
-    projectId: input.projectId,
+    projectId: context.projectId,
     schemaVersion: 1,
-    settings: settings.data,
+    settings: context.settings,
     source: {
-      originPath: material.data.originPath,
-      path: toWorkspacePath(input.workspace.root, paths.data.source),
-      sha256: material.data.sha256,
+      originPath: material.originPath,
+      path: toWorkspacePath(context.workspace.root, paths.data.source),
+      sha256: material.sha256,
     },
   };
 
-  const ops = episodeWriteOps(
-    input.workspace,
-    paths.data,
-    episode,
-    material.data.sha256,
-    material.data.content
-  );
-  const written = await applyWrites(ops, input.mode);
-
-  return written.ok
-    ? ok({
-        approved: false,
-        changedSinceApproval: [],
-        created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
-        nextStep:
-          missingSettings(settings.data).length === 0
-            ? `aimator check ${input.projectId}`
-            : `uzupełnij decyzje: aimator episode set ${input.projectId} ${identity.id} --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>`,
-        problems: [],
-        ready: false,
-        reused: [],
-      })
-    : written;
+  return ok({
+    added: { episodeId: identity.id, number: identity.number, originPath: material.originPath },
+    ops: episodeWriteOps(context.workspace, paths.data, episode, material.sha256, material.content),
+  });
 }
 
 /** How the bytes reach `source.md`: copied from a file, or written as typed. */
