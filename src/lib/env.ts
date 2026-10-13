@@ -70,6 +70,14 @@ export const env = createEnv({
      */
     AIMATOR_IMAGE_MODEL_GPT_IMAGE: z.string().min(1).optional(),
     AIMATOR_IMAGE_MODEL_SEEDREAM: z.string().min(1).optional(),
+    /**
+     * The private R2 bucket a clip is lent from for one lip-sync job, when the
+     * provider cannot take it by id. **Not the site's bucket**: the site's
+     * worker serves whatever its bucket holds, so a clip lent there would be
+     * published for as long as it sat there. It and the three `R2_*` variables
+     * below are read only on the paid path that actually sends.
+     */
+    AIMATOR_LIPSYNC_BUCKET: z.string().min(1).optional(),
     /** Stage 10's other audio call site; see `AIMATOR_EFFECTS_MODEL` above. */
     AIMATOR_MUSIC_MODEL: z.string().min(1).optional(),
     /**
@@ -166,5 +174,13 @@ export const env = createEnv({
     KLING_API_KEY: z.string().min(1).optional(),
     /** Read only on the paid path; `--dry-run` never asks for it. */
     OPENAI_API_KEY: z.string().min(1).optional(),
+    /**
+     * An R2 API token's S3 credentials, scoped to `AIMATOR_LIPSYNC_BUCKET`, and
+     * the account whose endpoint they sign for. Not wrangler's login: the
+     * lending is three signed URLs, made without a CLI and without an SDK.
+     */
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   },
 });

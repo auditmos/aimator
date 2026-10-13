@@ -47,6 +47,11 @@ OPENAI_API_KEY=…
 BYTEPLUS_MODELARK=…                   # także klucz wideo Seedance, na obu torach
 KLING_API_KEY=…                       # klucz wideo, gdy AIMATOR_VIDEO_MODEL=kling-3.0
 ELEVENLABS_API_KEY=…                  # mowa narratora i postaci, muzyka i efekty; jeden klucz
+
+AIMATOR_LIPSYNC_BUCKET=…              # lip-sync: PRYWATNY bucket R2 na klip pożyczony dostawcy
+R2_ACCOUNT_ID=…                       # konto R2, którego endpoint podpisują klucze niżej
+R2_ACCESS_KEY_ID=…                    # token API R2 (S3), zawężony do tego bucketu
+R2_SECRET_ACCESS_KEY=…
 ```
 
 **Model wideo wybiera dostawcę.** Identyfikator przechodzi przez zamkniętą tabelę:
@@ -54,6 +59,17 @@ ELEVENLABS_API_KEY=…                  # mowa narratora i postaci, muzyka i efe
 `kling-3.0` na Kling z kluczem `KLING_API_KEY`. Inny identyfikator to odmowa przed
 wysyłką, z listą znanych. Kling nie oddaje ostatniej klatki klipu, więc etap 7 wycina ją
 lokalnie przez ffmpeg i bez niego odmawia, zanim cokolwiek kupi.
+
+**Klip pożyczony na czas lip-syncu.** Kling Lip Sync nie przyjmuje bajtów wideo, tylko id
+klipu, który sam wyrenderował w ciągu 30 dni, albo adres, z którego go pobierze. Każdy inny
+klip trafia na czas zadania do **prywatnego** bucketu R2 `AIMATOR_LIPSYNC_BUCKET`, dostawca
+dostaje podpisany URL GET ważny najwyżej godzinę, a po zadaniu obiekt jest usuwany. Obiekt
+nazywa się sha256 pliku, nigdy ścieżką z katalogu roboczego. Nieudane usunięcie to
+meldunek, nie odmowa: bucket jest prywatny, a adres wygasa sam. To nie jest bucket strony,
+bo worker strony serwuje wszystko, co w nim leży. `R2_ACCESS_KEY_ID` i
+`R2_SECRET_ACCESS_KEY` to dane S3 tokenu API R2, zawężonego do tego jednego bucketu, a nie
+logowanie wranglera. Wszystkie cztery czytane są wyłącznie na ścieżce płatnej, która
+naprawdę wysyła, a brak którejkolwiek to odmowa z jej nazwą, zanim cokolwiek wyjdzie.
 
 ## Dlaczego tyle zmiennych
 

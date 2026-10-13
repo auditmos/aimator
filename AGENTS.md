@@ -353,6 +353,9 @@ src/
     ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
     │                 #                   page's worker and the local screen
     ├── byte-range.test.ts
+    ├── hosting.ts    # Single-file form: a clip lent to a provider for one job, from a
+    │                 #                   private R2 bucket, by signed URL, then taken back
+    ├── hosting.test.ts
     ├── result.ts     # Result<T>: the recoverable-error contract
     └── result.test.ts
 ```

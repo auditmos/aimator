@@ -99,6 +99,14 @@ describe("env", () => {
     const guide = readFileSync("docs/konfiguracja.md", "utf8");
 
     expect(declared).toContain("KLING_API_KEY");
+    expect(declared).toEqual(
+      expect.arrayContaining([
+        "AIMATOR_LIPSYNC_BUCKET",
+        "R2_ACCESS_KEY_ID",
+        "R2_ACCOUNT_ID",
+        "R2_SECRET_ACCESS_KEY",
+      ])
+    );
     expect(declared.filter((name) => !example.includes(name))).toEqual([]);
     expect(declared.filter((name) => !guide.includes(name))).toEqual([]);
   });
