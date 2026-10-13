@@ -66,6 +66,11 @@ Próba na sucho: nic nie zapisano. Scenariusz odcinka "01-burza" zatwierdzony
   sceny: 3, suma 30 s, najdłuższa 10 s"
 `;
 
+exports[`every command >   approve <id> --stage style --track <tor> --artifact S01[,S02] [--json] 1`] = `
+"StyleBasisError
+podstawa obrazów stylu projektu "ewa" to none, a generuje się je tylko przy: aimator project style ewa --generated --count <1-4>"
+`;
+
 exports[`every command >   assembly generate <id> <episode-id> --track <gpt-image|seedream> 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Montaż ewa/01-burza, tor gpt-image
@@ -501,6 +506,11 @@ exports[`every command >   check <id> --stage prepare [--json] 1`] = `
 }"
 `;
 
+exports[`every command >   check <id> --stage style --track <tor> [--json] 1`] = `
+"StyleBasisError
+podstawa obrazów stylu projektu "ewa" to none, a generuje się je tylko przy: aimator project style ewa --generated --count <1-4>"
+`;
+
 exports[`every command >   clip generate <id> <episode-id> --track <gpt-image|seedream> 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Klipy ewa/01-burza, tor gpt-image, kadr 2816x1584
@@ -866,6 +876,13 @@ Projekt "ewa": Dzielna Ewa
   Obsada:
     ewa   Ewa   z opisu w project.md
     tata  Tata  z opisu w project.md"
+`;
+
+exports[`every command >   project style <id> --generated --count <1-4> [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Obrazy stylu projektu "ewa" powstają z Style Bible, 2 na tor
+  ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
+Dalej: aimator check ewa"
 `;
 
 exports[`every command >   project style <id> --none [--json] 1`] = `
@@ -1895,4 +1912,9 @@ Odcinek "01-burza" projektu "ewa"
   10. muzyka i efekty, miks, tor seedream: zablokowany
       ! nie ma zmontowanego odcinka na torze seedream, etap 8 go nie ukończył; brakuje projects/ewa/episodes/01-burza/seedream/episode.mp4; nie ma arkusza cue, uruchom najpierw: sound-design generate
 Dalej: aimator character generate ewa ewa --track gpt-image"
+`;
+
+exports[`every command >   style generate <id> --track <gpt-image|seedream> [--artifact S01,...] [--model <id>] 1`] = `
+"StyleBasisError
+podstawa obrazów stylu projektu "ewa" to none, a generuje się je tylko przy: aimator project style ewa --generated --count <1-4>"
 `;

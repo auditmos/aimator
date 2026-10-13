@@ -51,6 +51,7 @@ const TATA_FROM_DESCRIPTION = /tata\s+Tata\s+z opisu w project\.md/;
 /** How `project show` states the style frames: the basis, then how many. */
 const STYLE_SUPPLIED_1 = /Obrazy stylu:\s+wnoszone \(1\)/;
 const STYLE_UNDECIDED = /Obrazy stylu:\s+nierozstrzygnięte/;
+const STYLE_GENERATED_2 = /Obrazy stylu:\s+generowane z Style Bible \(2 na tor\)/;
 
 /** How `episode show` lays out a decision: the label, then the value. */
 const DURATION_30 = /Długość:\s+30 s/;
@@ -335,6 +336,35 @@ describe("project style", () => {
 
     expect(both.ok ? null : both.error.name).toBe("UsageError");
     expect(neither.ok ? null : neither.error.name).toBe("UsageError");
+  });
+
+  /** The count is a decision too: generated without it is half an answer. */
+  it("should record --generated with --count, and refuse --generated without it", async () => {
+    await cli("project", "init", "generowany", "--title", "Generowany");
+
+    const without = await run([
+      "project",
+      "style",
+      "generowany",
+      "--generated",
+      "--workspace",
+      root,
+    ]);
+    const decided = await object(
+      "project",
+      "style",
+      "generowany",
+      "--generated",
+      "--count",
+      "2",
+      "--json"
+    );
+    const shown = await cli("project", "show", "generowany");
+
+    expect(without.ok ? null : without.error.message).toContain("--count");
+    expect(without.ok ? null : without.error.name).toBe("UsageError");
+    expect(decided).toMatchObject({ command: "project style", stage: "prepare" });
+    expect(shown).toMatch(STYLE_GENERATED_2);
   });
 });
 

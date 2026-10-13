@@ -57,6 +57,8 @@ etapy 5, 6 i 7:
 
 ```bash
 pnpm dev project style dzielna-ewa --source ~/Styl/kadr-1.png --source ~/Styl/kadr-2.png
+# albo generowane z Style Bible, dwa na każdy tor:
+pnpm dev project style dzielna-ewa --generated --count 2
 # albo jawnie bez obrazów stylu:
 pnpm dev project style dzielna-ewa --none
 ```
@@ -241,12 +243,13 @@ edycja zasad, która wygasza zgodę etapu 0 jak każda inna.
 
 Style Bible mówi modelowi słowami, jak wygląda seria. **Obrazy stylu** pokazują mu to:
 kilka kadrów w docelowym medium, które etapy 5, 6 i 7 dołączają do każdego kadru filmu.
-To decyzja projektu bez wartości domyślnej: obrazy wnoszone (`supplied`) albo jawnie
-żadne (`none`).
+To decyzja projektu bez wartości domyślnej: obrazy wnoszone (`supplied`), generowane
+z Style Bible osobno na każdym torze (`generated`) albo jawnie żadne (`none`).
 
 | Polecenie | Co zapisuje |
 |---|---|
 | `project style <id> --source <plik.png>` | kopiuje obraz do `style/sources/S01.png` (kolejne S02, S03…) z sha256 i ustawia `supplied`; można powtarzać, te same bajty drugi raz to ten sam obraz |
+| `project style <id> --generated --count <1-4>` | ustawia `generated` i liczbę obrazów na tor; liczba to decyzja bez wartości domyślnej, a `--generated` bez `--count` to błąd użycia. Same obrazy rysuje `style generate`, opisane przy [etapie 2](02-postac.md#obrazy-stylu-generowane-z-style-bible) |
 | `project style <id> --none` | jawne „bez obrazów stylu”; obrazy już wniesione zostają na dysku, ale nie są dołączane |
 
 Przyjmowany jest wyłącznie PNG, bo plik ląduje w katalogu roboczym jako `Snn.png`.
@@ -271,7 +274,9 @@ więc na etapie 5, dopóki ktoś nie zdecyduje, a `project style <id> --none` to
 Obrazy stylu idą **po** załącznikach treści, jako `Image N = style:S01 — style frame:
 medium, line, shading, palette, texture and lighting only; not content`, i liczą się do
 limitu referencji toru. Przekroczenie limitu to odmowa przed wysyłką, z liczbami, nigdy
-ciche obcięcie.
+ciche obcięcie. Przy `generated` każdy tor dołącza **wyłącznie swoje** obrazy stylu i tylko
+te, które ktoś przyjął przez `approve --stage style`; brakujący albo nieprzyjęty zatrzymuje
+kadr z poleceniem, które go kupuje albo przyjmuje.
 
 ## Sześć decyzji odcinka
 

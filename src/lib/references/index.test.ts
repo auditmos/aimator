@@ -10,10 +10,13 @@ import {
   PROJECT,
   png,
   FILM as REFERENCE,
+  RULES,
   recorder,
+  type StyleChoice,
 } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { approvePromptPackage } from "../prompt-package/index.js";
+import { approveStyle, generateStyle } from "../style/index.js";
 import { type ImageTrack, resolveWorkspace, type Workspace } from "../workspace.js";
 import { approveReferences, checkReferences, generateReferences } from "./index.js";
 
@@ -163,16 +166,85 @@ afterEach(async () => {
  * the list; and a list the track cannot carry is refused before a call.
  */
 describe("style frames", () => {
-  function styled(style: "undecided" | readonly Buffer[]): Promise<void> {
+  /** The rules with a Style Bible answered, which generated style frames are drawn from. */
+  const BIBLE = `${RULES}\n## Style Bible\n\n- Style line: flat 2D cutout, thick ink outline.\n- Palette: #1B2A41, #F2C14E, #FDF6EC.\n- Linework rule: 4 px outer line, #1B2A41.\n- Always / never: none.\n`;
+
+  function styled(style: StyleChoice): Promise<void> {
     return makeUpstream({
       answer: answer(),
       approvePackage: true,
       root,
       scratch,
+      ...(typeof style === "object" && "generated" in style ? { rules: BIBLE } : {}),
       style,
       workspace,
     });
   }
+
+  /** Each track draws its own style frames, so what the dry run reads is per track. */
+  async function drawStyle(track: ImageTrack, approve: boolean): Promise<void> {
+    await generateStyle({
+      apiKey: API_KEY,
+      artifacts: [],
+      fetch: recorder().fetch,
+      mode: "apply",
+      model: "image-model",
+      projectId: PROJECT,
+      regenerate: false,
+      track,
+      workspace,
+    });
+
+    if (approve) {
+      await approveStyle({
+        artifacts: ["S01"],
+        mode: "apply",
+        note: null,
+        projectId: PROJECT,
+        reviewer: "t",
+        track,
+        workspace,
+      });
+    }
+  }
+
+  it("should attach the style frame this track drew and accepted, not the other's", async () => {
+    await styled({ generated: 1 });
+    await drawStyle("seedream", true);
+    await drawStyle("gpt-image", true);
+    const result = await generate({ mode: "dry-run", model: "seedream-5-0", track: "seedream" });
+    const r01 = result.ok ? result.data.artifacts.find((one) => one.id === "R01") : undefined;
+    const paths = r01?.attachments.map((one) => one.path) ?? [];
+
+    expect(r01?.state).toBe("planned");
+    expect(r01?.prompt).toContain("Image 2 = style:S01 — style frame");
+    expect(paths).toContain(`projects/${PROJECT}/style/seedream/S01.png`);
+    expect(paths.filter((path) => path.includes("/style/gpt-image/"))).toEqual([]);
+  });
+
+  it("should block a frame on a style frame nobody accepted, the reason in its note", async () => {
+    await styled({ generated: 1 });
+    await drawStyle("gpt-image", false);
+    const status = await checkReferences({
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      track: "gpt-image",
+      workspace,
+    });
+    const r01 = status.ok ? status.data.artifacts.find((one) => one.id === "R01") : undefined;
+
+    expect(r01?.state).toBe("absent");
+    expect(r01?.note).toContain("style:S01");
+    expect(r01?.note).toContain(
+      `aimator approve ${PROJECT} --stage style --track gpt-image --artifact S01`
+    );
+    // Every frame on the track carries it, so it stops the whole stage, and a
+    // refusal that stops the whole stage belongs in `problems`, where `status`
+    // reads it.
+    expect(status.ok && status.data.problems.join("\n")).toContain(
+      `aimator approve ${PROJECT} --stage style --track gpt-image --artifact S01`
+    );
+  });
 
   it("should refuse to spend while nobody has decided the style frames", async () => {
     await styled("undecided");

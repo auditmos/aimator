@@ -93,6 +93,45 @@ Zwykle wznawia się **bez drugiej opłaty**: powtórz to samo polecenie. Odpowie
 zdążyła trafić na dysk, jest już opłacona. Gpt-image niesie w niej bajty, seedream adres
 ważny 24 h.
 
+## Obrazy stylu generowane z Style Bible
+
+Gdy projekt rozstrzygnął [obrazy stylu](00-przygotowanie.md#obrazy-stylu) jako
+generowane (`project style <id> --generated --count <1-4>`), powstają obok etapu 2, na
+poziomie projektu, **osobno na każdym torze**: dwa modele obrazu to dwie ręce, a obraz
+stylu jednego toru przy drugim mieszałby je w jednym rysunku.
+
+```bash
+pnpm dev style generate dzielna-ewa --track gpt-image --dry-run
+pnpm dev style generate dzielna-ewa --track gpt-image
+pnpm dev approve dzielna-ewa --stage style --track gpt-image --artifact S01,S02
+pnpm dev check dzielna-ewa --stage style --track gpt-image
+```
+
+| | |
+|---|---|
+| **Wejście** | `project.json` (kadr z `aspectRatio`, obsada), `project.md` (blok Style Bible), `style.json` (liczba) |
+| **Wyjście** | `style/<tor>/Snn.png`, `style/<tor>/style.stage.json`, `style/<tor>/runs/<runId>/` |
+| **Bramka** | zatwierdzony [etap 0](00-przygotowanie.md) i blok Style Bible bez `TODO(etap-0)`; potem ocena każdego obrazu z osobna |
+| **Koszt** | jedno płatne wywołanie na obraz, najwyżej cztery na tor |
+
+`style generate` rysuje **każdy brakujący** `Snn` decyzji i mówi, ile wywołań wykona,
+zanim je wykona; `--artifact S01` zawęża przebieg, a `--regenerate` wymaga jawnego
+`--artifact`. `--dry-run` pokazuje przeszkody (niezatwierdzony etap 0, Style Bible
+z `TODO(etap-0)`), liczy wtedy zero płatnych wywołań i i tak drukuje każdy prompt w
+całości. Flagi poza tym jak w `character generate`: `--model <id>`, `--json`.
+
+Prompt jest po angielsku i ma jawną wersję: obraz stylu N z M to neutralna scena ze świata
+serii opisanego w `project.md`, **bez żadnej postaci z obsady**, która pokazuje dokładnie
+medium, kreskę, cieniowanie, paletę, teksturę i światło ze Style Bible. `project.md` jedzie
+w nim dosłownie, jak w każdym obrazie. Kadr to kadr filmu, ten sam co w etapach 5 i 6.
+
+**Zgoda jest per obraz**: `approve <id> --stage style --track <tor> --artifact S01`
+odmawia bez `--artifact` i wiąże przyjęcie z sha256 obrazu. Etapy 5, 6 i 7 dołączają
+wyłącznie **zatwierdzone** obrazy stylu swojego toru, a niezatwierdzony zatrzymuje kadr
+z powodem i poleceniem w `note`, a że zatrzymuje każdy kadr toru, stoi też w `problems`
+etapu, skąd czyta go `status`. Zmiana `project.md`, `project.json` albo `style.json`
+cofa zgodę na obraz stylu tak jak na każdy inny obraz.
+
 ---
 
 [← etap 1](01-scenariusz.md) · [README](../../README.md) ·

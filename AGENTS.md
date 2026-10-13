@@ -110,6 +110,7 @@ src/
 │       ├── project.ts        # Etap 0: the rules, and who narrates
 │       ├── episode.ts        # Etap 0: the five production settings
 │       ├── character.ts      # Etap 0's cast and etap 2's images: one command
+│       ├── style.ts          # Style frames generated per track, beside etap 2
 │       ├── screenplay.ts     # Etap 1
 │       ├── shot-list.ts      # Etap 3
 │       ├── prompt-package.ts # Etap 4, and the free preview of a send
@@ -179,10 +180,12 @@ src/
     │   │                 #         addCharacter, addCharacterSources, setCharacterBasis,
     │   │                 #         checkStage0, approveStage0,
     │   │                 #         readStage0Inputs, readStage0Character, showProject,
-    │   │                 #         showEpisode
+    │   │                 #         showEpisode, setStyle, readStage0Style
     │   ├── schema.ts     # Internal: Zod schemas for the artifacts
-    │   ├── template.ts   # Internal: the project.md scaffold
-    │   └── index.test.ts # Tests through the entry
+    │   ├── template.ts   # Internal: the project.md scaffold, and its Style Bible gate
+    │   ├── style.ts      # Internal: the style decision, and the images brought in
+    │   ├── index.test.ts # Tests through the entry
+    │   └── style.test.ts # The style decision, and what changing it lapses
     ├── screenplay/   # Folder form: index.ts is the only entry (stage 1)
     │   ├── index.ts      # Public: generateScreenplay, checkScreenplay, approveScreenplay,
     │   │                 #         validateScreenplay, readScreenplayScenes, buildPrompt
@@ -203,6 +206,13 @@ src/
     │   ├── review.ts     # Internal: per-image verification and approval
     │   ├── index.test.ts    # Prompts and the reference plan, through the entry
     │   └── generate.test.ts # Gates/resume/approve, through the entry
+    ├── style/        # Folder form: style frames generated per track, beside stage 2
+    │   ├── index.ts      # Public: generateStyle, checkStyle, approveStyle
+    │   ├── prompt.ts     # Internal: the prompt, the ids, the declared version
+    │   ├── plan.ts       # Internal: what it reads from stage 0, and the gate
+    │   ├── generate.ts   # Internal: the command: targets, lock, preview, series
+    │   ├── review.ts     # Internal: per-image verification and approval
+    │   └── index.test.ts # Gate/bill/approval, through the entry
     ├── shot-list/    # Folder form: index.ts is the only entry (stage 3)
     │   ├── index.ts      # Public: generateShotList, checkShotList,
     │   │                 #         approveShotList, validateShotList, buildPrompt

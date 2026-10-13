@@ -172,12 +172,8 @@ export const episodeFileSchema = z.strictObject({
   source: assetSchema,
 });
 
-/**
- * Where the style frames every film frame carries come from. Recorded as a
- * decision for the reason a character's basis is: an empty `style/sources/`
- * does not tell "deliberately none" from "not brought yet".
- */
-const styleBases = ["none", "supplied"] as const;
+/** The most style frames a project generates per track, the number it decides. */
+export const MAX_GENERATED_STYLE_FRAMES = 4;
 
 const styleSourceSchema = z.strictObject({
   id: z.string().regex(/^S\d{2,}$/, "expected a style frame id such as S01"),
@@ -190,12 +186,32 @@ const styleSourceSchema = z.strictObject({
  * `style.json`, a file of its own beside `project.json` rather than a field in
  * it: `project.json` is a recorded input of nearly every artifact, and style
  * frames are an input of film frames alone. Its absence is the undecided state.
+ *
+ * `basis` is where the style frames come from, recorded as a decision for the
+ * reason a character's basis is: an empty `style/sources/` does not tell
+ * "deliberately none" from "not brought yet". Only `generated` carries a count,
+ * because only there does a number have to be decided before anything exists.
+ * Images brought in stay listed whatever the basis becomes: they are stage 0's
+ * outputs, and changing the basis only stops attaching them.
  */
-export const styleFileSchema = z.strictObject({
-  basis: z.enum(styleBases),
-  schemaVersion: z.literal(1),
-  sources: z.array(styleSourceSchema),
-});
+export const styleFileSchema = z.discriminatedUnion("basis", [
+  z.strictObject({
+    basis: z.literal("generated"),
+    count: z.int().min(1).max(MAX_GENERATED_STYLE_FRAMES),
+    schemaVersion: z.literal(1),
+    sources: z.array(styleSourceSchema),
+  }),
+  z.strictObject({
+    basis: z.literal("none"),
+    schemaVersion: z.literal(1),
+    sources: z.array(styleSourceSchema),
+  }),
+  z.strictObject({
+    basis: z.literal("supplied"),
+    schemaVersion: z.literal(1),
+    sources: z.array(styleSourceSchema),
+  }),
+]);
 
 export type CharacterEntry = z.infer<typeof characterSchema>;
 export type StyleFile = z.infer<typeof styleFileSchema>;

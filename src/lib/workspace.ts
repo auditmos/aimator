@@ -96,6 +96,15 @@ export interface CharacterPaths {
   readonly sources: string;
 }
 
+/** The style frames one track generates, beside its own stage file and archive. */
+export interface StyleTrackPaths {
+  /** A file, not a directory, for the reason `CharacterTrackPaths.lock` gives. */
+  readonly lock: string;
+  readonly root: string;
+  readonly runs: string;
+  readonly stage: string;
+}
+
 /** One character as one model track draws it. The two tracks never meet. */
 export interface CharacterTrackPaths {
   readonly card: string;
@@ -573,6 +582,29 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
 export function styleSource(project: ProjectPaths, id: string): Result<string> {
   return STYLE_ID.test(id)
     ? ok(join(project.styleSources, `${id}.png`))
+    : err(new IdentifierError(id, `invalid style frame id "${id}": expected a form like S01`));
+}
+
+/**
+ * The style frames one track draws when the project generates them. A track
+ * is a directory level here as under a character: two models are two hands,
+ * and a style frame from one beside the other would mix them in one drawing.
+ */
+export function styleTrackPaths(project: ProjectPaths, track: ImageTrack): StyleTrackPaths {
+  const root = join(project.root, "style", track);
+
+  return {
+    lock: join(root, "style.lock"),
+    root,
+    runs: join(root, "runs"),
+    stage: join(root, "style.stage.json"),
+  };
+}
+
+/** One generated style frame on one track, `style/<track>/S01.png`. */
+export function styleImage(paths: StyleTrackPaths, id: string): Result<string> {
+  return STYLE_ID.test(id)
+    ? ok(join(paths.root, `${id}.png`))
     : err(new IdentifierError(id, `invalid style frame id "${id}": expected a form like S01`));
 }
 

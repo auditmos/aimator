@@ -13,6 +13,7 @@ import { USAGE as REFERENCES } from "./stages/references.js";
 import { USAGE as SCREENPLAY } from "./stages/screenplay.js";
 import { USAGE as SHOT_LIST } from "./stages/shot-list.js";
 import { USAGE as SOUND_DESIGN } from "./stages/sound-design.js";
+import { USAGE as STYLE } from "./stages/style.js";
 import { USAGE as STATUS } from "./status.js";
 
 /** The glossary of the flags several stages share. */
@@ -74,6 +75,7 @@ export const USAGE = [
   ["Etap 0. Przygotowanie projektu i odcinka:", PROJECT, CAST, EPISODE].join("\n"),
   SCREENPLAY,
   CHARACTER,
+  STYLE,
   SHOT_LIST,
   PROMPT_PACKAGE,
   REFERENCES,

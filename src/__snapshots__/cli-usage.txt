@@ -12,11 +12,14 @@ Etap 0. Przygotowanie projektu i odcinka:
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
     etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
   project style <id> --source <plik.png> [--source <plik.png>...] [--json]
+  project style <id> --generated --count <1-4> [--json]
   project style <id> --none [--json]
-    Obrazy stylu: PNG kopiowane do style/sources/Snn.png albo jawne "bez obrazów
-    stylu". Decyzja mieszka w style.json, nie w project.json, więc jej zmiana
-    cofa zgody wyłącznie na kadry. Wymagają jej dopiero etapy 5, 6 i 7, które
-    dołączają obrazy stylu po załącznikach treści, jako style:Snn.
+    Obrazy stylu: PNG kopiowane do style/sources/Snn.png, generowane z Style
+    Bible osobno na każdym torze (style generate, liczba bez wartości
+    domyślnej) albo jawne "bez obrazów stylu". Decyzja mieszka w style.json, nie
+    w project.json, więc jej zmiana cofa zgody wyłącznie na kadry. Wymagają jej
+    dopiero etapy 5, 6 i 7, które dołączają obrazy stylu po załącznikach treści,
+    jako style:Snn.
   character new <id> <character-id> --name <nazwa> [--json]
   character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
   character describe <id> <character-id> [--json]
@@ -38,6 +41,14 @@ Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
   character generate <id> <character-id> --track <gpt-image|seedream>
                      [--artifact card|hero|<widok>,...] [--model <id>]
                      [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+
+Obrazy stylu (płatne; per tor, przy podstawie generated; obok etapu 2):
+  style generate <id> --track <gpt-image|seedream> [--artifact S01,...] [--model <id>]
+                 [--dry-run] [--json] [--regenerate]
+    Rysuje z bloku Style Bible każdy brakujący obraz stylu Snn tego toru, jedno
+    płatne wywołanie na obraz, i podaje ich liczbę przed wysyłką. Czeka na
+    zatwierdzony etap 0 i Style Bible bez TODO(etap-0). Każdy obraz przyjmuje się
+    osobno; etapy 5, 6 i 7 dołączają wyłącznie przyjęte obrazy swojego toru.
 
 Etap 3. Lista ujęć (płatny; wspólna dla obu torów, bez poziomu katalogu na tor):
   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
@@ -196,6 +207,7 @@ Wspólne:
   check <id> <episode-id> --stage shot-list [--json]
   check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor> [--json]
+  check <id> --stage style --track <tor> [--json]
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
@@ -206,6 +218,7 @@ Wspólne:
                [--note <uzasadnienie>] [--reviewer <kto>] [--json]
   approve <id> <character-id> --stage character --track <tor> [--json]
                --artifact <klucz>[,<klucz>...]
+  approve <id> --stage style --track <tor> --artifact S01[,S02] [--json]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
                [--json]
   approve <id> <episode-id> --stage opening-frame --track <tor> [--json]

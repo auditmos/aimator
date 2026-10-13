@@ -50,7 +50,7 @@ import {
   sourceNatures,
 } from "./schema.js";
 import { planStyle, readStyleFile, type StyleDecision, styleOutputs } from "./style.js";
-import { PLACEHOLDER, renderRules } from "./template.js";
+import { PLACEHOLDER, renderRules, styleBibleProblems } from "./template.js";
 
 /** The five episode decisions, all made. A later stage reads them, never the draft. */
 export type { ReadySettings as EpisodeSettings, ShotListSettings } from "./schema.js";
@@ -1248,13 +1248,21 @@ export async function showProject(input: CheckInput): Promise<Result<ProjectOver
     })),
     narratorVoiceId: file.data.narratorVoiceId,
     projectId: input.projectId,
-    style: {
-      basis: style.data?.basis ?? null,
-      images: style.data?.basis === "supplied" ? sources.length : 0,
-      sources,
-    },
+    style: { basis: style.data?.basis ?? null, images: imagesOf(style.data), sources },
     title: file.data.title,
   });
+}
+
+/**
+ * How many style frames a frame will carry: the images brought in, or the
+ * number decided per track. None while undecided or decided against.
+ */
+function imagesOf(style: StyleFile | null): number {
+  if (style?.basis === "generated") {
+    return style.count;
+  }
+
+  return style?.basis === "supplied" ? style.sources.length : 0;
 }
 
 /**
@@ -1801,19 +1809,33 @@ export async function readStage0Character(
   });
 }
 
-/** Everything a film-frame stage may read about the style frames, in one call. */
+/** Everything a stage may read about the style frames, in one call. */
 export interface Stage0Style {
   /**
    * Whether stage 0 of this project holds as it stands. A brought image has no
    * review of its own: it is a stage-0 output, accepted with the rest of it.
    */
   readonly approved: boolean;
+  /** The film frame a generated style frame is drawn in; null while undecided. */
+  readonly aspectRatio: string | null;
   /** Null while nobody has decided, which is not the same as "none". */
   readonly basis: StyleBasis | null;
+  /** The cast, which a generated style frame must show none of. */
+  readonly cast: readonly CastMember[];
+  /** How many style frames each track generates; null unless `generated`. */
+  readonly count: number | null;
   /** `style.json` with the digest of the bytes read; null while undecided. */
   readonly file: RecordedFile | null;
+  /**
+   * What a generated style frame consumes, with the digest of each file read:
+   * `project.json` for the frame, `project.md` for the Style Bible, and
+   * `style.json` for how many frames there are.
+   */
+  readonly inputs: readonly RecordedFile[];
   /** Why the approval does not hold, when it does not. */
   readonly problems: readonly string[];
+  /** `project.md`, verbatim. */
+  readonly rules: string;
   /**
    * The images this decision attaches, in id order: absolute, with the digest
    * stage 0 recorded. Empty unless the basis is `supplied`.
@@ -1823,6 +1845,11 @@ export interface Stage0Style {
     readonly path: string;
     readonly sha256: string;
   }[];
+  /**
+   * Why the Style Bible cannot be drawn from yet: absent, or still marked.
+   * Empty when it can. Only generation needs it; brought images do not.
+   */
+  readonly styleBible: readonly string[];
 }
 
 /**
@@ -1839,39 +1866,58 @@ export async function readStage0Style(input: CheckInput): Promise<Result<Stage0S
   }
 
   const style = await readStyleFile(project.data.style);
+  const file = await readProjectFile(project.data.file);
+  const projectJson = await readDigest(project.data.file);
+  const rules = await readDigest(project.data.rules);
 
   if (!style.ok) {
     return style;
   }
-
-  if (style.data === null) {
-    return ok({ approved: false, basis: null, file: null, problems: [], sources: [] });
+  if (!file.ok) {
+    return file;
+  }
+  if (!projectJson.ok) {
+    return projectJson;
+  }
+  if (!rules.ok) {
+    return rules;
   }
 
-  const digest = await readDigest(project.data.style);
+  const relative = (path: string): string => toWorkspacePath(input.workspace.root, path);
+  const digest = style.data === null ? null : await readDigest(project.data.style);
 
-  if (!digest.ok) {
+  if (digest !== null && !digest.ok) {
     return digest;
   }
 
+  const recorded =
+    digest === null ? null : { path: relative(project.data.style), sha256: digest.data.sha256 };
   const approval = await projectApproval(input.workspace, project.data);
+  const text = rules.data.bytes.toString("utf8");
 
   return ok({
     approved: approval.approved,
-    basis: style.data.basis,
-    file: {
-      path: toWorkspacePath(input.workspace.root, project.data.style),
-      sha256: digest.data.sha256,
-    },
+    aspectRatio: file.data.aspectRatio,
+    basis: style.data?.basis ?? null,
+    cast: Object.entries(file.data.characters).map(([id, entry]) => ({ id, name: entry.name })),
+    count: style.data?.basis === "generated" ? style.data.count : null,
+    file: recorded,
+    inputs: [
+      { path: relative(project.data.file), sha256: projectJson.data.sha256 },
+      { path: relative(project.data.rules), sha256: rules.data.sha256 },
+      ...(recorded === null ? [] : [recorded]),
+    ],
     problems: approval.problems,
+    rules: text,
     sources:
-      style.data.basis === "supplied"
+      style.data?.basis === "supplied"
         ? style.data.sources.map((one) => ({
             id: one.id,
             path: join(input.workspace.root, one.path),
             sha256: one.sha256,
           }))
         : [],
+    styleBible: styleBibleProblems(text),
   });
 }
 

@@ -15,6 +15,7 @@ import { runReference } from "./stages/references.js";
 import { runScreenplay } from "./stages/screenplay.js";
 import { runShotList } from "./stages/shot-list.js";
 import { runSoundDesign } from "./stages/sound-design.js";
+import { runStyle } from "./stages/style.js";
 import { runStatus } from "./status.js";
 import { USAGE } from "./usage.js";
 
@@ -76,6 +77,10 @@ export async function run(argv: string[]): Promise<Result<string>> {
 
   if (command === "sound-design") {
     return await runSoundDesign(rest);
+  }
+
+  if (command === "style") {
+    return await runStyle(rest);
   }
 
   if (command === "list") {

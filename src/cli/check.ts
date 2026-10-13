@@ -20,6 +20,7 @@ import { checkReferencesStage } from "./stages/references.js";
 import { checkScreenplayStage } from "./stages/screenplay.js";
 import { checkShotListStage } from "./stages/shot-list.js";
 import { checkSoundDesignStage } from "./stages/sound-design.js";
+import { checkStyleStage } from "./stages/style.js";
 
 /** Every question `check` answers, in the words the usage text promises. */
 export const USAGE = `  check <id> [<episode-id>]
@@ -28,6 +29,7 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage shot-list [--json]
   check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor> [--json]
+  check <id> --stage style --track <tor> [--json]
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
@@ -75,6 +77,7 @@ const WIDE: Readonly<
   references: checkReferencesStage,
   "sound-design": checkSoundDesignStage,
   soundtrack: checkSoundtrackStage,
+  style: checkStyleStage,
 };
 
 /**

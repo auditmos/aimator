@@ -19,12 +19,14 @@ import { approveReferencesStage } from "./stages/references.js";
 import { approveScreenplayStage } from "./stages/screenplay.js";
 import { approveShotListStage } from "./stages/shot-list.js";
 import { approveSoundDesignStage } from "./stages/sound-design.js";
+import { approveStyleStage } from "./stages/style.js";
 
 /** Every acceptance this tool records, in the words the usage text promises. */
 export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
                [--note <uzasadnienie>] [--reviewer <kto>] [--json]
   approve <id> <character-id> --stage character --track <tor> [--json]
                --artifact <klucz>[,<klucz>...]
+  approve <id> --stage style --track <tor> --artifact S01[,S02] [--json]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
                [--json]
   approve <id> <episode-id> --stage opening-frame --track <tor> [--json]
@@ -96,6 +98,10 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
     return await approveCharacterStage(parsed.data, approval);
   }
 
+  if (stage === "style") {
+    return await approveStyleStage(parsed.data, approval);
+  }
+
   if (stage === "references") {
     return await approveReferencesStage(parsed.data, approval);
   }
@@ -134,7 +140,7 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
 
   return err(
     new UsageError(
-      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design`
+      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design`
     )
   );
 }

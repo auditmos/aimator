@@ -9,7 +9,7 @@ import {
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import { type ProjectPaths, styleSource, type Workspace } from "../workspace.js";
-import { type StyleFile, styleFileSchema } from "./schema.js";
+import { MAX_GENERATED_STYLE_FRAMES, type StyleFile, styleFileSchema } from "./schema.js";
 
 /**
  * Internal to the project module: the style frames, stage 0's decision about
@@ -25,6 +25,7 @@ import { type StyleFile, styleFileSchema } from "./schema.js";
 
 /** What somebody decided, in the shape the command carries it. */
 export type StyleDecision =
+  | { readonly basis: "generated"; readonly count: number }
   | { readonly basis: "none" }
   | { readonly basis: "supplied"; readonly sourcePaths: readonly string[] };
 
@@ -82,6 +83,24 @@ export async function planStyle(
       file: { basis: "none", schemaVersion: 1, sources },
       reused: [],
     });
+  }
+
+  if (decision.basis === "generated") {
+    return Number.isInteger(decision.count) &&
+      decision.count >= 1 &&
+      decision.count <= MAX_GENERATED_STYLE_FRAMES
+      ? ok({
+          copies: [],
+          created: [],
+          file: { basis: "generated", count: decision.count, schemaVersion: 1, sources },
+          reused: [],
+        })
+      : err(
+          new StyleInputError(
+            "count",
+            `liczba obrazów stylu to ${decision.count}, a projekt generuje od 1 do ${MAX_GENERATED_STYLE_FRAMES} na tor`
+          )
+        );
   }
 
   const copies: WriteOp[] = [];

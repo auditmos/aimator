@@ -14,6 +14,37 @@
 
 export const PLACEHOLDER = "TODO(etap-0)";
 
+const STYLE_BIBLE = "## Style Bible";
+
+/**
+ * Why the Style Bible cannot be drawn from yet, or nothing when it can.
+ *
+ * Generated style frames are drawn from this block and nothing else, so it has
+ * to exist and be answered. The block runs from its heading to the next one; a
+ * project scaffolded before the block existed simply has none, and is told how
+ * to add it rather than drawn from rules that never stated a style.
+ */
+export function styleBibleProblems(rules: string): readonly string[] {
+  const start = rules.indexOf(`\n${STYLE_BIBLE}\n`);
+
+  if (start === -1) {
+    return [
+      `project.md nie ma bloku "${STYLE_BIBLE}", a obrazy stylu powstają wyłącznie z niego; dopisz go według docs/stages/00-przygotowanie.md#style-bible`,
+    ];
+  }
+
+  const rest = rules.slice(start + STYLE_BIBLE.length + 2);
+  const next = rest.indexOf("\n## ");
+  const block = next === -1 ? rest : rest.slice(0, next);
+  const left = block.split(PLACEHOLDER).length - 1;
+
+  return left === 0
+    ? []
+    : [
+        `blok Style Bible w project.md ma jeszcze ${left} znaczników ${PLACEHOLDER}, a obrazy stylu powstają wyłącznie z niego`,
+      ];
+}
+
 export function renderRules(title: string): string {
   return `# ${title}, zasady wspólne
 

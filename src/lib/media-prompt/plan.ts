@@ -23,6 +23,7 @@ import {
 import { checkPromptPackage, type PromptPackage } from "../prompt-package/index.js";
 import { err, ok, type Result } from "../result.js";
 import { checkShotList, type ShotList } from "../shot-list/index.js";
+import { checkStyle } from "../style/index.js";
 import {
   characterPaths,
   characterTrackPaths,
@@ -38,6 +39,8 @@ import {
   promptFile,
   promptPaths,
   referenceImage,
+  styleImage,
+  styleTrackPaths,
   type Workspace,
   workspacePath,
 } from "../workspace.js";
@@ -211,6 +214,8 @@ interface Scope {
    */
   readonly style: {
     readonly attachments: readonly Attachment[];
+    /** Brought in or generated: the two are accepted, and refused, differently. */
+    readonly basis: Stage0Style["basis"];
     readonly file: RecordedFile | null;
   };
 }
@@ -452,13 +457,63 @@ async function resolveHero(
 }
 
 /**
- * The style frames stage 0 brought in, as this run will attach them.
+ * The style frames this track generated, as this run will attach them.
+ *
+ * Only this track's: two models are two hands, and the other track's frame
+ * beside this one would mix them in one drawing. Whether each was accepted is
+ * the style module's question, asked through its entry, as a hero's is the
+ * character module's.
+ */
+async function resolveGenerated(scope: Scope): Promise<Result<readonly Attachment[]>> {
+  const { projectId, track, workspace } = scope.input;
+  const status = await checkStyle({ projectId, track, workspace });
+
+  if (!status.ok) {
+    return status;
+  }
+
+  const paths = styleTrackPaths(scope.paths.project, track);
+  const attachments: Attachment[] = [];
+
+  for (const entry of status.data.artifacts) {
+    const path = styleImage(paths, entry.id);
+
+    if (!path.ok) {
+      return path;
+    }
+
+    // biome-ignore lint/performance/noAwaitInLoops: ordered, and the order is the request
+    const digest = await digestOf(scope, path.data);
+
+    attachments.push({
+      bytes: digest?.bytes ?? null,
+      id: `${STYLE_PREFIX}${entry.id}`,
+      path: toWorkspacePath(workspace.root, path.data),
+      role: STYLE_ROLE,
+      sha256: digest?.sha256 ?? null,
+      state: digest === null ? "absent" : (entry.approved && "approved") || "pending",
+    });
+  }
+
+  return ok(attachments);
+}
+
+/**
+ * The style frames as this run will attach them: brought in at stage 0, or
+ * generated on this track.
  *
  * A brought image has no review of its own: it is a stage-0 output, accepted
  * when stage 0 is, so its state is that approval, bound to the digest stage 0
  * recorded rather than to whatever sits on disk now.
  */
-async function resolveStyle(scope: Scope, style: Stage0Style): Promise<readonly Attachment[]> {
+async function resolveStyle(
+  scope: Scope,
+  style: Stage0Style
+): Promise<Result<readonly Attachment[]>> {
+  if (style.basis === "generated") {
+    return await resolveGenerated(scope);
+  }
+
   const attachments: Attachment[] = [];
 
   for (const source of style.sources) {
@@ -482,7 +537,16 @@ async function resolveStyle(scope: Scope, style: Stage0Style): Promise<readonly 
     });
   }
 
-  return attachments;
+  return ok(attachments);
+}
+
+/** Why one generated style frame cannot be carried yet, with the command that fixes it. */
+function generatedBlocker(scope: Scope, attachment: Attachment, where: string): string {
+  const { projectId, track } = scope.input;
+
+  return attachment.state === "absent"
+    ? `${where}: obraz stylu nie powstał na torze ${track}: aimator style generate ${projectId} --track ${track}`
+    : `${where}: obraz stylu nie jest zatwierdzony na torze ${track}: aimator approve ${projectId} --stage style --track ${track} --artifact ${attachment.id.slice(STYLE_PREFIX.length)}`;
 }
 
 /** Why one attachment cannot be carried yet, in the words a person reads. */
@@ -492,6 +556,10 @@ function attachmentBlocker(scope: Scope, attachment: Attachment): string | null 
   }
 
   const where = `${attachment.id} (${attachment.path})`;
+
+  if (attachment.id.startsWith(STYLE_PREFIX) && scope.style.basis === "generated") {
+    return generatedBlocker(scope, attachment, where);
+  }
 
   if (attachment.id.startsWith(STYLE_PREFIX) && attachment.state !== "changed") {
     return attachment.state === "absent"
@@ -864,6 +932,42 @@ async function recordFile(scope: Scope, path: string): Promise<readonly Recorded
     : [{ path: toWorkspacePath(scope.input.workspace.root, path), sha256: digest.sha256 }];
 }
 
+/** Why nothing here may be sent at all: the package, or the style decision. */
+function planProblems(
+  input: SendPlanInput,
+  status: { readonly approved: boolean; readonly problems: readonly string[] },
+  style: Stage0Style,
+  frames: readonly string[]
+): readonly string[] {
+  const { episodeId, projectId } = input;
+
+  return [
+    ...(status.approved
+      ? []
+      : [
+          ...status.problems,
+          `etap 4 musi mieć review.status = "approved" zanim którykolwiek etap obrazowy wyda pieniądze: aimator approve ${projectId} ${episodeId} --stage prompt-package`,
+        ]),
+    // Rule 7: no decision is not "no style frames". Every frame would carry
+    // them, so every stage that draws one waits for the answer.
+    ...(style.basis === null
+      ? [
+          `projekt "${projectId}" nie ma decyzji o obrazach stylu (style.json), a etapy 5, 6 i 7 dołączają je do każdego kadru; zdecyduj: aimator project style ${projectId} --source <plik.png>, aimator project style ${projectId} --generated --count <1-4> albo aimator project style ${projectId} --none`,
+        ]
+      : []),
+    // Every frame on this track ends with the style frames, so one that cannot
+    // be carried stops the whole stage, which is what `problems` is for.
+    ...frames,
+  ];
+}
+
+/** Why the style frames cannot be carried on this track, one line per frame. */
+function styleBlockers(scope: Scope): readonly string[] {
+  return scope.style.attachments
+    .map((attachment) => attachmentBlocker(scope, attachment))
+    .filter((problem): problem is string => problem !== null);
+}
+
 /**
  * What every image stage from 5 on would send for this episode, on one track.
  *
@@ -948,17 +1052,23 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
       openingFrame: openingFrame.ok ? openingFrame.data : null,
       references: references.ok ? references.data : null,
     },
-    style: { attachments: [], file: style.data.file },
+    style: { attachments: [], basis: style.data.basis, file: style.data.file },
   };
   const shared = [
     ...(await recordFile(scope, paths.data.project.file)),
     ...(await recordFile(scope, paths.data.project.rules)),
     ...(await recordFile(scope, paths.data.episode.promptPackage)),
   ];
+  const styleFrames = await resolveStyle(scope, style.data);
+
+  if (!styleFrames.ok) {
+    return styleFrames;
+  }
+
   const withShared: Scope = {
     ...scope,
     shared,
-    style: { attachments: await resolveStyle(scope, style.data), file: style.data.file },
+    style: { ...scope.style, attachments: styleFrames.data },
   };
   const planned = enumerate(withShared);
   const known = new Set(planned.map((artifact) => artifact.name));
@@ -1001,21 +1111,7 @@ export async function readSendPlan(input: SendPlanInput): Promise<Result<SendPla
     artifacts,
     aspectRatio: stage0.data.aspectRatio,
     limit: withShared.limit,
-    problems: [
-      ...(status.data.approved
-        ? []
-        : [
-            ...status.data.problems,
-            `etap 4 musi mieć review.status = "approved" zanim którykolwiek etap obrazowy wyda pieniądze: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`,
-          ]),
-      // Rule 7: no decision is not "no style frames". Every frame would carry
-      // them, so every stage that draws one waits for the answer.
-      ...(style.data.basis === null
-        ? [
-            `projekt "${input.projectId}" nie ma decyzji o obrazach stylu (style.json), a etapy 5, 6 i 7 dołączają je do każdego kadru; zdecyduj: aimator project style ${input.projectId} --source <plik.png> albo aimator project style ${input.projectId} --none`,
-          ]
-        : []),
-    ],
+    problems: planProblems(input, status.data, style.data, styleBlockers(withShared)),
     promptVersion: PROMPT_VERSION,
     size: frame.data,
     track: input.track,

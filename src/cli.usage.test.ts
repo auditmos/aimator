@@ -155,6 +155,19 @@ const ON = [PROJECT, EPISODE] as const;
  * `<scratch>` is where the fixture put files a command takes from outside.
  */
 const TABLE: Readonly<Record<string, readonly string[]>> = {
+  "  approve <id> --stage style --track <tor> --artifact S01[,S02] [--json]": [
+    "approve",
+    PROJECT,
+    "--stage",
+    "style",
+    "--track",
+    T,
+    "--artifact",
+    "S01",
+    "--reviewer",
+    "fixture",
+    "--dry-run",
+  ],
   "  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]": [
     "approve",
     ...ON,
@@ -313,6 +326,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--dry-run",
   ],
   "  check <id> --stage prepare [--json]": ["check", PROJECT, "--stage", "prepare", "--json"],
+  "  check <id> --stage style --track <tor> [--json]": [
+    "check",
+    PROJECT,
+    "--stage",
+    "style",
+    "--track",
+    T,
+  ],
   "  check <id> [<episode-id>]": ["check", ...ON],
   "  check <id> <character-id> --stage character --track <tor> [--json]": [
     "check",
@@ -477,6 +498,15 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--dry-run",
   ],
   "  project show <id> [--json]": ["project", "show", PROJECT],
+  "  project style <id> --generated --count <1-4> [--json]": [
+    "project",
+    "style",
+    PROJECT,
+    "--generated",
+    "--count",
+    "2",
+    "--dry-run",
+  ],
   "  project style <id> --none [--json]": ["project", "style", PROJECT, "--none", "--dry-run"],
   "  project style <id> --source <plik.png> [--source <plik.png>...] [--json]": [
     "project",
@@ -574,6 +604,18 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
   // No `--dry-run`: the one command that cannot write or spend, whichever way
   // it is called, so there is no second mode of it to freeze.
   "  status <id> <episode-id> [--json]": ["status", ...ON],
+  // The fixture decides "none", so what is frozen here is the refusal a project
+  // that does not generate its style frames gets, which is itself a contract.
+  "  style generate <id> --track <gpt-image|seedream> [--artifact S01,...] [--model <id>]": [
+    "style",
+    "generate",
+    PROJECT,
+    "--track",
+    T,
+    "--model",
+    "gpt-image-2.5-sunburst",
+    "--dry-run",
+  ],
 };
 
 beforeAll(async () => {

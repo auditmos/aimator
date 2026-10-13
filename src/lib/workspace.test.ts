@@ -20,7 +20,9 @@ import {
   resolveWorkspace,
   runPaths,
   soundStem,
+  styleImage,
   styleSource,
+  styleTrackPaths,
   videoRunPaths,
   voiceRunPaths,
 } from "./workspace.js";
@@ -96,6 +98,28 @@ describe("projectPaths", () => {
     );
     expect(styleSource(project.data, "../S01").ok).toBe(false);
     expect(styleSource(project.data, "R01").ok).toBe(false);
+  });
+
+  it("should give each track its own generated style frames, as it does a character", () => {
+    const project = projectPaths(workspace, "48-praw-wladzy");
+
+    if (!project.ok) {
+      throw project.error;
+    }
+
+    const paths = styleTrackPaths(project.data, "seedream");
+    const frame = styleImage(paths, "S02");
+
+    expect(paths).toEqual({
+      lock: "/srv/aimator/projects/48-praw-wladzy/style/seedream/style.lock",
+      root: "/srv/aimator/projects/48-praw-wladzy/style/seedream",
+      runs: "/srv/aimator/projects/48-praw-wladzy/style/seedream/runs",
+      stage: "/srv/aimator/projects/48-praw-wladzy/style/seedream/style.stage.json",
+    });
+    expect(frame.ok ? frame.data : null).toBe(
+      "/srv/aimator/projects/48-praw-wladzy/style/seedream/S02.png"
+    );
+    expect(styleImage(paths, "S2/../x").ok).toBe(false);
   });
 
   it("should accept an id starting with a digit", () => {

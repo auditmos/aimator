@@ -39,6 +39,10 @@ export const stageNames = [
   "assembly",
   "soundtrack",
   "sound-design",
+  // The style frames a project generates per track, from its Style Bible. Not
+  // a numbered row of the pipeline: it sits beside stage 2, at the project
+  // level, and is consumed by every film frame from stage 5 on.
+  "style",
 ] as const;
 
 const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });

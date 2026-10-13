@@ -711,6 +711,9 @@ export async function makeHero(options: HeroOptions): Promise<void> {
   );
 }
 
+/** A style decision as a test states it: none, nobody's, images, or generated. */
+export type StyleChoice = "none" | "undecided" | readonly Buffer[] | { readonly generated: number };
+
 interface UpstreamOptions {
   /**
    * The manifest stage 4's model returns, as JSON. Every test brings its own,
@@ -748,9 +751,11 @@ interface UpstreamOptions {
    *
    * An explicit "none" unless a test brings images, because stages 5 to 7
    * refuse an undecided style and almost no test is about that refusal; the
-   * one that is says `"undecided"`, and nothing is decided for it.
+   * one that is says `"undecided"`, and nothing is decided for it. `{ generated }`
+   * decides that each track draws that many from the Style Bible, which then has
+   * to be in the rules the test brings.
    */
-  readonly style?: "none" | "undecided" | readonly Buffer[];
+  readonly style?: StyleChoice;
   /**
    * Which voice reads the series, cast before stage 0 is approved.
    *
@@ -764,15 +769,26 @@ interface UpstreamOptions {
 }
 
 /**
- * Brings the style frames in through stage 0's own command, or decides none.
- * The images are written outside the workspace first, where a person keeps them.
+ * Brings the style frames in through stage 0's own command, or decides none,
+ * or decides that each track generates them. Brought images are written outside
+ * the workspace first, where a person keeps them.
  */
 export async function decideStyle(
-  style: "none" | "undecided" | readonly Buffer[],
+  style: StyleChoice,
   scratch: string,
   workspace: Workspace
 ): Promise<void> {
   if (style === "undecided") {
+    return;
+  }
+
+  if (typeof style === "object" && "generated" in style) {
+    await setStyle({
+      decision: { basis: "generated", count: style.generated },
+      mode: "apply",
+      projectId: PROJECT,
+      workspace,
+    });
     return;
   }
 

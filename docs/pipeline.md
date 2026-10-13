@@ -19,9 +19,12 @@ $AIMATOR_WORKSPACE/
     ├── mix.json                      jak głośno siedzi podkład i jak ustępuje pod mową
     │                                 (etap 10), osobno od narration.json, bo unieważnia
     │                                 miks, a nie nagrania
-    ├── style.json                    obrazy stylu: supplied albo none (etap 0), osobno od
-    │                                 project.json, bo jego zmiana cofa zgody tylko na kadry
+    ├── style.json                    obrazy stylu: supplied, generated z liczbą albo none
+    │                                 (etap 0), osobno od project.json, bo jego zmiana
+    │                                 cofa zgody tylko na kadry
     ├── style/sources/Snn.png         obrazy stylu wniesione w etapie 0
+    ├── style/gpt-image/              ┐ obrazy stylu generowane z Style Bible: Snn.png,
+    ├── style/seedream/               ┘ style.stage.json, style.lock, runs/, per tor
     ├── prepare.stage.json
     ├── characters/<character-id>/
     │   ├── sources/                  zdjęcia użytkownika (etap 0)
@@ -260,7 +263,8 @@ Obowiązują we wszystkich etapach.
   (referencja, klatka otwarcia, klatka wejściowa) kończy listę obrazami stylu projektu,
   `style:Snn` z rolą `style frame: medium, line, shading, palette, texture and lighting
   only; not content`, po wszystkich załącznikach treści; przy wniesionych rozwiązują się na
-  `style/sources/Snn.png`. Etap 4 ich nie zna i nie pisze, dopina je składający, a blok nad
+  `style/sources/Snn.png`, przy generowanych na `style/<tor>/Snn.png` tego samego toru i
+  tylko wtedy, gdy ktoś je przyjął. Etap 4 ich nie zna i nie pisze, dopina je składający, a blok nad
   zadaniem mówi wtedy wprost, że obraz stylu jest jedynym wyjątkiem od zakazu przenoszenia
   tekstury, cieniowania i światła. Klip ich nie dostaje: zaczyna się od klatki, która już je
   niosła.
@@ -438,7 +442,9 @@ podstawę tej postaci na `photographs`.
 
 **Obrazy stylu to decyzja projektu w osobnym pliku, `style.json`.** Pole `basis` przyjmuje
 `supplied` (obrazy wniesione przez `project style <id> --source <plik.png>`, kopiowane do
-`style/sources/Snn.png` z sha256 w `style.json`) albo `none` (`project style <id> --none`).
+`style/sources/Snn.png` z sha256 w `style.json`), `generated` z liczbą 1–4 (`project style
+<id> --generated --count <n>`, bez wartości domyślnej; same obrazy rysuje `style generate`,
+opisane przy etapie 2) albo `none` (`project style <id> --none`).
 Brak pliku znaczy „nikt nie zdecydował” i nie jest tym samym co `none`. Plik leży obok
 `project.json`, a nie w nim, bo `project.json` jest zapisanym wejściem niemal każdego
 artefaktu: gdzie mieszka decyzja, to decyduje, co unieważnia jej zmiana, a styl wpływa
@@ -647,6 +653,42 @@ niczego.
 Ramki są stałymi toru, nie decyzją: karta 1920×1920, widok 1536×1536, hero 1536×2304.
 Żadna z nich nie jest `aspectRatio` projektu, ten rządzi kadrem filmu od etapu 5, a karta
 postaci w 16:9 zmarnowałaby większość siebie.
+
+### Obrazy stylu generowane z Style Bible
+
+Przy `style.json` z `basis: "generated"` obrazy stylu powstają obok etapu 2, na poziomie
+projektu, poleceniem `style generate <project-id> --track <tor>`. Nie są numerowanym
+wierszem potoku, ale obowiązują je te same niezmienniki co każdy płatny obraz: jeden rekord
+i jedno `submitted` na obraz, archiwum w `style/<tor>/runs/<runId>/`, wznowienie bez drugiej
+opłaty i nic, co ponawia się samo. Konsumują wyłącznie artefakty etapu 0: `project.json`
+(kadr z `aspectRatio`, obsada), `project.md` (blok Style Bible) i `style.json` (liczba),
+z hashami zapisanymi jako wejścia.
+
+**Osobno na każdym torze**, bo dwa modele obrazu to dwie ręce: obraz stylu jednego toru
+dołączony do kadru drugiego mieszałby je w jednym rysunku. Plik etapu to
+`style/<tor>/style.stage.json`, z rekordem na obraz pod kluczem `S01`…`Snn`.
+
+**Bramka**: zatwierdzony etap 0 projektu i blok `## Style Bible` w `project.md` bez znacznika
+`TODO(etap-0)`, bo obrazy powstają wyłącznie z niego. Projekt sprzed tego bloku dostaje
+odmowę z instrukcją, jak go dopisać. `--dry-run` raportuje obie przeszkody, liczy wtedy zero
+płatnych wywołań i i tak pokazuje każdy prompt. Polecenie rysuje **każdy brakujący** `Snn`
+decyzji i podaje liczbę wywołań, zanim je wykona; `--artifact` zawęża, a `--regenerate`
+wymaga jawnego `--artifact`.
+
+**Prompt** jest stałą z jawną wersją, po angielsku (reguła 9): obraz stylu N z M to neutralna
+scena ze świata serii, **bez postaci z obsady**, która pokazuje dokładnie medium, kreskę,
+cieniowanie, paletę, teksturę i światło ze Style Bible. `project.md` jedzie dosłownie.
+Żądanie nie niesie załączników: obraz stylu nie ma czego edytować, a załącznik byłby treścią,
+której ten obraz nie może nieść. Kadr to kadr filmu z `aspectRatio`, ten sam co w etapach 5
+i 6, nieprzezroczysty.
+
+**Zgoda per obraz**: `aimator approve <project-id> --stage style --track <tor> --artifact
+S01[,S02]` odmawia bez `--artifact` i wiąże przyjęcie z sha256 obrazu, a `aimator check
+<project-id> --stage style --track <tor>` sprawdza to samo i nic nie zapisuje. Etapy 5, 6
+i 7 dołączają **wyłącznie zatwierdzone** obrazy stylu swojego toru; brakujący albo
+nieprzyjęty trafia do przeszkód kadru, a więc do jego `note`, z poleceniem, które go kupuje
+albo przyjmuje, i do `problems` etapu, bo zatrzymuje każdy kadr toru, a stamtąd czyta go
+`status`.
 
 ## Etap 3: szczegóły
 

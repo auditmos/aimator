@@ -169,6 +169,7 @@ const JSON_STAGES = [
   "assembly",
   "soundtrack",
   "sound-design",
+  "style",
 ] as const;
 
 /**

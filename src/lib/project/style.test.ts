@@ -183,6 +183,40 @@ describe("setStyle", () => {
     expect(await readStyleFile()).toEqual({ basis: "none", schemaVersion: 1, sources: [] });
   });
 
+  it("records generated with the number of images, a decision with no default", async () => {
+    const result = await setStyle({
+      decision: { basis: "generated", count: 2 },
+      mode: "apply",
+      projectId: PROJECT,
+      workspace,
+    });
+    const shown = await showProject({ projectId: PROJECT, workspace });
+
+    expect(result.ok).toBe(true);
+    expect(await readStyleFile()).toEqual({
+      basis: "generated",
+      count: 2,
+      schemaVersion: 1,
+      sources: [],
+    });
+    expect(shown.ok && shown.data.style).toEqual({ basis: "generated", images: 2, sources: [] });
+  });
+
+  it("refuses a count outside 1 to 4", async () => {
+    const results = await Promise.all(
+      [0, 5].map((count) =>
+        setStyle({
+          decision: { basis: "generated", count },
+          mode: "dry-run",
+          projectId: PROJECT,
+          workspace,
+        })
+      )
+    );
+
+    expect(results.map((one) => one.ok)).toEqual([false, false]);
+  });
+
   it("refuses a file that is not a PNG, because it would land as Snn.png", async () => {
     const path = join(scratch, "a.jpg");
 

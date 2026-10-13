@@ -16,6 +16,7 @@ import {
   answerFlag,
   answerStage0,
   modeOf,
+  type Parsed,
   parse,
   requireFlag,
   requirePositional,
@@ -35,11 +36,14 @@ export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>
     dałaby drugiemu odcinkowi innego lektora bez śladu na dysku. Bramkuje sam
     etap 9, film bez narracji nigdy nie musi tej decyzji podejmować.
   project style <id> --source <plik.png> [--source <plik.png>...] [--json]
+  project style <id> --generated --count <1-4> [--json]
   project style <id> --none [--json]
-    Obrazy stylu: PNG kopiowane do style/sources/Snn.png albo jawne "bez obrazów
-    stylu". Decyzja mieszka w style.json, nie w project.json, więc jej zmiana
-    cofa zgody wyłącznie na kadry. Wymagają jej dopiero etapy 5, 6 i 7, które
-    dołączają obrazy stylu po załącznikach treści, jako style:Snn.`;
+    Obrazy stylu: PNG kopiowane do style/sources/Snn.png, generowane z Style
+    Bible osobno na każdym torze (style generate, liczba bez wartości
+    domyślnej) albo jawne "bez obrazów stylu". Decyzja mieszka w style.json, nie
+    w project.json, więc jej zmiana cofa zgody wyłącznie na kadry. Wymagają jej
+    dopiero etapy 5, 6 i 7, które dołączają obrazy stylu po załącznikach treści,
+    jako style:Snn.`;
 
 /**
  * Casts the narrator. A stage-0 command because a voice recurs between episodes
@@ -88,12 +92,65 @@ async function runProjectVoice(argv: readonly string[]): Promise<Result<string>>
     : result;
 }
 
+type StyleDecision = Parameters<typeof setStyle>[0]["decision"];
+
 /**
- * Decides the style frames. One answer per call, brought images or none: both
- * at once, or neither, is a decision nobody made, so it is refused as usage.
+ * The one answer a `project style` call carries. Two at once, or none, is a
+ * decision nobody made; `--generated` without `--count` is half of one, because
+ * how many images a track draws is decided, never defaulted.
  */
+function styleDecisionOf(parsed: Parsed): Result<StyleDecision> {
+  const { count, generated, none, source } = parsed.values;
+  const sources = Array.isArray(source) ? source.filter((one) => typeof one === "string") : [];
+  const answers = [sources.length > 0, none === true, generated === true].filter(Boolean);
+
+  if (answers.length !== 1) {
+    return err(
+      new UsageError(
+        "project style przyjmuje dokładnie jedną decyzję: --source <plik.png> [--source <plik.png>...], --none albo --generated --count <1-4>"
+      )
+    );
+  }
+
+  if (generated !== true) {
+    if (count !== undefined) {
+      return err(new UsageError("--count należy do --generated: liczy obrazy stylu na tor"));
+    }
+
+    return ok(none === true ? { basis: "none" } : { basis: "supplied", sourcePaths: sources });
+  }
+
+  if (typeof count !== "string") {
+    return err(
+      new UsageError(
+        "--generated wymaga --count <1-4>: liczba obrazów stylu na tor to decyzja bez wartości domyślnej"
+      )
+    );
+  }
+
+  const decided = Number(count);
+
+  return Number.isInteger(decided)
+    ? ok({ basis: "generated", count: decided })
+    : err(new UsageError(`--count: "${count}" nie jest liczbą całkowitą`));
+}
+
+/** What the command just decided, as the headline of its report. */
+function styleHeadline(projectId: string, decision: StyleDecision): string {
+  if (decision.basis === "generated") {
+    return `Obrazy stylu projektu "${projectId}" powstają z Style Bible, ${decision.count} na tor`;
+  }
+
+  return decision.basis === "supplied"
+    ? `Obrazy stylu projektu "${projectId}" są wnoszone`
+    : `Projekt "${projectId}" nie ma obrazów stylu`;
+}
+
+/** Decides the style frames: brought in, generated per track, or none. */
 async function runProjectStyle(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
+    count: { type: "string" },
+    generated: { type: "boolean" },
     json: { type: "boolean" },
     none: { type: "boolean" },
     source: { multiple: true, type: "string" },
@@ -105,6 +162,7 @@ async function runProjectStyle(argv: readonly string[]): Promise<Result<string>>
 
   const projectId = requirePositional(parsed.data, 0, "project-id");
   const workspace = workspaceOf(parsed.data);
+  const decision = styleDecisionOf(parsed.data);
 
   if (!projectId.ok) {
     return projectId;
@@ -112,22 +170,13 @@ async function runProjectStyle(argv: readonly string[]): Promise<Result<string>>
   if (!workspace.ok) {
     return workspace;
   }
-
-  const sources = parsed.data.values.source;
-  const supplied = Array.isArray(sources) && sources.length > 0;
-  const none = parsed.data.values.none === true;
-
-  if (supplied === none) {
-    return err(
-      new UsageError(
-        "project style przyjmuje dokładnie jedną decyzję: --source <plik.png> [--source <plik.png>...] albo --none"
-      )
-    );
+  if (!decision.ok) {
+    return decision;
   }
 
   const mode = modeOf(parsed.data);
   const result = await setStyle({
-    decision: supplied ? { basis: "supplied", sourcePaths: sources } : { basis: "none" },
+    decision: decision.data,
     mode,
     projectId: projectId.data,
     workspace: workspace.data,
@@ -138,9 +187,7 @@ async function runProjectStyle(argv: readonly string[]): Promise<Result<string>>
         answerStage0(
           answerFlag(parsed.data),
           "project style",
-          supplied
-            ? `Obrazy stylu projektu "${projectId.data}" są wnoszone`
-            : `Projekt "${projectId.data}" nie ma obrazów stylu`,
+          styleHeadline(projectId.data, decision.data),
           result.data,
           mode
         )
@@ -152,6 +199,10 @@ async function runProjectStyle(argv: readonly string[]): Promise<Result<string>>
 function styleOf(style: ProjectOverview["style"]): string {
   if (style.basis === "supplied") {
     return `wnoszone (${style.images})`;
+  }
+
+  if (style.basis === "generated") {
+    return `generowane z Style Bible (${style.images} na tor)`;
   }
 
   return style.basis === "none" ? "bez obrazów stylu" : "nierozstrzygnięte";
