@@ -13,9 +13,9 @@ import {
 } from "../artifact/index.js";
 import { type HostingVariables, hostFile } from "../hosting.js";
 import { err, ok, type Result } from "../result.js";
-import { videoRunPaths, type Workspace } from "../workspace.js";
+import { type StillFormat, videoRunPaths, type Workspace } from "../workspace.js";
 import { type JobCall, runJob, type VideoAttempt } from "./attempt.js";
-import { httpFailure, submitVideo } from "./client.js";
+import { downloadAsset, httpFailure, submitVideo } from "./client.js";
 import {
   type Face,
   type FaceSource,
@@ -28,7 +28,7 @@ import {
   readFaces,
 } from "./kling.js";
 import { type JobWire, providerOf } from "./provider.js";
-import { validateLipSyncInput, validateLipSyncResult } from "./validate.js";
+import { stillFormat, validateLipSyncInput, validateLipSyncResult } from "./validate.js";
 
 /**
  * Internal to the video-model module: Kling Lip Sync, the second kind of job
@@ -75,14 +75,32 @@ interface IdentifyClip {
   readonly record: PublishedBy;
 }
 
+/**
+ * A face as found, with its picture: the reason a person can bind it to a
+ * character at all. `null` when the picture could not be fetched, which is a
+ * notice rather than a refusal, because the call that found it is already paid.
+ */
+interface FoundFace extends Face {
+  readonly picture: { readonly bytes: Buffer; readonly format: StillFormat } | null;
+}
+
 interface Identified {
-  readonly faces: readonly Face[];
-  /** What a person should know that did not stop the call: a lent clip left behind. */
+  /** Where the call went and under what name its record says so. */
+  readonly endpoint: string;
+  readonly faces: readonly FoundFace[];
+  readonly model: string;
+  /**
+   * What a person should know that did not stop the call: a lent clip left
+   * behind, a face whose picture did not arrive.
+   */
   readonly notices: readonly string[];
   readonly runId: string;
   readonly sessionId: string;
   readonly source: "video_id" | "video_url";
 }
+
+/** The name a face call's record carries as its model, for `LIP_SYNC_MODEL`'s reason. */
+const FACE_MODEL = "kling-identify-face";
 
 function wireOf(model: string | null): JobWire | null {
   if (model === LIP_SYNC_MODEL) {
@@ -233,15 +251,42 @@ async function identify(
 
   const found = readFaces(transport.data.body);
 
-  return found.ok
-    ? ok({
-        faces: found.data.faces,
-        notices: [],
-        runId,
-        sessionId: found.data.sessionId,
-        source: "videoId" in source ? "video_id" : "video_url",
-      })
-    : found;
+  if (!found.ok) {
+    return found;
+  }
+
+  const faces: FoundFace[] = [];
+  const notices: string[] = [];
+
+  for (const face of found.data.faces) {
+    // biome-ignore lint/performance/noAwaitInLoops: one picture at a time, in the provider's order
+    const bytes = await downloadAsset({
+      fetch: call.fetch,
+      url: face.image,
+      what: `obrazka twarzy ${face.id}`,
+    });
+    const format = bytes.ok ? stillFormat(bytes.data) : null;
+
+    if (bytes.ok && format !== null) {
+      faces.push({ ...face, picture: { bytes: bytes.data, format } });
+      continue;
+    }
+
+    faces.push({ ...face, picture: null });
+    notices.push(
+      `twarz ${face.id}: ${bytes.ok ? "obrazek nie jest ani PNG, ani JPEG" : bytes.error.message}; adres obrazka jest w ${toWorkspacePath(call.workspace.root, run.response)}`
+    );
+  }
+
+  return ok({
+    endpoint: IDENTIFY_FACE,
+    faces,
+    model: FACE_MODEL,
+    notices,
+    runId,
+    sessionId: found.data.sessionId,
+    source: "videoId" in source ? "video_id" : "video_url",
+  });
 }
 
 /** The provider's floor for how long the sound and the face share the screen. */

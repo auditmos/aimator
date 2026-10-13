@@ -18,6 +18,7 @@ import { runScreenplay } from "./stages/screenplay.js";
 import { runShotList } from "./stages/shot-list.js";
 import { runSoundDesign } from "./stages/sound-design.js";
 import { runStyle } from "./stages/style.js";
+import { runVersions } from "./stages/versions.js";
 import { runStatus } from "./status.js";
 import { USAGE } from "./usage.js";
 
@@ -46,6 +47,7 @@ const COMMANDS: Readonly<Record<string, (argv: readonly string[]) => Promise<Res
   "sound-design": runSoundDesign,
   status: runStatus,
   style: runStyle,
+  versions: runVersions,
 };
 
 /**

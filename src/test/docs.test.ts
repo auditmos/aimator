@@ -436,8 +436,8 @@ describe("documentation", () => {
 
   it("should give every implemented stage a page of its own", () => {
     const pages = markdownUnder(join(repoRoot, "docs", "stages"));
-    expect(pages).toHaveLength(12);
-    for (const stage of Array.from({ length: 12 }, (_, index) => String(index).padStart(2, "0"))) {
+    expect(pages).toHaveLength(13);
+    for (const stage of Array.from({ length: 13 }, (_, index) => String(index).padStart(2, "0"))) {
       expect(pages.some((page) => relative(repoRoot, page).includes(`/${stage}-`))).toBe(true);
     }
   });

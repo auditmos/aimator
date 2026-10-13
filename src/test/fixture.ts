@@ -4,6 +4,7 @@ import { sha256Of } from "../lib/artifact/index.js";
 import { approveAssembly, generateAssembly } from "../lib/assembly/index.js";
 import { approveVoice, generateSample, setVoice } from "../lib/character-voice/index.js";
 import { approveClips, generateClips } from "../lib/clips/index.js";
+import { approveDialogue, generateDialogue, translateDialogue } from "../lib/dialogue/index.js";
 import type { Muxer } from "../lib/muxer.js";
 import {
   approveMix,
@@ -19,6 +20,7 @@ import {
   initProject,
   setCharacterBasis,
   setEpisodeSettings,
+  setLipSync,
   setNarratorVoice,
   setStyle,
 } from "../lib/project/index.js";
@@ -26,7 +28,7 @@ import { approvePromptPackage, generatePromptPackage } from "../lib/prompt-packa
 import { approveReferences, generateReferences } from "../lib/references/index.js";
 import { ok } from "../lib/result.js";
 import { approveScreenplay, generateScreenplay } from "../lib/screenplay/index.js";
-import { approveShotList, generateShotList } from "../lib/shot-list/index.js";
+import { approveShotList, checkShotList, generateShotList } from "../lib/shot-list/index.js";
 import {
   approveMaster,
   approveSoundDesign,
@@ -410,9 +412,20 @@ export const DIALOGUE = {
   U04: { cast: "tata", text: "Jestem tutaj, Ewo." },
 } as const satisfies Readonly<Record<string, { cast: string; text: string }>>;
 
+/**
+ * A second line in a shot both characters are in, so the clip holding it has
+ * two characters speaking on screen: the case lip-sync needs two jobs for,
+ * because the provider moves one face per job.
+ */
+const DUET = {
+  U02: { cast: "tata", text: "Burza zaraz przejdzie." },
+} as const satisfies Readonly<Record<string, { cast: string; text: string }>>;
+
 /** Who speaks in the shots: the narrator, the cast, both, or nobody. */
 interface Sound {
   readonly dialogue: boolean;
+  /** Whether Tata answers in U02 too, beside Ewa's line in U01. */
+  readonly duet: boolean;
   readonly narrated: boolean;
 }
 
@@ -435,10 +448,14 @@ function shot(
 ): string {
   const line: string | undefined = (NARRATION as Readonly<Record<string, string>>)[id];
   const spoken = (DIALOGUE as Readonly<Record<string, { cast: string; text: string }>>)[id];
+  const answer = (DUET as Readonly<Record<string, { cast: string; text: string }>>)[id];
   const audio = `${[
     "Deszcz o szybę",
     ...(sound.narrated && line !== undefined ? [`narrator: „${line}”`] : []),
     ...(sound.dialogue && spoken !== undefined ? [`${spoken.cast}: "${spoken.text}"`] : []),
+    ...(sound.dialogue && sound.duet && answer !== undefined
+      ? [`${answer.cast}: "${answer.text}"`]
+      : []),
   ].join("; ")}.`;
 
   return [
@@ -774,6 +791,12 @@ interface UpstreamOptions {
    */
   readonly dialogue?: boolean;
   /**
+   * With `dialogue`, Tata answers in U02 as well, a shot both are in, so the
+   * clip it sits in has two characters speaking on screen. Off by default,
+   * because every stage-11 test counts the lines the plan attributes.
+   */
+  readonly duet?: boolean;
+  /**
    * Which cut of the same thirty seconds the shot list plans. Two clips by
    * default; three when a test needs both ways of seeding a later clip, which
    * only a third one can show; and one cut so short no video model renders it,
@@ -867,7 +890,11 @@ export async function makeUpstream(options: UpstreamOptions): Promise<void> {
     shotList: shape = "two-clips",
     workspace,
   } = options;
-  const sound = { dialogue: options.dialogue ?? false, narrated: options.narration ?? false };
+  const sound = {
+    dialogue: options.dialogue ?? false,
+    duet: options.duet ?? false,
+    narrated: options.narration ?? false,
+  };
   const source = join(scratch, "01-Burza.md");
   await writeFile(source, "# Burza\n\nEwa boi się burzy.\n", "utf8");
 
@@ -1698,6 +1725,142 @@ export async function makeSoundDesign(options: {
       track,
       workspace,
     });
+  }
+}
+
+/** A text provider whose every answer is `text`, in the Responses envelope. */
+function textProvider(text: string): typeof fetch {
+  return (() =>
+    Promise.resolve(
+      Response.json({
+        id: "resp_fixture",
+        output: [{ content: [{ text, type: "output_text" }], role: "assistant", type: "message" }],
+        status: "completed",
+      })
+    )) as unknown as typeof fetch;
+}
+
+/** One line of a script as both the script and its translation head it. */
+interface ScriptLine {
+  readonly at: number;
+  readonly cast: string;
+  readonly id: string;
+  readonly shot: string;
+  readonly text: string;
+}
+
+/** Every line the approved plan attributes, once, a second into its shot. */
+async function liftedLines(workspace: Workspace): Promise<readonly ScriptLine[]> {
+  const plan = await checkShotList({ episodeId: EPISODE, projectId: PROJECT, workspace });
+  const shots = plan.ok ? (plan.data.verdict?.shots ?? []) : [];
+  let count = 0;
+
+  return shots.flatMap((planned) =>
+    planned.lines.map((line, index) => {
+      count += 1;
+
+      return {
+        at: planned.start + 1 + 2 * index,
+        cast: line.cast,
+        id: `D${String(count).padStart(2, "0")}`,
+        shot: planned.id,
+        text: line.text,
+      };
+    })
+  );
+}
+
+function scriptOf(sections: readonly string[], lines: readonly ScriptLine[]): string {
+  const [first = "", ...rest] = sections;
+
+  return [
+    first,
+    "## Lines\n",
+    ...lines.map(
+      (line) => `### ${line.id} | ${line.shot} | ${line.cast} | ${line.at}s\n\n${line.text}\n`
+    ),
+    ...rest,
+  ].join("\n");
+}
+
+/**
+ * Stage 11 finished in the language of the mouths: the script lifted from the
+ * approved plan and accepted, the episode's `lip-sync.json`, the translation
+ * accepted, the cast's voices in that language, and every translated line
+ * bought `lineSeconds` long and, unless `pending` names its key, accepted.
+ *
+ * Promoted at the threshold the rest of this file uses: stage 12's module tests
+ * and its CLI tests both need translated lines that are finished rather than
+ * under test. Stage 11's own tests and stage 10's mix keep their instrumented
+ * copies, because what they buy is what they assert on.
+ *
+ * The script is read off the approved plan rather than written here, so it
+ * lifts exactly the lines the episode's shot list attributes, whichever cut it
+ * was built with.
+ */
+export async function makeDialogue(options: {
+  readonly language?: string;
+  readonly lineSeconds?: number;
+  readonly pending?: readonly string[];
+  readonly workspace: Workspace;
+}): Promise<void> {
+  const { language = "en", lineSeconds = 1, pending = [], workspace } = options;
+  const lines = await liftedLines(workspace);
+  const scope = { episodeId: EPISODE, projectId: PROJECT, workspace } as const;
+  const text = {
+    ...scope,
+    apiKey: API_KEY,
+    maxOutputTokens: 8000,
+    mode: "apply",
+    model: "gpt-6-astra",
+    regenerate: false,
+  } as const;
+  const accept = (artifacts: readonly string[]) =>
+    approveDialogue({ ...scope, artifacts, mode: "apply", note: "ok", reviewer: "fixture" });
+
+  await generateDialogue({
+    ...text,
+    artifacts: [],
+    fetch: textProvider(
+      scriptOf(["## Plan\n\nKażdy mówi swoje.\n", "## Review\n\nWszystko z planu.\n"], lines)
+    ),
+    voiceKey: null,
+    voiceModel: null,
+  });
+  await accept(["script"]);
+  await setLipSync({ ...scope, choice: { kind: "language", language }, mode: "apply" });
+  await translateDialogue({
+    ...text,
+    fetch: textProvider(
+      scriptOf(
+        ["", "## Review\n\nNothing was shortened.\n"],
+        lines.map((line) => ({ ...line, text: `Line ${line.id}, in English.` }))
+      )
+    ),
+  });
+  await accept([`script-${language}`]);
+  await makeVoices({ language, workspace });
+  await generateDialogue({
+    ...text,
+    artifacts: [],
+    fetch: (() =>
+      Promise.resolve(
+        new Response(wav({ seconds: lineSeconds }), {
+          headers: { "content-type": "audio/wav" },
+          status: 200,
+        })
+      )) as unknown as typeof fetch,
+    language,
+    voiceKey: API_KEY,
+    voiceModel: "eleven_multilingual_v2",
+  });
+
+  const bought = lines
+    .map((line) => `${language}:${line.id}`)
+    .filter((key) => !pending.includes(key));
+
+  if (bought.length > 0) {
+    await accept(bought);
   }
 }
 

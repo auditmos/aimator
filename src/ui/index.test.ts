@@ -325,7 +325,14 @@ describe("the UI server", () => {
     });
   });
 
-  it("should open the stream with the ladder as it is right now", async () => {
+  /**
+   * The same two walks as the ladder above, the stream's first frame and the
+   * terminal's, so the same headroom: alone ~0.3 s, beside the whole suite
+   * measured at 4.1 s and then past the 5 s default once stage 12's tests joined.
+   */
+  it("should open the stream with the ladder as it is right now", {
+    timeout: 45_000,
+  }, async () => {
     const response = await createUi({ workspace }).request(`/api/events/${PROJECT}/${EPISODE}`);
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");

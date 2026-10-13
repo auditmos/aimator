@@ -16,6 +16,7 @@ import { USAGE as SCREENPLAY } from "./stages/screenplay.js";
 import { USAGE as SHOT_LIST } from "./stages/shot-list.js";
 import { USAGE as SOUND_DESIGN } from "./stages/sound-design.js";
 import { USAGE as STYLE } from "./stages/style.js";
+import { USAGE as VERSIONS } from "./stages/versions.js";
 import { USAGE as STATUS } from "./status.js";
 
 /** The glossary of the flags several stages share. */
@@ -25,7 +26,7 @@ const FLAGS = `  --audio      music-and-effects | dialogue | narration | dialogu
                wartości domyślnej, wymagana dopiero przez etap 3
   --json       obiekt etapu zamiast tekstu, z polem command i stage; na check
                i approve z każdym --stage, na komendach etapu na wszystkich
-               etapach 0–11. Pole command niesie podpolecenie tam, gdzie jeden
+               etapach 0–12. Pole command niesie podpolecenie tam, gdzie jeden
                etap piszą dwie gramatyki albo więcej
   --stage      zakres akceptacji; domyślnie prepare (etap 0)
   --track      tor modelu obrazowego; bez wartości domyślnej, bo każdy kosztuje osobno
@@ -87,6 +88,7 @@ export const USAGE = [
   NARRATION,
   SOUND_DESIGN,
   DIALOGUE,
+  VERSIONS,
   ["Wspólne:", LIST, STATUS, CHECK, APPROVE, REJECT].join("\n"),
   FLAGS,
   CAST_NOTE,

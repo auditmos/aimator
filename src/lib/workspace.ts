@@ -252,6 +252,14 @@ export interface EpisodeTrackPaths {
    */
   readonly soundtrackLock: string;
   readonly soundtrackStage: string;
+  /**
+   * Stage 12's directory: the faces found in each clip, who a person said they
+   * are, and each clip lip-synced into the second language. Per track, because
+   * the faces are in this track's pictures and no other's.
+   */
+  readonly versions: string;
+  readonly versionsLock: string;
+  readonly versionsStage: string;
 }
 
 /**
@@ -853,6 +861,9 @@ export function episodeTrackPaths(episode: EpisodePaths, track: ImageTrack): Epi
     soundDesignStage: join(root, "sound-design.stage.json"),
     soundtrackLock: join(root, "soundtrack.lock"),
     soundtrackStage: join(root, "soundtrack.stage.json"),
+    versions: join(root, "versions"),
+    versionsLock: join(root, "versions.lock"),
+    versionsStage: join(root, "versions.stage.json"),
   };
 }
 
@@ -913,6 +924,90 @@ export function clipFrame(
   return ARTIFACT_ID.test(id)
     ? ok(join(paths.frames, id, `${kind}.${EXTENSION[format]}`))
     : err(new IdentifierError(id, `invalid clip id "${id}": expected a form like C01`));
+}
+
+/** One clip's faces in stage 12: what the face call found, and who a person said each one is. */
+interface VersionFacePaths {
+  /** The person's word on which face is which character: a decision, never inferred. */
+  readonly binding: string;
+  /** The face call's answer, kept: its session, and each face's id and interval. */
+  readonly faces: string;
+  readonly root: string;
+}
+
+/**
+ * Where stage 12 keeps one clip's faces. The clip is a directory level, for the
+ * reason it is one under `frames/`: a clip has several faces and nothing else
+ * has to know how many.
+ */
+export function versionFaces(paths: EpisodeTrackPaths, clipId: string): Result<VersionFacePaths> {
+  if (!ARTIFACT_ID.test(clipId)) {
+    return err(
+      new IdentifierError(clipId, `invalid clip id "${clipId}": expected a form like C01`)
+    );
+  }
+
+  const root = join(paths.versions, "faces", clipId);
+
+  return ok({
+    binding: join(root, "binding.json"),
+    faces: join(root, "faces.json"),
+    root,
+  });
+}
+
+/**
+ * One clip in the second language: the clip with every speaking face moved to
+ * its lines. Named after the clip it replaces, so the version is the same cut
+ * with some clips swapped and the rest passed through.
+ */
+export function versionClip(paths: EpisodeTrackPaths, clipId: string): Result<string> {
+  return ARTIFACT_ID.test(clipId)
+    ? ok(join(paths.versions, "clips", `${clipId}.mp4`))
+    : err(new IdentifierError(clipId, `invalid clip id "${clipId}": expected a form like C01`));
+}
+
+/**
+ * A clip with one character's face moved and the next one's not yet, which
+ * exists only because the provider moves one face per job: the job after it
+ * runs on these bytes. A directory per clip, a file per character.
+ */
+export function versionStep(
+  paths: EpisodeTrackPaths,
+  clipId: string,
+  characterId: string
+): Result<string> {
+  if (!ARTIFACT_ID.test(clipId)) {
+    return err(
+      new IdentifierError(clipId, `invalid clip id "${clipId}": expected a form like C01`)
+    );
+  }
+
+  return PROJECT_ID.test(characterId)
+    ? ok(join(paths.versions, "clips", clipId, `${characterId}.mp4`))
+    : err(new IdentifierError(characterId, `invalid character id "${characterId}"`));
+}
+
+/**
+ * The picture of one face, there so a person can see whom they are binding.
+ * The face id is the provider's, so it is checked here rather than trusted into
+ * a path; the format is the provider's too, so the name says what it holds.
+ */
+export function faceImage(
+  paths: EpisodeTrackPaths,
+  clipId: string,
+  faceId: string,
+  format: StillFormat
+): Result<string> {
+  const faces = versionFaces(paths, clipId);
+
+  if (!faces.ok) {
+    return faces;
+  }
+
+  return PROJECT_ID.test(faceId)
+    ? ok(join(faces.data.root, `${faceId}.${EXTENSION[format]}`))
+    : err(new IdentifierError(faceId, `invalid face id "${faceId}": expected letters and digits`));
 }
 
 /**

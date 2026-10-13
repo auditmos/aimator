@@ -351,6 +351,9 @@ describe("episodeTrackPaths", () => {
       soundDesignStage: `${root}/sound-design.stage.json`,
       soundtrackLock: `${root}/soundtrack.lock`,
       soundtrackStage: `${root}/soundtrack.stage.json`,
+      versions: `${root}/versions`,
+      versionsLock: `${root}/versions.lock`,
+      versionsStage: `${root}/versions.stage.json`,
     });
   });
 

@@ -25,6 +25,7 @@ import { approveScreenplayStage } from "./stages/screenplay.js";
 import { approveShotListStage } from "./stages/shot-list.js";
 import { approveSoundDesignStage } from "./stages/sound-design.js";
 import { approveStyleStage } from "./stages/style.js";
+import { approveVersionsStage } from "./stages/versions.js";
 
 /** Every acceptance this tool records, in the words the usage text promises. */
 export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package]
@@ -45,7 +46,8 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
   approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]
-               [--json]`;
+               [--json]
+  approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02] [--json]`;
 
 /** The stages whose frames are accepted against the QC checklist. */
 const CHECKLIST_STAGES = ["opening-frame", "clips"] as const;
@@ -89,6 +91,7 @@ const STAGES: Readonly<
   "sound-design": approveSoundDesignStage,
   soundtrack: approveSoundtrackStage,
   style: approveStyleStage,
+  versions: approveVersionsStage,
   voice: approveVoiceStage,
 };
 
@@ -164,7 +167,7 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
 
   return err(
     new UsageError(
-      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design, dialogue, voice`
+      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design, dialogue, versions, voice`
     )
   );
 }

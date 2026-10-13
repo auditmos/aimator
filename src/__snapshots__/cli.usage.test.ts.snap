@@ -72,6 +72,13 @@ nie ma czego zatwierdzić: narracji nie położono na torze gpt-image
   - nie ma skryptu narracji, uruchom najpierw: narration generate"
 `;
 
+exports[`every command >   approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02] [--json] 1`] = `
+"VersionsStateError
+nie ma czego zatwierdzić: C01
+  - odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  - odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć"
+`;
+
 exports[`every command >   approve <id> [<episode-id>] [--stage prepare|screenplay|shot-list|prompt-package] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Scenariusz odcinka "01-burza" zatwierdzony
@@ -521,6 +528,14 @@ Odcinek "01-burza", tor gpt-image, etap 9, miks
   ! nie ma skryptu narracji, uruchom najpierw: narration generate
   · odcinek deklaruje audio: narration, co obejmuje muzykę i efekty, etap 9 produkuje samą narrację, a muzyki ani efektów nie wytwarza ani nie wnosi żaden etap tego potoku
 Dalej: aimator narration mix ewa 01-burza --track gpt-image"
+`;
+
+exports[`every command >   check <id> <episode-id> --stage versions --track <tor> [--json] 1`] = `
+"ok
+Odcinek "01-burza", tor gpt-image, etap 12
+  ! odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  ! odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
+Dalej: odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none"
 `;
 
 exports[`every command >   check <id> [<episode-id>] 1`] = `
@@ -2201,4 +2216,29 @@ Dalej: aimator character generate ewa ewa --track gpt-image"
 exports[`every command >   style generate <id> --track <gpt-image|seedream> [--artifact S01,...] [--model <id>] 1`] = `
 "StyleBasisError
 podstawa obrazów stylu projektu "ewa" to none, a generuje się je tylko przy: aimator project style ewa --generated --count <1-4>"
+`;
+
+exports[`every command >   versions bind <id> <episode-id> --track <tor> --artifact C01 1`] = `
+"Stage12BlockedError
+etap 12 nie może tego zrobić:
+  - odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  - odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć"
+`;
+
+exports[`every command >   versions faces <id> <episode-id> --track <gpt-image|seedream> --artifact C01 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Twarze ewa/01-burza, tor gpt-image, klip C01
+  płatnych rozpoznań do wykonania: 0
+  ! odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  ! odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
+Dalej: odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none"
+`;
+
+exports[`every command >   versions lip-sync <id> <episode-id> --track <tor> [--artifact C01[,C02]] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Lip-sync ewa/01-burza, tor gpt-image
+  płatnych wywołań do wykonania, rozpoznań: 0, zadań lip-sync: 0
+  ! odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  ! odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
+Dalej: odcinek nie ma decyzji, w jakim języku ruszają się usta, a wersja językowa powstaje właśnie w nim: aimator episode lip-sync ewa 01-burza --language <kod> albo --none"
 `;

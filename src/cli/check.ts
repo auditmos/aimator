@@ -22,6 +22,7 @@ import { checkScreenplayStage } from "./stages/screenplay.js";
 import { checkShotListStage } from "./stages/shot-list.js";
 import { checkSoundDesignStage } from "./stages/sound-design.js";
 import { checkStyleStage } from "./stages/style.js";
+import { checkVersionsStage } from "./stages/versions.js";
 
 /** Every question `check` answers, in the words the usage text promises. */
 export const USAGE = `  check <id> [<episode-id>]
@@ -38,7 +39,8 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage assembly --track <tor> [--json]
   check <id> <episode-id> --stage soundtrack [--track <tor>] [--json]
   check <id> <episode-id> --stage sound-design [--track <tor>] [--json]
-  check <id> <episode-id> --stage dialogue [--json]`;
+  check <id> <episode-id> --stage dialogue [--json]
+  check <id> <episode-id> --stage versions --track <tor> [--json]`;
 
 /**
  * The text stages, whose whole question is an episode and how to print it.
@@ -82,6 +84,7 @@ const WIDE: Readonly<
   "sound-design": checkSoundDesignStage,
   soundtrack: checkSoundtrackStage,
   style: checkStyleStage,
+  versions: checkVersionsStage,
   voice: checkVoiceStage,
 };
 

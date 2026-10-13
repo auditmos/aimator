@@ -23,7 +23,8 @@ scenariusz i assety, po gotowy film sklejony z klipów.
 Proces obsługuje w całości wszystkie cztery tryby dźwięku: `music-and-effects`, `narration`,
 `dialogue` i `dialogue-and-narration`. Kwestie postaci kupuje
 [etap 11: dialog](docs/stages/11-dialog.md), każdą głosem swojej postaci, a pełna ścieżka
-etapu 10 kładzie je obok narracji, muzyki i efektów.
+etapu 10 kładzie je obok narracji, muzyki i efektów. Usta postaci w drugim języku porusza
+klip po klipie [etap 12: wersje językowe](docs/stages/12-wersje-jezykowe.md).
 
 **„Krótka" znaczy tu kilkanaście minut.** `--duration` przyjmuje formalnie do 3600 s, ale
 praktyczna granica leży niżej i bierze się stąd, że etapy 1, 3 i 4 mieszczą **cały film

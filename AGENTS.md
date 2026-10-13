@@ -23,7 +23,7 @@ build when a documented command or flag is missing from `--help`, when a local l
 at nothing, and when an implemented stage has no page, so this is enforced rather than
 remembered. It cannot check prose, so a renamed concept is still yours to carry across.
 
-Stages 0 through 11 are implemented. Stage 11 lifts which line each character says, where,
+Stages 0 through 12 are implemented. Stage 11 lifts which line each character says, where,
 and when, from the attributed lines stage 3 writes, buys each line in its speaker's voice,
 and hands the accepted lines to stage 10's mix as one more stem of speech, which is what
 makes all four sound modes complete. It also translates the accepted script into the
@@ -90,6 +90,14 @@ count and nothing like the same money. It rebuilds from `episode.mp4` rather tha
 music over `narrated.mp4`, which is the only arrangement that encodes the speech once and
 the only one in which music can honestly step back under a voice, and `narrated.mp4`
 becomes a reviewed intermediate whose yes stage 10 gates on rather than reproduces.
+Stage 12 is the first that works **clip by clip on one track** and the first whose paid
+call is preceded by a person's decision about what the call found: Kling finds the faces in
+an accepted clip, a person says which face is which character (`binding.json`, rule 7 even
+with one face), and only then are mouths moved. Which clips need it is derived from the
+shot list and the translation, never stored. The provider moves one face per job and a job
+is addressed by a session opened on exactly one video, so a second speaker in a clip is a
+second face call on the first job's result, by its `video_id`, under the face id the person
+bound. It produces each clip's version; the two finished films come after it.
 
 ## Project Structure
 
@@ -127,7 +135,8 @@ src/
 │       ├── assembly.ts       # Etap 8
 │       ├── narration.ts      # Etap 9
 │       ├── sound-design.ts   # Etap 10
-│       └── dialogue.ts       # Etap 11, the script
+│       ├── dialogue.ts       # Etap 11, the script
+│       └── versions.ts       # Etap 12: faces, who they are, lip-sync per clip
 ├── config/
 │   └── index.ts      # App-level config (imports env, exports typed config)
 ├── site/             # Folder form: the published page; not a pipeline domain
@@ -348,6 +357,14 @@ src/
     │   ├── translate.ts   # Internal: the script in the language of the mouths
     │   ├── review.ts      # Internal: verification and approval of the script and each line
     │   └── index.test.ts  # The lift both ways, the voice gate, the bill, through the entry
+    ├── versions/      # Folder form: index.ts is the only entry (stage 12)
+    │   ├── index.ts       # Public: findFaces, bindFaces, generateLipSync, checkVersions,
+    │   │                  #         approveVersions
+    │   ├── plan.ts        # Internal: the gate, which clips (derived), the faces read back
+    │   ├── faces.ts       # Internal: the paid face call, and the binding a person gives
+    │   ├── generate.ts    # Internal: one job per speaker, each on the one before it
+    │   ├── review.ts      # Internal: verification and approval, clip by clip
+    │   └── index.test.ts  # Gate/which clips/faces/bind/duet/approve, through the entry
     ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
     ├── muxer.test.ts
     ├── instruction.ts # Single-file form: the marked block a person's note travels in

@@ -71,7 +71,13 @@ $AIMATOR_WORKSPACE/
                                         assembly.lock, narrated.mp4,
                                         soundtrack.stage.json, soundtrack.lock,
                                         mixed.mp4, sound-design.stage.json,
-                                        sound-design.lock, runs/
+                                        sound-design.lock,
+                                        versions/faces/Cxx/ (faces.json,
+                                        binding.json, obrazek każdej twarzy),
+                                        versions/clips/Cxx.mp4, versions/clips/
+                                        Cxx/<postać>.mp4 (krok przed ostatnią
+                                        twarzą), versions.stage.json,
+                                        versions.lock, runs/
 ```
 
 Cztery reguły, które ten układ egzekwuje:
@@ -317,6 +323,7 @@ Obowiązują we wszystkich etapach.
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, przy narracji zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9, przy dialogu przyjęte kwestie etapu 11 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json`; do przekładu `lip-sync.json` | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.<język ust>.md`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; przyjęty skrypt i przyjęta próbka głosu postaci przed kupnem jej kwestii; przyjęty skrypt i język ust przed przekładem; potem ocena skryptu, przekładu i każdej kwestii | **zaimplementowany** |
+| 12 wersje językowe | `lip-sync.json`, przyjęty `dialogue.<język ust>.md` i przyjęte kwestie `dialogue/<język ust>/Dnn.wav`, zatwierdzona `shot-list.md`, przyjęte klipy **na tym torze** | `<tor>/versions/faces/Cxx/faces.json`, obrazki twarzy, `binding.json`, `<tor>/versions/clips/Cxx.mp4`, `<tor>/versions.stage.json`, `<tor>/runs/<runId>/` | `lip-sync.json` z językiem i `audio` równe `dialogue` przed każdym poleceniem; per klip przyjęty klip, przyjęty przekład i kwestie tego klipu, rozpoznane twarze i przypisanie każdej postaci mówiącej w kadrze przed lip-syncem; potem ocena każdego klipu z osobna | **zaimplementowany**: twarze, przypisanie i lip-sync per klip |
 
 **Wiersz 10 zmienił się przy implementacji i to jest zapisane tutaj, a nie przemilczane.**
 Mówił, że muzyka i efekty są **wejściem** wnoszonym przez człowieka, i sam przyznawał, że
@@ -2150,3 +2157,70 @@ Etap 10 czyta je przez `readAcceptedDialogue` z wejścia etapu 11, tym samym wer
 drukuje `check --stage dialogue`, więc kwestia liczy się jako przyjęta w miksie dokładnie
 wtedy, gdy liczy się jako przyjęta tutaj. Wymagana jest **każda** kwestia skryptu: film bez
 jednej z nich mówiłby mniej niż skrypt, który ktoś zatwierdził.
+
+## Etap 12: szczegóły
+
+Etap 12 przestawia usta postaci na język ust odcinka, **per tor i klip po klipie**. Jest
+pierwszym etapem, który kupuje u Kling coś innego niż render: rozpoznanie twarzy
+(`identify-face`, płatne i synchroniczne) i zadanie lip-sync (`advanced-lip-sync`,
+asynchroniczne). Oba należą do `lib/video-model`, bo kolejność operacji wokół zadania jest
+ta sama co przy klipie: `submitted` przed POST, identyfikator zadania na dysku przed
+pierwszym odpytaniem, archiwum, wznowienie pytaniem, publikacja po werdykcie MP4.
+
+### Bramka
+
+Cały etap wisi na `lip-sync.json` ([etap 0](#etap-0-szczegóły)). Brak pliku, `none` i tryb
+`dialogue-and-narration` to odmowy z poleceniem, które je usuwa. Narracja w drugim języku
+jest poza zakresem, więc odcinek z narratorem wersji nie dostaje. Bramka per klip: klip
+przyjęty w etapie 7 werdyktem `check --stage clips`, przekład z ważną zgodą, każda kwestia
+tego klipu przyjęta, twarze rozpoznane w klipie, który leży na dysku, i przypisanie
+obejmujące każdą postać mówiącą w kadrze.
+
+### Które klipy
+
+Zbiór jest wyprowadzany z listy ujęć i przekładu, nigdy zapisywany (reguła 7, druga
+połowa): klip trafia do lip-syncu, gdy leży w nim kwestia przekładu wypowiadana przez
+postać z `Cast` swojego ujęcia. Kwestia spoza kadru to meldunek, nie odmowa. Klip bez
+widocznego mówiącego przechodzi do wersji bez zmian i `check` wymienia go w `untouched`.
+
+### Twarze są płatne, przypisanie jest decyzją
+
+`versions faces` kupuje jedno rozpoznanie na klip i zapisuje `faces.json` (klip, sesja,
+przedział każdej twarzy w ms) i obrazek każdej twarzy pod formatem, który oddał dostawca.
+Rekord `faces:Cxx` w `versions.stage.json` niesie wejście (klip) i wyjścia; zgody nie ma,
+bo nic tu nie jest osądem. Klip wyrenderowany przez Kling w ciągu 30 dni idzie po
+`video_id` z archiwum swojej próby, każdy inny po podpisanym adresie z prywatnego bucketu
+([`lib/hosting`](../src/lib/hosting.ts)), zabieranym po wywołaniu. Drugie rozpoznanie wymaga
+`--regenerate`.
+
+`versions bind` zapisuje `binding.json`: twarz → postać, zawsze jawnie, także przy jednej
+twarzy (reguła 7), razem z sha256 `faces.json`, któremu odpowiada. To plik decyzji, nie
+rekord, tak jak `lip-sync.json`: nie ma producenta ani zgody, jest wejściem zadań.
+
+### Jedna twarz na zadanie
+
+Każda postać mówiąca w klipie to osobne zadanie, w kolejności jej pierwszej kwestii.
+Jej kwestie jadą jako jedna ścieżka WAV z ciszą na ich pozycjach, dopełniona do dwóch
+sekund (`speechTrack` w `lib/voice-model`). Pozycja to kotwica planu przeliczona przez
+`lib/timeline` na zegar filmu toru, a potem na czas lokalny klipu. Zadanie zapowiada okno
+w ms: od wstawienia ścieżki do jej końca.
+
+Zadanie adresuje się sesją, a sesja jest otwarta na jednym wideo. Pierwsze zadanie
+korzysta więc z sesji z `faces.json`; każde kolejne poprzedza nowe, płatne rozpoznanie
+na wyniku poprzedniego zadania, po jego `video_id`, i rusza twarz o tej samej `face_id`,
+którą przypisał człowiek. Brak tej twarzy w nowej sesji to odmowa. Rachunek podaje
+rozpoznania i zadania osobno.
+
+| artefakt | `producer.kind` | `model` | wejścia |
+|---|---|---|---|
+| `faces:Cxx` | `model` | `kling-identify-face` | klip z etapu 7 |
+| `Cxx:<postać>` | `model` | `kling-lip-sync` | klip z etapu 7 (pierwsze zadanie) albo wynik poprzedniego, `faces.json` (pierwsze zadanie), `binding.json`, nagranie każdej kwestii tej postaci w klipie |
+| `Cxx` | `model` | `kling-lip-sync` | jak wyżej; to zadanie ostatniej postaci i jedyne, które publikuje `versions/clips/Cxx.mp4` |
+
+### Zgoda
+
+`approve <id> <episode-id> --stage versions --track <tor> --artifact C01[,C02]`;
+`--artifact` jest wymagane. Przyjmuje się wyłącznie klucz klipu, nigdy krok
+`Cxx:<postać>`. Zgoda wiąże się z sha256 klipu wersji i z jego wejściami, więc nowe
+przypisanie, nowe rozpoznanie albo nowe nagranie kwestii ją cofa, a `check` wymienia plik
+w `inputsChanged`.
