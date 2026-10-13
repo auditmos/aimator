@@ -169,7 +169,13 @@ export const episodeFileSchema = z.strictObject({
   projectId: z.string().min(1),
   schemaVersion: z.literal(1),
   settings: draftSettingsSchema,
-  source: assetSchema,
+  source: z.strictObject({
+    // Null for an idea typed into `episode add --idea`: nothing was copied, so
+    // there is no file to name, and a made-up path would be a second answer.
+    originPath: z.string().min(1).nullable(),
+    path: z.string().min(1),
+    sha256: sha256Schema,
+  }),
 });
 
 /** The most style frames a project generates per track, the number it decides. */

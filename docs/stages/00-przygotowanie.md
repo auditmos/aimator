@@ -114,6 +114,25 @@ je ocenia, a dopiero to polecenie mówi, jakie są teraz. Pod `--json` wypisuje 
 (`command`, `projectId`, `episodeId`, `number`, `source` z `path` i `originPath`,
 `settings` z sześcioma decyzjami, `null` tam, gdzie nikt nie zdecydował).
 
+## Pomysł bez pliku
+
+Pomysł na jedno zdanie nie musi leżeć w pliku. `--idea` przyjmuje go wprost, a `--episode`
+niesie to, co niosłaby nazwa pliku bez `.md`, czyli numer i slug:
+
+```bash
+pnpm dev episode add dzielna-ewa --idea "Wanda boi się zasnąć" --episode 03-wanda \
+  --nature law-or-idea
+```
+
+`--episode` jest wymagane, bo **numer odcinka to decyzja**: wyznacza katalog wyników,
+więc nie jest wyliczany z kolejnego wolnego. Sprawdza go ten sam walidator co nazwę pliku,
+a zajęty numer to ta sama odmowa. `source.md` to tekst pomysłu zakończony nową linią,
+z hashem jak każde źródło. `--idea` wyklucza się z `--source`, pusty pomysł albo same
+białe znaki to błąd użycia, a pozostałe flagi decyzji działają bez zmian.
+
+Nic nie zostało skopiowane, więc `episode.json` ma `source.originPath: null`, a
+`episode show` zamiast ścieżki pisze „pomysł wpisany w poleceniu”.
+
 ## Etap 0 jako obiekt
 
 Każde polecenie tego etapu przyjmuje `--json` i wypisuje **obiekt, który zwraca moduł
@@ -173,7 +192,7 @@ $AIMATOR_WORKSPACE/projects/dzielna-ewa/
 ├── style/sources/      obrazy stylu, skopiowane jako S01.png, S02.png… i zahashowane
 ├── characters/ewa/sources/   zdjęcia tej postaci, skopiowane i zahashowane
 └── episodes/01-burza/
-    ├── source.md       kopia bajtowa Twojego opisu
+    ├── source.md       kopia bajtowa Twojego opisu albo wpisany pomysł
     ├── episode.json    decyzje odcinka
     └── prepare.stage.json
 ```

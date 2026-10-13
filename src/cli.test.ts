@@ -155,6 +155,135 @@ describe("episode add and set", () => {
   });
 });
 
+/**
+ * An idea typed on the command line instead of a file holding it.
+ *
+ * Assumptions: `--episode` carries what a source file's name would, minus
+ * `.md`, through the same validator, so `03-wanda` is number 3. The idea is
+ * stored as typed and ends with exactly one newline; one already there is not
+ * doubled. `originPath` is null, because nothing was copied from anywhere.
+ * Not tested here: the screen's text field, which is a separate `ui` commit.
+ */
+describe("episode add --idea", () => {
+  const EPISODE_DIR = "projects/demo/episodes/03-wanda";
+
+  beforeEach(async () => {
+    await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");
+  });
+
+  it("should store the idea as the episode's source, numbered by --episode", async () => {
+    const result = await cli(
+      "episode",
+      "add",
+      "demo",
+      "--idea",
+      "Wanda boi się zasnąć",
+      "--episode",
+      "03-wanda"
+    );
+    const episode = JSON.parse(await readFile(join(root, EPISODE_DIR, "episode.json"), "utf8"));
+
+    expect(result.ok ? null : result.text).toBeNull();
+    expect(await readFile(join(root, EPISODE_DIR, "source.md"), "utf8")).toBe(
+      "Wanda boi się zasnąć\n"
+    );
+    expect(episode).toMatchObject({ id: "03-wanda", number: 3, source: { originPath: null } });
+  });
+
+  it("should require --episode, because the number is a decision", async () => {
+    const result = await run(["episode", "add", "demo", "--idea", "Wanda", "--workspace", root]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(result.ok ? null : result.error.message).toContain("--episode");
+  });
+
+  it("should refuse --idea together with --source", async () => {
+    const path = join(scratch, "03-wanda.md");
+    await writeFile(path, "Wanda boi się zasnąć.\n", "utf8");
+    const result = await run([
+      "episode",
+      "add",
+      "demo",
+      "--idea",
+      "Wanda",
+      "--episode",
+      "03-wanda",
+      "--source",
+      path,
+      "--workspace",
+      root,
+    ]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(await readdir(join(root, "projects/demo"))).not.toContain("episodes");
+  });
+
+  it("should refuse --episode beside --source, whose file name already says it", async () => {
+    const path = join(scratch, "03-wanda.md");
+    await writeFile(path, "Wanda boi się zasnąć.\n", "utf8");
+    const result = await run([
+      "episode",
+      "add",
+      "demo",
+      "--source",
+      path,
+      "--episode",
+      "04-wanda",
+      "--workspace",
+      root,
+    ]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+  });
+
+  it.each(["", " \n\t "])("should refuse an idea with nothing in it: %j", async (idea) => {
+    const result = await run([
+      "episode",
+      "add",
+      "demo",
+      "--idea",
+      idea,
+      "--episode",
+      "03-wanda",
+      "--workspace",
+      root,
+    ]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(result.ok ? null : result.error.message).toContain("--idea");
+    expect(await readdir(join(root, "projects/demo"))).not.toContain("episodes");
+  });
+
+  it("should refuse a number another episode already holds, as a file would be", async () => {
+    const path = join(scratch, "03-burza.md");
+    await writeFile(path, "Burza.\n", "utf8");
+    await cli("episode", "add", "demo", "--source", path);
+
+    const result = await cli("episode", "add", "demo", "--idea", "Wanda", "--episode", "03-wanda");
+
+    expect(result.text).toContain('numer odcinka 3 jest już zajęty przez "03-burza"');
+  });
+
+  it("should read --episode with the rule a source file's name meets", async () => {
+    const result = await cli("episode", "add", "demo", "--idea", "Wanda", "--episode", "wanda");
+
+    expect(result.text).toContain("the file name must start with its number and a separator");
+  });
+
+  it("should say in episode show that the idea was typed, and nothing was copied", async () => {
+    await cli("episode", "add", "demo", "--idea", "Wanda", "--episode", "03-wanda");
+
+    const text = await cli("episode", "show", "demo", "03-wanda");
+    const json = await cli("episode", "show", "demo", "03-wanda", "--json");
+
+    expect(text.text).toContain("wpisany w poleceniu");
+    expect(text.text).not.toContain("skopiowane z");
+    expect(JSON.parse(json.text)).toMatchObject({
+      source: { originPath: null, path: `${EPISODE_DIR}/source.md` },
+    });
+  });
+});
+
 describe("check", () => {
   it("should fail while stage 0 is incomplete", async () => {
     await cli("project", "init", "demo", "--title", "Demo", "--aspect-ratio", "16:9");

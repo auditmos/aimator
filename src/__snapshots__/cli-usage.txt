@@ -26,6 +26,9 @@ Etap 0. Przygotowanie projektu i odcinka:
   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
                    [--max-clip <s>] [--json]
+  episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]
+    Pomysł wpisany w poleceniu zamiast pliku. --episode niesie to, co nazwa
+    pliku bez .md: numer i slug. source.md to tekst pomysłu.
   episode set <id> <episode-id> [te same flagi decyzji] [--json]
   episode show <id> <episode-id> [--json]
     Co odcinek trzyma: plik źródłowy, skąd go skopiowano, i sześć decyzji,

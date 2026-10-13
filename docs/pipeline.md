@@ -134,7 +134,8 @@ i nie mówi nic o tym, czy instrukcja się zmieniła.
 
 Ścieżki w artefaktach są **względne wobec katalogu roboczego**, więc całe drzewo można
 przenieść. `originPath` w `project.json` i `episode.json` jest bezwzględny, bo wskazuje
-plik spoza katalogu roboczego; to jedyne miejsce, gdzie ma to sens.
+plik spoza katalogu roboczego; to jedyne miejsce, gdzie ma to sens. W `episode.json` bywa
+`null`: pomysł wpisany w `episode add --idea` nie ma pliku, z którego go skopiowano.
 
 `project.json` i `episode.json` trzymają wyłącznie treść; pochodzenie i ocena są w pliku
 etapu. `project.md` nie ma hasha od chwili `init`, bo pisze go wtedy człowiek i hash pustego

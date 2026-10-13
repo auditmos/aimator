@@ -519,6 +519,15 @@ Próba na sucho: nic nie zapisano, nic nie wysłano. Klipy ewa/01-burza, tor gpt
 Dalej: usuń powyższe przeszkody przed płatnym wywołaniem"
 `;
 
+exports[`every command >   episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Dodano odcinek
+  + projects/ewa/episodes/02-slonce/source.md
+  + projects/ewa/episodes/02-slonce/episode.json
+  + projects/ewa/episodes/02-slonce/prepare.stage.json
+Dalej: uzupełnij decyzje: aimator episode set ewa 02-slonce --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>"
+`;
+
 exports[`every command >   episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Dodano odcinek

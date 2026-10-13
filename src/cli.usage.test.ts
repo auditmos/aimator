@@ -429,6 +429,18 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "seedance-2.0",
     "--dry-run",
   ],
+  '  episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]': [
+    "episode",
+    "add",
+    PROJECT,
+    "--idea",
+    "Ewa czeka na słońce.",
+    "--episode",
+    "02-slonce",
+    "--duration",
+    "30",
+    "--dry-run",
+  ],
   "  episode add <id> --source <NN-tytul.md> [--duration <s>] [--audio <tryb>]": [
     "episode",
     "add",

@@ -125,8 +125,11 @@ export interface EpisodeOverview {
   readonly projectId: string;
   /** Every decision, null where nobody has made it yet. */
   readonly settings: DraftSettings;
-  /** The copy in the workspace, and the file it was copied from, as typed. */
-  readonly source: { readonly originPath: string; readonly path: string };
+  /**
+   * The copy in the workspace, and the file it was copied from, as typed; null
+   * when the idea itself was typed into the command and nothing was copied.
+   */
+  readonly source: { readonly originPath: string | null; readonly path: string };
 }
 
 /** Everything stage 1 is allowed to read, with the digests of the bytes it read. */
@@ -200,8 +203,15 @@ type SetBasisInput = CharacterInput & {
 type ApproveInput = ProjectInput & { readonly note: string | null; readonly reviewer: string };
 type AddEpisodeInput = ProjectInput & {
   readonly settings: Partial<DraftSettings>;
-  readonly sourcePath: string;
-};
+} & EpisodeSource;
+/**
+ * A file somebody saved, whose name carries the episode's number, or an idea
+ * typed into the command, which carries it in `episodeId` because there is no
+ * file name to read it from. Either way the number is given, never inferred.
+ */
+type EpisodeSource =
+  | { readonly sourcePath: string }
+  | { readonly episodeId: string; readonly idea: string };
 type SetSettingsInput = ProjectInput & {
   readonly episodeId: string;
   readonly settings: Partial<DraftSettings>;
@@ -578,6 +588,117 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
     return project;
   }
 
+  const material = await readSource(input);
+
+  if (!material.ok) {
+    return material;
+  }
+
+  const { identity } = material.data;
+  const clash = await findNumberClash(project.data, identity.number, identity.id);
+
+  if (clash !== null) {
+    return err(
+      new ProjectStateError(
+        "duplicate-number",
+        `numer odcinka ${identity.number} jest już zajęty przez "${clash}", numer wyznacza katalog wyników, więc musi być unikalny`
+      )
+    );
+  }
+
+  const paths = episodePaths(project.data, identity.id);
+
+  if (!paths.ok) {
+    return paths;
+  }
+
+  if (await exists(paths.data.file)) {
+    return err(
+      new ProjectStateError(
+        "already-exists",
+        `odcinek "${identity.id}" już istnieje, etap 0 nie nadpisuje źródła`
+      )
+    );
+  }
+
+  const settings = mergeSettings(EMPTY_SETTINGS, input.settings);
+
+  if (!settings.ok) {
+    return settings;
+  }
+
+  const episode: EpisodeFile = {
+    id: identity.id,
+    number: identity.number,
+    projectId: input.projectId,
+    schemaVersion: 1,
+    settings: settings.data,
+    source: {
+      originPath: material.data.originPath,
+      path: toWorkspacePath(input.workspace.root, paths.data.source),
+      sha256: material.data.sha256,
+    },
+  };
+
+  const ops = episodeWriteOps(
+    input.workspace,
+    paths.data,
+    episode,
+    material.data.sha256,
+    material.data.content
+  );
+  const written = await applyWrites(ops, input.mode);
+
+  return written.ok
+    ? ok({
+        approved: false,
+        changedSinceApproval: [],
+        created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+        nextStep:
+          missingSettings(settings.data).length === 0
+            ? `aimator check ${input.projectId}`
+            : `uzupełnij decyzje: aimator episode set ${input.projectId} ${identity.id} --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>`,
+        problems: [],
+        ready: false,
+        reused: [],
+      })
+    : written;
+}
+
+/** How the bytes reach `source.md`: copied from a file, or written as typed. */
+type SourceContent =
+  | { readonly from: string; readonly kind: "copy" }
+  | { readonly kind: "text"; readonly text: string };
+
+interface SourceMaterial {
+  readonly content: SourceContent;
+  readonly identity: { readonly id: string; readonly number: number };
+  /** Null when nothing was copied: the idea was typed into the command. */
+  readonly originPath: string | null;
+  readonly sha256: string;
+}
+
+/**
+ * The episode's identity and the bytes `source.md` will hold, from either kind
+ * of source. An idea's number goes through the same validator as a file name,
+ * so `03-wanda` means what `03-wanda.md` would, and it ends with one newline,
+ * so `source.md` is a text file whichever way it arrived.
+ */
+async function readSource(input: EpisodeSource): Promise<Result<SourceMaterial>> {
+  if ("idea" in input) {
+    const identity = episodeIdFromSource(`${input.episodeId}.md`);
+    const text = input.idea.endsWith("\n") ? input.idea : `${input.idea}\n`;
+
+    return identity.ok
+      ? ok({
+          content: { kind: "text", text },
+          identity: identity.data,
+          originPath: null,
+          sha256: sha256Of(Buffer.from(text)),
+        })
+      : identity;
+  }
+
   const identity = episodeIdFromSource(basename(input.sourcePath));
 
   if (!identity.ok) {
@@ -594,74 +715,12 @@ export async function addEpisode(input: AddEpisodeInput): Promise<Result<Stage0R
     return err(new InvalidInputError("source", `plik źródłowy ${input.sourcePath} jest pusty`));
   }
 
-  const clash = await findNumberClash(project.data, identity.data.number, identity.data.id);
-
-  if (clash !== null) {
-    return err(
-      new ProjectStateError(
-        "duplicate-number",
-        `numer odcinka ${identity.data.number} jest już zajęty przez "${clash}", numer wyznacza katalog wyników, więc musi być unikalny`
-      )
-    );
-  }
-
-  const paths = episodePaths(project.data, identity.data.id);
-
-  if (!paths.ok) {
-    return paths;
-  }
-
-  if (await exists(paths.data.file)) {
-    return err(
-      new ProjectStateError(
-        "already-exists",
-        `odcinek "${identity.data.id}" już istnieje, etap 0 nie nadpisuje źródła`
-      )
-    );
-  }
-
-  const settings = mergeSettings(EMPTY_SETTINGS, input.settings);
-
-  if (!settings.ok) {
-    return settings;
-  }
-
-  const episode: EpisodeFile = {
-    id: identity.data.id,
-    number: identity.data.number,
-    projectId: input.projectId,
-    schemaVersion: 1,
-    settings: settings.data,
-    source: {
-      originPath: input.sourcePath,
-      path: toWorkspacePath(input.workspace.root, paths.data.source),
-      sha256: source.data.sha256,
-    },
-  };
-
-  const ops = episodeWriteOps(
-    input.workspace,
-    paths.data,
-    episode,
-    source.data.sha256,
-    input.sourcePath
-  );
-  const written = await applyWrites(ops, input.mode);
-
-  return written.ok
-    ? ok({
-        approved: false,
-        changedSinceApproval: [],
-        created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
-        nextStep:
-          missingSettings(settings.data).length === 0
-            ? `aimator check ${input.projectId}`
-            : `uzupełnij decyzje: aimator episode set ${input.projectId} ${identity.data.id} --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>`,
-        problems: [],
-        ready: false,
-        reused: [],
-      })
-    : written;
+  return ok({
+    content: { from: input.sourcePath, kind: "copy" },
+    identity: identity.data,
+    originPath: input.sourcePath,
+    sha256: source.data.sha256,
+  });
 }
 
 function episodeWriteOps(
@@ -669,12 +728,12 @@ function episodeWriteOps(
   paths: EpisodePaths,
   episode: EpisodeFile,
   sourceSha: string,
-  originPath: string
+  content: SourceContent
 ): WriteOp[] {
   const text = serialize(episode);
 
   return [
-    { from: originPath, kind: "copy", to: paths.source },
+    { ...content, to: paths.source },
     { kind: "text", text, to: paths.file },
     {
       kind: "text",
@@ -817,13 +876,10 @@ export async function setEpisodeSettings(input: SetSettingsInput): Promise<Resul
     return sourceDigest;
   }
 
-  const ops = episodeWriteOps(
-    input.workspace,
-    paths.data,
-    episode,
-    sourceDigest.data.sha256,
-    paths.data.source
-  ).filter((op) => op.kind !== "copy");
+  const ops = episodeWriteOps(input.workspace, paths.data, episode, sourceDigest.data.sha256, {
+    from: paths.data.source,
+    kind: "copy",
+  }).filter((op) => op.kind !== "copy");
 
   const lapsed = await approvalLapses(paths.data.prepareStage);
   const written = await applyWrites(ops, input.mode);
