@@ -25,3 +25,4 @@ export {
   type DialogueStatus,
   readAcceptedDialogue,
 } from "./review.js";
+export { translateDialogue } from "./translate.js";

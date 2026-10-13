@@ -53,6 +53,7 @@ import {
 import { planStyle, readStyleFile, type StyleDecision, styleOutputs } from "./style.js";
 import { PLACEHOLDER, renderRules, styleBibleProblems } from "./template.js";
 
+export { type LipSyncChoice, readLipSync, setLipSync } from "./lip-sync.js";
 /** The five episode decisions, all made. A later stage reads them, never the draft. */
 export type { ReadySettings as EpisodeSettings, ShotListSettings } from "./schema.js";
 

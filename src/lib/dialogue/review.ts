@@ -4,6 +4,7 @@ import {
   driftableInputs,
   type RecordedFile,
   readDigest,
+  type StageFile,
   serialize,
   toWorkspacePath,
   type WriteMode,
@@ -12,9 +13,18 @@ import {
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
 import { validateSpeech } from "../voice-model/index.js";
-import { dialogueAudio, workspacePath } from "../workspace.js";
-import { readStage11Inputs, SCRIPT, STAGE, type Stage11Inputs, type Stage11Scope } from "./plan.js";
-import { type DialogueLine, validateDialogue } from "./validate.js";
+import { dialogueAudio, dialogueTranslation, workspacePath } from "../workspace.js";
+import {
+  readStage11Inputs,
+  readTranslationTarget,
+  SCRIPT,
+  STAGE,
+  type Stage11Inputs,
+  type Stage11Scope,
+  type TranslationTarget,
+  translationKey,
+} from "./plan.js";
+import { type DialogueLine, validateDialogue, validateTranslation } from "./validate.js";
 
 /**
  * Internal to the dialogue module: verification, and the approval on top of it.
@@ -52,10 +62,30 @@ export interface LineState extends DialogueLine {
   readonly state: "absent" | "completed" | "submitted";
 }
 
+/** The script in the episode's second language, and where its yes stands. */
+export interface TranslationState {
+  /**
+   * True once a human accepted this translation, nothing it was made from
+   * changed, and the script it translates is itself accepted.
+   */
+  readonly approved: boolean;
+  /** Its key in `dialogue.stage.json`: `script-en`. */
+  readonly id: string;
+  /** Recorded inputs whose bytes on disk no longer match what the translation used. */
+  readonly inputsChanged: readonly string[];
+  /** The language of the mouths, which this script is written in. */
+  readonly language: string;
+  readonly note: string;
+  readonly state: "absent" | "completed" | "submitted";
+}
+
 export interface DialogueStatus {
   /** The script, when a person corrected it by hand and nobody accepted that yet. */
   readonly amended: readonly string[];
-  /** True once the script and every line carry a still-valid approval. */
+  /**
+   * True once the script and every line carry a still-valid approval. The
+   * film's language only: a second one is the translation's own business.
+   */
   readonly approved: boolean;
   /** The script as data, once it validates against the plan as it stands. */
   readonly lines: readonly LineState[];
@@ -64,6 +94,8 @@ export interface DialogueStatus {
   readonly notices: readonly string[];
   readonly problems: readonly string[];
   readonly script: ScriptState;
+  /** The script in the episode's second language; null while it names none. */
+  readonly translation: TranslationState | null;
 }
 
 type ApproveScope = Stage11Scope & {
@@ -94,6 +126,18 @@ interface Inspection {
   readonly lineBlocking: ReadonlyMap<string, readonly string[]>;
   readonly stage11: Stage11Inputs;
   readonly status: DialogueStatus;
+  readonly translation: TranslationInspection | null;
+}
+
+/** The translation as `approve` needs it: what it may not write over, and what it rebinds. */
+interface TranslationInspection {
+  /** A hand-corrected translation, with the digest it has now. */
+  readonly amended: readonly RecordedFile[];
+  readonly blocking: readonly string[];
+  /** What the translation records, as the files stand now. */
+  readonly inputs: readonly RecordedFile[];
+  readonly problems: readonly string[];
+  readonly state: TranslationState;
 }
 
 function changedInputs(
@@ -107,8 +151,159 @@ function changedInputs(
     .map((entry) => entry.path);
 }
 
-function approveCommand(input: Stage11Scope): string {
-  return `aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${SCRIPT}`;
+function approveCommand(input: Stage11Scope, key = SCRIPT): string {
+  return `aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${key}`;
+}
+
+/** What the script being translated is, as far as its translation's yes goes. */
+interface Source {
+  readonly approved: boolean;
+  /** Its lines, or null while it does not validate. */
+  readonly lines: readonly DialogueLine[] | null;
+}
+
+/**
+ * The translation into the episode's second language, judged the way the
+ * script is: a validating answer, its own yes, and the inputs it was made from.
+ *
+ * Its yes counts only while the script it translates holds its own, because a
+ * translation of words nobody currently accepts accepts nothing.
+ */
+async function readTranslation(
+  input: Stage11Scope,
+  stage11: Stage11Inputs,
+  target: TranslationTarget,
+  source: Source
+): Promise<TranslationInspection | null> {
+  const path =
+    target.language === null ? null : dialogueTranslation(stage11.episode, target.language);
+
+  if (target.language === null || path === null || !path.ok) {
+    return null;
+  }
+
+  const id = translationKey(target.language);
+  const record = stage11.stage.artifacts[id];
+  const base = { approved: false, id, inputsChanged: [], language: target.language } as const;
+  const empty = { amended: [], blocking: [], inputs: target.inputs } as const;
+
+  if (record === undefined) {
+    return {
+      ...empty,
+      problems: [],
+      state: { ...base, note: "jeszcze nie powstał", state: "absent" },
+    };
+  }
+
+  if (record.status === "submitted") {
+    return {
+      ...empty,
+      problems: [
+        `${id}: rekord "submitted" bez opublikowanego przekładu, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty: aimator dialogue translate ${input.projectId} ${input.episodeId}`,
+      ],
+      state: { ...base, note: `próba ${record.runId} mogła zostać rozliczona`, state: "submitted" },
+    };
+  }
+
+  const text = await readDigest(path.data);
+  const [output] = record.outputs;
+  const amended: readonly RecordedFile[] =
+    output !== undefined && text.ok && output.sha256 !== text.data.sha256
+      ? [{ path: output.path, sha256: text.data.sha256 }]
+      : [];
+  const verdict =
+    source.lines !== null && text.ok
+      ? validateTranslation({ source: source.lines, text: text.data.bytes.toString("utf8") })
+      : null;
+  const blocking = [
+    ...(text.ok ? [] : [`${id}: brakuje ${toWorkspacePath(input.workspace.root, path.data)}`]),
+    ...(source.lines === null
+      ? [`${id}: skrypt, który przekład tłumaczy, nie przechodzi walidacji`]
+      : []),
+    ...(verdict !== null && !verdict.ok ? [verdict.error.message] : []),
+  ];
+  const inputsChanged = changedInputs(driftableInputs(record), target.inputs);
+  const accepted = record.review.status === "approved";
+
+  return {
+    amended,
+    blocking,
+    inputs: target.inputs,
+    problems: [
+      ...blocking,
+      ...inputsChanged.map(
+        (changed) =>
+          `${changed}: zmienił się od czasu przekładu (${id}), przeczytaj przekład jeszcze raz i zatwierdź ponownie: ${approveCommand(input, id)}`
+      ),
+      ...amended.map(
+        (one) =>
+          `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: ${approveCommand(input, id)}`
+      ),
+      ...(accepted && !source.approved
+        ? [
+            `${id}: przekład liczy się dopiero ze zgodą na skrypt, który tłumaczy: ${approveCommand(input)}`,
+          ]
+        : []),
+    ],
+    state: {
+      ...base,
+      approved:
+        accepted &&
+        source.approved &&
+        blocking.length === 0 &&
+        inputsChanged.length === 0 &&
+        amended.length === 0,
+      inputsChanged,
+      note:
+        verdict?.ok === true ? `${verdict.data.lines.length} kwestii` : "nie przechodzi walidacji",
+      state: "completed",
+    },
+  };
+}
+
+/** What the translation adds to the stage's problems: nothing while there is none. */
+function problemsOf(translation: TranslationInspection | null): readonly string[] {
+  return translation === null ? [] : translation.problems;
+}
+
+/** The translation as the status reports it, or null while the episode names no language. */
+function translationState(translation: TranslationInspection | null): TranslationState | null {
+  return translation === null ? null : translation.state;
+}
+
+/** A script that is not on disk: nothing to verify, and no line to read out of it. */
+async function unwritten(
+  input: Stage11Scope,
+  read: { readonly stage11: Stage11Inputs; readonly target: TranslationTarget },
+  script: {
+    readonly note: string;
+    readonly problems: readonly string[];
+    readonly state: ScriptState["state"];
+  }
+): Promise<Inspection> {
+  const { note, problems, state } = script;
+  const translation = await readTranslation(input, read.stage11, read.target, {
+    approved: false,
+    lines: null,
+  });
+
+  return {
+    amended: [],
+    blocking: [...problems],
+    lineBlocking: new Map(),
+    stage11: read.stage11,
+    status: {
+      amended: [],
+      approved: false,
+      lines: [],
+      nextStep: `aimator dialogue generate ${input.projectId} ${input.episodeId}`,
+      notices: [],
+      problems: [...problems, ...problemsOf(translation)],
+      script: { approved: false, id: SCRIPT, inputsChanged: [], note, state },
+      translation: translationState(translation),
+    },
+    translation,
+  };
 }
 
 async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
@@ -118,32 +313,21 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
     return stage11;
   }
 
+  const target = await readTranslationTarget(input, stage11.data);
+
+  if (!target.ok) {
+    return target;
+  }
+
   const { episode, gate, plan, stage } = stage11.data;
   const record = stage.artifacts[SCRIPT];
   const text = await readDigest(episode.dialogueScript);
-  const absent = (
-    state: ScriptState["state"],
-    note: string,
-    problems: readonly string[]
-  ): Inspection => ({
-    amended: [],
-    blocking: [...problems],
-    lineBlocking: new Map(),
-    stage11: stage11.data,
-    status: {
-      amended: [],
-      approved: false,
-      lines: [],
-      nextStep: `aimator dialogue generate ${input.projectId} ${input.episodeId}`,
-      notices: [],
-      problems,
-      script: { approved: false, id: SCRIPT, inputsChanged: [], note, state },
-    },
-  });
+  const absent = (state: ScriptState["state"], note: string, problems: readonly string[]) =>
+    unwritten(input, { stage11: stage11.data, target: target.data }, { note, problems, state });
 
   if (record?.status === "submitted") {
     return ok(
-      absent("submitted", `próba ${record.runId} mogła zostać rozliczona`, [
+      await absent("submitted", `próba ${record.runId} mogła zostać rozliczona`, [
         ...gate,
         `rekord "submitted" bez opublikowanego skryptu, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
       ])
@@ -151,7 +335,9 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
   }
 
   if (record === undefined || !text.ok) {
-    return ok(absent("absent", gate.length > 0 ? gate.join("; ") : "jeszcze nie powstał", gate));
+    return ok(
+      await absent("absent", gate.length > 0 ? gate.join("; ") : "jeszcze nie powstał", gate)
+    );
   }
 
   const blocking: string[] = [];
@@ -191,6 +377,10 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
     amended.length === 0;
   const script = verdict?.ok === true ? verdict.data : null;
   const lines = await readLineStates(input, stage11.data, script?.lines ?? []);
+  const translation = await readTranslation(input, stage11.data, target.data, {
+    approved: scriptApproved,
+    lines: script?.lines ?? null,
+  });
 
   return ok({
     amended,
@@ -215,6 +405,7 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
             `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: ${approveCommand(input)}`
         ),
         ...lines.problems,
+        ...problemsOf(translation),
       ],
       script: {
         approved: scriptApproved,
@@ -223,7 +414,9 @@ async function inspect(input: Stage11Scope): Promise<Result<Inspection>> {
         note: script === null ? "nie przechodzi walidacji" : `${script.lines.length} kwestii`,
         state: "completed",
       },
+      translation: translationState(translation),
     },
+    translation,
   });
 }
 
@@ -359,6 +552,38 @@ export async function checkDialogue(input: Stage11Scope): Promise<Result<Dialogu
   return inspection.ok ? ok(inspection.data.status) : inspection;
 }
 
+/** Where a named artifact stands, whichever of the three kinds it is. */
+function stateOf(status: DialogueStatus, id: string): string | undefined {
+  if (id === SCRIPT) {
+    return status.script.state;
+  }
+
+  return id === status.translation?.id
+    ? status.translation.state
+    : status.lines.find((one) => one.id === id)?.state;
+}
+
+/**
+ * A hand correction that validated is accepted with its script, the one
+ * decision able to: its digest is rebound, its inputs are taken as they now
+ * stand, and the record says who changed it from what. The script and its
+ * translation are each rebound only when named.
+ */
+function rebind(inspection: Inspection, input: ApproveScope): StageFile {
+  const { amended, stage11, translation } = inspection;
+  const script = input.artifacts.includes(SCRIPT)
+    ? withInputs(withAmendments(stage11.stage, amended, input.reviewer), SCRIPT, stage11.inputs)
+    : stage11.stage;
+
+  return translation !== null && input.artifacts.includes(translation.state.id)
+    ? withInputs(
+        withAmendments(script, translation.amended, input.reviewer),
+        translation.state.id,
+        translation.inputs
+      )
+    : script;
+}
+
 /**
  * Records that a human read the script, or listened to named lines.
  *
@@ -370,7 +595,7 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
   if (input.artifacts.length === 0) {
     return err(
       new DialogueStateError(
-        `--artifact jest wymagane: ${SCRIPT} albo D01[,D02], przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a przyjęcie kwestii otwiera miks`
+        `--artifact jest wymagane: ${SCRIPT}, ${SCRIPT}-<język> albo D01[,D02], przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a przyjęcie kwestii otwiera miks`
       )
     );
   }
@@ -381,8 +606,12 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
     return inspection;
   }
 
-  const { amended, blocking, lineBlocking, stage11, status } = inspection.data;
-  const known = [SCRIPT, ...status.lines.map((one) => one.id)];
+  const { blocking, lineBlocking, stage11, status, translation } = inspection.data;
+  const known = [
+    SCRIPT,
+    ...(translation === null ? [] : [translation.state.id]),
+    ...status.lines.map((one) => one.id),
+  ];
   const unknown = input.artifacts.filter((id) => !known.includes(id));
 
   if (unknown.length > 0) {
@@ -393,11 +622,7 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
     );
   }
 
-  const notReady = input.artifacts.filter((id) =>
-    id === SCRIPT
-      ? status.script.state !== "completed"
-      : status.lines.find((one) => one.id === id)?.state !== "completed"
-  );
+  const notReady = input.artifacts.filter((id) => stateOf(status, id) !== "completed");
 
   if (notReady.length > 0) {
     return err(
@@ -407,6 +632,9 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
 
   const refused = [
     ...(input.artifacts.includes(SCRIPT) ? blocking : []),
+    ...(translation !== null && input.artifacts.includes(translation.state.id)
+      ? translation.blocking
+      : []),
     ...input.artifacts.flatMap((id) => lineBlocking.get(id) ?? []),
   ];
 
@@ -416,13 +644,7 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
     );
   }
 
-  // A hand correction that validated is accepted with the script, the one
-  // decision able to: its digest is rebound and the record says who changed it
-  // from what.
-  const rebound = input.artifacts.includes(SCRIPT)
-    ? withInputs(withAmendments(stage11.stage, amended, input.reviewer), SCRIPT, stage11.inputs)
-    : stage11.stage;
-  const approved = approveArtifacts(rebound, input.artifacts, {
+  const approved = approveArtifacts(rebind(inspection.data, input), input.artifacts, {
     note: input.note,
     reviewer: input.reviewer,
   });

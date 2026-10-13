@@ -3,7 +3,9 @@ import {
   addEpisode,
   type EpisodeAddReport,
   type EpisodeOverview,
+  type LipSyncChoice,
   setEpisodeSettings,
+  setLipSync,
   showEpisode,
 } from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
@@ -33,7 +35,12 @@ export const USAGE = `  episode add <id> --source <NN-tytul.md|katalog> [--durat
   episode show <id> <episode-id> [--json]
     Co odcinek trzyma: plik źródłowy, skąd go skopiowano, i sześć decyzji,
     nierozstrzygnięte nazwane wprost. Opis, nie werdykt: czy to wystarcza,
-    mówi check. Niczego nie zapisuje i niczego nie wydaje.`;
+    mówi check. Niczego nie zapisuje i niczego nie wydaje.
+  episode lip-sync <id> <episode-id> --language <kod>|--none [--json]
+    Język, w którym ruszają się usta drugiej wersji filmu, i na który etap 11
+    tłumaczy skrypt dialogu; inny niż język filmu. --none: drugiej wersji nie
+    będzie. Osobny plik lip-sync.json, nie episode.json, więc zmiana nie cofa
+    zgody etapu 0 ani scenariusza. Bez decyzji czeka przekład dialogu.`;
 
 const SETTINGS_OPTIONS = {
   audio: { type: "string" },
@@ -273,11 +280,88 @@ async function runEpisodeShow(argv: readonly string[]): Promise<Result<string>> 
   );
 }
 
+/** Exactly one answer: a language, or a deliberate no. Neither is undecided. */
+function lipSyncChoiceOf(parsed: Parsed): Result<LipSyncChoice> {
+  const { language, none } = parsed.values;
+
+  if ((typeof language === "string") === (none === true)) {
+    return err(
+      new UsageError(
+        "episode lip-sync przyjmuje jedną odpowiedź: --language <kod> albo --none, nie obie i nie żadną"
+      )
+    );
+  }
+
+  return ok(typeof language === "string" ? { kind: "language", language } : { kind: "none" });
+}
+
+/** Which language the mouths move in: an input of the dialogue translation and stage 12 only. */
+async function runEpisodeLipSync(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, {
+    json: { type: "boolean" },
+    language: { type: "string" },
+    none: { type: "boolean" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const choice = lipSyncChoiceOf(parsed.data);
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!choice.ok) {
+    return choice;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const mode = modeOf(parsed.data);
+  const result = await setLipSync({
+    choice: choice.data,
+    episodeId: episodeId.data,
+    mode,
+    projectId: projectId.data,
+    workspace: workspace.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  if (answerFlag(parsed.data) === "json") {
+    return ok(JSON.stringify({ command: "episode lip-sync", ...result.data }, null, 2));
+  }
+
+  const headline = `Język ust odcinka "${episodeId.data}": ${result.data.language}`;
+
+  return ok(
+    [
+      mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
+      ...result.data.created.map((path) => `  + ${path}`),
+      `Dalej: ${result.data.nextStep}`,
+    ].join("\n")
+  );
+}
+
 export async function runEpisode(argv: readonly string[]): Promise<Result<string>> {
   const [action] = argv;
 
   if (action === "show") {
     return runEpisodeShow(argv.slice(1));
+  }
+
+  if (action === "lip-sync") {
+    return runEpisodeLipSync(argv.slice(1));
   }
 
   if (action !== "add" && action !== "set") {

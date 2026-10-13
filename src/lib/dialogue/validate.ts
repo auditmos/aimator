@@ -60,13 +60,36 @@ interface ValidateInput {
 class DialogueFormatError extends Error {
   readonly problems: readonly string[];
 
-  constructor(problems: readonly string[]) {
-    super(
-      `skrypt dialogu nie przechodzi walidacji:\n${problems.map((p) => `  - ${p}`).join("\n")}`
-    );
+  constructor(problems: readonly string[], what = "skrypt dialogu") {
+    super(`${what} nie przechodzi walidacji:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
     this.name = "DialogueFormatError";
     this.problems = problems;
   }
+}
+
+/** Which of the expected `## ` sections are missing, empty or out of order. */
+function sectionProblems(
+  found: ReadonlyMap<string, string>,
+  expected: readonly string[]
+): readonly string[] {
+  const problems: string[] = [];
+  const order = [...found.keys()].filter((name) => expected.includes(name));
+
+  for (const [index, name] of expected.entries()) {
+    const body = found.get(name);
+
+    if (body === undefined) {
+      problems.push(`brak sekcji "${name}"`);
+    } else if (flatten(body) === "") {
+      problems.push(`sekcja "${name}" jest pusta`);
+    }
+
+    if (order[index] !== undefined && order[index] !== name) {
+      problems.push(`sekcja "${order[index]}" stoi tam, gdzie oczekiwano "${name}"`);
+    }
+  }
+
+  return problems;
 }
 
 /** Whitespace collapsed, so a line wrapped at a different column still matches. */
@@ -120,21 +143,8 @@ export function validateDialogue(input: ValidateInput): Result<DialogueScript> {
   }
 
   const found = sections(input.text);
-  const order = [...found.keys()].filter((name) => SECTIONS.includes(name as "Plan"));
 
-  for (const [index, name] of SECTIONS.entries()) {
-    const body = found.get(name);
-
-    if (body === undefined) {
-      problems.push(`brak sekcji "${name}"`);
-    } else if (flatten(body) === "") {
-      problems.push(`sekcja "${name}" jest pusta`);
-    }
-
-    if (order[index] !== undefined && order[index] !== name) {
-      problems.push(`sekcja "${order[index]}" stoi tam, gdzie oczekiwano "${name}"`);
-    }
-  }
+  problems.push(...sectionProblems(found, SECTIONS));
 
   const shots = new Map(input.shotList.shots.map((one) => [one.id, one]));
   const lines = readLines(found.get("Lines") ?? "", { cast: input.cast, problems, shots });
@@ -337,4 +347,132 @@ function readLine(block: Block, index: number, context: Context): DialogueLine |
   }
 
   return { atSeconds, cast, id, onScreen: shot.cast.includes(cast), shot: shotId, text };
+}
+
+const TRANSLATION_SECTIONS = ["Lines", "Review"] as const;
+
+interface TranslationInput {
+  /** The accepted script in the film's language: what every block must match. */
+  readonly source: readonly DialogueLine[];
+  /** The translation being judged. */
+  readonly text: string;
+}
+
+/**
+ * The second-language script, judged against the accepted one, one to one.
+ *
+ * Purely structural, and on purpose: the same ids, shots, speakers and anchors,
+ * none missing, none added, each with text. Whether the words are faithful is
+ * not something a validator can know, so a human answers it at `approve`.
+ * Each line keeps its source's `onScreen`, because who has a face to move does
+ * not change with the language.
+ */
+export function validateTranslation(input: TranslationInput): Result<DialogueScript> {
+  const problems: string[] = [];
+
+  if (CODE_FENCE.test(input.text)) {
+    problems.push("dokument zawiera blok kodu, przekład jest prozą i nagłówkami");
+  }
+
+  const found = sections(input.text);
+
+  problems.push(...sectionProblems(found, TRANSLATION_SECTIONS));
+
+  const source = new Map(input.source.map((line) => [line.id, line]));
+  const lines: DialogueLine[] = [];
+
+  for (const block of splitBlocks(found.get("Lines") ?? "")) {
+    const line = readTranslatedLine(block, source, problems);
+
+    if (line === null) {
+      continue;
+    }
+
+    if (lines.some((one) => one.id === line.id)) {
+      problems.push(`${line.id}: kwestia powtórzona, w skrypcie pada raz`);
+      continue;
+    }
+
+    lines.push(line);
+  }
+
+  problems.push(...unmatched(input.source, lines));
+
+  return problems.length > 0
+    ? err(new DialogueFormatError(problems, "przekład skryptu dialogu"))
+    : ok({ lines, notices: [] });
+}
+
+/** One translated block, checked against the line it claims to translate. */
+function readTranslatedLine(
+  block: Block,
+  source: ReadonlyMap<string, DialogueLine>,
+  problems: string[]
+): DialogueLine | null {
+  const match = HEADING.exec(block.heading);
+
+  if (match === null) {
+    problems.push(`nagłówek "${block.heading.trim()}" nie ma kształtu "### D01 | U01 | ewa | 0s"`);
+
+    return null;
+  }
+
+  const [, id = "", shot = "", cast = "", anchor = ""] = match;
+  const original = source.get(id);
+
+  if (original === undefined) {
+    problems.push(`${id}: takiej kwestii nie ma w dialogue.md, przekład niczego nie dopisuje`);
+
+    return null;
+  }
+
+  const atSeconds = Number(anchor.replace(",", "."));
+  const text = flatten(block.text);
+
+  // A translation changes the words and nothing else: where a line sits and
+  // who says it were accepted with the source, and lip-sync reads them.
+  if (shot !== original.shot) {
+    problems.push(
+      `${id}: ujęcie ${shot}, w skrypcie ${original.shot}; przekład nie przenosi kwestii`
+    );
+  }
+
+  if (cast !== original.cast) {
+    problems.push(
+      `${id}: mówi ${cast}, w skrypcie ${original.cast}; przekład nie zmienia mówiącego`
+    );
+  }
+
+  if (atSeconds !== original.atSeconds) {
+    problems.push(
+      `${id}: kotwica ${atSeconds}s, w skrypcie ${original.atSeconds}s; przekład nie przesuwa kwestii`
+    );
+  }
+
+  if (text === "") {
+    problems.push(`${id}: pod nagłówkiem nie ma tekstu`);
+  }
+
+  return { ...original, text };
+}
+
+/** Every source line the translation left out, and an order it did not keep. */
+function unmatched(
+  source: readonly DialogueLine[],
+  lines: readonly DialogueLine[]
+): readonly string[] {
+  const missing = source.filter((line) => !lines.some((one) => one.id === line.id));
+
+  if (missing.length > 0) {
+    return missing.map(
+      (line) =>
+        `brakuje ${line.id} (${line.shot}, ${line.cast}), przekład ma każdą kwestię skryptu dokładnie raz`
+    );
+  }
+
+  const order = lines.map((one) => one.id).join(",");
+
+  return order === source.map((one) => one.id).join(",")
+    ? []
+    : ["kwestie stoją w innej kolejności niż w dialogue.md"];
 }

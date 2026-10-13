@@ -109,6 +109,14 @@ export const env = createEnv({
      */
     AIMATOR_SOUND_MODEL: z.string().min(1).optional(),
     /**
+     * The text model stage 11 translates the accepted dialogue script with,
+     * into the language the mouths move in. Its own variable because it is
+     * its own call site: lifting lines out of a shot list and rewriting them
+     * in another language to fit a window are different tasks, and choosing a
+     * model for one must not quietly choose it for the other.
+     */
+    AIMATOR_TRANSLATION_MODEL: z.string().min(1).optional(),
+    /**
      * The video model stage 7 renders every clip with, **one variable, not one
      * per track**, unlike the image models above.
      *

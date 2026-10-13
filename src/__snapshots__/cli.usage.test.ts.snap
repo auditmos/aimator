@@ -28,7 +28,7 @@ Odcinek "01-burza", tor gpt-image, zatwierdzono
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage dialogue --artifact script|D01[,D02] [--json] 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02] 1`] = `
 "DialogueStateError
 nie ma czego zatwierdzić: script
   - odcinek deklaruje audio: narration, ten odcinek nie ma dialogu, etap 11 nie ma czego podnosić"
@@ -750,6 +750,15 @@ Sprawdzono sumy czasów. Plan wymaga oceny.
 "
 `;
 
+exports[`every command >   dialogue translate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Przekład dialogu ewa/01-burza
+  płatnych wywołań do wykonania: 0
+  ! odcinek nie ma decyzji, w jakim języku ruszają się usta, a przekład idzie właśnie na ten język: aimator episode lip-sync ewa 01-burza --language <kod> albo --none
+  ! nie ma jeszcze skryptu dialogu w języku filmu, przekład nie ma czego tłumaczyć: aimator dialogue generate ewa 01-burza
+Dalej: usuń powyższe przeszkody przed płatnym wywołaniem"
+`;
+
 exports[`every command >   episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Dodano odcinek
@@ -766,6 +775,13 @@ Próba na sucho: nic nie zapisano. Dodano odcinek
   + projects/ewa/episodes/02-slonce/episode.json
   + projects/ewa/episodes/02-slonce/prepare.stage.json
 Dalej: uzupełnij decyzje: aimator episode set ewa 02-slonce --duration <s> --audio <tryb> --language <kod> --subtitles <kod|none> --nature <rodzaj>"
+`;
+
+exports[`every command >   episode lip-sync <id> <episode-id> --language <kod>|--none [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Język ust odcinka "01-burza": en
+  + projects/ewa/episodes/01-burza/lip-sync.json
+Dalej: skrypt dialogu w tym języku: aimator dialogue translate ewa 01-burza --dry-run"
 `;
 
 exports[`every command >   episode set <id> <episode-id> [te same flagi decyzji] [--json] 1`] = `

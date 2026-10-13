@@ -49,6 +49,11 @@ Etap 0. Przygotowanie projektu i odcinka:
     Co odcinek trzyma: plik źródłowy, skąd go skopiowano, i sześć decyzji,
     nierozstrzygnięte nazwane wprost. Opis, nie werdykt: czy to wystarcza,
     mówi check. Niczego nie zapisuje i niczego nie wydaje.
+  episode lip-sync <id> <episode-id> --language <kod>|--none [--json]
+    Język, w którym ruszają się usta drugiej wersji filmu, i na który etap 11
+    tłumaczy skrypt dialogu; inny niż język filmu. --none: drugiej wersji nie
+    będzie. Osobny plik lip-sync.json, nie episode.json, więc zmiana nie cofa
+    zgody etapu 0 ani scenariusza. Bez decyzji czeka przekład dialogu.
 
 Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
@@ -224,6 +229,15 @@ Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla obu torów):
     Model skryptu: --model albo AIMATOR_DIALOGUE_MODEL; model mowy:
     --voice-model albo AIMATOR_DIALOGUE_VOICE_MODEL.
     --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.
+  dialogue translate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                     [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+    Tłumaczy przyjęty skrypt na język ust z episode lip-sync jednym płatnym
+    wywołaniem tekstowym i publikuje dialogue.<język>.md z tymi samymi
+    nagłówkami. Każda kwestia idzie z oknem czasu, od kotwicy do następnej
+    kwestii albo końca ujęcia, i ma się w nim zmieścić. Walidator sprawdza 1:1
+    kwestie, ujęcia, postacie i kotwice; wierność ocenia człowiek przy
+    approve --artifact script-<język>. Model: --model albo
+    AIMATOR_TRANSLATION_MODEL.
 
 Wspólne:
   list [--json]
@@ -273,7 +287,8 @@ Wspólne:
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
-  approve <id> <episode-id> --stage dialogue --artifact script|D01[,D02] [--json]
+  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]
+               [--json]
   reject <id> <episode-id> --stage <etap> [--track <tor>] [--artifact <klucz>[,...]]
               --note <uwaga> [--fail <kryteria>] [--reviewer <kto>] [--json]
   reject <id> <character-id> --stage character --track <tor> --artifact <klucz>

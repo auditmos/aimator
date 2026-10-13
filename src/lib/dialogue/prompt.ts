@@ -1,5 +1,7 @@
 import { serialize } from "../artifact/index.js";
 import type { CastMember, EpisodeSettings } from "../project/index.js";
+import type { ShotListShot } from "../shot-list/index.js";
+import type { DialogueLine } from "./validate.js";
 
 /**
  * Internal to the dialogue module: the instruction, and its declared version.
@@ -121,4 +123,129 @@ ${input.rules}
 # Shot list, the approved source for this script
 
 ${input.shotList}`;
+}
+
+/**
+ * The second-language script's own version, apart from the lift's: the two
+ * tasks change for different reasons, and a record has to name the one that
+ * really produced its answer.
+ */
+export const TRANSLATION_PROMPT_VERSION = 1;
+
+interface TranslationPromptInput {
+  readonly cast: readonly CastMember[];
+  /** The accepted script as data: where each line begins, and in which shot. */
+  readonly lines: readonly DialogueLine[];
+  readonly rules: string;
+  /** The accepted script, verbatim. Every line of the translation comes out of it. */
+  readonly script: string;
+  /** The approved plan's shots: where each shot ends. */
+  readonly shots: readonly ShotListShot[];
+  /** The film's language, which the script is written in. */
+  readonly source: string;
+  /** The language of the mouths, which the translation is written in. */
+  readonly target: string;
+}
+
+function translationTask(source: string, target: string): string {
+  return `# Task
+
+Translate the dialogue script of one episode of an animated series from
+\`${source}\` into \`${target}\`.
+
+The translated lines will be read aloud by the same characters, in voices cast
+for \`${target}\`, and the characters' mouths will be animated again to match
+them. A line that cannot be said inside its window cannot be lip-synced.
+
+## The rules that matter
+
+- **Keep every block, and keep every heading exactly as it is.** The same line
+  ids in the same order, each heading copied character for character, such as
+  \`### D01 | U03 | ewa | 7s\`. Do not add a line, drop one, merge two or split
+  one. Do not move an anchor and do not change who speaks.
+- **Translate only the text under each heading.** Write what this character
+  would say in \`${target}\`: short, natural, spoken. Keep the meaning, the tone
+  and who is being addressed; this is not a word-for-word gloss.
+- **Fit the window.** Each line has a time window below: the seconds of the
+  plan from its anchor to the next line, or to the end of its shot, whichever
+  comes first. Write a line that is comfortable to say inside it at a natural
+  pace. Where a faithful translation would not fit, shorten it and keep the
+  meaning; nothing downstream will speed a line up.
+- Names stay names. No quotation marks, no speaker label, no stage directions,
+  no formatting.
+
+This is checked mechanically against the source script: ids, shots, speakers
+and anchors, one to one. Whether the translation is faithful is judged by a
+person before anything is bought with it.
+
+# Output format
+
+Markdown, exactly two sections, in this order, none empty, no code blocks.
+
+## Lines
+
+One block per line of the source script: its heading, copied unchanged, and
+the translated line below it as plain text.
+
+## Review
+
+Prose. Name every line you shortened or rephrased to fit its window, and say
+what was given up. Do not call the result approved.`;
+}
+
+/** Seconds as a person writes them: 8, 7.5, never 7.499999. */
+function seconds(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * How long each line has, in seconds of the plan: from its anchor to the next
+ * line, or to the end of its shot, whichever comes first. Derived rather than
+ * stored, for rule 7's mirror: the script and the plan already say both ends.
+ */
+function windows(lines: readonly DialogueLine[], shots: readonly ShotListShot[]): string {
+  return lines
+    .map((line, index) => {
+      const ends = [
+        shots.find((shot) => shot.id === line.shot)?.end,
+        lines[index + 1]?.atSeconds,
+      ].filter((one): one is number => one !== undefined);
+      const end = ends.length === 0 ? line.atSeconds : Math.min(...ends);
+
+      return `- ${line.id} | ${line.shot} | ${line.cast}: ${line.atSeconds}-${end}s of the plan, ${seconds(end - line.atSeconds)}s`;
+    })
+    .join("\n");
+}
+
+/**
+ * Task, settings, windows, then the material verbatim.
+ *
+ * This is the one deliberate translation of material in the pipeline, and rule
+ * 9 still holds around it: the instruction is English, and `project.md` and the
+ * accepted `dialogue.md` travel exactly as they were written. What comes back
+ * is a new artifact with its own yes, never a re-encoding of the source.
+ */
+export function buildTranslationPrompt(input: TranslationPromptInput): string {
+  const settings = {
+    cast: input.cast.map((member) => ({ id: member.id, name: member.name })),
+    sourceLanguage: input.source,
+    targetLanguage: input.target,
+  };
+
+  return `${translationTask(input.source, input.target)}
+
+# Production settings
+
+${serialize(settings)}
+# Time windows
+
+${windows(input.lines, input.shots)}
+
+# Project rules, original source material
+
+${input.rules}
+
+# Dialogue script, the approved source for this translation
+
+${input.script}`;
 }

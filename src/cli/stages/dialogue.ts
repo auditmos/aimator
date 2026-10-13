@@ -4,6 +4,7 @@ import {
   type DialogueReport,
   type DialogueStatus,
   generateDialogue,
+  translateDialogue,
 } from "../../lib/dialogue/index.js";
 import { env } from "../../lib/env.js";
 import { err, ok, type Result } from "../../lib/result.js";
@@ -43,7 +44,16 @@ export const USAGE = `Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla ob
     ElevenLabs rozlicza ZNAKI, nie wywołania, więc podgląd podaje jedno i drugie.
     Model skryptu: --model albo AIMATOR_DIALOGUE_MODEL; model mowy:
     --voice-model albo AIMATOR_DIALOGUE_VOICE_MODEL.
-    --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.`;
+    --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.
+  dialogue translate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
+                     [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+    Tłumaczy przyjęty skrypt na język ust z episode lip-sync jednym płatnym
+    wywołaniem tekstowym i publikuje dialogue.<język>.md z tymi samymi
+    nagłówkami. Każda kwestia idzie z oknem czasu, od kotwicy do następnej
+    kwestii albo końca ujęcia, i ma się w nim zmieścić. Walidator sprawdza 1:1
+    kwestie, ujęcia, postacie i kotwice; wierność ocenia człowiek przy
+    approve --artifact script-<język>. Model: --model albo
+    AIMATOR_TRANSLATION_MODEL.`;
 
 /**
  * The script is a list of short lines under four-field headings, well under
@@ -70,19 +80,19 @@ function modelOf(flag: unknown, fallback: string | undefined): Result<string | n
  */
 function renderGenerate(
   report: DialogueReport,
-  projectId: string,
-  episodeId: string,
+  scope: { readonly episodeId: string; readonly projectId: string; readonly what: string },
   mode: "apply" | "dry-run"
 ): string {
   const speaking = report.lines.length > 0;
+  const named = `${scope.what} ${scope.projectId}/${scope.episodeId}`;
   const lines =
     mode === "dry-run"
       ? [
-          `Próba na sucho: nic nie zapisano, nic nie wysłano. Dialog ${projectId}/${episodeId}`,
+          `Próba na sucho: nic nie zapisano, nic nie wysłano. ${named}`,
           `  płatnych wywołań do wykonania: ${report.paidCalls}`,
         ]
       : [
-          `Dialog ${projectId}/${episodeId}${report.runId === null ? "" : `, próba ${report.runId}`}`,
+          `${named}${report.runId === null ? "" : `, próba ${report.runId}`}`,
           `  płatnych wywołań wykonanych: ${report.paidCalls}`,
         ];
 
@@ -124,10 +134,15 @@ function renderGenerate(
 }
 
 function renderStatus(headline: string, status: DialogueStatus): string {
-  const { script } = status;
+  const { script, translation } = status;
   const lines = [
     headline,
     `  script: ${script.approved ? "zatwierdzony" : script.state}, ${script.note}`,
+    ...(translation === null
+      ? []
+      : [
+          `  ${translation.id}: ${translation.approved ? "zatwierdzony" : translation.state}, ${translation.note}`,
+        ]),
   ];
 
   for (const line of status.lines) {
@@ -229,13 +244,94 @@ async function runDialogueGenerate(argv: readonly string[]): Promise<Result<stri
   return ok(
     parsed.data.values.json === true
       ? asJson("generate", STAGE, result.data)
-      : renderGenerate(result.data, projectId.data, episodeId.data, mode)
+      : renderGenerate(
+          result.data,
+          { episodeId: episodeId.data, projectId: projectId.data, what: "Dialog" },
+          mode
+        )
+  );
+}
+
+/**
+ * The script in the language of the mouths. One artifact per episode, so no
+ * `--artifact`: a flag with one legal value is ceremony, stage 6's reason.
+ */
+async function runDialogueTranslate(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, {
+    instruction: { type: "string" },
+    json: { type: "boolean" },
+    "max-output-tokens": { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const instruction = instructionOf(parsed.data);
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const episodeId = requirePositional(parsed.data, 1, "episode-id");
+  const workspace = workspaceOf(parsed.data);
+  const model = modelOf(parsed.data.values.model, env.AIMATOR_TRANSLATION_MODEL);
+  const tokens = maxOutputTokensOf(parsed.data, DEFAULT_DIALOGUE_MAX_OUTPUT_TOKENS);
+
+  if (!instruction.ok) {
+    return instruction;
+  }
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!episodeId.ok) {
+    return episodeId;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  if (!model.ok) {
+    return model;
+  }
+  if (!tokens.ok) {
+    return tokens;
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await translateDialogue({
+    apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    episodeId: episodeId.data,
+    fetch,
+    instruction: instruction.data,
+    maxOutputTokens: tokens.data,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    workspace: workspace.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    parsed.data.values.json === true
+      ? asJson("translate", STAGE, result.data)
+      : renderGenerate(
+          result.data,
+          { episodeId: episodeId.data, projectId: projectId.data, what: "Przekład dialogu" },
+          mode
+        )
   );
 }
 
 export async function runDialogue(argv: readonly string[]): Promise<Result<string>> {
   if (argv[0] === "generate") {
     return await runDialogueGenerate(argv.slice(1));
+  }
+
+  if (argv[0] === "translate") {
+    return await runDialogueTranslate(argv.slice(1));
   }
 
   return err(new UsageError(`nieznane polecenie: dialogue ${argv[0] ?? ""}`.trim()));
@@ -262,7 +358,7 @@ export async function checkDialogueStage(
   );
 }
 
-/** `approve --stage dialogue --artifact script|D01[,D02]`: a human read the script, or heard lines. */
+/** `approve --stage dialogue`: a human read the script or its translation, or heard lines. */
 export async function approveDialogueStage(
   parsed: Parsed,
   approval: Approval

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { checkDialogue, generateDialogue } from "../../lib/dialogue/index.js";
+import { checkDialogue, generateDialogue, translateDialogue } from "../../lib/dialogue/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
 import {
   API_KEY,
@@ -49,14 +49,25 @@ function script(): string {
   ].join("\n");
 }
 
-function provider(): typeof fetch {
+/** The same three lines in English, every heading untouched. */
+function translated(): string {
+  return [
+    "## Lines\n",
+    "### D01 | U01 | ewa | 2s\n\nDad, is the storm coming?\n",
+    "### D02 | U03 | ewa | 16s\n\nDad, where are you?\n",
+    "### D03 | U04 | tata | 22s\n\nI'm right here, Ewa.\n",
+    "## Review\n\nNothing was shortened.\n",
+  ].join("\n");
+}
+
+function provider(text = script()): typeof fetch {
   return (() =>
     Promise.resolve(
       Response.json({
         id: "resp_1",
         output: [
           {
-            content: [{ text: script(), type: "output_text" }],
+            content: [{ text, type: "output_text" }],
             role: "assistant",
             type: "message",
           },
@@ -221,5 +232,75 @@ describe("check and approve --stage dialogue", () => {
 
     expect(printed).toContain("AIMATOR_DIALOGUE_VOICE_MODEL");
     expect(printed).toContain("płatnych wywołań do wykonania: 0");
+  });
+});
+
+describe("dialogue translate", () => {
+  it("should name the undecided language of the mouths and the variable of its model", async () => {
+    const printed = await cli("dialogue", "translate", PROJECT, EPISODE, "--dry-run");
+
+    expect(printed).toContain(`aimator episode lip-sync ${PROJECT} ${EPISODE} --language <kod>`);
+    expect(printed).toContain("AIMATOR_TRANSLATION_MODEL");
+    expect(printed).toContain("płatnych wywołań do wykonania: 0");
+  });
+
+  it("should state one paid call and a prompt carrying each line's window", async () => {
+    await cli("episode", "lip-sync", PROJECT, EPISODE, "--language", "en");
+    const printed = await object(
+      "dialogue",
+      "translate",
+      PROJECT,
+      EPISODE,
+      "--model",
+      "gpt-6-astra",
+      "--dry-run",
+      "--json"
+    );
+
+    expect(printed).toMatchObject({ command: "translate", paidCalls: 1, stage: "dialogue" });
+    expect(String(printed.prompt)).toContain("D02 | U03 | ewa: 16-20s of the plan, 4s");
+  });
+
+  it("should print where the translation stands in check, once the episode names a language", async () => {
+    const printed = await cli("check", PROJECT, EPISODE, "--stage", "dialogue");
+
+    expect(printed).toContain("script-en: absent, jeszcze nie powstał");
+  });
+
+  it("should accept script-en when it is named", async () => {
+    const bought = await translateDialogue({
+      apiKey: API_KEY,
+      episodeId: EPISODE,
+      fetch: provider(translated()),
+      maxOutputTokens: 8000,
+      mode: "apply",
+      model: "gpt-6-astra",
+      projectId: PROJECT,
+      regenerate: false,
+      workspace,
+    });
+
+    if (!bought.ok) {
+      throw bought.error;
+    }
+
+    const printed = await object(
+      "approve",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "dialogue",
+      "--artifact",
+      "script-en",
+      "--reviewer",
+      "fixture",
+      "--json"
+    );
+
+    expect(printed).toMatchObject({
+      command: "approve",
+      stage: "dialogue",
+      translation: { approved: true, id: "script-en" },
+    });
   });
 });

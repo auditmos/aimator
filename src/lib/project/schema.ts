@@ -14,7 +14,9 @@ import { sha256Schema } from "../artifact/index.js";
 const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 const ASPECT_RATIO = /^\d{1,2}:\d{1,2}$/;
 
-const languageSchema = z.string().regex(LANGUAGE, "expected a language code such as pl or en-GB");
+export const languageSchema = z
+  .string()
+  .regex(LANGUAGE, "expected a language code such as pl or en-GB");
 
 export const audioModes = [
   "dialogue",
@@ -222,6 +224,16 @@ export const styleFileSchema = z.discriminatedUnion("basis", [
 export type CharacterEntry = z.infer<typeof characterSchema>;
 export type StyleFile = z.infer<typeof styleFileSchema>;
 export type DraftSettings = z.infer<typeof draftSettingsSchema>;
+/**
+ * `lip-sync.json`: the language the mouths move in, or `none`. The shape of
+ * `subtitles`, because it is the same kind of answer, a language or a
+ * deliberate no; the file existing at all is what says somebody gave it.
+ */
+export const lipSyncFileSchema = z.strictObject({
+  language: subtitlesSchema,
+  schemaVersion: z.literal(1),
+});
+
 export type EpisodeFile = z.infer<typeof episodeFileSchema>;
 export type ProjectFile = z.infer<typeof projectFileSchema>;
 /** Every episode decision made, the shape a later stage is allowed to read. */

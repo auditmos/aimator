@@ -379,6 +379,18 @@ Pięć z nich blokuje bramkę tego etapu. Szósta, `--max-clip`, jest wymagana d
 wartości domyślnych: `--duration` nie ma „zwykle 60", a `--language` nie dziedziczy się
 z zasad projektu.
 
+Jest jeszcze **język ust**, decyzja odcinka trzymana poza `episode.json`:
+
+```bash
+pnpm dev episode lip-sync dzielna-ewa 01-burza --language en   # albo --none
+```
+
+Zapisuje `episodes/<id>/lip-sync.json`, bo `episode.json` jest wejściem scenariusza i
+wszystkiego pod nim, a język ust jest wejściem wyłącznie skryptu dialogu w drugim języku
+i etapu 12. Dlatego zmiana nie cofa zgody etapu 0 ani scenariusza. Język równy językowi
+filmu to błąd; `--none` znaczy „drugiej wersji nie będzie”, a brak pliku, że nikt nie
+zdecydował, i wtedy czeka [przekład dialogu](11-dialog.md#drugi-język-skrypt-pod-lip-sync).
+
 ## Bramka
 
 `check` przepuszcza, gdy zasady nie zawierają już żadnego `TODO(etap-0)`, obie decyzje

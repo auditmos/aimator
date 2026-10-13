@@ -7,10 +7,10 @@ miks [etapu 10](10-muzyka-i-efekty.md).
 
 | | |
 |---|---|
-| **Wejście** | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, `project.json`, `project.md`, `episode.json`, a do kwestii `characters/<c>/voices/<język filmu>/voice.json` każdej mówiącej postaci |
-| **Wyjście** | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.stage.json`, `runs/<runId>/` (wspólne dla obu torów) |
-| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i `--audio dialogue` albo `dialogue-and-narration`; kwestie czekają na przyjęty skrypt i przyjętą próbkę głosu swojej postaci |
-| **Koszt** | skrypt: jedno płatne wywołanie tekstowe; kwestie: jedno wywołanie mowy na kwestię, rachunek liczy się w **znakach** |
+| **Wejście** | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, `project.json`, `project.md`, `episode.json`, a do kwestii `characters/<c>/voices/<język filmu>/voice.json` każdej mówiącej postaci; do przekładu `lip-sync.json` |
+| **Wyjście** | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.<język ust>.md`, `dialogue.stage.json`, `runs/<runId>/` (wspólne dla obu torów) |
+| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i `--audio dialogue` albo `dialogue-and-narration`; kwestie czekają na przyjęty skrypt i przyjętą próbkę głosu swojej postaci; przekład na przyjęty skrypt i decyzję o języku ust |
+| **Koszt** | skrypt i przekład: po jednym płatnym wywołaniu tekstowym; kwestie: jedno wywołanie mowy na kwestię, rachunek liczy się w **znakach** |
 
 ## Komendy
 
@@ -24,19 +24,30 @@ pnpm dev dialogue generate dzielna-ewa 01-burza --dry-run  # rachunek kwestii
 pnpm dev dialogue generate dzielna-ewa 01-burza          # dopiero teraz kupuje kwestie
 pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact D01,D02,D03
 pnpm dev dialogue generate dzielna-ewa 01-burza --regenerate --artifact D03
+pnpm dev episode lip-sync dzielna-ewa 01-burza --language en
+pnpm dev dialogue translate dzielna-ewa 01-burza --dry-run   # okna czasu w prompcie
+pnpm dev dialogue translate dzielna-ewa 01-burza
+pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact script-en
 ```
 
 Dodatkowe flagi: `--model <id>`, `--voice-model <id>`, `--max-output-tokens <n>`
 (domyślnie 8 000), `--artifact script|D01[,D02]`, `--regenerate`, `--instruction <uwaga>`
 (tylko razem z `--regenerate --artifact script`), `--json`.
 
-Dwa modele, dwie zmienne, bez wartości domyślnych ([konfiguracja](../konfiguracja.md)):
+`dialogue translate` przyjmuje `--model <id>`, `--max-output-tokens <n>`, `--regenerate`,
+`--instruction <uwaga>` (tylko z `--regenerate`), `--dry-run` i `--json`; nie ma
+`--artifact`, bo przekład odcinka jest jeden.
+
+Trzy modele, trzy zmienne, bez wartości domyślnych ([konfiguracja](../konfiguracja.md)):
 
 - skrypt podnosi `--model` albo `AIMATOR_DIALOGUE_MODEL`, własna zmienna, nie ta od
   narracji: dwa miejsca wywołania, więc wybór modelu, który podnosi narrację, nie może po
   cichu wybrać modelu, który podnosi dialog;
 - kwestie czyta `--voice-model` albo `AIMATOR_DIALOGUE_VOICE_MODEL`, ta sama zmienna co
-  próbki głosów postaci, bo próbka istnieje po to, żeby brzmieć tak, jak zabrzmią kwestie.
+  próbki głosów postaci, bo próbka istnieje po to, żeby brzmieć tak, jak zabrzmią kwestie;
+- przekład pisze `--model` polecenia `dialogue translate` albo `AIMATOR_TRANSLATION_MODEL`,
+  własna zmienna, bo podnoszenie kwestii z listy ujęć i przepisywanie ich w innym języku pod
+  okno czasu to dwa różne zadania.
 
 `--regenerate` po powstaniu skryptu wymaga adresata, z powodu etapu 9: `--artifact script`
 podnosi skrypt od nowa, `--artifact D03` kupuje jedną kwestię jeszcze raz. Druga próba to
@@ -53,7 +64,11 @@ a `characters` to znaki, które dostawca policzy. `lines` mówi, co ten przebieg
 z każdą kwestią: `planned`, `blocked` z powodem, `skipped`, `published` albo `resumed`.
 
 Obiekt `check` niesie `approved` całego etapu, czyli skryptu **i** każdej kwestii, obok
-`script.approved`, które dotyczy samego skryptu.
+`script.approved`, które dotyczy samego skryptu. Pole `translation` opisuje przekład:
+`null`, dopóki odcinek nie wskazał języka ust, a potem `id` (`script-en`), `language`,
+`state`, `approved` i `inputsChanged`. `approved` całego etapu go nie obejmuje: to język
+filmu, a drugi język ma własną zgodę. `dialogue translate --json` wypisuje raport tego
+samego kształtu co `generate`, z `command: "translate"`.
 
 ## Skąd się biorą kwestie
 
@@ -165,6 +180,55 @@ w tym języku. `project.json` nim nie jest, więc zmiana narratora nie cofa żad
 Zmiana głosu `ewa` cofa zgody na kwestie `ewa` i nie rusza kwestii `tata`. Zgody na
 kwestię przeczytaną głosem, którego już nie ma, nie da się wydać ponownie: to nagranie
 kogoś innego, więc `approve` odmawia i wskazuje `--regenerate --artifact Dnn`.
+
+## Drugi język: skrypt pod lip-sync
+
+Wersja z ustami w drugim języku zaczyna się od zatwierdzanego tekstu, nie od nagrania. Język
+ust to decyzja odcinka z [etapu 0](00-przygotowanie.md#sześć-decyzji-odcinka),
+`episode lip-sync <id> <episode-id> --language en` albo `--none`, zapisana w
+`lip-sync.json` obok `episode.json`, a nie w nim. Bez tego pliku przekład czeka (reguła 7),
+przy `none` odmawia, bo drugiej wersji nie będzie, a język równy językowi filmu jest błędem
+już przy zapisie.
+
+`dialogue translate` kupuje **jedno wywołanie tekstowe** i publikuje `dialogue.en.md` obok
+`dialogue.md`, z rekordem `script-en` w tym samym `dialogue.stage.json`. Czeka na
+**przyjęty** skrypt w języku filmu: tłumaczy się to, co ktoś zatwierdził.
+
+To **jedyne świadome tłumaczenie materiału w potoku**. Reguła 9 zabrania przekładać to, z
+czego pracuje model, bo przekład byłby drugą wersją tej samej prawdy. Tutaj druga wersja
+jest dokładnie tym, czego potrzeba, więc powstaje jako **nowy artefakt z własną zgodą**,
+a nie jako przekodowanie źródła. Reszta reguły 9 obowiązuje: zadanie jest po angielsku,
+a `project.md` i `dialogue.md` jadą w prompcie dosłownie.
+
+Każda kwestia idzie z **oknem czasu**, w sekundach planu: od jej kotwicy do następnej
+kwestii albo do końca ujęcia, co nastąpi wcześniej. Okno jest wyprowadzane z `dialogue.md`
+i listy ujęć, nigdy zapisywane. Prompt każe pisać krótko i naturalnie, a gdy wierny
+przekład się nie mieści, skrócić go z zachowaniem sensu: nic dalej nie przyspieszy kwestii.
+
+```
+- D01 | U01 | ewa: 2-10s of the plan, 8s
+- D02 | U03 | ewa: 16-20s of the plan, 4s
+- D03 | U04 | tata: 22-30s of the plan, 8s
+```
+
+Wynik ma sekcje `Lines` i `Review` i **te same nagłówki**, `### D01 | U03 | ewa | 7s`, z
+przetłumaczonym tekstem pod każdym. Walidacja jest strukturalna i działa 1:1 względem
+przyjętego skryptu: te same identyfikatory w tej samej kolejności, te same ujęcia, postacie
+i kotwice, żadnej brakującej ani dopisanej, każda z tekstem. Odpowiedź, która tego nie
+spełnia, zostaje w `runs/<runId>/response.json`, a `dialogue.en.md` nie powstaje. Czy
+przekład jest **wierny**, walidator nie wie, więc ocenia to człowiek przy `approve`.
+
+```bash
+pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact script-en
+```
+
+Przekład zapisuje cztery wejścia: `project.md`, `shot-list.md` (końce ujęć wyznaczają okna),
+`dialogue.md` i `lip-sync.json`. Zmiana któregokolwiek cofa jego zgodę, a `check` mówi,
+który plik się zmienił; zmiana `dialogue.md` cofa ją także wtedy, gdy to tylko ręczna
+poprawka skryptu. `episode.json` wejściem nie jest, bo każda jego zmiana cofa już zgodę na
+tłumaczony skrypt. Zgoda na przekład liczy się wyłącznie razem z ważną zgodą na skrypt,
+który tłumaczy. `dialogue.en.md` można poprawić ręcznie; `approve --artifact script-en`
+przyjmuje poprawkę, o ile dalej przechodzi walidację.
 
 ## W pełnej ścieżce
 

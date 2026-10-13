@@ -11,6 +11,7 @@ import {
   clipFrame,
   clipVideo,
   dialogueAudio,
+  dialogueTranslation,
   episodeIdFromSource,
   episodePaths,
   episodeTrackPaths,
@@ -280,6 +281,7 @@ describe("episodePaths", () => {
       dialogueScript: `${episode}/dialogue.md`,
       dialogueStage: `${episode}/dialogue.stage.json`,
       file: `${episode}/episode.json`,
+      lipSync: `${episode}/lip-sync.json`,
       narration: `${episode}/narration`,
       narrationLock: `${episode}/narration.lock`,
       narrationScript: `${episode}/narration.md`,
@@ -555,6 +557,13 @@ describe("stage 9 paths", () => {
   it("should reject a line id or a language that would walk out of the directory", () => {
     expect(paths?.ok ? dialogueAudio(paths.data, "pl", "../D03").ok : null).toBe(false);
     expect(paths?.ok ? dialogueAudio(paths.data, "../pl", "D03").ok : null).toBe(false);
+  });
+
+  /** A translation sits beside the script it translates, named by its language. */
+  it("should place a second-language script beside dialogue.md, refusing a path for a language", () => {
+    const en = paths?.ok ? dialogueTranslation(paths.data, "en") : null;
+    expect(en?.ok ? en.data : null).toBe(`${episode}/dialogue.en.md`);
+    expect(paths?.ok ? dialogueTranslation(paths.data, "../en").ok : null).toBe(false);
   });
 
   /**

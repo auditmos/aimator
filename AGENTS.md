@@ -26,7 +26,10 @@ remembered. It cannot check prose, so a renamed concept is still yours to carry 
 Stages 0 through 11 are implemented. Stage 11 lifts which line each character says, where,
 and when, from the attributed lines stage 3 writes, buys each line in its speaker's voice,
 and hands the accepted lines to stage 10's mix as one more stem of speech, which is what
-makes all four sound modes complete.
+makes all four sound modes complete. It also translates the accepted script into the
+language the mouths move in, the episode's `lip-sync.json`, each line inside its window:
+the one deliberate translation of material in the pipeline, bought as a new artifact with
+its own yes rather than as a re-encoding of the source, which is how rule 9 stays intact.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -185,10 +188,12 @@ src/
     │   │                 #         addCharacter, addCharacterSources, setCharacterBasis,
     │   │                 #         checkStage0, approveStage0,
     │   │                 #         readStage0Inputs, readStage0Character, showProject,
-    │   │                 #         showEpisode, setStyle, readStage0Style
+    │   │                 #         showEpisode, setStyle, readStage0Style,
+    │   │                 #         setLipSync, readLipSync
     │   ├── schema.ts     # Internal: Zod schemas for the artifacts
     │   ├── template.ts   # Internal: the project.md scaffold, and its Style Bible gate
     │   ├── style.ts      # Internal: the style decision, and the images brought in
+    │   ├── lip-sync.ts   # Internal: the language of the mouths, kept out of episode.json
     │   ├── index.test.ts # Tests through the entry
     │   └── style.test.ts # The style decision, and what changing it lapses
     ├── screenplay/   # Folder form: index.ts is the only entry (stage 1)
@@ -330,11 +335,12 @@ src/
     │   └── mix.test.ts    # The full mix with the cast speaking, through the entry
     ├── dialogue/      # Folder form: index.ts is the only entry (stage 11)
     │   ├── index.ts       # Public: generateDialogue, checkDialogue, approveDialogue,
-    │   │                  #         readAcceptedDialogue
+    │   │                  #         readAcceptedDialogue, translateDialogue
     │   ├── prompt.ts      # Internal: the instruction that forbids writing a line
     │   ├── validate.ts    # Internal: lifted, not invented, nothing left behind
     │   ├── plan.ts        # Internal: two gates: a plan and a film that speaks, then voices
     │   ├── generate.ts    # Internal: the script, then the lines it authorises
+    │   ├── translate.ts   # Internal: the script in the language of the mouths
     │   ├── review.ts      # Internal: verification and approval of the script and each line
     │   └── index.test.ts  # The lift both ways, the voice gate, the bill, through the entry
     ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
@@ -1039,6 +1045,10 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
 - `AIMATOR_DIALOGUE_MODEL` is stage 11's text call site, the model that lifts the dialogue
   script out of the shot list. Not `AIMATOR_NARRATION_MODEL`, for the per-call-site reason:
   choosing who lifts the narration must not quietly choose who lifts the dialogue.
+- `AIMATOR_TRANSLATION_MODEL` is stage 11's second text call site, the model that translates
+  the accepted script into the language of the mouths. Not `AIMATOR_DIALOGUE_MODEL`, for the
+  same reason: lifting a line and rewriting it in another language to fit a window are two
+  tasks. It names a model, never the language; that is the episode's `lip-sync.json`.
 - `AIMATOR_FFMPEG` is the only variable here that names a **program** rather than a model or
   a key, and the only one whose absence has a sensible answer. Every other one refuses a
   default because a model nobody chose is not a decision; "the ffmpeg on this machine" is

@@ -41,6 +41,7 @@ AIMATOR_SOUND_MODEL=…                 # etap 10, tekstowy; pisze arkusz cue
 AIMATOR_MUSIC_MODEL=…                 # etap 10, podkład; JEDEN dla obu torów
 AIMATOR_EFFECTS_MODEL=…               # etap 10, efekty; JEDEN dla obu torów
 AIMATOR_DIALOGUE_MODEL=…              # etap 11, tekstowy; podnosi skrypt dialogu
+AIMATOR_TRANSLATION_MODEL=…           # etap 11, tekstowy; tłumaczy skrypt na język ust
 
 OPENAI_API_KEY=…
 BYTEPLUS_MODELARK=…                   # także klucz wideo Seedance, na obu torach
@@ -81,6 +82,10 @@ lektora, a na dysku nie byłoby pliku mówiącego, że ktokolwiek tak zdecydowa�
 osobno dla każdej postaci i języka w `characters/<postać>/voices/<język>/voice.json`,
 ustawianym przez `character voice`. Zmiana takiego pliku cofa wyłącznie zgodę na próbkę
 tego języka, a zmiana `project.json` cofnęłaby zgody na obrazy i klipy.
+
+**Języka ust.** Na jaki język tłumaczy się dialog i w jakim ruszają się usta drugiej
+wersji, to decyzja odcinka w `episodes/<odcinek>/lip-sync.json`, ustawiana przez
+`episode lip-sync`. `AIMATOR_TRANSLATION_MODEL` wybiera model, który tłumaczy, nigdy język.
 
 **Sposobu czytania i poziomów miksu.** `narration.json` i `mix.json` leżą w katalogu
 projektu, bo to suwaki, które ktoś kręci po odsłuchu, a zmienna środowiskowa nie

@@ -400,6 +400,13 @@ export interface EpisodePaths {
   readonly dialogueStage: string;
   readonly file: string;
   /**
+   * Which language the mouths move in, or `none`: an episode decision kept out
+   * of `episode.json`, because that file is an input of the screenplay and of
+   * everything below it, while this one is an input of the second-language
+   * dialogue script and of stage 12 alone.
+   */
+  readonly lipSync: string;
+  /**
    * Stage 9's spoken lines, one file per utterance and per paid call.
    *
    * Shared between the tracks, with no track level, because what the bytes
@@ -783,6 +790,7 @@ export function episodePaths(project: ProjectPaths, episodeId: string): Result<E
     dialogueScript: join(root, "dialogue.md"),
     dialogueStage: join(root, "dialogue.stage.json"),
     file: join(root, "episode.json"),
+    lipSync: join(root, "lip-sync.json"),
     narration: join(root, "narration"),
     narrationLock: join(root, "narration.lock"),
     narrationScript: join(root, "narration.md"),
@@ -991,6 +999,23 @@ export function dialogueAudio(paths: EpisodePaths, language: string, id: string)
   return ARTIFACT_ID.test(id)
     ? ok(join(paths.dialogue, language, `${id}.wav`))
     : err(new IdentifierError(id, `invalid line id "${id}": expected a form like D01`));
+}
+
+/**
+ * Stage 11's script in a second language, beside the one it translates and
+ * with the same headings. A file of its own rather than a section of
+ * `dialogue.md`, because it has its own yes: the source script's digest is one
+ * of its inputs, and a file that held both would be an input of itself.
+ */
+export function dialogueTranslation(paths: EpisodePaths, language: string): Result<string> {
+  return LANGUAGE_CODE.test(language)
+    ? ok(join(paths.root, `dialogue.${language}.md`))
+    : err(
+        new IdentifierError(
+          language,
+          `invalid language "${language}": expected a code like pl, en or pt-BR`
+        )
+      );
 }
 
 /**

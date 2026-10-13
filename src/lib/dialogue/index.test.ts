@@ -14,15 +14,17 @@ import {
 } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { setVoice } from "../character-voice/index.js";
+import { setLipSync } from "../project/index.js";
 import { approveShotList } from "../shot-list/index.js";
 import {
+  dialogueTranslation,
   type EpisodePaths,
   episodePaths,
   projectPaths,
   resolveWorkspace,
   type Workspace,
 } from "../workspace.js";
-import { approveDialogue, checkDialogue, generateDialogue } from "./index.js";
+import { approveDialogue, checkDialogue, generateDialogue, translateDialogue } from "./index.js";
 
 /**
  * Stage 11's script, through the module entry.
@@ -156,6 +158,35 @@ function generate(
     voiceModel: "eleven_multilingual_v2",
     workspace,
     ...overrides,
+  });
+}
+
+function translate(
+  calls: { readonly fetch: typeof fetch },
+  overrides: Partial<Parameters<typeof translateDialogue>[0]> = {}
+) {
+  return translateDialogue({
+    apiKey: API_KEY,
+    episodeId: EPISODE,
+    fetch: calls.fetch,
+    maxOutputTokens: 8000,
+    mode: "apply",
+    model: "gpt-6-astra",
+    projectId: PROJECT,
+    regenerate: false,
+    workspace,
+    ...overrides,
+  });
+}
+
+/** The episode's answer to which language the mouths move in. */
+function lipSync(language: string) {
+  return setLipSync({
+    choice: language === "none" ? { kind: "none" } : { kind: "language", language },
+    episodeId: EPISODE,
+    mode: "apply",
+    projectId: PROJECT,
+    workspace,
   });
 }
 
@@ -640,5 +671,229 @@ describe("buying the lines", () => {
       { id: "D03", state: "skipped" },
     ]);
     expect(calls.sent).toHaveLength(0);
+  });
+});
+
+/**
+ * The script in a second language: the one deliberate translation of material
+ * in this pipeline, bought as a new artifact with its own yes rather than as a
+ * re-encoding of the source.
+ *
+ * Assumptions this block encodes, stated before its first test:
+ *
+ * - **Which language is an episode decision**, `lip-sync.json`, and without it
+ *   the translation waits: rule 7, an absent file is nobody deciding.
+ * - **It translates an accepted script**, never one still waiting for its yes.
+ * - **Each line goes out with its window**: from its anchor to the next line or
+ *   the end of its shot, whichever comes first, in seconds of the plan.
+ * - **The verdict is structural**: the same ids, shots, speakers and anchors,
+ *   one to one. Whether the English is faithful is a human's call at approve.
+ */
+describe("translating the script", () => {
+  it("should name the undecided language of the mouths as the obstacle and buy nothing", async () => {
+    await accepted();
+    const calls = transport();
+    const preview = await translate(calls, { mode: "dry-run" });
+    const result = await translate(calls);
+
+    expect(preview.ok ? preview.data.paidCalls : preview.error.message).toBe(0);
+    expect(preview.ok ? preview.data.problems.join("\n") : null).toContain(
+      `aimator episode lip-sync ${PROJECT} ${EPISODE} --language <kod>`
+    );
+    expect(result.ok ? null : result.error.message).toContain("aimator episode lip-sync");
+    expect(calls.text).toHaveLength(0);
+  });
+
+  it("should preview one paid call whose prompt carries the window of every line", async () => {
+    await accepted();
+    await lipSync("en");
+    const calls = transport();
+    const preview = await translate(calls, { mode: "dry-run" });
+    const prompt = preview.ok ? (preview.data.prompt ?? "") : preview.error.message;
+
+    expect(preview.ok ? preview.data.problems : null).toEqual([]);
+    expect(preview.ok ? preview.data.paidCalls : null).toBe(1);
+    expect(prompt).toContain("D01 | U01 | ewa: 2-10s of the plan, 8s");
+    // U03 ends before the next line begins, so the shot closes this window.
+    expect(prompt).toContain("D02 | U03 | ewa: 16-20s of the plan, 4s");
+    expect(prompt).toContain("D03 | U04 | tata: 22-30s of the plan, 8s");
+    expect(prompt).toContain(script(LIFTED));
+    expect(calls.text).toHaveLength(0);
+  });
+
+  it("should wait for the script in the film's language to be accepted", async () => {
+    await upstream();
+    await generate(transport(script(LIFTED)));
+    await lipSync("en");
+    const preview = await translate(transport(), { mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.paidCalls : preview.error.message).toBe(0);
+    expect(preview.ok ? preview.data.problems.join("\n") : null).toContain(
+      "--stage dialogue --artifact script"
+    );
+  });
+
+  it("should refuse an episode whose mouths stay in the film's language", async () => {
+    await accepted();
+    await lipSync("none");
+    const preview = await translate(transport(), { mode: "dry-run" });
+
+    expect(preview.ok ? preview.data.problems.join("\n") : preview.error.message).toContain(
+      "lip-sync.json: none"
+    );
+  });
+});
+
+/** The fixture's script in English, every heading untouched. */
+const TRANSLATED = [
+  ...line("D01", "U01", "ewa", "2s", "Dad, is the storm coming?"),
+  ...line("D02", "U03", "ewa", "16s", "Dad, where are you?"),
+  ...line("D03", "U04", "tata", "22s", "I'm right here, Ewa."),
+];
+
+/** A translation the validator accepts, so each test can break exactly one thing. */
+function translation(lines: readonly string[]): string {
+  return ["## Lines", "", ...lines, "## Review", "", "Nothing was shortened.", ""].join("\n");
+}
+
+function translationPath(): string {
+  const path = dialogueTranslation(episode(), "en");
+
+  if (!path.ok) {
+    throw path.error;
+  }
+
+  return path.data;
+}
+
+interface StageRecord {
+  readonly inputs: readonly { readonly path: string }[];
+  readonly review: { readonly status: string };
+}
+
+async function stageRecords(): Promise<Partial<Record<string, StageRecord>>> {
+  const file = JSON.parse(await readFile(episode().dialogueStage, "utf8")) as {
+    readonly artifacts: Partial<Record<string, StageRecord>>;
+  };
+
+  return file.artifacts;
+}
+
+describe("publishing the translation", () => {
+  it("should publish dialogue.en.md under script-en, beside the script and pending a human's yes", async () => {
+    await accepted();
+    await lipSync("en");
+    const calls = transport(translation(TRANSLATED));
+    const result = await translate(calls);
+    const records = await stageRecords();
+    const episodeDir = `projects/${PROJECT}/episodes/${EPISODE}`;
+
+    expect(
+      result.ok ? result.data.verdict?.lines.map((one) => one.text) : result.error.message
+    ).toEqual(["Dad, is the storm coming?", "Dad, where are you?", "I'm right here, Ewa."]);
+    expect(await readFile(translationPath(), "utf8")).toBe(translation(TRANSLATED));
+    expect(records["script-en"]?.review.status).toBe("pending");
+    expect(records["script-en"]?.inputs.map((one) => one.path)).toEqual([
+      `projects/${PROJECT}/project.md`,
+      `${episodeDir}/shot-list.md`,
+      `${episodeDir}/dialogue.md`,
+      `${episodeDir}/lip-sync.json`,
+    ]);
+    expect(records.script?.review.status).toBe("approved");
+    expect(calls.text).toHaveLength(1);
+  });
+
+  it("should refuse an answer that leaves D02 out, keeping it in the archive", async () => {
+    await accepted();
+    await lipSync("en");
+    const answered = translation([...TRANSLATED.slice(0, 4), ...TRANSLATED.slice(8)]);
+    const result = await translate(transport(answered));
+    const message = result.ok ? "" : result.error.message;
+    const [, archived = ""] = ARCHIVED.exec(message) ?? [];
+
+    expect(message).toContain("brakuje D02 (U03, ewa)");
+    expect(await readFile(join(root, archived), "utf8")).toContain("Dad, is the storm coming?");
+    await expect(readFile(translationPath(), "utf8")).rejects.toThrow();
+  });
+
+  it("should refuse an answer that moves an anchor, keeping it in the archive", async () => {
+    await accepted();
+    await lipSync("en");
+    const moved = translation([
+      ...TRANSLATED.slice(0, 4),
+      ...line("D02", "U03", "ewa", "17s", "Dad, where are you?"),
+      ...TRANSLATED.slice(8),
+    ]);
+    const result = await translate(transport(moved));
+    const message = result.ok ? "" : result.error.message;
+    const [, archived = ""] = ARCHIVED.exec(message) ?? [];
+
+    expect(message).toContain("D02: kotwica 17s, w skrypcie 16s; przekład nie przesuwa kwestii");
+    expect(await readFile(join(root, archived), "utf8")).toContain("| 17s");
+    await expect(readFile(translationPath(), "utf8")).rejects.toThrow();
+  });
+});
+
+describe("accepting the translation", () => {
+  /** The script accepted, translated and published, still waiting for its own yes. */
+  async function translated(): Promise<void> {
+    await accepted();
+    await lipSync("en");
+    await translate(transport(translation(TRANSLATED)));
+  }
+
+  function check() {
+    return checkDialogue({ episodeId: EPISODE, projectId: PROJECT, workspace });
+  }
+
+  it("should report no translation while the episode names no second language", async () => {
+    await accepted();
+    const status = await check();
+
+    expect(status.ok ? status.data.translation : status.error.message).toBeNull();
+  });
+
+  it("should accept script-en when it is named, and leave the script's own yes alone", async () => {
+    await translated();
+    const before = await check();
+    const result = await approve(["script-en"]);
+
+    expect(before.ok ? before.data.translation : before.error.message).toMatchObject({
+      approved: false,
+      id: "script-en",
+      language: "en",
+      state: "completed",
+    });
+    expect(result.ok ? result.data.translation?.approved : result.error.message).toBe(true);
+    expect(result.ok ? result.data.script.approved : null).toBe(true);
+  });
+
+  it("should refuse to accept a translation nobody has bought", async () => {
+    await accepted();
+    await lipSync("en");
+    const result = await approve(["script-en"]);
+
+    expect(result.ok ? null : result.error.message).toContain(
+      "nie ma czego zatwierdzić: script-en"
+    );
+  });
+
+  /** A hand correction of the script that still validates: the words it translates changed. */
+  it("should lapse script-en when the script it translates changes", async () => {
+    await translated();
+    await approve(["script-en"]);
+    const { dialogueScript } = episode();
+    const text = await readFile(dialogueScript, "utf8");
+    await writeFile(dialogueScript, text.replace("pyta dwa razy", "pyta dwukrotnie"), "utf8");
+    const status = await check();
+    const words = `projects/${PROJECT}/episodes/${EPISODE}/dialogue.md`;
+
+    expect(status.ok ? status.data.translation : status.error.message).toMatchObject({
+      approved: false,
+      inputsChanged: [words],
+    });
+    expect(status.ok ? status.data.problems.join("\n") : null).toContain(
+      `${words}: zmienił się od czasu przekładu (script-en)`
+    );
   });
 });

@@ -227,7 +227,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage dialogue --artifact script|D01[,D02] [--json]": [
+  "  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]": [
     "approve",
     ...ON,
     "--stage",
@@ -496,6 +496,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "eleven-v4",
     "--dry-run",
   ],
+  "  dialogue translate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]": [
+    "dialogue",
+    "translate",
+    ...ON,
+    "--model",
+    "gpt-6-astra",
+    "--dry-run",
+  ],
   '  episode add <id> --idea "<tekst>" --episode <NN-slug> [te same flagi decyzji] [--json]': [
     "episode",
     "add",
@@ -518,6 +526,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "30",
     "--audio",
     "narration",
+    "--dry-run",
+  ],
+  "  episode lip-sync <id> <episode-id> --language <kod>|--none [--json]": [
+    "episode",
+    "lip-sync",
+    ...ON,
+    "--language",
+    "en",
     "--dry-run",
   ],
   "  episode set <id> <episode-id> [te same flagi decyzji] [--json]": [

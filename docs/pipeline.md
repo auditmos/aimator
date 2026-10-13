@@ -36,6 +36,8 @@ $AIMATOR_WORKSPACE/
     └── episodes/<episode-id>/
         ├── source.md                 kopia bajtowa źródła (etap 0)
         ├── episode.json              decyzje odcinka
+        ├── lip-sync.json             język ust drugiej wersji albo none, osobno od
+        │                             episode.json: wejście przekładu dialogu i etapu 12
         ├── prepare.stage.json
         ├── screenplay.md             ┐
         ├── screenplay.stage.json     │
@@ -52,6 +54,11 @@ $AIMATOR_WORKSPACE/
         ├── sound/Enn.mp3              │ efekty; jedno wywołanie na plik
         ├── sound-design.stage.json    ┘ rekord arkusza i każdego stemu
         ├── sound-design.lock
+        ├── dialogue.md                ┐ etap 11: skrypt w języku filmu, wspólny
+        ├── dialogue.<język>.md        │ przekład skryptu na język ust
+        ├── dialogue/<język>/Dnn.wav   │ jedna kupiona kwestia na plik
+        ├── dialogue.stage.json        ┘ rekord skryptu, przekładu i każdej kwestii
+        ├── dialogue.lock
         ├── runs/<runId>/             archiwum prób etapów tekstowych;
         │                             previous/ tylko przy --regenerate
         ├── gpt-image/                ┐ references/Rxx.png, references.stage.json,
@@ -260,7 +267,10 @@ Obowiązują we wszystkich etapach.
   razem z etykietami `subject`, bo te trafiają do modelu w liście załączników. Materiałem
   są `project.md`, `source.md`, `screenplay.md` i `shot-list.md`: wklejane **dosłownie**,
   nigdy tłumaczone, bo ich hashe są zapisane, a przekład byłby drugą wersją tej samej
-  prawdy. Żądanie bywa więc dwujęzyczne i tak ma być. Wynik etapu, który jest treścią
+  prawdy. Jedynym świadomym wyjątkiem jest przekład skryptu dialogu w etapie 11, bo druga
+  wersja jest tam dokładnie tym, czego trzeba: powstaje jako **nowy artefakt z własną
+  zgodą** (`dialogue.<język>.md`), nigdy jako przekodowanie źródła, a samo źródło jedzie
+  do niego dosłownie. Żądanie bywa więc dwujęzyczne i tak ma być. Wynik etapu, który jest treścią
   filmu (scenariusz, lista ujęć), idzie w `language`; wynik etapu, który jest instrukcją
   (pakiet promptów), idzie po angielsku, bo modele obrazu i wideo są trenowane
   przytłaczająco na angielskich promptach, a `language` opisuje film, nie rozmowę
@@ -306,7 +316,7 @@ Obowiązują we wszystkich etapach.
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
 | 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, przy narracji zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9, przy dialogu przyjęte kwestie etapu 11 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
-| 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json` | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; przyjęty skrypt i przyjęta próbka głosu postaci przed kupnem jej kwestii; potem ocena skryptu, ocena każdej kwestii | **zaimplementowany** |
+| 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json`; do przekładu `lip-sync.json` | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.<język ust>.md`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; przyjęty skrypt i przyjęta próbka głosu postaci przed kupnem jej kwestii; przyjęty skrypt i język ust przed przekładem; potem ocena skryptu, przekładu i każdej kwestii | **zaimplementowany** |
 
 **Wiersz 10 zmienił się przy implementacji i to jest zapisane tutaj, a nie przemilczane.**
 Mówił, że muzyka i efekty są **wejściem** wnoszonym przez człowieka, i sam przyznawał, że
@@ -501,6 +511,15 @@ trzeba by wpisywać drugi raz, a limit żyjący tylko w archiwum próby zamieni�
 w stan. Jest per odcinek, nie per tor, bo oba tory planują z jednej listy ujęć, więc liczba
 jest dokładnie jedna. To plan montażowy: prawdziwy limit dostawcy wideo nie jest sprawdzony
 przed etapem 7.
+
+**Język ust jest decyzją odcinka w osobnym pliku**, `episodes/<id>/lip-sync.json`
+(`{ "language": "en" }` albo `"none"`), zapisywaną przez `episode lip-sync <project-id>
+<episode-id> --language <kod>|--none`. Nie jest polem `episode.json`, bo ten plik jest
+wejściem scenariusza i wszystkiego pod nim, a język ust jest wejściem wyłącznie przekładu
+skryptu dialogu i etapu 12; dlatego jego zapis nie cofa zgody etapu 0 ani scenariusza. Brak
+pliku znaczy, że nikt nie zdecydował, i blokuje tylko te dwa miejsca (reguła 7). `none` to
+decyzja „drugiej wersji nie będzie”. Kod równy `language` odcinka jest odmową przy zapisie,
+bo usta w języku filmu poruszają się tak, jak je narysowano.
 
 Świeży `episode.json` ma wszystkie sześć jako `null` i jest celowo niegotowy do generacji.
 Gotowość jest **wyliczana**, nie deklarowana: nie ma pola `status`, które plik mógłby
@@ -2068,15 +2087,42 @@ drugiej opłaty, nic się samo nie ponawia, drugą próbę kupuje wyłącznie
 | artefakt | `producer.kind` | `model` | wejścia |
 |---|---|---|---|
 | `script` | `model` | model tekstowy, z `promptVersion` | `project.json`, `project.md`, `episode.json`, `shot-list.md` |
+| `script-<kod>` | `model` | model tekstowy, z własnym `promptVersion` | `project.md`, `shot-list.md`, `dialogue.md`, `lip-sync.json` |
 | `D01`…`Dnn` | `model` | `<model mowy> / voice <voiceId>` | `dialogue.md` i `voice.json` tej postaci w tym języku |
 
 Wejścia kwestii są **dokładnie dwa** i to jest decyzja, nie przeoczenie. `project.json` nim
 nie jest, więc zmiana narratora nie cofa żadnej kwestii; zmiana głosu jednej postaci cofa
 zgody wyłącznie na jej kwestie.
 
+### Skrypt w drugim języku
+
+`dialogue translate <id> <episode-id>` kupuje **jedno wywołanie tekstowe**
+(`AIMATOR_TRANSLATION_MODEL`, własna zmienna, bo własne miejsce wywołania) i publikuje
+`dialogue.<kod>.md` obok `dialogue.md`, z rekordem `script-<kod>` w tym samym
+`dialogue.stage.json` (reguła 1). Kod to język ust z `lip-sync.json`
+([etap 0](#etap-0-szczegóły)). Bramka: przyjęty skrypt w języku filmu i decyzja o języku
+ust; brak pliku, `none` i język filmu to trzy różne odmowy z poleceniem, które je usuwa.
+
+To jedyne świadome tłumaczenie materiału w potoku i reguła 9 mówi o nim wprost: przekład
+jest nowym artefaktem z własną zgodą, a nie przekodowaniem źródła. Zadanie jest po
+angielsku, `project.md` i przyjęty `dialogue.md` jadą dosłownie.
+
+Każda kwestia idzie z **oknem czasu** w sekundach planu: od kotwicy do następnej kwestii
+albo końca ujęcia, co nastąpi wcześniej. Okno jest wyprowadzane z `dialogue.md` i listy
+ujęć, nigdy zapisywane (reguła 7, druga połowa). Prompt każe pisać krótko, naturalnie
+i w oknie, a skracać zamiast przyspieszać, bo nic dalej kwestii nie przyspieszy.
+
+Werdykt jest strukturalny: sekcje `Lines` i `Review`, te same identyfikatory w tej samej
+kolejności, te same ujęcia, postacie i kotwice, 1:1, bez braków i nadmiarów, tekst
+niepusty. Odpowiedź, która go nie spełnia, zostaje w archiwum próby, a plik nie powstaje.
+Wierność przekładu ocenia człowiek przy `approve --artifact script-<kod>`. Zgoda wiąże się
+z sha256 pliku i z czterema wejściami, więc zmiana `dialogue.md`, także ręczna, cofa ją, a
+liczy się wyłącznie razem z ważną zgodą na skrypt, który przekład tłumaczy. `approved`
+w obiekcie `check` dalej oznacza język filmu; przekład ma własne pole `translation`.
+
 ### Zgoda
 
-`approve <id> <episode-id> --stage dialogue --artifact script|D01[,D02]`; `--artifact` jest
+`approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]`; `--artifact` jest
 wymagane z powodu etapu 9: przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a
 przyjęcie kwestii otwiera miks. Kwestia jest przyjmowana osobno, związana z sha256 nagrania.
 Kwestii, której wejście zmieniło się od nagrania, nie da się przyjąć ponownie: przy zmianie
