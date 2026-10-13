@@ -227,7 +227,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
-  "  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]": [
+  "  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]": [
     "approve",
     ...ON,
     "--stage",

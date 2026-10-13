@@ -44,7 +44,7 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
-  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]
+  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]
                [--json]`;
 
 /** The stages whose frames are accepted against the QC checklist. */

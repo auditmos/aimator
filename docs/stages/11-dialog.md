@@ -9,7 +9,7 @@ miks [etapu 10](10-muzyka-i-efekty.md).
 |---|---|
 | **Wejście** | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, `project.json`, `project.md`, `episode.json`, a do kwestii `characters/<c>/voices/<język filmu>/voice.json` każdej mówiącej postaci; do przekładu `lip-sync.json` |
 | **Wyjście** | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.<język ust>.md`, `dialogue.stage.json`, `runs/<runId>/` (wspólne dla obu torów) |
-| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i `--audio dialogue` albo `dialogue-and-narration`; kwestie czekają na przyjęty skrypt i przyjętą próbkę głosu swojej postaci; przekład na przyjęty skrypt i decyzję o języku ust |
+| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md) i `--audio dialogue` albo `dialogue-and-narration`; kwestie czekają na przyjęty skrypt i przyjętą próbkę głosu swojej postaci; przekład na przyjęty skrypt i decyzję o języku ust; kwestie w drugim języku na przyjęty przekład i przyjętą próbkę głosu w tym języku |
 | **Koszt** | skrypt i przekład: po jednym płatnym wywołaniu tekstowym; kwestie: jedno wywołanie mowy na kwestię, rachunek liczy się w **znakach** |
 
 ## Komendy
@@ -28,11 +28,17 @@ pnpm dev episode lip-sync dzielna-ewa 01-burza --language en
 pnpm dev dialogue translate dzielna-ewa 01-burza --dry-run   # okna czasu w prompcie
 pnpm dev dialogue translate dzielna-ewa 01-burza
 pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact script-en
+pnpm dev dialogue generate dzielna-ewa 01-burza --language en --dry-run
+pnpm dev dialogue generate dzielna-ewa 01-burza --language en
+pnpm dev approve dzielna-ewa 01-burza --stage dialogue --artifact en:D01,en:D02,en:D03
 ```
 
 Dodatkowe flagi: `--model <id>`, `--voice-model <id>`, `--max-output-tokens <n>`
-(domyślnie 8 000), `--artifact script|D01[,D02]`, `--regenerate`, `--instruction <uwaga>`
-(tylko razem z `--regenerate --artifact script`), `--json`.
+(domyślnie 8 000), `--artifact script|D01[,D02]`, `--language <kod>`, `--regenerate`,
+`--instruction <uwaga>` (tylko razem z `--regenerate --artifact script`), `--json`.
+`--language` z językiem ust kupuje kwestie przekładu, a nie języka filmu
+([Kwestie w drugim języku](#kwestie-w-drugim-języku)); bez niej albo z językiem filmu
+wszystko działa jak dotąd.
 
 `dialogue translate` przyjmuje `--model <id>`, `--max-output-tokens <n>`, `--regenerate`,
 `--instruction <uwaga>` (tylko z `--regenerate`), `--dry-run` i `--json`; nie ma
@@ -66,9 +72,11 @@ z każdą kwestią: `planned`, `blocked` z powodem, `skipped`, `published` albo 
 Obiekt `check` niesie `approved` całego etapu, czyli skryptu **i** każdej kwestii, obok
 `script.approved`, które dotyczy samego skryptu. Pole `translation` opisuje przekład:
 `null`, dopóki odcinek nie wskazał języka ust, a potem `id` (`script-en`), `language`,
-`state`, `approved` i `inputsChanged`. `approved` całego etapu go nie obejmuje: to język
-filmu, a drugi język ma własną zgodę. `dialogue translate --json` wypisuje raport tego
-samego kształtu co `generate`, z `command: "translate"`.
+`state`, `approved`, `inputsChanged` i `lines`, czyli kwestie drugiego języka, każda ze
+swoim `key` (`en:D01`) i własną zgodą. `approved` całego etapu go nie obejmuje: to język
+filmu, a drugi język ma własne zgody. Każda kwestia, w obu językach, niesie `key`, czyli
+to, co podaje się w `--artifact`. `dialogue translate --json` wypisuje raport tego samego
+kształtu co `generate`, z `command: "translate"`.
 
 ## Skąd się biorą kwestie
 
@@ -174,6 +182,8 @@ nikt nie nazwał, wydałaby pieniądze, na które nikt się nie zgodził.
   wtedy „poprawiony ręcznie po generacji”, a `approve` przyjmuje poprawkę, o ile dalej
   przechodzi walidację względem listy ujęć.
 - `--artifact D01,D02` przyjmuje kwestie, każdą osobno, związane z bajtami nagrania.
+- `--artifact script-en` przyjmuje przekład, a `--artifact en:D01` kwestię w drugim języku,
+  każdą osobno i bez ruszania `D01`.
 
 Kwestia zapisuje **dokładnie dwa wejścia**: `dialogue.md` i `voice.json` swojej postaci
 w tym języku. `project.json` nim nie jest, więc zmiana narratora nie cofa żadnej kwestii.
@@ -229,6 +239,39 @@ poprawka skryptu. `episode.json` wejściem nie jest, bo każda jego zmiana cofa 
 tłumaczony skrypt. Zgoda na przekład liczy się wyłącznie razem z ważną zgodą na skrypt,
 który tłumaczy. `dialogue.en.md` można poprawić ręcznie; `approve --artifact script-en`
 przyjmuje poprawkę, o ile dalej przechodzi walidację.
+
+## Kwestie w drugim języku
+
+`dialogue generate --language en` kupuje kwestie z przyjętego `dialogue.en.md` tak, jak bez
+tej flagi kupuje się je z `dialogue.md`: **jedno wywołanie mowy na kwestię**, ten sam model
+mowy i ten sam rachunek w wywołaniach i znakach. Różnią się trzy rzeczy:
+
+- głos to `characters/<c>/voices/en/voice.json`, obsadzony i wysłuchany w
+  [etapie 0](00-przygotowanie.md) osobno dla angielskiego;
+- nagranie trafia do `dialogue/en/Dnn.wav`, obok `dialogue/pl/`, nie zamiast niego;
+- klucz rekordu to `en:D01`, bo `D01` zajmuje kwestia w języku filmu, a oba rekordy
+  dzielą `dialogue.stage.json`. Ten klucz podaje się w `--artifact` przy `approve`
+  i przy `--regenerate`: `--artifact en:D03`.
+
+```
+Próba na sucho: nic nie zapisano, nic nie wysłano. Dialog dzielna-ewa/01-burza
+  płatnych wywołań do wykonania: 3
+  znaków do rozliczenia: 64
+      en:D01: ewa, planned, gotowa do kupienia, 25 znaków
+      en:D02: ewa, planned, gotowa do kupienia, 19 znaków
+      en:D03: tata, planned, gotowa do kupienia, 20 znaków
+```
+
+Bramka: przyjęty `script-en`, czyli przekład z ważną zgodą, i przyjęta próbka angielskiego
+głosu każdej mówiącej postaci. Jak w języku filmu, **głos jest bramką tylko kwestii swojej
+postaci**: `tata` bez przyjętej próbki EN czeka, a kwestie `ewa` są kupowane. Język, którego
+`lip-sync.json` nie wskazuje, to odmowa: kwestie kupuje się w języku ust, bo dla nich
+istnieje druga wersja.
+
+Kwestia EN zapisuje dokładnie dwa wejścia, `dialogue.en.md` i `voices/en/voice.json` swojej
+postaci, więc ręczna poprawka przekładu cofa zgody na kwestie EN i nie rusza polskich, a
+zgoda na `en:D01` nie dotyka `D01`. Gdzie kwestia EN usiądzie i co, jeśli nachodzi na
+następną, sprawdza etap 12 na zegarze swojego toru, nie zakup.
 
 ## W pełnej ścieżce
 

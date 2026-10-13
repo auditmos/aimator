@@ -304,3 +304,29 @@ describe("dialogue translate", () => {
     });
   });
 });
+
+describe("dialogue generate --language", () => {
+  it("should bill the lines of the accepted translation, keyed by their language", async () => {
+    await makeVoices({ language: "en", workspace });
+    const printed = await cli(
+      "dialogue",
+      "generate",
+      PROJECT,
+      EPISODE,
+      "--language",
+      "en",
+      "--voice-model",
+      "eleven_multilingual_v2",
+      "--dry-run"
+    );
+
+    expect(printed).toContain("płatnych wywołań do wykonania: 3");
+    expect(printed).toContain("en:D01: ewa, planned, gotowa do kupienia");
+  });
+
+  it("should print the second language's lines under script-en in check", async () => {
+    const printed = await cli("check", PROJECT, EPISODE, "--stage", "dialogue");
+
+    expect(printed).toContain("en:D03: U04, tata, 22s planu, absent, nie kupiona");
+  });
+});

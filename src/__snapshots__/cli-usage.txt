@@ -217,7 +217,8 @@ Etap 10. Muzyka i efekty (płatny; stemy wspólne, miks per tor):
 Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla obu torów):
   dialogue generate <id> <episode-id> [--model <id>] [--voice-model <id>]
                     [--max-output-tokens <n>] [--artifact script|D01[,D02]]
-                    [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+                    [--language <kod>] [--dry-run] [--json]
+                    [--regenerate [--instruction <uwaga>]]
     Podnosi skrypt dialogu z zatwierdzonej listy ujęć: kto, w którym ujęciu
     i od której sekundy planu. Kwestii nie pisze: etap 3 zapisał każdą jako
     <id>: "…", a walidator sprawdza w obie strony, że żadnej nie wymyślono
@@ -229,6 +230,9 @@ Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla obu torów):
     Model skryptu: --model albo AIMATOR_DIALOGUE_MODEL; model mowy:
     --voice-model albo AIMATOR_DIALOGUE_VOICE_MODEL.
     --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.
+    --language <kod> kupuje kwestie w języku ust, z przyjętego przekładu
+    (dialogue translate), głosami tego języka, pod kluczami <kod>:D01, do
+    dialogue/<kod>/; --artifact en:D01[,en:D02] przy --regenerate.
   dialogue translate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                      [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
     Tłumaczy przyjęty skrypt na język ust z episode lip-sync jednym płatnym
@@ -287,7 +291,7 @@ Wspólne:
   approve <id> <episode-id> --stage soundtrack --track <tor> [--json]
   approve <id> <episode-id> --stage sound-design --artifact cues|M01[,E02] [--json]
   approve <id> <episode-id> --stage sound-design --track <tor> [--json]
-  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]
+  approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]
                [--json]
   reject <id> <episode-id> --stage <etap> [--track <tor>] [--artifact <klucz>[,...]]
               --note <uwaga> [--fail <kryteria>] [--reviewer <kto>] [--json]

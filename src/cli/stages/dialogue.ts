@@ -33,7 +33,8 @@ const STAGE = "dialogue";
 export const USAGE = `Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla obu torów):
   dialogue generate <id> <episode-id> [--model <id>] [--voice-model <id>]
                     [--max-output-tokens <n>] [--artifact script|D01[,D02]]
-                    [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+                    [--language <kod>] [--dry-run] [--json]
+                    [--regenerate [--instruction <uwaga>]]
     Podnosi skrypt dialogu z zatwierdzonej listy ujęć: kto, w którym ujęciu
     i od której sekundy planu. Kwestii nie pisze: etap 3 zapisał każdą jako
     <id>: "…", a walidator sprawdza w obie strony, że żadnej nie wymyślono
@@ -45,6 +46,9 @@ export const USAGE = `Etap 11. Dialog (płatny; skrypt i kwestie wspólne dla ob
     Model skryptu: --model albo AIMATOR_DIALOGUE_MODEL; model mowy:
     --voice-model albo AIMATOR_DIALOGUE_VOICE_MODEL.
     --instruction poprawia sam skrypt, więc idzie wyłącznie z --artifact script.
+    --language <kod> kupuje kwestie w języku ust, z przyjętego przekładu
+    (dialogue translate), głosami tego języka, pod kluczami <kod>:D01, do
+    dialogue/<kod>/; --artifact en:D01[,en:D02] przy --regenerate.
   dialogue translate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                      [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
     Tłumaczy przyjęty skrypt na język ust z episode lip-sync jednym płatnym
@@ -135,21 +139,20 @@ function renderGenerate(
 
 function renderStatus(headline: string, status: DialogueStatus): string {
   const { script, translation } = status;
+  const row = (line: DialogueStatus["lines"][number]): string =>
+    `      ${line.key}: ${line.shot}, ${line.cast}, ${line.atSeconds}s planu, ${line.approved ? "zatwierdzona" : line.state}, ${line.note}`;
+  // Each script above its own lines: the film's language, then the second.
   const lines = [
     headline,
     `  script: ${script.approved ? "zatwierdzony" : script.state}, ${script.note}`,
+    ...status.lines.map(row),
     ...(translation === null
       ? []
       : [
           `  ${translation.id}: ${translation.approved ? "zatwierdzony" : translation.state}, ${translation.note}`,
+          ...translation.lines.map(row),
         ]),
   ];
-
-  for (const line of status.lines) {
-    lines.push(
-      `      ${line.id}: ${line.shot}, ${line.cast}, ${line.atSeconds}s planu, ${line.approved ? "zatwierdzona" : line.state}, ${line.note}`
-    );
-  }
 
   for (const problem of status.problems) {
     lines.push(`  ! ${problem}`);
@@ -169,6 +172,7 @@ async function runDialogueGenerate(argv: readonly string[]): Promise<Result<stri
     artifact: { type: "string" },
     instruction: { type: "string" },
     json: { type: "boolean" },
+    language: { type: "string" },
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
@@ -227,6 +231,7 @@ async function runDialogueGenerate(argv: readonly string[]): Promise<Result<stri
     episodeId: episodeId.data,
     fetch,
     instruction: instruction.data,
+    language: typeof parsed.data.values.language === "string" ? parsed.data.values.language : null,
     maxOutputTokens: tokens.data,
     mode,
     model: model.data,

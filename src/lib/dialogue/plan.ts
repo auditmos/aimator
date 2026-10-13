@@ -51,6 +51,15 @@ export function translationKey(language: string): string {
   return `${SCRIPT}-${language}`;
 }
 
+/**
+ * The record key of a bought line: `D01` in the film's language, `en:D01` in a
+ * second one (`second`), because both live in one `dialogue.stage.json` and the
+ * film's line already holds `D01`.
+ */
+export function lineKey(id: string, second: string | null): string {
+  return second === null ? id : `${second}:${id}`;
+}
+
 export interface Stage11Scope {
   readonly episodeId: string;
   readonly projectId: string;

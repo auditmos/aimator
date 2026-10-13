@@ -2089,6 +2089,7 @@ drugiej opłaty, nic się samo nie ponawia, drugą próbę kupuje wyłącznie
 | `script` | `model` | model tekstowy, z `promptVersion` | `project.json`, `project.md`, `episode.json`, `shot-list.md` |
 | `script-<kod>` | `model` | model tekstowy, z własnym `promptVersion` | `project.md`, `shot-list.md`, `dialogue.md`, `lip-sync.json` |
 | `D01`…`Dnn` | `model` | `<model mowy> / voice <voiceId>` | `dialogue.md` i `voice.json` tej postaci w tym języku |
+| `<kod>:D01`…`<kod>:Dnn` | `model` | `<model mowy> / voice <voiceId>` | `dialogue.<kod>.md` i `voices/<kod>/voice.json` tej postaci |
 
 Wejścia kwestii są **dokładnie dwa** i to jest decyzja, nie przeoczenie. `project.json` nim
 nie jest, więc zmiana narratora nie cofa żadnej kwestii; zmiana głosu jednej postaci cofa
@@ -2120,9 +2121,19 @@ z sha256 pliku i z czterema wejściami, więc zmiana `dialogue.md`, także ręcz
 liczy się wyłącznie razem z ważną zgodą na skrypt, który przekład tłumaczy. `approved`
 w obiekcie `check` dalej oznacza język filmu; przekład ma własne pole `translation`.
 
+`dialogue generate --language <kod>` kupuje kwestie przyjętego przekładu: jedno wywołanie
+mowy na kwestię, ten sam model mowy i ten sam rachunek w wywołaniach i znakach co w języku
+filmu, głosem z `characters/<c>/voices/<kod>/voice.json`, do `dialogue/<kod>/Dnn.wav`.
+Klucz rekordu to `<kod>:D01`, bo `D01` zajmuje kwestia w języku filmu, a oba dzielą
+`dialogue.stage.json` (reguła 1); tego klucza używają `--artifact` przy `approve`
+i `--regenerate`. Bramka: przyjęty `script-<kod>` i przyjęta próbka głosu w tym języku,
+przy czym głos bramkuje wyłącznie kwestie swojej postaci; kod, którego `lip-sync.json` nie
+wskazuje, jest odmową. Kwestie trafiają do `translation.lines` obiektu `check`, każda ze
+swoim `key`. Umieszczenie i odmowy przy nachodzeniu należą do etapu 12, na zegarze toru.
+
 ### Zgoda
 
-`approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,D02]`; `--artifact` jest
+`approve <id> <episode-id> --stage dialogue --artifact script|script-<kod>|D01[,<kod>:D01]`; `--artifact` jest
 wymagane z powodu etapu 9: przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a
 przyjęcie kwestii otwiera miks. Kwestia jest przyjmowana osobno, związana z sha256 nagrania.
 Kwestii, której wejście zmieniło się od nagrania, nie da się przyjąć ponownie: przy zmianie

@@ -15,6 +15,7 @@ import { err, ok, type Result } from "../result.js";
 import { validateSpeech } from "../voice-model/index.js";
 import { dialogueAudio, dialogueTranslation, workspacePath } from "../workspace.js";
 import {
+  lineKey,
   readStage11Inputs,
   readTranslationTarget,
   SCRIPT,
@@ -56,6 +57,8 @@ export interface LineState extends DialogueLine {
   readonly approved: boolean;
   /** Recorded inputs whose bytes on disk no longer match what this recording used. */
   readonly inputsChanged: readonly string[];
+  /** Its record key, what `--artifact` names: `D01`, or `en:D01` in a second language. */
+  readonly key: string;
   readonly note: string;
   /** How long the recording runs, read from its own header; null without one. */
   readonly seconds: number | null;
@@ -75,6 +78,12 @@ export interface TranslationState {
   readonly inputsChanged: readonly string[];
   /** The language of the mouths, which this script is written in. */
   readonly language: string;
+  /**
+   * Its lines and where each recording stands, keyed `en:D01`, once the
+   * translation validates. Each has its own yes, which `approved` above does
+   * not include: that one is the translated script's alone.
+   */
+  readonly lines: readonly LineState[];
   readonly note: string;
   readonly state: "absent" | "completed" | "submitted";
 }
@@ -136,6 +145,8 @@ interface TranslationInspection {
   readonly blocking: readonly string[];
   /** What the translation records, as the files stand now. */
   readonly inputs: readonly RecordedFile[];
+  /** Per line, keyed `en:D01`, what an approval of that line may not write over. */
+  readonly lineBlocking: ReadonlyMap<string, readonly string[]>;
   readonly problems: readonly string[];
   readonly state: TranslationState;
 }
@@ -184,8 +195,19 @@ async function readTranslation(
 
   const id = translationKey(target.language);
   const record = stage11.stage.artifacts[id];
-  const base = { approved: false, id, inputsChanged: [], language: target.language } as const;
-  const empty = { amended: [], blocking: [], inputs: target.inputs } as const;
+  const base = {
+    approved: false,
+    id,
+    inputsChanged: [],
+    language: target.language,
+    lines: [],
+  } as const;
+  const empty = {
+    amended: [],
+    blocking: [],
+    inputs: target.inputs,
+    lineBlocking: new Map<string, readonly string[]>(),
+  } as const;
 
   if (record === undefined) {
     return {
@@ -224,11 +246,20 @@ async function readTranslation(
   ];
   const inputsChanged = changedInputs(driftableInputs(record), target.inputs);
   const accepted = record.review.status === "approved";
+  // The lines are read out of the translation only once it validates, as the
+  // film's are read out of the script: a block the verdict refused names nothing.
+  const spoken = await readLineStates(
+    input,
+    stage11,
+    verdict?.ok === true ? verdict.data.lines : [],
+    target.language
+  );
 
   return {
     amended,
     blocking,
     inputs: target.inputs,
+    lineBlocking: spoken.blocking,
     problems: [
       ...blocking,
       ...inputsChanged.map(
@@ -244,6 +275,7 @@ async function readTranslation(
             `${id}: przekład liczy się dopiero ze zgodą na skrypt, który tłumaczy: ${approveCommand(input)}`,
           ]
         : []),
+      ...spoken.problems,
     ],
     state: {
       ...base,
@@ -254,6 +286,7 @@ async function readTranslation(
         inputsChanged.length === 0 &&
         amended.length === 0,
       inputsChanged,
+      lines: spoken.states,
       note:
         verdict?.ok === true ? `${verdict.data.lines.length} kwestii` : "nie przechodzi walidacji",
       state: "completed",
@@ -447,10 +480,16 @@ interface LineStates {
   readonly states: readonly LineState[];
 }
 
+/**
+ * Every line's recording, in the film's language or, given `second`, in the
+ * second one: the same verdict, under the key and in the directory of that
+ * language.
+ */
 async function readLineStates(
   input: Stage11Scope,
   stage11: Stage11Inputs,
-  lines: readonly DialogueLine[]
+  lines: readonly DialogueLine[],
+  second: string | null = null
 ): Promise<LineStates> {
   const blocking = new Map<string, readonly string[]>();
   const problems: string[] = [];
@@ -458,9 +497,9 @@ async function readLineStates(
 
   for (const line of lines) {
     // biome-ignore lint/performance/noAwaitInLoops: each line read once per check
-    const one = await readLineState(input, stage11, line);
+    const one = await readLineState(input, stage11, line, second);
 
-    blocking.set(line.id, one.blocking);
+    blocking.set(one.state.key, one.blocking);
     problems.push(...one.problems);
     states.push(one.state);
   }
@@ -469,19 +508,23 @@ async function readLineStates(
 }
 
 /** The command that buys one line again, which is every lapsed recording's remedy. */
-function regenerateCommand(input: Stage11Scope, id: string): string {
-  return `aimator dialogue generate ${input.projectId} ${input.episodeId} --regenerate --artifact ${id}`;
+function regenerateCommand(input: Stage11Scope, key: string, second: string | null): string {
+  const language = second === null ? "" : ` --language ${second}`;
+
+  return `aimator dialogue generate ${input.projectId} ${input.episodeId}${language} --regenerate --artifact ${key}`;
 }
 
 /** One bought line: is the recording there, is it speech, and did anybody accept it. */
 async function readLineState(
   input: Stage11Scope,
   stage11: Stage11Inputs,
-  line: DialogueLine
+  line: DialogueLine,
+  second: string | null
 ): Promise<{ blocking: readonly string[]; problems: readonly string[]; state: LineState }> {
-  const record = stage11.stage.artifacts[line.id];
-  const file = dialogueAudio(stage11.episode, stage11.language, line.id);
-  const absent = { ...line, approved: false, inputsChanged: [], seconds: null } as const;
+  const key = lineKey(line.id, second);
+  const record = stage11.stage.artifacts[key];
+  const file = dialogueAudio(stage11.episode, second ?? stage11.language, line.id);
+  const absent = { ...line, approved: false, inputsChanged: [], key, seconds: null } as const;
 
   if (record === undefined || !file.ok) {
     return {
@@ -495,7 +538,7 @@ async function readLineState(
     return {
       blocking: [],
       problems: [
-        `${line.id}: rekord "submitted" bez opublikowanego nagrania, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
+        `${key}: rekord "submitted" bez opublikowanego nagrania, powtórz polecenie, żeby dokończyć próbę bez drugiej opłaty`,
       ],
       state: {
         ...absent,
@@ -509,11 +552,11 @@ async function readLineState(
   const speech = digest.ok ? validateSpeech(digest.data.bytes) : null;
   const [output] = record.outputs;
   const bytes = [
-    ...(digest.ok ? [] : [`${line.id}: brakuje nagrania`]),
+    ...(digest.ok ? [] : [`${key}: brakuje nagrania`]),
     ...(digest.ok && output?.sha256 !== digest.data.sha256
-      ? [`${line.id}: nagranie nie zgadza się z zapisanym hashem`]
+      ? [`${key}: nagranie nie zgadza się z zapisanym hashem`]
       : []),
-    ...(speech !== null && !speech.ok ? [`${line.id}: ${speech.error.message}`] : []),
+    ...(speech !== null && !speech.ok ? [`${key}: ${speech.error.message}`] : []),
   ];
   const inputsChanged: string[] = [];
 
@@ -528,7 +571,7 @@ async function readLineState(
 
   const drift = inputsChanged.map(
     (path) =>
-      `${line.id}: ${path} zmienił się od czasu nagrania, to nagranie czyta coś innego niż teraz; nowe kupuje: ${regenerateCommand(input, line.id)}`
+      `${key}: ${path} zmienił się od czasu nagrania, to nagranie czyta coś innego niż teraz; nowe kupuje: ${regenerateCommand(input, key, second)}`
   );
 
   return {
@@ -538,6 +581,7 @@ async function readLineState(
       ...line,
       approved: record.review.status === "approved" && bytes.length === 0 && drift.length === 0,
       inputsChanged,
+      key,
       note: speech?.ok === true ? `${speech.data.seconds}s` : "nie przechodzi walidacji",
       seconds: speech?.ok === true ? speech.data.seconds : null,
       state: "completed",
@@ -558,9 +602,12 @@ function stateOf(status: DialogueStatus, id: string): string | undefined {
     return status.script.state;
   }
 
-  return id === status.translation?.id
-    ? status.translation.state
-    : status.lines.find((one) => one.id === id)?.state;
+  if (id === status.translation?.id) {
+    return status.translation.state;
+  }
+
+  return [...status.lines, ...(status.translation?.lines ?? [])].find((one) => one.key === id)
+    ?.state;
 }
 
 /**
@@ -595,7 +642,7 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
   if (input.artifacts.length === 0) {
     return err(
       new DialogueStateError(
-        `--artifact jest wymagane: ${SCRIPT}, ${SCRIPT}-<język> albo D01[,D02], przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a przyjęcie kwestii otwiera miks`
+        `--artifact jest wymagane: ${SCRIPT}, ${SCRIPT}-<język>, D01[,D02] albo <język>:D01, przyjęcie skryptu otwiera kupowanie każdej jego kwestii, a przyjęcie kwestii otwiera miks`
       )
     );
   }
@@ -609,8 +656,10 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
   const { blocking, lineBlocking, stage11, status, translation } = inspection.data;
   const known = [
     SCRIPT,
-    ...(translation === null ? [] : [translation.state.id]),
-    ...status.lines.map((one) => one.id),
+    ...status.lines.map((one) => one.key),
+    ...(translation === null
+      ? []
+      : [translation.state.id, ...translation.state.lines.map((one) => one.key)]),
   ];
   const unknown = input.artifacts.filter((id) => !known.includes(id));
 
@@ -635,7 +684,9 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
     ...(translation !== null && input.artifacts.includes(translation.state.id)
       ? translation.blocking
       : []),
-    ...input.artifacts.flatMap((id) => lineBlocking.get(id) ?? []),
+    ...input.artifacts.flatMap(
+      (id) => lineBlocking.get(id) ?? translation?.lineBlocking.get(id) ?? []
+    ),
   ];
 
   if (refused.length > 0) {

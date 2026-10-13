@@ -1371,7 +1371,9 @@ export const VOICES = { ewa: "pNInz6obpgDQGcFmaJgB", tata: "ErXwobaYiN019PkySvjV
 
 /**
  * Cast voices in the film's language, each heard through a bought sample and
- * accepted: what stage 11 needs before it may buy a single line.
+ * accepted: what stage 11 needs before it may buy a single line. `language`
+ * casts the same voices for the second language instead, which is what the
+ * lines bought from the translated script are read in.
  *
  * Promoted for the threshold the rest of this file uses: the stage-11 module
  * tests and its CLI tests both need a cast whose voices are decided, and
@@ -1380,9 +1382,10 @@ export const VOICES = { ewa: "pNInz6obpgDQGcFmaJgB", tata: "ErXwobaYiN019PkySvjV
  */
 export async function makeVoices(options: {
   readonly cast?: readonly (keyof typeof VOICES)[];
+  readonly language?: string;
   readonly workspace: Workspace;
 }): Promise<void> {
-  const { cast = CAST, workspace } = options;
+  const { cast = CAST, language = "pl", workspace } = options;
   const answer = (() =>
     Promise.resolve(
       new Response(wav({ seconds: 1 }), {
@@ -1392,7 +1395,7 @@ export async function makeVoices(options: {
     )) as unknown as typeof fetch;
 
   for (const characterId of cast) {
-    const scope = { characterId, language: "pl", projectId: PROJECT, workspace } as const;
+    const scope = { characterId, language, projectId: PROJECT, workspace } as const;
 
     // biome-ignore lint/performance/noAwaitInLoops: one voice at a time, in roster order
     await setVoice({ ...scope, mode: "apply", voiceId: VOICES[characterId] });

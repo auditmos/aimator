@@ -339,7 +339,7 @@ src/
     │   ├── prompt.ts      # Internal: the instruction that forbids writing a line
     │   ├── validate.ts    # Internal: lifted, not invented, nothing left behind
     │   ├── plan.ts        # Internal: two gates: a plan and a film that speaks, then voices
-    │   ├── generate.ts    # Internal: the script, then the lines it authorises
+    │   ├── generate.ts    # Internal: the script, then the lines it authorises, either language
     │   ├── translate.ts   # Internal: the script in the language of the mouths
     │   ├── review.ts      # Internal: verification and approval of the script and each line
     │   └── index.test.ts  # The lift both ways, the voice gate, the bill, through the entry

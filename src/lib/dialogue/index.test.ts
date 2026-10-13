@@ -768,6 +768,7 @@ function translationPath(): string {
 
 interface StageRecord {
   readonly inputs: readonly { readonly path: string }[];
+  readonly outputs: readonly { readonly path: string }[];
   readonly review: { readonly status: string };
 }
 
@@ -895,5 +896,131 @@ describe("accepting the translation", () => {
     expect(status.ok ? status.data.problems.join("\n") : null).toContain(
       `${words}: zmienił się od czasu przekładu (script-en)`
     );
+  });
+});
+
+/**
+ * The lines of the second language, bought from the accepted translation.
+ *
+ * Assumptions this block encodes, stated before its first test:
+ *
+ * - **The translation's yes opens the buying**, as the script's opens the
+ *   film's language: `script-en`, accepted, and nothing less.
+ * - **A line is read in its speaker's English voice**, `voices/en/voice.json`,
+ *   gated by that voice's own accepted sample and nobody else's.
+ * - **Its key is `en:D01`**, because `D01` is the film's line, and the two share
+ *   one `dialogue.stage.json`; its bytes go to `dialogue/en/D01.wav`.
+ * - **It records exactly two inputs**, `dialogue.en.md` and the English voice.
+ */
+describe("buying the lines in the second language", () => {
+  /** The billed length of a line, as the provider counts it. */
+  function billed(text: string): number {
+    return [...text].length;
+  }
+
+  const ENGLISH = ["Dad, is the storm coming?", "Dad, where are you?", "I'm right here, Ewa."];
+
+  /** The script accepted and translated, the translation still waiting for its yes. */
+  async function translatedOnly(): Promise<void> {
+    await accepted();
+    await lipSync("en");
+    await translate(transport(translation(TRANSLATED)));
+  }
+
+  async function translatedAccepted(): Promise<void> {
+    await translatedOnly();
+    await approve(["script-en"]);
+  }
+
+  it("should wait for an accepted script-en, then bill calls and characters per line", async () => {
+    await translatedOnly();
+    await makeVoices({ language: "en", workspace });
+    const calls = speech();
+    const before = await generate(calls, { language: "en", mode: "dry-run" });
+    await approve(["script-en"]);
+    const after = await generate(calls, { language: "en", mode: "dry-run" });
+
+    expect(before.ok ? before.data.paidCalls : before.error.message).toBe(0);
+    expect(before.ok ? before.data.problems.join("\n") : null).toContain("--artifact script-en");
+    expect(
+      after.ok
+        ? after.data.lines.map(({ characters, id, state }) => ({ characters, id, state }))
+        : after.error.message
+    ).toEqual(
+      ENGLISH.map((text, index) => ({
+        characters: billed(text),
+        id: `en:D0${index + 1}`,
+        state: "planned",
+      }))
+    );
+    expect(after.ok ? [after.data.paidCalls, after.data.characters] : null).toEqual([
+      3,
+      ENGLISH.reduce((total, one) => total + billed(one), 0),
+    ]);
+    expect(calls.sent).toHaveLength(0);
+  });
+
+  it("should buy each line into dialogue/en under en:Dnn, from dialogue.en.md in the English voice", async () => {
+    await translatedAccepted();
+    await makeVoices({ language: "en", workspace });
+    const calls = speech();
+    const result = await generate(calls, { language: "en" });
+    const records = await stageRecords();
+    const episodeDir = `projects/${PROJECT}/episodes/${EPISODE}`;
+
+    expect(result.ok ? result.data.paidCalls : result.error.message).toBe(3);
+    expect(calls.sent.map((one) => one.text)).toEqual(ENGLISH);
+    expect(records["en:D01"]?.inputs.map((one) => one.path)).toEqual([
+      `${episodeDir}/dialogue.en.md`,
+      `projects/${PROJECT}/characters/ewa/voices/en/voice.json`,
+    ]);
+    expect(records["en:D03"]?.outputs.map((one) => one.path)).toEqual([
+      `${episodeDir}/dialogue/en/D03.wav`,
+    ]);
+    expect(records.D01).toBeUndefined();
+  });
+
+  it("should hold back only the lines of a character whose English sample nobody accepted", async () => {
+    await translatedAccepted();
+    await makeVoices({ cast: ["ewa"], language: "en", workspace });
+    const calls = speech();
+    const result = await generate(calls, { language: "en" });
+    const lines = result.ok ? result.data.lines : [];
+
+    expect(
+      result.ok ? lines.map(({ id, state }) => ({ id, state })) : result.error.message
+    ).toEqual([
+      { id: "en:D01", state: "published" },
+      { id: "en:D02", state: "published" },
+      { id: "en:D03", state: "blocked" },
+    ]);
+    expect(lines[2]?.note).toContain('głos postaci "tata" (en) nie ma przyjętej próbki');
+    expect(calls.sent.map((one) => one.text)).toEqual(ENGLISH.slice(0, 2));
+  });
+
+  it("should accept en:D01 alone and leave the film's D01 alone", async () => {
+    await translatedAccepted();
+    await makeVoices({ workspace });
+    await makeVoices({ language: "en", workspace });
+    await generate(speech());
+    await generate(speech(), { language: "en" });
+    const result = await approve(["en:D01"]);
+    const records = await stageRecords();
+
+    expect(
+      result.ok
+        ? result.data.translation?.lines.map(({ approved, key }) => ({ approved, key }))
+        : result.error.message
+    ).toEqual([
+      { approved: true, key: "en:D01" },
+      { approved: false, key: "en:D02" },
+      { approved: false, key: "en:D03" },
+    ]);
+    expect(result.ok ? result.data.lines.map((one) => one.approved) : null).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(records.D01?.review.status).toBe("pending");
   });
 });

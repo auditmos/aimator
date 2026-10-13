@@ -20,18 +20,21 @@ import {
   textPrompt,
 } from "../text-model/index.js";
 import { billedCharacters, DEFAULT_DELIVERY, runVoiceStage } from "../voice-model/index.js";
-import { dialogueAudio, type Workspace } from "../workspace.js";
+import { dialogueAudio, dialogueTranslation, type Workspace } from "../workspace.js";
 import {
+  lineKey,
   readStage11Inputs,
+  readTranslationTarget,
   readVoices,
   SCRIPT,
   type SpeakerVoice,
   STAGE,
   Stage11BlockedError,
   type Stage11Inputs,
+  translationKey,
 } from "./plan.js";
 import { PROMPT_VERSION } from "./prompt.js";
-import { checkDialogue } from "./review.js";
+import { checkDialogue, type DialogueStatus } from "./review.js";
 import { type DialogueLine, type DialogueScript, validateDialogue } from "./validate.js";
 
 /**
@@ -94,6 +97,12 @@ interface GenerateInput {
   readonly fetch: typeof fetch;
   /** A note correcting the published version; only with `regenerate`. */
   readonly instruction?: string | null;
+  /**
+   * Which language's lines to buy. Absent, null or the film's own means the
+   * film's; the episode's language of the mouths means the lines of the
+   * accepted translation, keyed `en:D01`.
+   */
+  readonly language?: string | null;
   readonly maxOutputTokens: number;
   readonly mode: WriteMode;
   /** The text model that lifts the script. */
@@ -151,6 +160,21 @@ export async function generateDialogue(input: GenerateInput): Promise<Result<Dia
     return stage11;
   }
 
+  const { language } = input;
+
+  // A second language buys lines and nothing else: its script is bought by
+  // `dialogue translate`, so there is no lifting half to fall back to.
+  if (typeof language === "string" && language !== stage11.data.language) {
+    return input.regenerate && input.artifacts.length === 0
+      ? err(
+          new Stage11BlockedError([
+            `--regenerate wymaga jawnego --artifact: ${lineKey("D01", language)}[,${lineKey("D02", language)}]`,
+            "nowa płatna próba musi mieć adresata",
+          ])
+        )
+      : await speak(input, stage11.data, language);
+  }
+
   const record = stage11.data.stage.artifacts[SCRIPT];
 
   // `--regenerate` needs an addressee, as in stage 9: a new attempt is a new
@@ -171,7 +195,7 @@ export async function generateDialogue(input: GenerateInput): Promise<Result<Dia
     record.status === "submitted" ||
     (input.regenerate && input.artifacts.includes(SCRIPT));
 
-  return lifting ? await lift(input, stage11.data) : await speak(input, stage11.data);
+  return lifting ? await lift(input, stage11.data) : await speak(input, stage11.data, null);
 }
 
 /** The first half: the one paid text call that lifts the script. */
@@ -255,11 +279,13 @@ async function lift(input: GenerateInput, stage11: Stage11Inputs): Promise<Resul
  *
  * The script's acceptance is read through `checkDialogue`, so a script edited
  * by hand after its yes, or one whose plan has since changed, opens nothing:
- * the same verdict the check prints, asked once.
+ * the same verdict the check prints, asked once. A second language is the
+ * same purchase read from the accepted translation instead (`second`).
  */
 async function speak(
   input: GenerateInput,
-  stage11: Stage11Inputs
+  stage11: Stage11Inputs,
+  second: string | null
 ): Promise<Result<DialogueReport>> {
   const status = await checkDialogue(input);
 
@@ -267,23 +293,31 @@ async function speak(
     return status;
   }
 
-  const { approved } = status.data.script;
-  const { lines } = status.data;
+  const read =
+    second === null
+      ? ok(filmReading(stage11, status.data))
+      : await translatedReading(input, stage11, { second, status: status.data });
+
+  if (!read.ok) {
+    return read;
+  }
+
+  const reading = read.data;
   const voices = await readVoices(
     input,
-    lines.map((line) => line.cast),
-    stage11.language
+    reading.lines.map((line) => line.cast),
+    reading.language
   );
 
   if (!voices.ok) {
     return voices;
   }
 
-  const planned = outcomes(input, stage11, { approved, lines, voices: voices.data });
-  const blocking = approved ? speechBlockers(input) : status.data.problems;
+  const planned = outcomes(input, stage11, reading, voices.data);
+  const blocking = reading.approved ? speechBlockers(input) : reading.problems;
   const held = obstacles(planned, voices.data);
 
-  if (input.mode === "dry-run" || !approved) {
+  if (input.mode === "dry-run" || !reading.approved) {
     const buying = blocking.length === 0 ? planned.filter((one) => one.state === "planned") : [];
 
     return ok({
@@ -291,8 +325,10 @@ async function speak(
       correction: null,
       created: [],
       lines: planned,
-      nextStep: approved ? nextOf(input, planned, buying.length > 0) : status.data.nextStep,
-      notices: status.data.notices,
+      nextStep: reading.approved
+        ? nextOf(input, planned, { buying: buying.length > 0, second })
+        : reading.nextStep,
+      notices: reading.notices,
       paidCalls: buying.length,
       problems: [...blocking, ...held],
       prompt: null,
@@ -306,7 +342,101 @@ async function speak(
     return err(new Stage11BlockedError(blocking));
   }
 
-  return await buy(input, stage11, { lines, planned, voices: voices.data });
+  return await buy(input, stage11, { planned, reading, voices: voices.data });
+}
+
+/**
+ * Which lines a purchase reads, and from what: the film's language from the
+ * script, or a second language from its translation. Everything after this is
+ * the same purchase, so this is the only place the two differ.
+ */
+interface Reading {
+  /** Whether the script the lines come from is accepted, which opens buying them. */
+  readonly approved: boolean;
+  /** The language the lines are read in, and so whose voices read them. */
+  readonly language: string;
+  readonly lines: readonly DialogueLine[];
+  /** What to do while the script is not accepted. */
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  /** Why the script does not open the buying yet. */
+  readonly problems: readonly string[];
+  /** The file the words come from, a recorded input of every line bought from it. */
+  readonly script: string;
+  /** The second language, or null for the film's; it decides every key. */
+  readonly second: string | null;
+  /** Why a line is held back while its script waits for a yes. */
+  readonly waiting: string;
+}
+
+function filmReading(stage11: Stage11Inputs, status: DialogueStatus): Reading {
+  return {
+    approved: status.script.approved,
+    language: stage11.language,
+    lines: status.lines,
+    nextStep: status.nextStep,
+    notices: status.notices,
+    problems: status.problems,
+    script: stage11.episode.dialogueScript,
+    second: null,
+    waiting: "skrypt czeka na ocenę człowieka",
+  };
+}
+
+/**
+ * The lines of the accepted translation. Their gate is the translation's yes,
+ * read through the same `checkDialogue`, and before it the episode's own
+ * answer to which language the mouths move in: a language it did not name is
+ * refused, because buying lines nothing will lip-sync to is buying nothing.
+ */
+async function translatedReading(
+  input: GenerateInput,
+  stage11: Stage11Inputs,
+  read: { readonly second: string; readonly status: DialogueStatus }
+): Promise<Result<Reading>> {
+  const { second, status } = read;
+  const target = await readTranslationTarget(input, stage11);
+  const script = dialogueTranslation(stage11.episode, second);
+
+  if (!target.ok) {
+    return target;
+  }
+  if (!script.ok) {
+    return script;
+  }
+
+  const { translation } = status;
+  const key = translationKey(second);
+  const scope = `${input.projectId} ${input.episodeId}`;
+  const problems = [...target.data.problems];
+
+  if (target.data.language !== null && target.data.language !== second) {
+    problems.push(
+      `lip-sync.json wskazuje ${target.data.language}, a kwestie kupuje się w języku ust: --language ${target.data.language}`
+    );
+  }
+
+  const approved = problems.length === 0 && translation?.approved === true;
+
+  if (problems.length === 0 && !approved) {
+    problems.push(
+      translation?.state === "completed"
+        ? `przekład skryptu nie ma ważnej zgody, a kwestie czyta się właśnie z niego: aimator approve ${scope} --stage ${STAGE} --artifact ${key}`
+        : `nie ma jeszcze przekładu skryptu na ${second}: aimator dialogue translate ${scope}`
+    );
+  }
+
+  return ok({
+    approved,
+    language: second,
+    lines: translation?.language === second ? translation.lines : [],
+    nextStep: problems[0] ?? `aimator dialogue generate ${scope} --language ${second}`,
+    notices: [],
+    problems,
+    script: script.data,
+    second,
+    waiting: "przekład czeka na ocenę człowieka",
+  });
 }
 
 /** Why a line that would otherwise be bought is held back, once per speaker. */
@@ -325,33 +455,31 @@ function obstacles(
 function outcomes(
   input: GenerateInput,
   stage11: Stage11Inputs,
-  script: {
-    readonly approved: boolean;
-    readonly lines: readonly DialogueLine[];
-    readonly voices: ReadonlyMap<string, SpeakerVoice>;
-  }
+  reading: Reading,
+  voices: ReadonlyMap<string, SpeakerVoice>
 ): readonly LineOutcome[] {
   const named = input.artifacts.filter((id) => id !== SCRIPT);
 
-  return script.lines.map((line) => {
-    const record = stage11.stage.artifacts[line.id];
-    const obstacle = script.voices.get(line.cast)?.obstacle ?? null;
+  return reading.lines.map((line) => {
+    const key = lineKey(line.id, reading.second);
+    const record = stage11.stage.artifacts[key];
+    const obstacle = voices.get(line.cast)?.obstacle ?? null;
     const base = {
       cast: line.cast,
       characters: billedCharacters(line.text),
-      id: line.id,
+      id: key,
       seconds: null,
     };
 
-    if (record?.status === "completed" && !(input.regenerate && named.includes(line.id))) {
+    if (record?.status === "completed" && !(input.regenerate && named.includes(key))) {
       return { ...base, note: "kupiona i gotowa", state: "skipped" as const };
     }
 
-    if (!script.approved) {
-      return { ...base, note: "skrypt czeka na ocenę człowieka", state: "blocked" as const };
+    if (!reading.approved) {
+      return { ...base, note: reading.waiting, state: "blocked" as const };
     }
 
-    if (named.length > 0 && !named.includes(line.id)) {
+    if (named.length > 0 && !named.includes(key)) {
       return { ...base, note: "poza --artifact", state: "skipped" as const };
     }
 
@@ -362,9 +490,15 @@ function outcomes(
 }
 
 /** What to do next, read off what this run leaves behind. */
-function nextOf(input: GenerateInput, lines: readonly LineOutcome[], buying: boolean): string {
-  if (buying) {
-    return `aimator dialogue generate ${input.projectId} ${input.episodeId}`;
+function nextOf(
+  input: GenerateInput,
+  lines: readonly LineOutcome[],
+  run: { readonly buying: boolean; readonly second: string | null }
+): string {
+  if (run.buying) {
+    const language = run.second === null ? "" : ` --language ${run.second}`;
+
+    return `aimator dialogue generate ${input.projectId} ${input.episodeId}${language}`;
   }
 
   const fresh = lines.filter((one) => one.state === "published" || one.state === "resumed");
@@ -391,12 +525,13 @@ async function buy(
   input: GenerateInput,
   stage11: Stage11Inputs,
   script: {
-    readonly lines: readonly DialogueLine[];
     readonly planned: readonly LineOutcome[];
+    readonly reading: Reading;
     readonly voices: ReadonlyMap<string, SpeakerVoice>;
   }
 ): Promise<Result<DialogueReport>> {
-  const digest = await readDigest(stage11.episode.dialogueScript);
+  const { reading } = script;
+  const digest = await readDigest(reading.script);
 
   if (!digest.ok) {
     return digest;
@@ -405,16 +540,18 @@ async function buy(
   // Exactly two inputs, and that is the decision rather than an omission: the
   // words, and the voice reading them. `project.json` is not one, so recasting
   // the narrator lapses no line, and changing one character's voice lapses
-  // that character's lines and nobody else's.
+  // that character's lines and nobody else's. In a second language the words
+  // are the translation's and the voice is that language's.
   const words: RecordedFile = {
-    path: toWorkspacePath(input.workspace.root, stage11.episode.dialogueScript),
+    path: toWorkspacePath(input.workspace.root, reading.script),
     sha256: digest.data.sha256,
   };
   const bought: LineOutcome[] = [];
   const created: string[] = [];
 
-  for (const line of script.lines) {
-    const outcome = script.planned.find((one) => one.id === line.id);
+  for (const line of reading.lines) {
+    const key = lineKey(line.id, reading.second);
+    const outcome = script.planned.find((one) => one.id === key);
     const voice = script.voices.get(line.cast);
 
     if (outcome === undefined) {
@@ -431,7 +568,7 @@ async function buy(
       continue;
     }
 
-    const target = dialogueAudio(stage11.episode, stage11.language, line.id);
+    const target = dialogueAudio(stage11.episode, reading.language, line.id);
 
     if (!target.ok) {
       return target;
@@ -459,7 +596,7 @@ async function buy(
         // somebody else speaking.
         context: { next: null, previous: null },
         inputs: [words, voice.file],
-        key: line.id,
+        key,
         stage: STAGE,
         stagePath: stage11.episode.dialogueStage,
         target: target.data,
@@ -487,7 +624,7 @@ async function buy(
     correction: null,
     created,
     lines: bought,
-    nextStep: nextOf(input, bought, false),
+    nextStep: nextOf(input, bought, { buying: false, second: reading.second }),
     notices: [],
     // Including a resumed line: its answer was already paid for.
     paidCalls: paid.length,
