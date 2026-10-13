@@ -2,7 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { checkDialogue } from "../lib/dialogue/index.js";
 import { checkReferences } from "../lib/references/index.js";
+import { checkVersions } from "../lib/versions/index.js";
 import {
   episodePaths,
   episodeTrackPaths,
@@ -10,14 +12,21 @@ import {
   resolveWorkspace,
   type Workspace,
 } from "../lib/workspace.js";
-import { EPISODE, makeCut, makeUpstream, PROJECT } from "../test/fixture.js";
+import {
+  EPISODE,
+  makeCut,
+  makeDialogue,
+  makeTrack,
+  makeUpstream,
+  PROJECT,
+} from "../test/fixture.js";
 import { run } from "./index.js";
 
 /**
  * One question instead of a dozen.
  *
  * `status` is the only command that reads every stage at once, so what it has
- * to get right is the reading rather than any single verdict: five states, a
+ * to get right is the reading rather than any single verdict: six states, a
  * reason whenever a cell is waiting on somebody else's yes, and exactly one
  * "Dalej:" for the episode. The ladder is frozen as a snapshot of the cells,
  * without the stage objects they carry, because those are each stage's own
@@ -27,7 +36,7 @@ import { run } from "./index.js";
 
 vi.mock("../lib/env.js", () => ({ env: { AIMATOR_FFMPEG: "/nonexistent/aimator-ffmpeg" } }));
 
-const STATES = new Set(["approved", "blocked", "ready", "review", "running"]);
+const STATES = new Set(["approved", "blocked", "excluded", "ready", "review", "running"]);
 const WORD = /^[a-z][a-z-]*$/;
 const USAGE_LINE = /^ {2}(\S+)(?: (\S+))?/;
 const NEXT_LINE = /^Dalej: (.*)$/gm;
@@ -127,7 +136,7 @@ afterAll(async () => {
 });
 
 describe("status --json", () => {
-  it("should give every stage, track and character a cell in one of five states", async () => {
+  it("should give every stage, track and character a cell in one of six states", async () => {
     const episode = await json("status", PROJECT, EPISODE);
 
     expect(episode.command).toBe("status");
@@ -282,6 +291,169 @@ describe("the ladder", () => {
     expect(reported.cells.find((one) => one.id === "7/seedream")?.state).toBe("running");
     expect(reported.cells.find((one) => one.id === "7/gpt-image")?.state).not.toBe("running");
   });
+
+  /**
+   * A stage the episode decided it does not need is not waiting for anybody.
+   *
+   * This episode is narrated and its cast never speaks, so stage 11 has nothing
+   * to lift and stage 12 no mouths to move. Read as "blocked", they would hold
+   * the episode open forever behind a decision a person already made.
+   */
+  it("should rule out the stages the episode's own decisions exclude, and say why", async () => {
+    const episode = await json("status", PROJECT, EPISODE);
+    const excluded = episode.cells.filter((one) => one.state === "excluded");
+
+    expect(excluded.map((one) => one.id)).toEqual(["11", "12/gpt-image", "12/seedream"]);
+
+    for (const cell of excluded) {
+      expect(cell.reason).toContain("audio: narration");
+      expect(cell.nextStep).toBeNull();
+      expect(cell.status).toBeNull();
+    }
+  });
+});
+
+/**
+ * An episode whose cast speaks, in a second language too.
+ *
+ * Stages 11 and 12 are read off their own checks, and stage 9 is the one this
+ * episode rules out: nobody narrates it. Its language of the mouths is decided,
+ * and the last case here takes that decision away and back, which is why it is
+ * the last.
+ */
+describe("an episode whose cast speaks", () => {
+  let spoken = "";
+  let spokenScratch = "";
+  let spokenWorkspace: Workspace = { root: "" };
+
+  async function spokenStatus(): Promise<Episode> {
+    const result = await run(["status", PROJECT, EPISODE, "--json", "--workspace", spoken]);
+
+    if (!result.ok) {
+      throw result.error;
+    }
+
+    return JSON.parse(result.data) as Episode;
+  }
+
+  async function decide(...choice: readonly string[]): Promise<void> {
+    const result = await run([
+      "episode",
+      "lip-sync",
+      PROJECT,
+      EPISODE,
+      ...choice,
+      "--workspace",
+      spoken,
+    ]);
+
+    if (!result.ok) {
+      throw result.error;
+    }
+  }
+
+  beforeAll(async () => {
+    spokenScratch = await mkdtemp(join(tmpdir(), "aimator-status-dialogue-"));
+    spoken = join(spokenScratch, "workspace");
+    const resolved = resolveWorkspace(spoken);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    spokenWorkspace = resolved.data;
+    await makeUpstream({
+      answer: answer(),
+      approvePackage: true,
+      dialogue: true,
+      root: spoken,
+      scratch: spokenScratch,
+      workspace: spokenWorkspace,
+    });
+    await makeTrack({ root: spoken, track: "gpt-image", workspace: spokenWorkspace });
+    await makeDialogue({ workspace: spokenWorkspace });
+  }, 240_000);
+
+  afterAll(async () => {
+    await rm(spokenScratch, { force: true, recursive: true });
+  });
+
+  it("should carry stage 11's and stage 12's own objects, unchanged", async () => {
+    const episode = await spokenStatus();
+    const scope = { episodeId: EPISODE, projectId: PROJECT, workspace: spokenWorkspace };
+    const dialogue = await checkDialogue(scope);
+    const versions = await checkVersions({ ...scope, track: "gpt-image" });
+
+    if (!(dialogue.ok && versions.ok)) {
+      throw new Error("stage 11 or 12 refused to answer");
+    }
+
+    expect(episode.cells.find((one) => one.id === "11")?.status).toEqual(
+      JSON.parse(JSON.stringify(dialogue.data))
+    );
+    expect(episode.cells.find((one) => one.id === "12/gpt-image")?.status).toEqual(
+      JSON.parse(JSON.stringify(versions.data))
+    );
+  }, 60_000);
+
+  it("should rule stage 9 out of an episode nobody narrates", async () => {
+    const episode = await spokenStatus();
+    const stage9 = episode.cells.filter((one) => one.stage === 9);
+
+    expect(stage9.map((one) => one.state)).toEqual(["excluded", "excluded", "excluded"]);
+    expect(stage9[0]?.reason).toContain("audio: dialogue");
+  }, 60_000);
+
+  /**
+   * The fixture finishes the second language and leaves the film's own lines
+   * unbought, so stage 11 is open on the half both mixes stand on, and a
+   * finished translation does not make it read as done.
+   */
+  it("should keep stage 11 open on the film's own lines, whatever the translation says", async () => {
+    const episode = await spokenStatus();
+    const cell = episode.cells.find((one) => one.id === "11");
+
+    expect(cell?.state).toBe("ready");
+    expect(cell?.nextStep).toBe(`aimator dialogue generate ${PROJECT} ${EPISODE}`);
+  }, 60_000);
+
+  /**
+   * Rule 7 both ways: no `lip-sync.json` is a decision nobody made, which
+   * blocks, and `--none` is one somebody made, which rules the stage out.
+   */
+  it("should block stage 12 while the language is undecided, and rule it out once declined", async () => {
+    const project = projectPaths(spokenWorkspace, PROJECT);
+
+    if (!project.ok) {
+      throw project.error;
+    }
+
+    const episode = episodePaths(project.data, EPISODE);
+
+    if (!episode.ok) {
+      throw episode.error;
+    }
+
+    await rm(episode.data.lipSync, { force: true });
+
+    const undecided = await spokenStatus();
+
+    await decide("--none");
+
+    const declined = await spokenStatus();
+
+    await decide("--language", "en");
+
+    const stage12 = (reported: Episode): readonly (string | null)[] =>
+      reported.cells.filter((one) => one.stage === 12).flatMap((one) => [one.state, one.reason]);
+    const [undecidedState, undecidedReason] = stage12(undecided);
+    const [declinedState, declinedReason] = stage12(declined);
+
+    expect(undecidedState).toBe("blocked");
+    expect(undecidedReason).toContain("--language <kod> albo --none");
+    expect(declinedState).toBe("excluded");
+    expect(declinedReason).toContain("none");
+  }, 120_000);
 });
 
 describe("the text render", () => {

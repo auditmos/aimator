@@ -688,8 +688,8 @@ describe("reject --stage clips", () => {
   });
 
   /**
-   * `status` keeps five states: a rejected result is one waiting for a person,
-   * like any unaccepted one, and the cell says why rather than growing a sixth.
+   * `status` grows no state for a no: a rejected result is one waiting for a
+   * person, like any unaccepted one, and the cell says why.
    */
   it("should show a rejected cell as waiting for review, with the reason", async () => {
     const result = await inChain("status", PROJECT, EPISODE, "--json");

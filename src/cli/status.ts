@@ -3,15 +3,22 @@ import { readJson, stageFileSchema } from "../lib/artifact/index.js";
 import { checkAssembly } from "../lib/assembly/index.js";
 import { checkCharacter } from "../lib/character/index.js";
 import { checkClips } from "../lib/clips/index.js";
+import { checkDialogue, type DialogueStatus } from "../lib/dialogue/index.js";
 import { checkMix, checkNarration } from "../lib/narration/index.js";
 import { checkOpeningFrame } from "../lib/opening-frame/index.js";
-import { checkStage0, readStage0Inputs } from "../lib/project/index.js";
+import {
+  checkStage0,
+  type EpisodeSettings,
+  readLipSync,
+  readStage0Inputs,
+} from "../lib/project/index.js";
 import { checkPromptPackage } from "../lib/prompt-package/index.js";
 import { checkReferences } from "../lib/references/index.js";
 import { ok, type Result } from "../lib/result.js";
 import { checkScreenplay } from "../lib/screenplay/index.js";
 import { checkShotList } from "../lib/shot-list/index.js";
 import { checkMaster, checkSoundDesign } from "../lib/sound-design/index.js";
+import { checkVersions } from "../lib/versions/index.js";
 import {
   characterPaths,
   characterTrackPaths,
@@ -30,22 +37,25 @@ import { parse, requirePositional, workspaceOf } from "./common.js";
 /** The one question this command answers, and the shape it answers it in. */
 export const USAGE = `  status <id> <episode-id> [--json]
     Jedno pytanie zamiast kilkunastu: stan każdego etapu odcinka, osobno na
-    każdym torze i na każdej postaci, w jednym z pięciu stanów, z powodem
-    blokady, i dokładnie jedno "Dalej:" dla całego odcinka. Woła check każdego
-    etapu; niczego nie zapisuje i niczego nie wydaje.
+    każdym torze i na każdej postaci, w jednym z sześciu stanów, z powodem
+    blokady, i dokładnie jedno "Dalej:" dla całego odcinka. Etap, którego
+    odcinek według własnych decyzji nie potrzebuje, ma stan "nie dotyczy".
+    Woła check każdego etapu; niczego nie zapisuje i niczego nie wydaje.
     --json wypisuje ten sam obiekt, który renderuje tekst: pole command mówi,
     która komenda go wypisała, a każda komórka niesie obiekt swojego etapu bez
     zmian. Odmowa zostaje w Result, dokładnie jak bez flagi.`;
 
 /**
- * Five states, and nothing between them.
+ * Six states, and nothing between them.
  *
  * They are read off what `check` already answers rather than off the disk, with
- * one exception the contract names: a lock file is the only evidence that a
+ * two exceptions the contract names: a lock file is the only evidence that a
  * stage is mid-flight, because a stage that has written nothing yet and a stage
- * that is writing right now look the same in every artifact it owns.
+ * that is writing right now look the same in every artifact it owns; and a
+ * stage the episode's own decisions rule out is `excluded` before any of its
+ * files is read, because no verdict of it can bring it back into the film.
  */
-type CellState = "approved" | "blocked" | "ready" | "review" | "running";
+type CellState = "approved" | "blocked" | "excluded" | "ready" | "review" | "running";
 
 /** What every stage's artifacts answer, whatever else they also answer. */
 interface Reviewed {
@@ -86,6 +96,7 @@ interface EpisodeStatus {
 const LABEL: Record<CellState, string> = {
   approved: "zatwierdzony",
   blocked: "zablokowany",
+  excluded: "nie dotyczy",
   ready: "gotowy do generowania",
   review: "do przeglądu",
   running: "w toku",
@@ -155,7 +166,8 @@ interface CellInput {
 }
 
 /**
- * One cell, read in the order the five states exclude each other.
+ * One cell of a stage that was read, in the order its five states exclude each
+ * other; the sixth, `excluded`, is settled before the stage is read at all.
  *
  * A held lock wins over everything, because a stage writing right now says
  * nothing trustworthy about itself in its own files. An approval wins next: it
@@ -227,6 +239,64 @@ function refused(input: {
     status: null,
     title: input.title,
     track: input.track ?? null,
+  };
+}
+
+/**
+ * A stage this episode decided it does not need: nobody waits on it.
+ *
+ * Read before the stage is asked anything, so it carries no stage object and
+ * no command; its reason names the decision that rules it out.
+ */
+function excluded(input: {
+  readonly id: string;
+  readonly reason: string;
+  readonly stage: number;
+  readonly title: string;
+  readonly track?: ImageTrack;
+}): StatusCell {
+  return { ...refused(input), state: "excluded" };
+}
+
+/** Why each stage that can be ruled out is, or null where the episode needs it. */
+interface RuledOut {
+  readonly dialogue: string | null;
+  readonly narration: string | null;
+  readonly versions: string | null;
+}
+
+/**
+ * Which stages the episode's own decisions rule out, read off those decisions.
+ *
+ * Its audio mode says whether a narrator and the cast speak, which is the
+ * reading stage 10 makes of which speech its mix waits for; `lip-sync.json`
+ * says whether there is a second language at all. An absent `lip-sync.json` is
+ * nobody's answer, so it rules nothing out: stage 12 says it blocks, rule 7.
+ * This is not the gate graph: it is which rows the episode has, and every gate
+ * inside a row is still the stage's own.
+ */
+function ruledOut(
+  audio: EpisodeSettings["audio"],
+  lipSync: "language" | "none" | "undecided"
+): RuledOut {
+  const declared = `odcinek deklaruje audio: ${audio}`;
+  const narrated = audio === "narration" || audio === "dialogue-and-narration";
+  const spoken = audio === "dialogue" || audio === "dialogue-and-narration";
+  const versions = ((): string | null => {
+    if (audio === "dialogue-and-narration") {
+      return `${declared}, a narracja w drugim języku jest poza zakresem, więc wersji językowej nie będzie`;
+    }
+    if (!spoken) {
+      return `${declared}, postacie nie mówią, nie ma czyich ust poruszyć`;
+    }
+
+    return lipSync === "none" ? "lip-sync.json: none, odcinek nie dostaje drugiej wersji" : null;
+  })();
+
+  return {
+    dialogue: spoken ? null : `${declared}, postacie nie mówią, etap 11 nie ma czego podnosić`,
+    narration: narrated ? null : `${declared}, nikt go nie narruje, etap 9 nie ma czego podnosić`,
+    versions,
   };
 }
 
@@ -542,14 +612,58 @@ const MASTER_ROW: TrackRow = {
   title: "muzyka i efekty, miks",
 };
 
+/**
+ * Stage 12: a clip's version, one clip after another, on each track.
+ *
+ * Its "Dalej:" is its `check`, as stage 0's is, because what moves the next
+ * clip is one of three things and only the stage knows which: a paid face
+ * call, a person saying which face is whom, or the paid lip-sync itself. The
+ * check names that one, per clip, as a command.
+ */
+const VERSIONS_ROW: TrackRow = {
+  file: (paths) => paths.versionsStage,
+  id: "12",
+  lock: (paths) => paths.versionsLock,
+  produce: (on) =>
+    `aimator check ${on.projectId} ${on.episodeId} --stage versions --track ${on.track}`,
+  read: async (scope) => {
+    const result = await checkVersions(scope);
+
+    return result.ok
+      ? ok({
+          approved: result.data.approved,
+          parts: result.data.clips,
+          problems: result.data.problems,
+          status: result.data,
+        })
+      : result;
+  },
+  reviewStage: "versions",
+  stage: 12,
+  title: "wersje językowe",
+};
+
 async function trackCells(
-  scope: Scope & { readonly episode: EpisodePaths; readonly row: TrackRow }
+  scope: Scope & {
+    readonly episode: EpisodePaths;
+    /** Why the episode does not need this row, which then reads nothing. */
+    readonly ruledOut?: string | null;
+    readonly row: TrackRow;
+  }
 ): Promise<readonly StatusCell[]> {
   const { episode, row } = scope;
   const cells: StatusCell[] = [];
 
   for (const track of imageTracks) {
     const id = `${row.id}/${track}`;
+
+    if (scope.ruledOut !== undefined && scope.ruledOut !== null) {
+      cells.push(
+        excluded({ id, reason: scope.ruledOut, stage: row.stage, title: row.title, track })
+      );
+      continue;
+    }
+
     // biome-ignore lint/performance/noAwaitInLoops: the ladder is read in order
     const result = await row.read({ ...scope, track });
 
@@ -589,6 +703,66 @@ async function trackCells(
   }
 
   return cells;
+}
+
+/**
+ * What moves stage 11 next, when nothing in it waits for a person.
+ *
+ * The film's own language first, since both mixes and the translation stand on
+ * it: `dialogue generate` buys the script or, once that is accepted, its lines.
+ * Then the translation, then the lines in the language of the mouths.
+ */
+function dialogueProduce(scope: Scope, report: DialogueStatus): string {
+  const command = `${scope.projectId} ${scope.episodeId}`;
+
+  if (!report.approved || report.translation === null) {
+    return `aimator dialogue generate ${command}`;
+  }
+
+  return report.translation.state === "absent"
+    ? `aimator dialogue translate ${command}`
+    : `aimator dialogue generate ${command} --language ${report.translation.language}`;
+}
+
+/**
+ * Stage 11: one cell for both of its languages, because both are at one level.
+ *
+ * Stages 9 and 10 have two rows each because their artifacts live at two
+ * levels of the tree; stage 11's all sit beside the shot list. Its own
+ * `approved` speaks for the film's language alone, so the cell is finished
+ * only once the translation and each of its lines carry their yes as well,
+ * or a second language still waiting would hide behind the first one's.
+ */
+async function dialogueCell(scope: Scope, paths: EpisodePaths): Promise<StatusCell> {
+  const title = "dialog";
+  const result = await checkDialogue(scope);
+
+  if (!result.ok) {
+    return refused({ id: "11", reason: result.error.message, stage: 11, title });
+  }
+
+  const { lines, script, translation } = result.data;
+  const second = translation === null ? [] : [translation, ...translation.lines];
+  const spoken = [...lines, ...(translation?.lines ?? [])].map((line) => ({
+    approved: line.approved,
+    id: line.key,
+    state: line.state,
+  }));
+
+  return cellOf({
+    approved: result.data.approved && second.every((part) => part.approved),
+    id: "11",
+    locked: await held(paths.dialogueLock),
+    parts: [script, ...(translation === null ? [] : [translation]), ...spoken],
+    problems: result.data.problems,
+    produce: dialogueProduce(scope, result.data),
+    rejected: await rejectedIn(paths.dialogueStage),
+    review: (waiting) =>
+      named(`aimator approve ${scope.projectId} ${scope.episodeId} --stage dialogue`, waiting),
+    stage: 11,
+    status: result.data,
+    title,
+  });
 }
 
 /**
@@ -694,30 +868,18 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
     cells.push(...(await trackCells({ ...scope, episode: paths, row })));
   }
 
-  const narration = await checkNarration(scope);
+  const lipSync = await readLipSync(scope);
 
+  if (!lipSync.ok) {
+    return lipSync;
+  }
+
+  const ruled = ruledOut(inputs.data.settings.audio, lipSync.data.kind);
+
+  cells.push(await narrationCell(scope, paths, ruled.narration));
   cells.push(
-    narration.ok
-      ? cellOf({
-          approved: narration.data.approved,
-          id: "9",
-          locked: await held(paths.narrationLock),
-          parts: [narration.data.script, ...narration.data.lines],
-          problems: narration.data.problems,
-          produce: `aimator narration generate ${scope.projectId} ${scope.episodeId}`,
-          rejected: await rejectedIn(paths.soundtrackStage),
-          review: (waiting) =>
-            named(
-              `aimator approve ${scope.projectId} ${scope.episodeId} --stage soundtrack`,
-              waiting
-            ),
-          stage: 9,
-          status: narration.data,
-          title: "narracja, słowa",
-        })
-      : refused({ id: "9", reason: narration.error.message, stage: 9, title: "narracja, słowa" })
+    ...(await trackCells({ ...scope, episode: paths, row: MIX_ROW, ruledOut: ruled.narration }))
   );
-  cells.push(...(await trackCells({ ...scope, episode: paths, row: MIX_ROW })));
 
   const design = await checkSoundDesign(scope);
 
@@ -748,8 +910,51 @@ async function ladderOf(scope: Scope): Promise<Result<readonly StatusCell[]>> {
         })
   );
   cells.push(...(await trackCells({ ...scope, episode: paths, row: MASTER_ROW })));
+  cells.push(
+    ruled.dialogue === null
+      ? await dialogueCell(scope, paths)
+      : excluded({ id: "11", reason: ruled.dialogue, stage: 11, title: "dialog" })
+  );
+  cells.push(
+    ...(await trackCells({ ...scope, episode: paths, row: VERSIONS_ROW, ruledOut: ruled.versions }))
+  );
 
   return ok(cells);
+}
+
+/** Stage 9's shared half: the words, unless nobody narrates this episode. */
+async function narrationCell(
+  scope: Scope,
+  paths: EpisodePaths,
+  ruledOutBy: string | null
+): Promise<StatusCell> {
+  const title = "narracja, słowa";
+
+  if (ruledOutBy !== null) {
+    return excluded({ id: "9", reason: ruledOutBy, stage: 9, title });
+  }
+
+  const narration = await checkNarration(scope);
+
+  return narration.ok
+    ? cellOf({
+        approved: narration.data.approved,
+        id: "9",
+        locked: await held(paths.narrationLock),
+        parts: [narration.data.script, ...narration.data.lines],
+        problems: narration.data.problems,
+        produce: `aimator narration generate ${scope.projectId} ${scope.episodeId}`,
+        rejected: await rejectedIn(paths.soundtrackStage),
+        review: (waiting) =>
+          named(
+            `aimator approve ${scope.projectId} ${scope.episodeId} --stage soundtrack`,
+            waiting
+          ),
+        stage: 9,
+        status: narration.data,
+        title,
+      })
+    : refused({ id: "9", reason: narration.error.message, stage: 9, title });
 }
 
 /** The first cell a person can actually move. There is exactly one. */
@@ -779,7 +984,7 @@ function renderStatus(episode: EpisodeStatus): string {
 
   lines.push(
     episode.next === null
-      ? "Odcinek zamknięty: każdy etap zatwierdzony."
+      ? "Odcinek zamknięty: każdy etap zatwierdzony albo odcinka nie dotyczy."
       : `Dalej: ${episode.next.command}`
   );
 

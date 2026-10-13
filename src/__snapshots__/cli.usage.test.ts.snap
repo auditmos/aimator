@@ -2210,6 +2210,12 @@ Odcinek "01-burza" projektu "ewa"
       ! nie ma narracji położonej na obrazie na torze gpt-image, etap 9 nie ukończył miksu; nie ma arkusza cue, uruchom najpierw: sound-design generate
   10. muzyka i efekty, miks, tor seedream: zablokowany
       ! nie ma zmontowanego odcinka na torze seedream, etap 8 go nie ukończył; brakuje projects/ewa/episodes/01-burza/seedream/episode.mp4; nie ma arkusza cue, uruchom najpierw: sound-design generate
+  11. dialog: nie dotyczy
+      · odcinek deklaruje audio: narration, postacie nie mówią, etap 11 nie ma czego podnosić
+  12. wersje językowe, tor gpt-image: nie dotyczy
+      · odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
+  12. wersje językowe, tor seedream: nie dotyczy
+      · odcinek deklaruje audio: narration, postacie nie mówią, nie ma czyich ust poruszyć
 Dalej: aimator character generate ewa ewa --track gpt-image"
 `;
 

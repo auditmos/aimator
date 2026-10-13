@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`status --json > should give every stage, track and character a cell in one of five states 1`] = `
+exports[`status --json > should give every stage, track and character a cell in one of six states 1`] = `
 [
   "0 przygotowanie: approved",
   "1 scenariusz: approved",
@@ -24,5 +24,8 @@ exports[`status --json > should give every stage, track and character a cell in 
   "10 muzyka i efekty, arkusz: ready",
   "10/gpt-image muzyka i efekty, miks: blocked",
   "10/seedream muzyka i efekty, miks: blocked",
+  "11 dialog: excluded",
+  "12/gpt-image wersje językowe: excluded",
+  "12/seedream wersje językowe: excluded",
 ]
 `;

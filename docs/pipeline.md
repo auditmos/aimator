@@ -384,23 +384,45 @@ niezmiennik co `check`: rozjazd jest raportowany, nigdy zapisywany.
 
 **Komórka** to jedno pytanie o jeden artefakt albo jeden ich komplet. Etapy tekstowe mają
 po jednej (`0`, `1`, `3`, `4`), etap 2 ma jedną na postać i tor (`2/ewa/gpt-image`), etapy
-5–8 po jednej na tor (`5/seedream`), a etapy 9 i 10 po jednej wspólnej i po jednej na tor
-(`9`, `9/gpt-image`), bo ich artefakty siedzą na dwóch poziomach drzewa.
+5–8 po jednej na tor (`5/seedream`), etapy 9 i 10 po jednej wspólnej i po jednej na tor
+(`9`, `9/gpt-image`), bo ich artefakty siedzą na dwóch poziomach drzewa, etap 11 jedną
+wspólną (`11`), a etap 12 po jednej na tor (`12/gpt-image`).
 
-**Pięć stanów**, wykluczających się w tej kolejności:
+Komórka etapu 11 obejmuje oba jego języki: skrypt i kwestie w języku filmu, a gdy odcinek
+ma język ust, także przekład i kwestie w tym języku. Wszystkie leżą na jednym poziomie
+drzewa, więc to jedna komórka, a nie dwie jak w etapach 9 i 10. `approved` etapu 11 mówi
+wyłącznie o języku filmu, więc komórka jest zatwierdzona dopiero wtedy, gdy zgodę ma też
+przekład i każda jego kwestia. „Dalej:" bierze najpierw język filmu (`dialogue generate`),
+potem przekład (`dialogue translate`), potem kwestie w języku ust (`dialogue generate
+--language <kod>`). „Dalej:" etapu 12 to jego `check`, tak jak etapu 0: kolejny klip rusza
+płatne rozpoznanie twarzy, decyzja człowieka, która twarz jest którą postacią, albo płatny
+lip-sync, a który z tych trzech kroków, wie tylko etap i nazywa go w `check` poleceniem dla
+każdego klipu.
+
+**Sześć stanów**, wykluczających się w tej kolejności:
 
 | Stan | Znaczy | Skąd się bierze |
 |---|---|---|
+| `excluded` „nie dotyczy" | odcinek według własnych decyzji nie potrzebuje tego etapu | tryb audio odcinka albo `lip-sync.json` równe `none`, czytane przed etapem |
 | `running` „w toku" | etap właśnie pisze | plik blokady etapu istnieje |
 | `approved` „zatwierdzony" | człowiek powiedział tak | `approved` z `check` |
 | `review` „do przeglądu" | coś przeszło walidację i czeka na człowieka | artefakt w stanie `completed` bez akceptacji |
 | `blocked` „zablokowany" | etap czeka na cudzą decyzję albo odmawia | `problems` z `check`, albo odmowa całego `check` |
 | `ready` „gotowy do generowania" | bramka otwarta, nic jeszcze nie powstało | nic z powyższych |
 
-Kolejność jest umową, nie porządkiem alfabetycznym. Blokada wygrywa ze wszystkim, bo etap,
-który właśnie pisze, nie mówi o sobie prawdy w żadnym ze swoich plików. Akceptacja wygrywa
-z resztą, bo jest jedynym stanem, który wytwarza człowiek. Dopiero potem to, co czeka na
-ocenę, potem to, co jest odmówione, a `ready` jest tym, co zostało.
+Kolejność jest umową, nie porządkiem alfabetycznym. `excluded` rozstrzyga się, zanim
+`status` zapyta etap o cokolwiek, bo żaden werdykt etapu nie wprowadzi go z powrotem do
+filmu, z którego decyzja odcinka go wyjęła. Taka komórka nie niesie obiektu etapu ani
+polecenia, a jej powód nazywa decyzję. Etap 9 nie dotyczy odcinka bez narratora
+(`music-and-effects`, `dialogue`), etap 11 odcinka bez dialogu (`music-and-effects`,
+`narration`), a etap 12 każdego odcinka poza `dialogue` oraz odcinka z `lip-sync.json`
+równym `none`. To ta sama lektura trybu audio, którą robi pełna ścieżka etapu 10, pytając,
+na czyją mowę czeka. **Brak** `lip-sync.json` niczego nie wyklucza, bo nikt jeszcze nie
+odpowiedział (reguła 7): etap 12 mówi wtedy, że blokuje. Wśród pozostałych pięciu blokada
+wygrywa ze wszystkim, bo etap, który właśnie pisze, nie mówi o sobie prawdy w żadnym ze
+swoich plików. Akceptacja wygrywa z resztą, bo jest jedynym stanem, który wytwarza
+człowiek. Dopiero potem to, co czeka na ocenę, potem to, co jest odmówione, a `ready` jest
+tym, co zostało.
 
 **Powód blokady** jest cytatem, nie streszczeniem: to `problems` etapu, jego własnymi
 słowami. Etap 5 bez zatwierdzonego etapu 4 mówi o etapie 4, bo tak mówi jego `check`.
@@ -436,7 +458,8 @@ kolejnej komendy, która tę flagę dostanie:
 
 Poza tym obiekt niesie `projectId`, `episodeId`, `next` (`{ cell, command }` albo `null`)
 i listę `cells`, a każda komórka: `id`, `stage`, `track`, `character`, `state`, `reason`,
-`nextStep`, `title` i `status`. Meldunki etapu nie wchodzą do `reason`: jadą tam, gdzie
+`nextStep`, `title` i `status`; `status` jest `null`, gdy etap odmówił odpowiedzi albo nie
+dotyczy odcinka. Meldunki etapu nie wchodzą do `reason`: jadą tam, gdzie
 etap je zapisał, w `status.notices`, bo `reason` odpowiada na pytanie „dlaczego stoi",
 a meldunek na to pytanie nie odpowiada.
 
