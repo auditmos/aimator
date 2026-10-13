@@ -436,7 +436,7 @@ async function adoption(
     );
   } else if (verdict !== null && !verdict.ok) {
     problems.push(
-      `source.md: ${verdict.error.message}`,
+      ...verdict.error.problems.map((problem) => `source.md: ${problem}`),
       "source.md nie przechodzi walidacji scenariusza; popraw źródło w etapie 0 albo zwykłe screenplay generate kupi adaptację"
     );
   }

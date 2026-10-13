@@ -557,7 +557,9 @@ czasów dokładnie równa `durationSeconds`, w każdej scenie dokładnie jedno n
 Action, Audio, Text i End state. Przy `subtitles: none` każde pole Text musi brzmieć
 `none`; przy zamówionych napisach co najmniej jedno nie może. Minimalna liczba scen,
 `ceil(durationSeconds / 15)`, jest **raportowana, nie sprawdzana osobno**, bo przy twardym
-limicie sceny poprawna suma nie da się osiągnąć mniejszą liczbą scen.
+limicie sceny poprawna suma nie da się osiągnąć mniejszą liczbą scen. Werdykt wymienia
+każdy problem, który da się odczytać, a nie pierwszy; przerywa go tylko blok kodu, zły
+zestaw sekcji, pusta sekcja Scenes albo nagłówek sceny w złym formacie.
 
 **Walidacja to nie akceptacja.** Wynik, który przeszedł walidację, ma
 `review.status = "pending"`. Przyjmuje go dopiero

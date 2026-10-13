@@ -17,6 +17,8 @@ import { approveScreenplay, checkScreenplay, generateScreenplay } from "./index.
 
 const API_KEY = "sk-test-0123456789";
 const SHA256 = /^[0-9a-f]{64}$/;
+/** One scene's Audio line, to take out of a draft. */
+const AUDIO_FIELD = /^- Audio:.*\n/m;
 const EPISODE = "01-burza";
 const PROJECT = "ewa";
 
@@ -804,6 +806,26 @@ describe("a screenplay corrected by hand", () => {
     expect(result.ok ? "" : result.error.message).toContain("nie przechodzi walidacji");
   });
 
+  it("should name each problem of a broken correction as a problem of its own", async () => {
+    await generate();
+    await writeFile(
+      join(episodeDir(), "screenplay.md"),
+      draft([16, 10, 10]).replace(AUDIO_FIELD, ""),
+      "utf8"
+    );
+
+    const checked = await checkScreenplay(scope());
+    const broken = (checked.ok ? checked.data.problems : []).filter((problem) =>
+      problem.startsWith("screenplay.md: ")
+    );
+
+    expect(broken).toEqual([
+      "screenplay.md: scena S01: 16s przekracza twardy limit 15s na scenę",
+      "screenplay.md: scena S01: wymagane dokładnie jedno niepuste pole Audio",
+      "screenplay.md: suma czasów scen: 36s; wymagane dokładnie 30s, czyli co najmniej 2 sceny po maks. 15s",
+    ]);
+  });
+
   it("should regenerate from the corrected version, which is the one replaced", async () => {
     await generate();
     await approve();
@@ -1054,6 +1076,18 @@ describe("generateScreenplay --verbatim", () => {
     expect(result.ok ? null : result.error.message).toContain("16");
     expect(result.ok ? null : result.error.message).toContain("kupi adaptację");
     expect(await readdir(readyDir())).toEqual(before);
+  });
+
+  it("should list every problem the verdict finds in the source, one per line", async () => {
+    await makeReady(draft([16, 14]).replace(AUDIO_FIELD, ""));
+
+    const result = await verbatim();
+    const message = result.ok ? "" : result.error.message;
+
+    expect(message).toContain("  - source.md: scena S01: 16s przekracza twardy limit 15s");
+    expect(message).toContain(
+      "  - source.md: scena S01: wymagane dokładnie jedno niepuste pole Audio"
+    );
   });
 
   it("should refuse while stage 0 is not approved, as generation does", async () => {

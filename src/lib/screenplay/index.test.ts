@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { EpisodeSettings } from "../project/index.js";
 import { buildPrompt, PROMPT_VERSION, validateScreenplay } from "./index.js";
 
+/** One scene's Audio line, to take out of a draft. */
+const AUDIO_FIELD = /^- Audio:.*\n/m;
+
 const SETTINGS: EpisodeSettings = {
   audio: "narration",
   durationSeconds: 30,
@@ -159,6 +162,41 @@ describe("validateScreenplay", () => {
 
   it("should tolerate CRLF line endings", () => {
     expect(validateScreenplay(valid().replaceAll("\n", "\r\n"), SETTINGS).ok).toBe(true);
+  });
+
+  /**
+   * A person fixing a screenplay by hand needs the list, not its first entry:
+   * one problem per round trip is how a 16-second scene, a missing field and a
+   * wrong total become three edits and three runs instead of one. Problems are
+   * collected wherever the document can still be read past them; a code fence,
+   * a wrong section order or a broken scene heading still ends the reading,
+   * because nothing after it would be read correctly.
+   */
+  it("should name every problem it can find, not only the first", () => {
+    const text = document(
+      [scene(1, 16), scene(2, 10).replace(AUDIO_FIELD, ""), scene(3, 10, "BURZA")].join("\n")
+    );
+    const result = validateScreenplay(text, SETTINGS);
+
+    expect(result.ok ? [] : result.error.problems).toEqual([
+      "scena S01: 16s przekracza twardy limit 15s na scenę",
+      "scena S02: wymagane dokładnie jedno niepuste pole Audio",
+      'scena S03: tekst ekranowy mimo subtitles=none, jedyna dozwolona wartość pola Text to "none"',
+      "suma czasów scen: 36s; wymagane dokładnie 30s, czyli co najmniej 2 sceny po maks. 15s",
+    ]);
+  });
+
+  it("should report every empty section at once", () => {
+    const text = document([scene(1, 10), scene(2, 10), scene(3, 10)].join("\n"), {
+      Beats: " ",
+      Review: " ",
+    });
+    const result = validateScreenplay(text, SETTINGS);
+
+    expect(result.ok ? [] : result.error.problems).toEqual([
+      "pusta sekcja: Beats",
+      "pusta sekcja: Review",
+    ]);
   });
 });
 

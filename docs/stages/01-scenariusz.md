@@ -40,11 +40,11 @@ pnpm dev approve dzielna-ewa 03-wanda --stage screenplay
 ```
 
 Działa tylko wtedy, gdy odcinek ma `sourceNature: screenplay`, a `source.md` przechodzi
-[walidację](#co-sprawdza-walidacja) wobec decyzji odcinka. Inaczej odmawia, podając błąd
-walidatora i podpowiedź, że zwykłe `screenplay generate` kupi adaptację. Bramka jest ta
-sama co przy generacji: zatwierdzony etap 0 projektu i odcinka. Etap 1 czyta przy tym
-wyłącznie `source.md`, artefakt etapu 0, więc **monopol etapu 0** na wnoszenie plików
-spoza katalogu roboczego zostaje nietknięty.
+[walidację](#co-sprawdza-walidacja) wobec decyzji odcinka. Inaczej odmawia, podając
+każdy problem walidatora w osobnym wierszu i podpowiedź, że zwykłe `screenplay generate`
+kupi adaptację. Bramka jest ta sama co przy generacji: zatwierdzony etap 0 projektu
+i odcinka. Etap 1 czyta przy tym wyłącznie `source.md`, artefakt etapu 0, więc
+**monopol etapu 0** na wnoszenie plików spoza katalogu roboczego zostaje nietknięty.
 
 Rekord ma `producer.kind: "manual"`, bo te bajty napisał człowiek, w `inputs` sam
 `source.md` ze ścieżką i hashem, status `completed` i ocenę `pending`. Dalej jest zwykłe
@@ -132,6 +132,12 @@ Siedem sekcji w ustalonej kolejności, żadnej pustej. Nagłówki
 suma czasów **dokładnie** równa `durationSeconds`. W każdej scenie dokładnie jedno
 niepuste pole `Action`, `Audio`, `Text` i `End state`. Przy `subtitles: none` każde pole
 `Text` musi brzmieć `none`; przy zamówionych napisach co najmniej jedno nie może.
+
+Walidator wymienia **każdy problem, który da się odczytać**, scena po scenie, a nie tylko
+pierwszy: scena 16 s, brakujące pole i zła suma to trzy wiersze jednego `check`, nie trzy
+rundy poprawek. Czytanie przerywają tylko błędy, po których reszty nie da się odczytać
+poprawnie: blok kodu wokół dokumentu, zły zestaw albo kolejność sekcji, pusta sekcja
+`Scenes` i nagłówek sceny w złym formacie.
 
 ## Poprawka ręczna
 

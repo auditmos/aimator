@@ -76,14 +76,28 @@ export interface ScreenplayScene {
   readonly start: number;
 }
 
+/**
+ * Every structural problem one reading of a draft found, in the order found.
+ *
+ * One problem per round trip turned fixing a draft by hand into a loop of edit
+ * and rerun, so the verdict collects whatever the document still lets it read.
+ * The message is the problems joined, which is why a draft with one problem
+ * reads exactly as it always did.
+ */
 class ScreenplayFormatError extends Error {
-  readonly rule: string;
+  readonly problems: readonly string[];
 
-  constructor(rule: string, message: string) {
-    super(message);
+  constructor(problems: readonly string[]) {
+    super(problems.join("; "));
     this.name = "ScreenplayFormatError";
-    this.rule = rule;
+    this.problems = problems;
   }
+}
+
+type Verdict<T> = Result<T, ScreenplayFormatError>;
+
+function reject(problems: readonly string[]): Verdict<never> {
+  return err(new ScreenplayFormatError(problems));
 }
 
 interface Scene {
@@ -109,83 +123,83 @@ function scenesWord(count: number): string {
   return unit >= 2 && unit <= 4 && !(teen >= 12 && teen <= 14) ? "sceny" : "scen";
 }
 
-function sectionBounds(text: string): Result<readonly { end: number; start: number }[]> {
+/**
+ * The Scenes section, and every other section left empty.
+ *
+ * A wrong set or order of sections ends the reading, because nothing says
+ * where the scenes begin; so does an empty Scenes section, which has nothing
+ * to read. Any other empty section is a problem the scenes can be read past.
+ */
+function readSections(
+  text: string
+): Verdict<{ readonly empty: readonly string[]; readonly scenes: string }> {
   const headings = [...text.matchAll(SECTION_HEADING)];
   const names = headings.map((heading) => (heading[1] ?? "").trim());
 
   if (names.join("|") !== SECTIONS.join("|")) {
-    return err(
-      new ScreenplayFormatError(
-        "sections",
-        `scenariusz ma niepoprawne sekcje albo ich kolejność, wymagane dokładnie, w tej kolejności: ${SECTIONS.join(", ")}`
-      )
-    );
+    return reject([
+      `scenariusz ma niepoprawne sekcje albo ich kolejność, wymagane dokładnie, w tej kolejności: ${SECTIONS.join(", ")}`,
+    ]);
   }
 
-  const bounds = headings.map((heading, index) => ({
-    end: headings[index + 1]?.index ?? text.length,
-    start: (heading.index ?? 0) + (heading[0]?.length ?? 0),
-  }));
+  const bodies = headings.map((heading, index) =>
+    text.slice(
+      (heading.index ?? 0) + (heading[0]?.length ?? 0),
+      headings[index + 1]?.index ?? text.length
+    )
+  );
+  const empty = bodies.flatMap((body, index) =>
+    body.trim() === "" ? [`pusta sekcja: ${SECTIONS[index] ?? ""}`] : []
+  );
+  const scenes = bodies[SCENES_INDEX] ?? "";
 
-  for (const [index, bound] of bounds.entries()) {
-    if (text.slice(bound.start, bound.end).trim() === "") {
-      return err(
-        new ScreenplayFormatError("empty-section", `pusta sekcja: ${SECTIONS[index] ?? ""}`)
-      );
-    }
-  }
-
-  return ok(bounds);
+  return scenes.trim() === "" ? reject(empty) : ok({ empty, scenes });
 }
 
-function readScenes(sceneText: string): Result<readonly Scene[]> {
+/** The scenes under well-formed headings; one heading that is not ends the reading. */
+function readScenes(sceneText: string): Verdict<readonly Scene[]> {
   const headings = [...sceneText.matchAll(SCENE_HEADING)];
   const all = sceneText.match(ANY_SCENE_HEADING) ?? [];
 
   if (headings.length === 0 || all.length !== headings.length) {
-    return err(
-      new ScreenplayFormatError(
-        "scene-heading",
-        "brak scen albo niepoprawny nagłówek sceny, wymagany format: ### S01 | 15s | miejsce i pora dnia"
-      )
-    );
+    return reject([
+      "brak scen albo niepoprawny nagłówek sceny, wymagany format: ### S01 | 15s | miejsce i pora dnia",
+    ]);
   }
 
-  const scenes = headings.map((heading, index) => ({
-    body: sceneText.slice(
-      (heading.index ?? 0) + (heading[0]?.length ?? 0),
-      headings[index + 1]?.index ?? sceneText.length
-    ),
-    id: heading[1] ?? "",
-    number: Number(heading[1]),
-    seconds: Number(heading[2]),
-  }));
-
-  for (const [index, scene] of scenes.entries()) {
-    if (scene.number !== index + 1) {
-      return err(
-        new ScreenplayFormatError(
-          "scene-order",
-          `sceny muszą mieć kolejne numery od S01, napotkano S${scene.id} na pozycji ${index + 1}`
-        )
-      );
-    }
-
-    if (scene.seconds > MAX_SCENE_SECONDS) {
-      return err(
-        new ScreenplayFormatError(
-          "scene-length",
-          `scena S${scene.id}: ${scene.seconds}s przekracza twardy limit ${MAX_SCENE_SECONDS}s na scenę`
-        )
-      );
-    }
-  }
-
-  return ok(scenes);
+  return ok(
+    headings.map((heading, index) => ({
+      body: sceneText.slice(
+        (heading.index ?? 0) + (heading[0]?.length ?? 0),
+        headings[index + 1]?.index ?? sceneText.length
+      ),
+      id: heading[1] ?? "",
+      number: Number(heading[1]),
+      seconds: Number(heading[2]),
+    }))
+  );
 }
 
-/** Returns whether this scene carries on-screen text. */
-function readFields(scene: Scene, settings: EpisodeSettings): Result<boolean> {
+/** What one scene's heading says wrong: its place in the sequence, its length. */
+function headingProblems(scene: Scene, index: number): readonly string[] {
+  return [
+    ...(scene.number === index + 1
+      ? []
+      : [`sceny muszą mieć kolejne numery od S01, napotkano S${scene.id} na pozycji ${index + 1}`]),
+    ...(scene.seconds > MAX_SCENE_SECONDS
+      ? [
+          `scena S${scene.id}: ${scene.seconds}s przekracza twardy limit ${MAX_SCENE_SECONDS}s na scenę`,
+        ]
+      : []),
+  ];
+}
+
+/** One scene's fields: what is wrong with them, and whether it carries on-screen text. */
+function readFields(
+  scene: Scene,
+  settings: EpisodeSettings
+): { readonly onScreenText: boolean; readonly problems: readonly string[] } {
+  const problems: string[] = [];
   let onScreenText = false;
 
   for (const field of FIELDS) {
@@ -194,44 +208,19 @@ function readFields(scene: Scene, settings: EpisodeSettings): Result<boolean> {
 
     // An empty duplicate must not pass, so empty occurrences are counted too.
     if (matches.length !== 1 || value === "") {
-      return err(
-        new ScreenplayFormatError(
-          "scene-field",
-          `scena S${scene.id}: wymagane dokładnie jedno niepuste pole ${field.label}`
-        )
-      );
-    }
-
-    if (field.label !== "Text" || NO_TEXT.test(value)) {
-      continue;
-    }
-
-    if (settings.subtitles === "none") {
-      return err(
-        new ScreenplayFormatError(
-          "subtitles",
+      problems.push(`scena S${scene.id}: wymagane dokładnie jedno niepuste pole ${field.label}`);
+    } else if (field.label === "Text" && !NO_TEXT.test(value)) {
+      if (settings.subtitles === "none") {
+        problems.push(
           `scena S${scene.id}: tekst ekranowy mimo subtitles=none, jedyna dozwolona wartość pola Text to "none"`
-        )
-      );
+        );
+      } else {
+        onScreenText = true;
+      }
     }
-
-    onScreenText = true;
   }
 
-  return ok(onScreenText);
-}
-
-/** The Scenes section of a document whose sections are already known good. */
-function sceneSection(text: string): Result<string> {
-  const bounds = sectionBounds(text);
-
-  if (!bounds.ok) {
-    return bounds;
-  }
-
-  const section = bounds.data[SCENES_INDEX];
-
-  return ok(text.slice(section?.start ?? 0, section?.end ?? text.length));
+  return { onScreenText, problems };
 }
 
 /**
@@ -242,19 +231,22 @@ function sceneSection(text: string): Result<string> {
  * stage 3 check that its shots cover the episode without inventing a second
  * source of truth about when anything happens.
  */
-export function readScreenplayScenes(text: string): Result<readonly ScreenplayScene[]> {
-  const section = sceneSection(text);
+export function readScreenplayScenes(
+  text: string
+): Result<readonly ScreenplayScene[], ScreenplayFormatError> {
+  const sections = readSections(text);
 
-  if (!section.ok) {
-    return section;
+  if (!sections.ok) {
+    return sections;
   }
 
-  const scenes = readScenes(section.data);
+  const scenes = readScenes(sections.data.scenes);
 
   if (!scenes.ok) {
-    return scenes;
+    return reject([...sections.data.empty, ...scenes.error.problems]);
   }
 
+  const problems = [...sections.data.empty, ...scenes.data.flatMap(headingProblems)];
   const placed: ScreenplayScene[] = [];
   let cursor = 0;
 
@@ -263,12 +255,7 @@ export function readScreenplayScenes(text: string): Result<readonly ScreenplaySc
     const value = (matches[0]?.[1] ?? "").trim();
 
     if (matches.length !== 1 || value === "") {
-      return err(
-        new ScreenplayFormatError(
-          "scene-field",
-          `scena S${scene.id}: wymagane dokładnie jedno niepuste pole Text`
-        )
-      );
+      problems.push(`scena S${scene.id}: wymagane dokładnie jedno niepuste pole Text`);
     }
 
     placed.push({
@@ -281,7 +268,7 @@ export function readScreenplayScenes(text: string): Result<readonly ScreenplaySc
     cursor += scene.seconds;
   }
 
-  return ok(placed);
+  return problems.length === 0 ? ok(placed) : reject(problems);
 }
 
 /**
@@ -290,42 +277,39 @@ export function readScreenplayScenes(text: string): Result<readonly ScreenplaySc
  * Deliberately says nothing about quality: a draft that passes every rule
  * here is a correctly shaped draft and nothing more, which is why approval
  * is a separate command rather than a consequence of this function.
+ *
+ * It names every problem it can read, scene by scene, rather than the first;
+ * a code fence, a wrong section order or a broken scene heading still ends
+ * the reading, because nothing after it would be read correctly.
  */
 export function validateScreenplay(
   text: string,
   settings: EpisodeSettings
-): Result<ScreenplayVerdict> {
+): Result<ScreenplayVerdict, ScreenplayFormatError> {
   if (text.trim().startsWith("```")) {
-    return err(
-      new ScreenplayFormatError(
-        "code-fence",
-        "scenariusz jest opakowany blokiem kodu, oczekiwano samego dokumentu Markdown"
-      )
-    );
+    return reject(["scenariusz jest opakowany blokiem kodu, oczekiwano samego dokumentu Markdown"]);
   }
 
-  const section = sceneSection(text);
+  const sections = readSections(text);
 
-  if (!section.ok) {
-    return section;
+  if (!sections.ok) {
+    return sections;
   }
 
-  const scenes = readScenes(section.data);
+  const scenes = readScenes(sections.data.scenes);
 
   if (!scenes.ok) {
-    return scenes;
+    return reject([...sections.data.empty, ...scenes.error.problems]);
   }
 
+  const problems = [...sections.data.empty];
   let onScreenText = false;
 
-  for (const scene of scenes.data) {
+  for (const [index, scene] of scenes.data.entries()) {
     const fields = readFields(scene, settings);
 
-    if (!fields.ok) {
-      return fields;
-    }
-
-    onScreenText = onScreenText || fields.data;
+    problems.push(...headingProblems(scene, index), ...fields.problems);
+    onScreenText = onScreenText || fields.onScreenText;
   }
 
   const total = scenes.data.reduce((sum, scene) => sum + scene.seconds, 0);
@@ -335,28 +319,24 @@ export function validateScreenplay(
   // scene capped, a correct total cannot be reached by too few scenes. It is
   // named here because it tells the reader what a fix has to look like.
   if (total !== settings.durationSeconds) {
-    return err(
-      new ScreenplayFormatError(
-        "total-duration",
-        `suma czasów scen: ${total}s; wymagane dokładnie ${settings.durationSeconds}s, czyli co najmniej ${required} ${scenesWord(required)} po maks. ${MAX_SCENE_SECONDS}s`
-      )
+    problems.push(
+      `suma czasów scen: ${total}s; wymagane dokładnie ${settings.durationSeconds}s, czyli co najmniej ${required} ${scenesWord(required)} po maks. ${MAX_SCENE_SECONDS}s`
     );
   }
 
   if (settings.subtitles !== "none" && !onScreenText) {
-    return err(
-      new ScreenplayFormatError(
-        "subtitles",
-        `żadna scena nie ma tekstu ekranowego mimo zamówionych napisów (subtitles=${settings.subtitles})`
-      )
+    problems.push(
+      `żadna scena nie ma tekstu ekranowego mimo zamówionych napisów (subtitles=${settings.subtitles})`
     );
   }
 
-  return ok({
-    durationSeconds: total,
-    longestSceneSeconds: Math.max(...scenes.data.map((scene) => scene.seconds)),
-    maxSceneSeconds: MAX_SCENE_SECONDS,
-    minimumScenes: required,
-    scenes: scenes.data.length,
-  });
+  return problems.length === 0
+    ? ok({
+        durationSeconds: total,
+        longestSceneSeconds: Math.max(...scenes.data.map((scene) => scene.seconds)),
+        maxSceneSeconds: MAX_SCENE_SECONDS,
+        minimumScenes: required,
+        scenes: scenes.data.length,
+      })
+    : reject(problems);
 }

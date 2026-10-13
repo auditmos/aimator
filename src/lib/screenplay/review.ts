@@ -186,7 +186,7 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
     : null;
 
   if (verdict !== null && !verdict.ok) {
-    blocking.push(`screenplay.md: ${verdict.error.message}`);
+    blocking.push(...verdict.error.problems.map((problem) => `screenplay.md: ${problem}`));
   }
 
   // Drift is reported beside the blocking problems and revokes the approval
