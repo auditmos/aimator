@@ -61,6 +61,7 @@ const STYLE_GENERATED_2 = /Obrazy stylu:\s+generowane z Style Bible \(2 na tor\)
 const DURATION_30 = /Długość:\s+30 s/;
 const AUDIO_NARRATION = /Dźwięk:\s+narration/;
 const MAX_CLIP_15 = /Najdłuższy klip:\s+15 s/;
+const LIP_SYNC_UNDECIDED = /Język ust:\s+nierozstrzygnięte/;
 
 /** Every stage-0 command, in the words `--help` spells them. */
 const COMMANDS = [
@@ -439,6 +440,7 @@ describe("episode show", () => {
     expect(text).toMatch(DURATION_30);
     expect(text).toMatch(AUDIO_NARRATION);
     expect(text).toMatch(MAX_CLIP_15);
+    expect(text).toMatch(LIP_SYNC_UNDECIDED);
   });
 
   it("should refuse an episode the project does not have", async () => {

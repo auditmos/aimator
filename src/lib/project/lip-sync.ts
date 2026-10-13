@@ -32,6 +32,15 @@ type LipSync =
   | { readonly file: RecordedFile; readonly kind: "none" }
   | { readonly file: RecordedFile; readonly kind: "language"; readonly language: string };
 
+/** The decision as `lip-sync.json` spells it, a code or `none`; null while undecided. */
+export function lipSyncOf(decision: LipSync): string | null {
+  if (decision.kind === "undecided") {
+    return null;
+  }
+
+  return decision.kind === "none" ? "none" : decision.language;
+}
+
 /** What a person answers: a language, or a deliberate no. */
 export type LipSyncChoice =
   | { readonly kind: "none" }

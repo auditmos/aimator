@@ -140,12 +140,15 @@ Odcinek "01-burza" (nr 1) w projekcie "dzielna-ewa"
   Język: pl
   Napisy: none
   Najdłuższy klip: nierozstrzygnięte
+  Język ust: en
 ```
 
 Też opis, nie werdykt, i z tego samego powodu: `episode set` zapisuje decyzje, `check`
 je ocenia, a dopiero to polecenie mówi, jakie są teraz. Pod `--json` wypisuje obiekt
 (`command`, `projectId`, `episodeId`, `number`, `source` z `path` i `originPath`,
-`settings` z sześcioma decyzjami, `null` tam, gdzie nikt nie zdecydował).
+`settings` z sześcioma decyzjami, `null` tam, gdzie nikt nie zdecydował, i `lipSync`:
+kod języka ust, `none` albo `null`). `lipSync` stoi obok `settings`, a nie w nim, bo
+mieszka w `lip-sync.json`, a nie w `episode.json`.
 
 ## Pomysł bez pliku
 

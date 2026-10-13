@@ -33,9 +33,10 @@ export const USAGE = `  episode add <id> --source <NN-tytul.md|katalog> [--durat
     pliku bez .md: numer i slug. source.md to tekst pomysłu.
   episode set <id> <episode-id> [te same flagi decyzji] [--json]
   episode show <id> <episode-id> [--json]
-    Co odcinek trzyma: plik źródłowy, skąd go skopiowano, i sześć decyzji,
-    nierozstrzygnięte nazwane wprost. Opis, nie werdykt: czy to wystarcza,
-    mówi check. Niczego nie zapisuje i niczego nie wydaje.
+    Co odcinek trzyma: plik źródłowy, skąd go skopiowano, sześć decyzji
+    i język ust z lip-sync.json, nierozstrzygnięte nazwane wprost. Opis, nie
+    werdykt: czy to wystarcza, mówi check. Niczego nie zapisuje i niczego nie
+    wydaje.
   episode lip-sync <id> <episode-id> --language <kod>|--none [--json]
     Język, w którym ruszają się usta drugiej wersji filmu, i na który etap 11
     tłumaczy skrypt dialogu; inny niż język filmu. --none: drugiej wersji nie
@@ -231,6 +232,7 @@ function renderEpisode(overview: EpisodeOverview): string {
     `  Język: ${decided(settings.language)}`,
     `  Napisy: ${decided(settings.subtitles)}`,
     `  Najdłuższy klip: ${decided(settings.maxClipSeconds, " s")}`,
+    `  Język ust: ${decided(overview.lipSync)}`,
   ].join("\n");
 }
 

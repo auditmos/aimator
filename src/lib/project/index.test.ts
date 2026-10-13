@@ -12,6 +12,7 @@ import {
   initProject,
   setCharacterBasis,
   setEpisodeSettings,
+  setLipSync,
   setNarratorVoice,
   showEpisode,
   showProject,
@@ -1178,6 +1179,7 @@ describe("showEpisode", () => {
 
     expect(result.ok ? result.data : result.error.message).toEqual({
       episodeId: EPISODE,
+      lipSync: null,
       number: 1,
       projectId: "demo",
       settings: {
@@ -1218,6 +1220,31 @@ describe("showEpisode", () => {
       ...FULL_SETTINGS,
       maxClipSeconds: 6,
     });
+  });
+
+  /**
+   * The seventh decision lives in `lip-sync.json`, apart from the six, so it is
+   * shown apart from them too: a field beside `settings`, never inside it.
+   */
+  it("should show the language of the mouths, and a deliberate no as one", async () => {
+    await makeProject();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    const scope = { episodeId: EPISODE, mode: "apply", projectId: "demo", workspace } as const;
+
+    await setLipSync({ ...scope, choice: { kind: "language", language: "en" } });
+    const english = await showEpisode({ episodeId: EPISODE, projectId: "demo", workspace });
+    await setLipSync({ ...scope, choice: { kind: "none" } });
+    const none = await showEpisode({ episodeId: EPISODE, projectId: "demo", workspace });
+
+    expect(english.ok ? english.data.lipSync : english.error.message).toBe("en");
+    expect(none.ok ? none.data.lipSync : none.error.message).toBe("none");
+    expect(english.ok ? Object.keys(english.data.settings) : null).not.toContain("lipSync");
   });
 
   it("should refuse an episode the project does not have", async () => {

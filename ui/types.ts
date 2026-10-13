@@ -591,6 +591,8 @@ export interface ProjectOverview {
 export interface EpisodeOverview {
   readonly command: "episode show";
   readonly episodeId: string;
+  /** The language of the mouths from `lip-sync.json`, `none`, or null while undecided. */
+  readonly lipSync: string | null;
   readonly number: number;
   readonly projectId: string;
   /** Every decision, null where nobody has made it yet. */

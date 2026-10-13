@@ -804,7 +804,8 @@ Odcinek "01-burza" (nr 1) w projekcie "ewa"
   Dźwięk: narration
   Język: pl
   Napisy: none
-  Najdłuższy klip: 15 s"
+  Najdłuższy klip: 15 s
+  Język ust: nierozstrzygnięte"
 `;
 
 exports[`every command >   list [--json] 1`] = `

@@ -34,6 +34,7 @@ import {
   projectPaths,
   type Workspace,
 } from "../workspace.js";
+import { lipSyncOf, readLipSync } from "./lip-sync.js";
 import {
   audioModes,
   type CharacterEntry,
@@ -123,6 +124,12 @@ export interface ProjectOverview {
 /** What an episode holds, described rather than judged: its source and six decisions. */
 export interface EpisodeOverview {
   readonly episodeId: string;
+  /**
+   * The language the mouths move in, `none`, or null while nobody decided. Beside
+   * `settings` rather than in it, because it lives in `lip-sync.json` rather than
+   * in `episode.json`, and what it lapses differs accordingly.
+   */
+  readonly lipSync: string | null;
   readonly number: number;
   readonly projectId: string;
   /** Every decision, null where nobody has made it yet. */
@@ -1503,8 +1510,15 @@ export async function showEpisode(
     );
   }
 
+  const lipSync = await readLipSync(input);
+
+  if (!lipSync.ok) {
+    return lipSync;
+  }
+
   return ok({
     episodeId: input.episodeId,
+    lipSync: lipSyncOf(lipSync.data),
     number: episode.data.number,
     projectId: input.projectId,
     settings: episode.data.settings,
