@@ -426,7 +426,7 @@ kolejnej komendy, która tę flagę dostanie:
   wszędzie tam, gdzie obiekt należy do jednego etapu. `status` i `list` niosą samo
   `command`, bo odpowiadają za cały odcinek i za cały katalog roboczy, więc nie mają etapu
   do nazwania; `check`, `approve` i każda komenda, której pierwsze słowo **jest** jej
-  etapem, niosą oba, bo `check` odpowiada za jedenaście etapów i odpowiedź musi mówić, o
+  etapem, niosą oba, bo `check` odpowiada za trzynaście etapów i odpowiedź musi mówić, o
   który chodzi;
 - **reszta to obiekty etapów bez zmian**: `cells[].status` niesie dokładnie to, co zwrócił
   `check` tego etapu, co do pola. Nie powstaje osobny format i nie ma warstwy tłumaczącej;

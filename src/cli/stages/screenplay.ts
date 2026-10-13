@@ -195,7 +195,7 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
   }
 
   // `answerOf` is deliberately not asked here, and the difference is the whole
-  // reason it exists: `check` and `approve` answer for eleven stages, so they
+  // reason it exists: `check` and `approve` answer for thirteen stages, so they
   // have to refuse the spellings whose stage has no object yet. This command
   // names its stage in its own first word, so there is no `--json` here that
   // could hand a caller Polish sentences after it asked for an object.
@@ -259,7 +259,7 @@ export async function checkScreenplayStage(
  * `approve --stage screenplay`: the whole result, bound to its digest.
  *
  * What to print travels in the approval, beside who accepted and in which
- * mode, because `approve` settles it once for eleven stages: the spellings
+ * mode, because `approve` settles it once for thirteen stages: the spellings
  * `--json` cannot answer are refused before any stage is reached.
  */
 export async function approveScreenplayStage(

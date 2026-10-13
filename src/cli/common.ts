@@ -212,7 +212,7 @@ export function answerOf(parsed: Parsed, fallback: string | null = null): Result
  * What a command that names its own stage was asked to print.
  *
  * There is no refusal here and there cannot be one, for the reason
- * `answerOf` has both: `check` and `approve` answer for eleven stages, so they
+ * `answerOf` has both: `check` and `approve` answer for thirteen stages, so they
  * have to reject a `--stage` whose object does not exist yet, while a command
  * whose first word *is* its stage can only ever print its own report.
  */
@@ -227,7 +227,7 @@ export function answerFlag(parsed: Parsed): Answer {
  * object the stage module already returns, so a caller reading the browser and
  * a caller reading the terminal are reading one contract. `command` and
  * `stage` are the two words a cross-stage command has to add, because `check`
- * answers for eleven stages and the answer has to say which one it is.
+ * answers for thirteen stages and the answer has to say which one it is.
  */
 export function asJson(command: string, stage: string, data: object): string {
   return JSON.stringify({ command, stage, ...data }, null, 2);

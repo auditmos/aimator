@@ -104,7 +104,7 @@ panelem w [lokalnym UI](../ui.md).
 
 `screenplay generate --json` wypisuje raport tej komendy tym samym sposobem, z polami
 `command: "generate"` i `stage: "screenplay"`. Odmowy tu nie ma i nie może być: `check`
-i `approve` odpowiadają za jedenaście etapów, więc muszą odrzucić pisownię, której etap
+i `approve` odpowiadają za trzynaście etapów, więc muszą odrzucić pisownię, której etap
 nie umie jeszcze odpowiedzieć obiektem, a ta komenda nazywa swój etap własnym pierwszym
 słowem. Przy `--dry-run` raport niesie `prompt` i `paidCalls`, przy zakupie `runId` i
 listę zapisanych plików. Panel etapu 1 czyta właśnie ten obiekt, żeby postawić rachunek
