@@ -235,6 +235,8 @@ interface Everything extends Delivery, Failed, Judged, Levels, Send, Settings {
   readonly dryRun: boolean;
   /** Stage 10's third model: the one that renders one effect. */
   readonly effectsModel: string;
+  /** Stage 12: face id to character, as a person bound them in one clip. */
+  readonly faces: Readonly<Record<string, string>>;
   /** Stage 0: an episode's idea typed on screen, which becomes `source.md`. */
   readonly idea: string;
   readonly imageModel: string;
@@ -563,6 +565,24 @@ export const INTENTS = {
     ...artifacts(one.artifacts),
   ],
   /**
+   * Stage 12, accepted: clips whose mouths a person watched land on the lines.
+   *
+   * Each is its own judgement, so the CLI asks for the list rather than reading
+   * none as all, and an empty choice spells no flag for it to refuse.
+   */
+  approveVersions: (
+    one: TrackRef & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "versions",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+  ],
+  /**
    * Stage 8: the cut, and the only `generate` on this screen that is not a send.
    *
    * It has no model flag, no key and no bill, because it reaches no provider:
@@ -584,6 +604,36 @@ export const INTENTS = {
     ...(one.regenerate ? ["--regenerate"] : []),
     ...(one.dryRun ? ["--dry-run"] : []),
     "--json",
+  ],
+  /**
+   * Stage 12: who each face in one clip is, as a person said it.
+   *
+   * A decision rather than a purchase, so it is written at once and has no
+   * preview: nothing is sent and no key is read. Face id to character, in the
+   * order chosen; an empty choice spells no `--face`, and the CLI refuses that
+   * rather than this screen guessing, because a face is never inferred, not
+   * even when the clip shows one.
+   */
+  bindFaces: (
+    one: TrackRef & {
+      readonly artifact: string;
+      readonly faces: Readonly<Record<string, string>>;
+    }
+  ): readonly string[] => [
+    "versions",
+    "bind",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    "--artifact",
+    one.artifact,
+    ...flag(
+      "--face",
+      Object.entries(one.faces)
+        .map(([face, cast]) => `${face}=${cast}`)
+        .join(",")
+    ),
   ],
   /**
    * Stage 0: the narrator of the series, cast rather than configured.
@@ -728,6 +778,16 @@ export const INTENTS = {
     episodeId,
     "--stage",
     "sound-design",
+  ],
+  /** Stage 12, verified: one track's clips, their faces and who each face is. */
+  checkVersions: (one: TrackRef): readonly string[] => [
+    "check",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "versions",
+    "--track",
+    one.track,
   ],
   /** Stage 0: this character is drawn from `project.md`, not from photographs. */
   describeCharacter: (one: CastRef): readonly string[] => [
@@ -884,6 +944,48 @@ export const INTENTS = {
     ...flag("--voice-model", one.voiceModel),
     ...flag("--max-output-tokens", one.maxOutputTokens),
     ...attempt(one),
+    "--dry-run",
+    "--json",
+  ],
+  /**
+   * Stage 12, previewed: the faces in one clip, one paid face call.
+   *
+   * Exactly one clip, because one call finds the faces of one; the CLI refuses
+   * a list. A second call on the same clip is a second charge, so it takes a
+   * new attempt, and no note: nothing here is written by a model that reads.
+   */
+  previewFaces: (
+    one: TrackRef & { readonly artifact: string; readonly regenerate: boolean }
+  ): readonly string[] => [
+    "versions",
+    "faces",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...flag("--artifact", one.artifact),
+    ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
+  /**
+   * Stage 12, previewed: the jobs that move the mouths, and their two bills.
+   *
+   * No choice is every clip the gates allow, and a choice narrows the purchase
+   * to it. The bill is face calls and lip-sync jobs counted apart, because a
+   * second speaker in a clip costs a face call beside its job.
+   */
+  previewLipSync: (
+    one: TrackRef & { readonly artifacts: readonly string[]; readonly regenerate: boolean }
+  ): readonly string[] => [
+    "versions",
+    "lip-sync",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    ...(one.regenerate ? ["--regenerate"] : []),
     "--dry-run",
     "--json",
   ],
@@ -1120,6 +1222,26 @@ export const INTENTS = {
     one.episodeId,
     "--stage",
     "references",
+    "--track",
+    one.track,
+    ...artifacts(one.artifacts),
+    "--note",
+    one.note,
+  ],
+  /**
+   * Stage 12, refused: the chosen clips' versions, and why.
+   *
+   * No model reads the note: a lip-sync is a sound and a face, so the reason
+   * is what the record says, and the way out is a new job or a new binding.
+   */
+  rejectVersions: (
+    one: TrackRef & Refusal & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "reject",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "versions",
     "--track",
     one.track,
     ...artifacts(one.artifacts),

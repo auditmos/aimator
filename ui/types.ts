@@ -513,6 +513,79 @@ export interface DialogueReport {
   readonly prompt: string | null;
 }
 
+/** One face stage 12's face call found: on screen from `start` to `end` ms, and its picture. */
+export interface ClipFace {
+  readonly end: number;
+  readonly id: string;
+  /** Workspace-relative, or null when the provider's picture did not arrive. */
+  readonly image: string | null;
+  readonly start: number;
+}
+
+/**
+ * One clip of stage 12 whose mouths move, and where its version stands.
+ *
+ * `faces` and `binding` are what a person binds by and what they said, each
+ * null until there is one: the binding stays null while it speaks of faces
+ * found before the ones on disk, because those are faces nobody looked at.
+ */
+export interface ClipVersion {
+  readonly approved: boolean;
+  readonly binding: Readonly<Record<string, string>> | null;
+  readonly faces: readonly ClipFace[] | null;
+  readonly id: string;
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  /** Who speaks in it on screen, in the order the jobs run. */
+  readonly speakers: readonly string[];
+  readonly state: "absent" | "completed" | "submitted";
+}
+
+/** Stage 12 on one track: the clips that need their mouths moved, and those that do not. */
+export interface VersionsStatus {
+  readonly approved: boolean;
+  readonly clips: readonly ClipVersion[];
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly track: string;
+  /** Clips nobody visible speaks in, which pass to the version as they are. */
+  readonly untouched: readonly string[];
+}
+
+/** Stage 12's face call: one clip, one call, and in a dry run no faces yet. */
+export interface FacesReport {
+  readonly clip: string;
+  readonly faces: readonly ClipFace[];
+  readonly notices: readonly string[];
+  readonly paidCalls: number;
+  readonly problems: readonly string[];
+}
+
+/**
+ * Stage 12's lip-sync: every job with its face and its window in ms, and two
+ * bills, because a second speaker in a clip costs a face call beside its job.
+ */
+export interface LipSyncReport {
+  readonly clips: readonly {
+    readonly id: string;
+    readonly jobs: readonly {
+      readonly cast: string;
+      readonly end: number;
+      readonly face: string;
+      readonly key: string;
+      readonly lines: readonly string[];
+      readonly start: number;
+      readonly state: string;
+    }[];
+    readonly problems: readonly string[];
+  }[];
+  readonly notices: readonly string[];
+  readonly paidFaces: number;
+  readonly paidLipSyncs: number;
+  readonly problems: readonly string[];
+}
+
 /**
  * What every paid stage's report says that a panel has to show.
  *

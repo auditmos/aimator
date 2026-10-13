@@ -18,7 +18,7 @@ import {
 } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
-import { Block, Commands, plural, RunDock, Said, SettledStage } from "./panel";
+import { Commands, plural, RunDock, SettledStage } from "./panel";
 import { NewEpisode, NewProject, PreparePanel, ProjectApproval } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
@@ -35,6 +35,7 @@ import type {
   StatusCell,
   WorkspaceListing,
 } from "./types";
+import { VersionsPanel } from "./versions";
 
 /**
  * The screen, and the order a person meets it in.
@@ -311,24 +312,13 @@ function StagePanel(props: PanelProps): JSX.Element | null {
     return <DialoguePanel {...props} />;
   }
 
-  return <TerminalStage cell={props.cell} />;
-}
+  // Stage 12 is per track like stage 7: the faces are in this track's
+  // pictures and no other's, so each track's cell is its own panel.
+  if (props.cell.stage === 12) {
+    return <VersionsPanel {...props} />;
+  }
 
-/**
- * A stage this screen draws no panel for, which today is 12.
- *
- * Where it stands is on the ladder like any other; what moves it is the one
- * command `status` composed for its cell, and the terminal is where that runs.
- */
-function TerminalStage(props: { readonly cell: StatusCell }): JSX.Element {
-  const { cell } = props;
-
-  return (
-    <Block title="Polecenie w terminalu">
-      <p>Ten etap nie ma jeszcze panelu na ekranie; prowadzi go terminal.</p>
-      {cell.nextStep === null ? null : <Said text={cell.nextStep} />}
-    </Block>
-  );
+  return null;
 }
 
 /**

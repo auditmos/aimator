@@ -1142,6 +1142,28 @@ h1 {
   border-radius: 0.25rem;
 }
 
+/* Stage 12: the faces found in one clip, small, each above who it is. */
+.faces {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  list-style: none;
+}
+.face img {
+  display: block;
+  width: 100%;
+  max-width: 10rem;
+  height: auto;
+  background: var(--color-neutral-950);
+  border-radius: 0.25rem;
+}
+.face .field select {
+  width: 100%;
+  min-width: 0;
+}
+
 /* Stage 4: the plan of one track, one future paid call at a time. */
 .plan-review {
   margin-top: 1rem;

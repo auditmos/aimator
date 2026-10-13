@@ -28,6 +28,8 @@ import { buy, commandLine, INTENTS } from "./commands.js";
 const WORD = /^[a-z][a-z-]*$/;
 /** Commands whose `generate` reaches no provider: stage 8 cuts locally. */
 const FREE = new Set(["assembly"]);
+/** The second word of every command that reaches a paid provider. */
+const PAID = new Set(["faces", "generate", "lip-sync", "translate"]);
 const NO_DRY_RUN = /dry-run/;
 const NO_RUN_ID = /identyfikator/;
 const USAGE_LINE = /^ {2}(\S+)(?: (\S+))?/;
@@ -56,6 +58,7 @@ const scope = {
   effectsDb: "-10",
   effectsModel: "eleven-sfx",
   episodeId: "01-burza",
+  faces: { 0: "ewa", 1: "tata" },
   failed: ["anatomy"],
   idea: "Wanda boi się zasnąć",
   imageModel: "gpt-image-2.5-sunburst",
@@ -184,15 +187,17 @@ describe("the command dictionary", () => {
    * buys nothing at all, from anybody, and what it needs instead is a program
    * on this machine. Everything else that reaches a model has to arrive here
    * as a dry run, because a purchase is derived from one and is the only
-   * intent that cannot be built from a scope. Stage 11's `translate` is a
-   * paid call under another verb, so it is held to the same rule.
+   * intent that cannot be built from a scope. Stage 11's `translate` and stage
+   * 12's `faces` and `lip-sync` are paid calls under other verbs, so they are
+   * held to the same rule; stage 12's `bind` is not, because it writes down a
+   * person's decision and sends nothing.
    */
   it("should build no purchase from a scope alone", () => {
     const spending = Object.entries(INTENTS).filter(([, build]) => {
       const argv = build(scope);
 
       return (
-        (argv.includes("generate") || argv.includes("translate")) &&
+        PAID.has(argv[1] ?? "") &&
         !(argv.includes("--dry-run") || argv.includes("--republish") || FREE.has(argv[0] ?? ""))
       );
     });
@@ -1115,6 +1120,124 @@ describe("the stage-11 commands", () => {
       "Ewa ma mieć czerwony szalik",
       "--dry-run",
       "--json",
+    ]);
+  });
+});
+
+/**
+ * Stage 12, per track and clip by clip.
+ *
+ * Two of its commands are paid and previewed (`faces`, one clip per call, and
+ * `lip-sync`), one is a person's decision written at once (`bind`), and its yes
+ * and no name clips, never everything: the CLI asks for `--artifact` on both.
+ */
+describe("the stage-12 commands", () => {
+  const clips = { ...scope, artifacts: ["C01", "C02"] };
+
+  it("should accept and refuse the chosen clips of one track", () => {
+    expect(INTENTS.approveVersions(clips)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "versions",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01,C02",
+    ]);
+    expect(INTENTS.rejectVersions(clips)).toEqual([
+      "reject",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "versions",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01,C02",
+      "--note",
+      "Za ciemno, Ewa ma sześć palców.",
+    ]);
+  });
+
+  it("should ask about one track, because each has its own faces", () => {
+    expect(INTENTS.checkVersions(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "versions",
+      "--track",
+      "gpt-image",
+    ]);
+  });
+
+  it("should preview the faces of exactly one clip, again only on a new attempt", () => {
+    const one = { ...scope, artifact: "C01" };
+
+    expect(INTENTS.previewFaces(one)).toEqual([
+      "versions",
+      "faces",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(INTENTS.previewFaces({ ...one, regenerate: true })).toContain("--regenerate");
+  });
+
+  it("should write the binding as the person chose it, and spell no --face for none", () => {
+    const one = { ...scope, artifact: "C01" };
+
+    expect(INTENTS.bindFaces(one)).toEqual([
+      "versions",
+      "bind",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01",
+      "--face",
+      "0=ewa,1=tata",
+    ]);
+    expect(INTENTS.bindFaces({ ...one, faces: {} })).not.toContain("--face");
+  });
+
+  it("should preview the lip-sync of the chosen clips, or of every clip when none is", () => {
+    expect(INTENTS.previewLipSync({ ...clips, regenerate: true })).toEqual([
+      "versions",
+      "lip-sync",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01,C02",
+      "--regenerate",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(INTENTS.previewLipSync({ ...scope, artifacts: [] })).not.toContain("--artifact");
+  });
+
+  it("should buy exactly the lip-sync it previewed", () => {
+    const preview = INTENTS.previewLipSync(clips);
+
+    expect(buy({ argv: preview, runId: "9f1c" })).toEqual([
+      "versions",
+      "lip-sync",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "C01,C02",
     ]);
   });
 });

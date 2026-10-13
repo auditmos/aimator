@@ -10,13 +10,16 @@ import {
   type EpisodePaths,
   episodePaths,
   episodeTrackPaths,
+  faceImage,
   type ImageTrack,
   imageTracks,
   narrationAudio,
   type ProjectPaths,
   projectPaths,
   referenceImage,
+  type StillFormat,
   soundStem,
+  versionClip,
   type Workspace,
 } from "../lib/workspace.js";
 
@@ -98,6 +101,17 @@ const MIXED = "mixed";
 
 /** Stage 11's script in the language of the mouths: `script-en`, as its stage file keys it. */
 const TRANSLATED = "script-";
+
+/** Stage 12's one artifact that is not a clip's version: a face's picture. */
+const FACE = "face:";
+
+/** The extensions the layout module gives a face's picture, and what each holds. */
+const FACE_FORMATS: Readonly<
+  Record<string, { readonly contentType: string; readonly format: StillFormat }>
+> = {
+  jpg: { contentType: "image/jpeg", format: "jpeg" },
+  png: { contentType: PNG, format: "png" },
+};
 
 /** What each episode stage publishes, in the stage's own word for it. */
 const UNDER_EPISODE: Readonly<
@@ -347,6 +361,45 @@ function underDialogue(project: ProjectPaths, request: ArtifactRequest): Located
 }
 
 /**
+ * Stage 12, per track: a clip's version under the clip's own id, `C01`, as
+ * `--artifact` names it, and a face's picture as `face:C01:0.png`.
+ *
+ * A face's format is the provider's choice, which is why stage 7's `end:Cnn`
+ * is not served at all. Here the choice is already written down: `check`
+ * names each face's picture by its path, so the panel asks with the extension
+ * it read there, and this table builds the path in that format rather than
+ * guessing one. Only the two the layout module writes are taken.
+ */
+function underVersions(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const track = trackOf(request);
+  const episode = episodePaths(project, request.episodeId);
+
+  if (track === null || !episode.ok) {
+    return null;
+  }
+
+  const paths = episodeTrackPaths(episode.data, track);
+
+  if (request.artifact.startsWith(FACE)) {
+    const [clip = "", picture = "", ...rest] = request.artifact.slice(FACE.length).split(":");
+    const dot = picture.lastIndexOf(".");
+    const format = FACE_FORMATS[picture.slice(dot + 1)];
+    const image =
+      rest.length === 0 && dot > 0 && format !== undefined
+        ? faceImage(paths, clip, picture.slice(0, dot), format.format)
+        : null;
+
+    return image?.ok === true && format !== undefined
+      ? { contentType: format.contentType, path: image.data }
+      : null;
+  }
+
+  const version = versionClip(paths, request.artifact);
+
+  return version.ok ? { contentType: MP4, path: version.data } : null;
+}
+
+/**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
  * It is a function rather than a row in the table above because its artifacts
@@ -457,6 +510,10 @@ export function locateArtifact(
 
   if (request.stage === "dialogue") {
     return underDialogue(project.data, request);
+  }
+
+  if (request.stage === "versions") {
+    return underVersions(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

@@ -3,6 +3,7 @@ import { asMedia } from "./clips";
 import { asDialogue } from "./dialogue";
 import { approvable, asImages } from "./panel";
 import type { DrawnReport, MediaReport, TextStatus } from "./types";
+import { asVersions } from "./versions";
 
 /**
  * How a panel reads its own stage's report, and the one thing it must not do.
@@ -225,5 +226,68 @@ describe("a text stage's approval", () => {
         ],
       })
     ).toBe(false);
+  });
+});
+
+/**
+ * Stage 12's reader, which reads two reports. A face call is billed in face
+ * calls; a lip-sync in face calls **and** jobs, apart, because a second speaker
+ * in a clip costs a face call beside its job. What a lip-sync would send is a
+ * plan rather than a prompt, so its jobs stand where a prompt would.
+ */
+describe("stage 12's reader", () => {
+  it("should bill a face call in face calls, with nothing to read", () => {
+    const priced = asVersions({ clip: "C01", faces: [], notices: [], paidCalls: 1, problems: [] });
+
+    expect(priced.billed.map((line) => [line.count, line.unit[2]])).toEqual([
+      [1, "rozpoznań twarzy"],
+    ]);
+    expect(priced.prompts).toEqual([]);
+  });
+
+  it("should bill a lip-sync in face calls and jobs, apart, with every job it would run", () => {
+    const priced = asVersions({
+      clips: [
+        {
+          id: "C01",
+          jobs: [
+            {
+              cast: "ewa",
+              end: 3000,
+              face: "0",
+              key: "C01:ewa",
+              lines: ["en:D01"],
+              start: 1000,
+              state: "planned",
+            },
+            {
+              cast: "tata",
+              end: 9000,
+              face: "1",
+              key: "C01",
+              lines: ["en:D02"],
+              start: 6000,
+              state: "planned",
+            },
+          ],
+          problems: [],
+        },
+      ],
+      notices: [],
+      paidFaces: 1,
+      paidLipSyncs: 2,
+      problems: [],
+    });
+
+    expect(priced.billed.map((line) => [line.count, line.unit[2]])).toEqual([
+      [1, "rozpoznań twarzy"],
+      [2, "zadań lip-sync"],
+    ]);
+    expect(priced.prompts[0]?.text).toBe(
+      [
+        "C01:ewa: ewa, twarz 0, od 1000 ms do 3000 ms, en:D01, do kupienia",
+        "C01: tata, twarz 1, od 6000 ms do 9000 ms, en:D02, do kupienia",
+      ].join("\n")
+    );
   });
 });

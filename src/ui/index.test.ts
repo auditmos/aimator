@@ -12,7 +12,9 @@ import {
   makeDialogue,
   makeNarration,
   makeSoundDesign,
+  makeTrack,
   makeUpstream,
+  makeVersions,
   makeVoices,
   PROJECT,
   png,
@@ -1007,6 +1009,98 @@ describe("the artifact resolver, stage 11", () => {
     );
 
     expect(answers).toEqual(Array.from({ length: 6 }, () => 404));
+  });
+});
+
+/**
+ * Stage 12 is per track: a clip's version under the clip's own id, and a
+ * face's picture under `face:<clip>:<face>.<format>`, the format being the one
+ * `check` names the picture by, so the resolver builds the path rather than
+ * guessing which format the provider handed back.
+ */
+describe("the artifact resolver, stage 12", () => {
+  let versioned = "";
+  let versionedScratch = "";
+
+  function versionsRoot(): string {
+    return join(versioned, "projects", PROJECT, "episodes", EPISODE, TRACK, "versions");
+  }
+
+  function ask(artifact: string, track = TRACK) {
+    const resolved = resolveWorkspace(versioned);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    return createUi({ workspace: resolved.data }).request(
+      `/api/artifact/${PROJECT}/versions/${encodeURIComponent(artifact)}?episode=${EPISODE}&track=${track}`
+    );
+  }
+
+  beforeAll(async () => {
+    versionedScratch = await mkdtemp(join(tmpdir(), "aimator-ui-versions-"));
+    versioned = join(versionedScratch, "workspace");
+    const resolved = resolveWorkspace(versioned);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    await makeUpstream({
+      answer: answer(),
+      approvePackage: true,
+      dialogue: true,
+      root: versioned,
+      scratch: versionedScratch,
+      workspace: resolved.data,
+    });
+    await makeTrack({ root: versioned, track: TRACK, workspace: resolved.data });
+    await makeDialogue({ workspace: resolved.data });
+    // C02 is Tata alone speaking on screen: faces found, bound, lip-synced.
+    await makeVersions({ faces: { C02: { 1: "tata" } }, workspace: resolved.data });
+  }, 240_000);
+
+  afterAll(async () => {
+    await rm(versionedScratch, { force: true, recursive: true });
+  });
+
+  it("should serve a clip's version as the MP4 it is and a face as the picture it is", async () => {
+    const [clip, face] = await Promise.all(
+      ["C02", "face:C02:1.png"].map(async (artifact) => {
+        const response = await ask(artifact);
+
+        return {
+          bytes: Buffer.from(await response.arrayBuffer()),
+          status: response.status,
+          type: response.headers.get("content-type") ?? "",
+        };
+      })
+    );
+
+    expect([clip?.status, face?.status]).toEqual([200, 200]);
+    expect(clip?.type).toBe("video/mp4");
+    expect(face?.type).toBe("image/png");
+    expect(clip?.bytes).toEqual(await readFile(join(versionsRoot(), "clips", "C02.mp4")));
+    expect(face?.bytes).toEqual(await readFile(join(versionsRoot(), "faces", "C02", "1.png")));
+  });
+
+  it("should answer 404 without a track, for a step, and for anything it does not name", async () => {
+    const answers = await Promise.all(
+      [
+        ask("C02", ""),
+        // A step is half a clip, and nothing a person is meant to watch.
+        ask("C02:tata"),
+        ask("face:C02:1"),
+        ask("face:C02:1.gif"),
+        ask("face:C02:1.png:x"),
+        ask(`face:C02:${"../../C02"}.png`),
+        ask(`face:${"../.."}:1.png`),
+        ask("faces.json"),
+      ].map(async (response) => (await response).status)
+    );
+
+    expect(answers).toEqual(Array.from({ length: 8 }, () => 404));
   });
 });
 

@@ -162,12 +162,29 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   <kod>`). Jeden blok zamiast trzech, bo „Kup” bierze się z ostatniego podglądu, a trzy
   bloki proponowałyby kupno cudzych podglądów. Rachunek kwestii stoi w **kwestiach
   i znakach**, rachunek skryptu i przekładu w wywołaniach tekstowych.
+- **Panel etapu 12** per tor, jak etap 7, bo twarze są w obrazach tego toru i żadnego
+  innego. Karta każdego klipu, w którym postać widoczna w kadrze mówi kwestię przekładu,
+  stoi w kolejności z terminala: przyjęty klip z etapu 7, twarze, które znalazło
+  rozpoznanie (obrazek i przedział w ms każdej), pod każdą twarzą wybór „Kto to?” spośród
+  mówiących w kadrze i „Zapisz przypisanie” (`versions bind`), a na końcu wersja do
+  obejrzenia pod klipem, z którego powstała. Przypisanie to **decyzja, nie zakup**, więc
+  zapisuje się od razu, bez podglądu, i zawsze jawnie, także przy jednej twarzy. Twarze
+  i przypisanie panel bierze z obiektu `check` (`faces`, `binding`), bo ekran nie wie nic,
+  czego nie powie terminal. Płatny blok kupuje jedną z dwóch rzeczy, wybieraną polem
+  „Co kupić”: rozpoznanie twarzy w jednym klipie (`versions faces`, jedno wywołanie na
+  klip) albo lip-sync zaznaczonych klipów (`versions lip-sync`, bez zaznaczenia każdego,
+  na który pozwalają bramki). „Rozpoznaj twarze” w karcie klipu ustawia ten blok na ten
+  klip, rozwija go i uruchamia darmowy podgląd, więc płaci się dalej wyłącznie „Kup”.
+  Rachunek lip-syncu stoi w **rozpoznaniach i zadaniach**, osobno, bo druga mówiąca
+  postać w klipie kosztuje rozpoznanie na wyniku pierwszego zadania, a pod nim lista zadań:
+  postać, twarz, okno w ms i kwestie. Klipy bez mówiącego w kadrze stoją w stanie jako
+  „bez zmian”.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
 
-Każdy zaimplementowany etap od 0 do 11 ma swój ekran, a etapy 9 i 10 mają po dwa, bo ich
-artefakty leżą na dwóch poziomach drzewa. Etap 12 panelu jeszcze nie ma.
+Każdy zaimplementowany etap od 0 do 12 ma swój ekran, a etapy 9 i 10 mają po dwa, bo ich
+artefakty leżą na dwóch poziomach drzewa.
 
 ## Gdzie stoi panel
 
@@ -182,8 +199,7 @@ odległości. Z daleka to trzynaście wierszy. Z bliska to jeden etap:
   niż jeden;
 - powód blokady w słowach etapu albo decyzja odcinka, która go wyklucza;
 - i sam panel, na całą szerokość. Etap, który odcinka nie dotyczy, panelu nie ma, bo nie
-  ma w nim czego kupić ani przyjąć. Etap 12 nie ma jeszcze panelu: jego strona pokazuje
-  stan i polecenie, które złożył dla niego `status`, do uruchomienia w terminalu;
+  ma w nim czego kupić ani przyjąć;
 - na dole odnośniki do etapu poprzedniego i następnego.
 
 Przejście do innego etapu albo zakładki to nowa strona. Ekran wraca wtedy na górę, a
@@ -229,7 +245,7 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    inny wybór ogniw czyści zaznaczenia, bo dotyczyły obrazu, którego już nie ma. Dryf wejść nie
    chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
    wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje. W etapach, które
-   rysują (2, 5, 6 i 7), i w etapie 11 obok „Zatwierdź” stoi **„Odrzuć…”** (`reject`): otwiera pole na
+   rysują (2, 5, 6 i 7), i w etapach 11 i 12 obok „Zatwierdź” stoi **„Odrzuć…”** (`reject`): otwiera pole na
    powód, bez którego terminal odrzucenia nie przyjmie, a przy klatce otwarcia i samych
    klatkach wejściowych także pola na niespełnione kryteria QC (`--fail`). Powód trafia do
    oceny i na drabinę („odrzucone: …”). Odrzucenie niczego nie kupuje ani nie rysuje;
@@ -507,6 +523,14 @@ języka `en:D01`, ale obie leżą w katalogu nazwanym od swojego języka, więc 
 się jako `pl:D01`. Inaczej resolver musiałby czytać `episode.json`, żeby wiedzieć, w jakim
 języku mówi film, a resolver buduje ścieżki i niczego nie rozstrzyga. Język filmu panel bierze
 z `episode show --json`.
+
+Etap 12 przyjmuje tylko z torem. Wersja klipu to identyfikator klipu (`C01`), ten sam, który
+bierze `--artifact`, a obrazek twarzy to `face:C01:0.png`. Format obrazka wybiera dostawca,
+tak jak przy końcówce klipu, ale tu jest już zapisany: `check` podaje ścieżkę każdego
+obrazka, więc panel pyta z rozszerzeniem, które tam przeczytał, a resolver buduje ścieżkę
+w tym formacie, zamiast go zgadywać. Przyjmuje tylko dwa, które zapisuje układ (`png`,
+`jpg`). Krok pośredni (`C01:ewa`) dostaje 404: to klip z jedną twarzą poruszoną, a drugą
+jeszcze nie, i nikt nie ma go oglądać.
 
 Od etapu 7 dochodzi film, a film się **przewija**, więc artefakt odpowiada na nagłówek
 `Range`: bez niego 200 i całość, z czytelnym zakresem 206 i dokładnie te bajty (200 kazałoby
