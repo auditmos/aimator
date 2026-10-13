@@ -11,6 +11,7 @@ import {
   PROJECT,
   png,
   recorder,
+  type ShotListShape,
 } from "../../test/fixture.js";
 import { approveReferences, generateReferences } from "../references/index.js";
 import { type ImageTrack, resolveWorkspace, type Workspace } from "../workspace.js";
@@ -44,7 +45,7 @@ let workspace: Workspace = { root: "" };
  * thing to wait for that stage 5 had to draw first, which is the whole point
  * of the stage's position in the pipeline.
  */
-function answer(): string {
+function answer(opening: readonly string[] = ["hero:ewa", "R01"]): string {
   return JSON.stringify({
     clips: [
       {
@@ -59,7 +60,7 @@ function answer(): string {
       },
     ],
     entryFrames: [{ clipId: "C02", prompt: "Dokładnie końcowe położenie z C01." }],
-    opening: { prompt: "Ewa centralnie, burza za oknem.", referenceIds: ["hero:ewa", "R01"] },
+    opening: { prompt: "Ewa centralnie, burza za oknem.", referenceIds: opening },
     references: [
       {
         dependsOn: ["hero:ewa"],
@@ -74,13 +75,14 @@ function answer(): string {
 }
 
 /** Stages 0 to 4, ending with a package this stage is allowed to read. */
-function upstream(): Promise<void> {
+function upstream(shotList?: ShotListShape, opening?: readonly string[]): Promise<void> {
   return makeUpstream({
-    answer: answer(),
+    answer: answer(opening),
     approvePackage: true,
     root,
     scratch,
     workspace,
+    ...(shotList === undefined ? {} : { shotList }),
   });
 }
 
@@ -129,6 +131,7 @@ function generate(overrides: Partial<Parameters<typeof generateOpeningFrame>[0]>
 function accept(overrides: Partial<Parameters<typeof approveOpeningFrame>[0]> = {}) {
   return approveOpeningFrame({
     artifacts: [],
+    checks: "all",
     episodeId: EPISODE,
     mode: "apply",
     note: "ok",
@@ -407,6 +410,21 @@ describe("checkOpeningFrame", () => {
     expect(await readStageFile()).toEqual(before);
   });
 
+  /** The next step is a command that works, so it carries the checklist it is judged by. */
+  it("should name the criteria to judge by in the next step of a pending frame", async () => {
+    await upstream();
+    await makeReferences("gpt-image");
+    const drawn = await generate();
+    const status = await inspect();
+
+    for (const step of [
+      drawn.ok ? drawn.data.nextStep : "",
+      status.ok ? status.data.nextStep : "",
+    ]) {
+      expect(step).toContain("--checks anatomy,master,style,continuity,props");
+    }
+  });
+
   it("should report a frame that was never drawn", async () => {
     await upstream();
     await makeReferences("gpt-image");
@@ -429,6 +447,32 @@ describe("approveOpeningFrame", () => {
     const stage = await readStageFile();
     expect(stage.artifacts["opening-frame"].review.status).toBe("approved");
     expect(stage.artifacts["opening-frame"].review.reviewer).toBe("tester");
+  });
+
+  /**
+   * `master` compares the drawing with a cast member's canonical image. An
+   * opening shot with nobody from the cast in it attaches no `hero:`, so there
+   * is nothing to compare, and the checklist it is accepted against has four.
+   */
+  it("should not require master of a frame that attaches no hero", async () => {
+    await upstream("empty-opening", [OPENING_NEEDS]);
+    await makeReferences("gpt-image");
+    await generate();
+    const refused = await accept({ checks: null });
+    const result = await accept({ checks: ["anatomy", "style", "continuity", "props"] });
+
+    expect(refused.ok ? null : refused.error.message).toContain(
+      "anatomy, style, continuity, props (albo --checks all)"
+    );
+    expect(result.ok ? result.data.approved : result.error.message).toBe(true);
+
+    const stage = await readStageFile();
+    expect(stage.artifacts["opening-frame"].review.checks).toEqual([
+      "anatomy",
+      "style",
+      "continuity",
+      "props",
+    ]);
   });
 
   it("should still accept an explicit --artifact opening-frame", async () => {

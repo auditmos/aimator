@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -32,14 +32,16 @@ let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
 
-function answer(): string {
+function answer(clipIds: readonly string[] = ["C01", "C02"]): string {
   return JSON.stringify({
-    clips: ["C01", "C02"].map((id) => ({
+    clips: clipIds.map((id) => ({
       id,
       prompt: `Akcja klipu ${id}.`,
       referenceIds: ["hero:ewa", "hero:tata", "R01"],
     })),
-    entryFrames: [{ clipId: "C02", prompt: "Pierwsza chwila klipu C02." }],
+    entryFrames: clipIds
+      .slice(1)
+      .map((id) => ({ clipId: id, prompt: `Pierwsza chwila klipu ${id}.` })),
     opening: { prompt: "Ewa centralnie, burza za oknem.", referenceIds: ["hero:ewa", "R01"] },
     references: [
       {
@@ -153,6 +155,8 @@ describe("approve --stage clips", () => {
       DRAWN,
       "--artifact",
       "C01,entry:C02",
+      "--checks",
+      "all",
       "--reviewer",
       "fixture",
       "--dry-run",
@@ -160,6 +164,106 @@ describe("approve --stage clips", () => {
     );
 
     expect(printed).toMatchObject({ command: "approve", stage: "clips", track: DRAWN });
+  });
+});
+
+/**
+ * An entry frame is a frame ready for animation, so it is accepted against the
+ * QC checklist like the opening frame; a clip is not. Assumptions: one
+ * `--checks` covers every entry frame `--artifact` names; every frame here
+ * attaches `hero:ewa`, so all five criteria apply; a clip ignores the flag.
+ * Three clips, because two entry frames are what "each of them" needs.
+ */
+describe("approve --stage clips --checks", () => {
+  let chain = "";
+
+  beforeAll(async () => {
+    chain = await mkdtemp(join(tmpdir(), "aimator-cli-clips-chain-"));
+    const sources = await mkdtemp(join(tmpdir(), "aimator-cli-clips-chain-src-"));
+    const resolved = resolveWorkspace(chain);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    await makeUpstream({
+      answer: answer(["C01", "C02", "C03"]),
+      approvePackage: true,
+      root: chain,
+      scratch: sources,
+      shotList: "three-clips",
+      workspace: resolved.data,
+    });
+    await makeTrack({ root: chain, track: DRAWN, workspace: resolved.data });
+    await rm(sources, { force: true, recursive: true });
+  }, 120_000);
+
+  afterAll(async () => {
+    await rm(chain, { force: true, recursive: true });
+  });
+
+  async function records(): Promise<
+    Partial<Record<string, { review: { checks?: readonly string[]; reviewer: string } }>>
+  > {
+    const path = join(chain, "projects", PROJECT, "episodes", EPISODE, DRAWN, "clips.stage.json");
+
+    return JSON.parse(await readFile(path, "utf8")).artifacts;
+  }
+
+  function approve(...flags: readonly string[]) {
+    return run([
+      "approve",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "clips",
+      "--track",
+      DRAWN,
+      ...flags,
+      "--workspace",
+      chain,
+    ]);
+  }
+
+  it("should record the checklist on every entry frame it names", async () => {
+    const result = await approve(
+      "--artifact",
+      "entry:C02,entry:C03",
+      "--checks",
+      "all",
+      "--reviewer",
+      "qc"
+    );
+
+    expect(result.ok ? null : result.error.message).toBeNull();
+
+    const artifacts = await records();
+
+    for (const id of ["entry:C02", "entry:C03"]) {
+      expect(artifacts[id]?.review).toMatchObject({
+        checks: ["anatomy", "master", "style", "continuity", "props"],
+        reviewer: "qc",
+      });
+    }
+  });
+
+  it("should refuse an entry frame without --checks, naming the criteria", async () => {
+    const result = await approve("--artifact", "C01,entry:C02");
+
+    expect(result.ok ? null : result.error.message).toContain(
+      "entry:C02 (gpt-image): zatwierdzenie wymaga --checks z kryteriami: anatomy, master, style, continuity, props"
+    );
+  });
+
+  it("should accept a clip without --checks, as before, and record none", async () => {
+    const result = await approve("--artifact", "C01", "--reviewer", "clip-only");
+
+    expect(result.ok ? null : result.error.message).toBeNull();
+
+    const clip = (await records()).C01;
+
+    expect(clip?.review.reviewer).toBe("clip-only");
+    expect(clip?.review.checks).toBeUndefined();
   });
 });
 

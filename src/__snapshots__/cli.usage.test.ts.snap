@@ -22,7 +22,7 @@ Odcinek "01-burza", tor gpt-image, zatwierdzono
 Dalej: etap 7 dla odcinka "01-burza" na torze gpt-image jest kompletny, dalej etap 8, montaż"
 `;
 
-exports[`every command >   approve <id> <episode-id> --stage opening-frame --track <tor> [--json] 1`] = `
+exports[`every command >   approve <id> <episode-id> --stage opening-frame --track <tor> --checks <kryteria>|all 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, zatwierdzono klatkę otwarcia
   opening-frame: zatwierdzona, 2816x1584

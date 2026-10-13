@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { Check } from "../checklist.js";
 import { archivedBy, type Workspace } from "../workspace.js";
 import type { RecordedFile, StageFile } from "./schema.js";
 import { nowIso, readDigest } from "./store.js";
@@ -15,6 +16,8 @@ import { nowIso, readDigest } from "./store.js";
  */
 
 interface Approval {
+  /** The QC criteria confirmed, by artifact key, for the ones accepted against a checklist. */
+  readonly checks?: Readonly<Record<string, readonly Check[]>>;
   readonly note: string | null;
   readonly reviewer: string;
 }
@@ -136,10 +139,13 @@ export function approveArtifacts(
   for (const key of keys) {
     const artifact = artifacts[key];
 
+    const checks = approval.checks?.[key];
+
     if (artifact !== undefined) {
       artifacts[key] = {
         ...artifact,
         review: {
+          ...(checks === undefined ? {} : { checks: [...checks] }),
           note: approval.note,
           reviewedAt,
           reviewer: approval.reviewer,

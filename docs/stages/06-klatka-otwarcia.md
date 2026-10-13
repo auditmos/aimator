@@ -17,6 +17,7 @@ pnpm dev opening-frame generate dzielna-ewa 01-burza --track seedream --dry-run
 pnpm dev opening-frame generate dzielna-ewa 01-burza --track seedream
 pnpm dev check dzielna-ewa 01-burza --stage opening-frame --track seedream
 pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track seedream \
+  --checks anatomy,master,style,continuity,props \
   --note "pozycja alpaki bez ucisku ucha"
 ```
 
@@ -34,7 +35,7 @@ z konstrukcji. Szczegóły na stronie [etapu 5](05-referencje.md#poprawka-z-uwag
 
 ```bash
 pnpm dev check dzielna-ewa 01-burza --stage opening-frame --track gpt-image --json
-pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track gpt-image --json
+pnpm dev approve dzielna-ewa 01-burza --stage opening-frame --track gpt-image --checks all --json
 pnpm dev opening-frame generate dzielna-ewa 01-burza --track gpt-image --dry-run --json
 ```
 
@@ -56,6 +57,27 @@ Ani przy `--regenerate`, ani przy `approve`. Etap ma jeden artefakt, więc samo 
 już mówi, o co chodzi; flaga o jednej dozwolonej wartości byłaby ceremonią, nie
 zabezpieczeniem. Napisana i tak jest sprawdzana: `--artifact R01` w tym etapie to odmowa,
 nie ciche zignorowanie.
+
+## Zatwierdzenie to checklista, nie samo „tak"
+
+Walidator obrazu sprawdza strukturę PNG i wymiary, a z tej klatki zostanie wyrenderowany
+klip. Dlatego `approve` tego etapu **wymaga `--checks`**: listy kryteriów, które człowiek
+sprawdził, albo `all`.
+
+| Kryterium | Co sprawdzasz |
+|---|---|
+| `anatomy` | anatomia postaci |
+| `master` | zgodność z Character Master (`hero.png` na tym torze) |
+| `style` | zgodność ze stylem serii |
+| `continuity` | ciągłość z listą ujęć |
+| `props` | rekwizyty i otoczenie |
+
+Zbiór wymaganych kryteriów jest **wyprowadzony z planu wysyłki**, nie pytany: `master`
+obowiązuje tylko wtedy, gdy klatka dołącza jakiś `hero:<id>`. Kadr bez postaci z obsady nie
+ma czego porównywać z Character Master. Bez `--checks` albo z niepełną listą `approve`
+odmawia i wymienia brakujące kryteria; nazwa spoza słownika to błąd użycia. `--checks all`
+znaczy „wszystkie wymagane dla tej klatki". Rekord zapisuje je w `review.checks`.
+Podpowiedź „Dalej:" w `check` i `generate` niesie już tę listę.
 
 ## Czym różni się od referencji
 

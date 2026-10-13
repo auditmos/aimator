@@ -40,6 +40,8 @@ const SHORT_CLIP = mp4({ height: 1080, seconds: 3, width: 1920 });
 const END_FRAME = png(1920, 1080, 3);
 /** How stage 7 names a prompt Kling will not take: the clip, then the count. */
 const TOO_LONG = /C01: prompt klipu ma \d{4} znaków/;
+/** A next step that names one clip and no checklist: nothing but C01 waits. */
+const ONLY_CLIP_WAITS = /--artifact C01$/;
 
 let root = "";
 let scratch = "";
@@ -125,6 +127,7 @@ async function makeOpeningFrame(track: ImageTrack, approve = true): Promise<void
   if (approve) {
     await approveOpeningFrame({
       artifacts: [],
+      checks: "all",
       episodeId: EPISODE,
       mode: "apply",
       note: "ok",
@@ -242,6 +245,7 @@ function generate(overrides: Partial<Parameters<typeof generateClips>[0]> = {}) 
 function accept(artifacts: readonly string[]) {
   return approveClips({
     artifacts,
+    checks: "all",
     episodeId: EPISODE,
     mode: "apply",
     note: "ok",
@@ -374,6 +378,31 @@ describe("generateClips", () => {
    * The chain: C03 continues C02, so its entry frame cannot be drawn until a
    * human has accepted the clip whose final frame it has to match.
    */
+  /**
+   * The next step is a command that works: with an entry frame among what
+   * waits it carries the checklist, and with only a clip waiting it does not.
+   */
+  it("should carry --checks in the next step only while an entry frame waits", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+    const bought = await generate();
+    const both = await status();
+
+    for (const step of [
+      bought.ok ? bought.data.nextStep : reason(bought),
+      both.ok ? both.data.nextStep : reason(both),
+    ]) {
+      expect(step).toContain(
+        "--artifact C01,entry:C02 --checks anatomy,master,style,continuity,props"
+      );
+    }
+
+    await accept(["entry:C02"]);
+    const clip = await status();
+
+    expect(clip.ok ? clip.data.nextStep : reason(clip)).toMatch(ONLY_CLIP_WAITS);
+  });
+
   it("should wait for the accepted end of the clip a later one continues", async () => {
     await upstream();
     await makeOpeningFrame("gpt-image");

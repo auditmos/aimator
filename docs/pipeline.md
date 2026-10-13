@@ -1130,8 +1130,13 @@ więc nie ma czego naprawiać po stronie publikacji.
 
 **Akceptacja jest osobna od walidacji**, jak wszędzie. Klatka, która przeszła walidację, ma
 `review.status = "pending"`; przyjmuje ją dopiero `aimator approve <project-id> <episode-id>
---stage opening-frame --track <tor>`. `aimator check <project-id> <episode-id> --stage
-opening-frame --track <tor>` sprawdza to samo i nie zapisuje niczego.
+--stage opening-frame --track <tor> --checks <kryteria>|all`. Zgoda jest checklistą QC, nie
+samym „tak": `anatomy`, `master`, `style`, `continuity`, `props`, przy czym `master`
+obowiązuje tylko wtedy, gdy plan wysyłki klatki ma załącznik `hero:<id>`. Zbiór wymaganych
+kryteriów jest wyprowadzony z planu, nie zapisany; brak `--checks` albo niepełna lista to
+odmowa z nazwami brakujących, a przyjęte kryteria trafiają do `review.checks` rekordu.
+`aimator check <project-id> <episode-id> --stage opening-frame --track <tor>` sprawdza to
+samo i nie zapisuje niczego.
 
 Rozjazd wejścia unieważnia akceptację i `check` to zgłasza, a `approve` przepisuje hashe
 wejść i zapisuje nową zgodę. Zabezpieczeniem nie jest ponowna walidacja strukturalna, bo
@@ -1312,6 +1317,9 @@ i tekst, i rachunek.
 jawnego `--artifact`, i `approve` też, tu ostrzej niż w etapie 5: przyjęcie klipu otwiera
 rysowanie następnej klatki wejściowej, a przyjęcie tej klatki kupuje następny klip.
 Akceptacja, której nikt nie napisał, wydawałaby pieniądze, na które nikt się nie zgodził.
+Klatka wejściowa przyjmuje się z tą samą checklistą QC co klatka otwarcia (`--checks`,
+z `master` tylko przy załączniku `hero:`); jedno `--checks` obejmuje każdą klatkę wskazaną
+w `--artifact`, a klip przyjmuje się bez niej.
 
 `aimator check <project-id> <episode-id> --stage clips --track <tor>` sprawdza to samo i nie
 zapisuje niczego. Rozjazd wejścia unieważnia akceptację i `check` to zgłasza, a `approve`

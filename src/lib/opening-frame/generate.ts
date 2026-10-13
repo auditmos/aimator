@@ -6,6 +6,7 @@ import {
   type WriteMode,
   writeNew,
 } from "../artifact/index.js";
+import { checksFlag } from "../checklist.js";
 import { attach, type ImageVerdict, runImageStage } from "../image-model/index.js";
 import type { PlannedArtifact } from "../media-prompt/index.js";
 import { err, ok, type Result } from "../result.js";
@@ -215,7 +216,7 @@ function idle(input: GenerateInput, stage6: Stage6Inputs): OpeningFrameReport {
     },
     created: [],
     nextStep: waiting
-      ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`
+      ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}${checksFlag(stage6.opening.checks)}`
       : `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 7, klipy`,
     paidCalls: 0,
     problems: waiting ? ["klatka czeka na ocenę człowieka"] : [],
@@ -358,7 +359,7 @@ async function runOne(
     },
     created: attempt.data.created,
     nextStep: drawn
-      ? `oceń wynik, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`
+      ? `oceń wynik, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}${checksFlag(target.checks)}`
       : `usuń przeszkody i powtórz: aimator opening-frame generate ${input.projectId} ${input.episodeId} --track ${input.track}`,
     paidCalls: attempt.data.state === "published" ? 1 : 0,
     problems: [],

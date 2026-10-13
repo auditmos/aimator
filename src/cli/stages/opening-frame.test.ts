@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -67,6 +67,35 @@ async function object(...argv: readonly string[]): Promise<unknown> {
   return JSON.parse(await cli(...argv));
 }
 
+/** The opening frame's record on the drawn track, as the stage file holds it. */
+async function openingRecord(): Promise<{
+  readonly review: { readonly checks?: readonly string[]; readonly reviewer: string };
+}> {
+  const path = join(
+    root,
+    "projects",
+    PROJECT,
+    "episodes",
+    EPISODE,
+    DRAWN,
+    "opening-frame.stage.json"
+  );
+  const stage = JSON.parse(await readFile(path, "utf8"));
+
+  return stage.artifacts["opening-frame"];
+}
+
+/** The message a refused command answers with; a command that succeeds fails the test. */
+async function refusal(...argv: readonly string[]): Promise<string> {
+  const result = await run([...argv, "--workspace", root]);
+
+  if (result.ok) {
+    throw new Error(`expected a refusal, got:\n${result.data}`);
+  }
+
+  return result.error.message;
+}
+
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "aimator-cli-opening-"));
   scratch = await mkdtemp(join(tmpdir(), "aimator-cli-opening-src-"));
@@ -124,6 +153,8 @@ describe("approve --stage opening-frame", () => {
       "opening-frame",
       "--track",
       DRAWN,
+      "--checks",
+      "all",
       "--reviewer",
       "fixture",
       "--dry-run",
@@ -136,6 +167,86 @@ describe("approve --stage opening-frame", () => {
       stage: "opening-frame",
     });
   });
+});
+
+/**
+ * A frame ready for animation is accepted against a checklist, not with a bare
+ * yes. Assumptions: `--checks` takes `all` or a comma list from the fixed
+ * vocabulary; this frame carries `hero:ewa`, so all five criteria apply; the
+ * record stores the criteria that applied, in vocabulary order.
+ */
+describe("approve --stage opening-frame --checks", () => {
+  it("should refuse without --checks and name every criterion the frame requires", async () => {
+    const message = await refusal(
+      "approve",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "opening-frame",
+      "--track",
+      DRAWN
+    );
+
+    expect(message).toContain("--checks");
+    expect(message).toContain("anatomy, master, style, continuity, props");
+  });
+
+  it("should refuse an incomplete list and name only what is missing", async () => {
+    const message = await refusal(
+      "approve",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "opening-frame",
+      "--track",
+      DRAWN,
+      "--checks",
+      "anatomy,style"
+    );
+
+    expect(message).toContain("brakuje kryteriów: master, continuity, props");
+  });
+
+  it("should refuse a criterion outside the vocabulary and name the allowed ones", async () => {
+    const message = await refusal(
+      "approve",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "opening-frame",
+      "--track",
+      DRAWN,
+      "--checks",
+      "anatomy,colour"
+    );
+
+    expect(message).toContain('"colour"');
+    expect(message).toContain("anatomy, master, style, continuity, props albo all");
+  });
+
+  it.each([["all"], ["props,continuity,style,master,anatomy"]])(
+    "should accept --checks %s and record every criterion",
+    async (checks) => {
+      await cli(
+        "approve",
+        PROJECT,
+        EPISODE,
+        "--stage",
+        "opening-frame",
+        "--track",
+        DRAWN,
+        "--checks",
+        checks,
+        "--reviewer",
+        `qc-${checks}`
+      );
+
+      const { review } = await openingRecord();
+
+      expect(review.reviewer).toBe(`qc-${checks}`);
+      expect(review.checks).toEqual(["anatomy", "master", "style", "continuity", "props"]);
+    }
+  );
 });
 
 describe("opening-frame generate --json", () => {

@@ -404,6 +404,33 @@ describe("approve --stage", () => {
     const result = await cli("approve", "demo", "--stage", "screenplay");
     expect(result.text).toContain("<episode-id>");
   });
+
+  /**
+   * Only frames ready for animation carry a QC checklist. Accepted elsewhere,
+   * `--checks` would be recorded nowhere, and a flag that silently does nothing
+   * reads as a check somebody did.
+   */
+  it.each(["references", "character", "prepare"])(
+    "should refuse --checks on --stage %s",
+    async (stage) => {
+      const result = await cli(
+        "approve",
+        "demo",
+        "01-burza",
+        "--stage",
+        stage,
+        "--track",
+        "seedream",
+        "--artifact",
+        "R01",
+        "--checks",
+        "all"
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.text).toContain("--checks dotyczy tylko klatek gotowych do animacji");
+    }
+  );
 });
 
 describe("approve --stage character", () => {

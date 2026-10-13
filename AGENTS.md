@@ -318,6 +318,8 @@ src/
     ├── muxer.ts      # Single-file form: the local engine, shared by stages 7 to 10
     ├── muxer.test.ts
     ├── instruction.ts # Single-file form: the marked block a person's note travels in
+    ├── checklist.ts  # Single-file form: the QC criteria a frame ready for animation
+    │                 #                   is accepted against, stages 6 and 7
     ├── timeline.ts   # Single-file form: the plan's clock as one film's, stages 9 and 10
     ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
     │                 #                   page's worker and the local screen

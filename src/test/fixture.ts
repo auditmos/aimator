@@ -437,21 +437,25 @@ function shot(
  * the longest clip, and shorter than Seedance renders, which is what
  * stage 7 has to refuse before it spends anything.
  *
+ * `empty-opening` is the two-clip cut with nobody from the cast in its first
+ * shot, so the opening frame attaches no `hero:`, the one frame whose QC
+ * checklist has nothing to compare with a Character Master.
+ *
  * These are options rather than the only shape because the manifest a test
  * brings has to name exactly the clips the shot list plans, so switching
  * everybody to three clips would silently rewrite what stages 5 and 6 assert.
  */
-export type ShotListShape = "three-clips" | "two-clips" | "unrenderable-clip";
+export type ShotListShape = "empty-opening" | "three-clips" | "two-clips" | "unrenderable-clip";
 
 function shotList(shape: ShotListShape, narrated: boolean): string {
-  if (shape === "two-clips") {
-    return twoClips(narrated);
+  if (shape === "two-clips" || shape === "empty-opening") {
+    return twoClips(narrated, shape === "empty-opening" ? "none" : "ewa");
   }
 
   return shape === "three-clips" ? threeClips(narrated) : unrenderableClips(narrated);
 }
 
-function twoClips(narrated: boolean): string {
+function twoClips(narrated: boolean, openingCast: string): string {
   return [
     "## Plan\n\nDwa klipy, kadr 16:9.\n",
     [
@@ -473,7 +477,7 @@ function twoClips(narrated: boolean): string {
     [
       "## Shots",
       "",
-      shot("U01", "S01", "C01", "0-10s", "ewa", narrated),
+      shot("U01", "S01", "C01", "0-10s", openingCast, narrated),
       shot("U02", "S02", "C01", "10-15s", "ewa,tata", narrated),
       shot("U03", "S02", "C02", "15-20s", "tata", narrated),
       shot("U04", "S03", "C02", "20-30s", "ewa,tata", narrated),
@@ -1028,6 +1032,7 @@ export async function makeTrack(options: {
   });
   await approveOpeningFrame({
     artifacts: [],
+    checks: "all",
     episodeId: EPISODE,
     mode: "apply",
     note: "ok",
@@ -1085,6 +1090,7 @@ async function rerender(options: {
   });
   await approveClips({
     artifacts: [id],
+    checks: "all",
     episodeId: EPISODE,
     mode: "apply",
     note: "ok",
@@ -1135,6 +1141,7 @@ async function buyAndAccept(options: {
   if (bought.length > 0) {
     await approveClips({
       artifacts: bought,
+      checks: "all",
       episodeId: EPISODE,
       mode: "apply",
       note: "ok",

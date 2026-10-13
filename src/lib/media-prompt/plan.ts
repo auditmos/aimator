@@ -7,6 +7,7 @@ import {
   toWorkspacePath,
 } from "../artifact/index.js";
 import { checkCharacter } from "../character/index.js";
+import { CHECKS, type Check } from "../checklist.js";
 import {
   correction,
   frameSize,
@@ -104,6 +105,12 @@ export interface PlannedArtifact {
   readonly attachments: readonly Attachment[];
   /** Why this call may not happen yet. Empty means every input is accepted. */
   readonly blockers: readonly string[];
+  /**
+   * What a person confirms before accepting the result. Every criterion for a
+   * frame a clip starts on, `master` only when it attaches a cast member's
+   * image; none for a reference or a clip, which are accepted without one.
+   */
+  readonly checks: readonly Check[];
   /** The stage-file key and the output's own name: `R02`, `C03`, `opening-frame`. */
   readonly id: string;
   /** Everything it consumes, with the digest of each file as it was read. */
@@ -836,6 +843,21 @@ function overLimit(
     : `${head} załączników (poprawiany obraz i ${content} referencji), ${limit}; --instruction dokłada poprzedni obraz jako Image 1, więc tu się nie zmieści, zaplanuj w pakiecie mniej referencji`;
 }
 
+/**
+ * The checklist a frame ready for animation is accepted against, derived from
+ * what it is drawn from rather than asked: without a `hero:` there is no
+ * Character Master to compare the drawing with.
+ */
+function checklistOf(artifact: Artifact): readonly Check[] {
+  if (artifact.kind !== "opening" && artifact.kind !== "entry-frame") {
+    return [];
+  }
+
+  const cast = artifact.referenceIds.some((id) => id.startsWith(HERO));
+
+  return CHECKS.filter((check) => cast || check !== "master");
+}
+
 async function planOne(
   scope: Scope,
   artifact: Artifact,
@@ -890,6 +912,7 @@ async function planOne(
   return ok({
     attachments,
     blockers,
+    checks: checklistOf(artifact),
     id: artifact.id,
     inputs: [
       ...scope.shared,

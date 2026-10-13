@@ -7,6 +7,7 @@ import {
   type WriteMode,
   withInputs,
 } from "../artifact/index.js";
+import { type Checklist, checksFlag, confirmChecks } from "../checklist.js";
 import { type ImageVerdict, validateImage } from "../image-model/index.js";
 import { err, ok, type Result } from "../result.js";
 import { type ImageTrack, workspacePath } from "../workspace.js";
@@ -58,6 +59,8 @@ export interface OpeningFrameStatus {
 type ApproveScope = Stage6Scope & {
   /** Empty is the normal call. A named artifact must be this stage's one. */
   readonly artifacts: readonly string[];
+  /** What the person confirmed; `null` is refused, a frame is not accepted without it. */
+  readonly checks: Checklist | null;
   readonly mode: WriteMode;
   readonly note: string | null;
   readonly reviewer: string;
@@ -222,7 +225,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
       },
       nextStep: approved
         ? `etap 6 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 7, klipy`
-        : `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
+        : `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}${checksFlag(opening.checks)}`,
       problems,
       track: input.track,
     },
@@ -271,7 +274,17 @@ export async function approveOpeningFrame(
     problems.push(`nie ma czego zatwierdzić (${status.artifact.state})`);
   }
 
-  if (problems.length > 0) {
+  const checks = confirmChecks(
+    `${OPENING_FRAME} (${input.track})`,
+    stage6.opening.checks,
+    input.checks
+  );
+
+  if (!checks.ok) {
+    problems.push(checks.error.message);
+  }
+
+  if (!checks.ok || problems.length > 0) {
     return err(
       new OpeningFrameStateError("nie akceptuje się tego, co nie przechodzi walidacji", problems)
     );
@@ -281,6 +294,7 @@ export async function approveOpeningFrame(
     withInputs(stage6.stage, OPENING_FRAME, inputs),
     [OPENING_FRAME],
     {
+      checks: { [OPENING_FRAME]: checks.data },
       note: input.note,
       reviewer: input.reviewer,
     }

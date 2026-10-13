@@ -44,7 +44,8 @@ export const USAGE = `Etap 7. Klipy (płatny; per tor, dwa media w jednym polece
     OSOBNO dla obrazów i dla wideo, zanim cokolwiek wyśle. Długość klipu
     bierze się z listy ujęć; klipu, którego model nie renderuje (Seedance
     4-30 s, Kling 3-15 s), narzędzie nie zaokrągli, odmówi i wskaże poprawkę
-    w etapie 3.`;
+    w etapie 3. Klatkę wejściową zatwierdza się z checklistą QC (--checks,
+    jak klatkę otwarcia), każdą wskazaną w --artifact; klip bez niej.`;
 
 /** Which stage this file answers for, in the word `--stage` takes. */
 const STAGE = "clips";

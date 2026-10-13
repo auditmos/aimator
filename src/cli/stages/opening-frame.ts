@@ -31,7 +31,9 @@ export const USAGE = `Etap 6. Klatka otwarcia (płatny; per tor, dokładnie jedn
                          [--regenerate [--instruction <uwaga>]]
     Czeka na referencje, które pakiet wpisał w opening.referenceIds, i na hero
     każdej postaci w kadrze, zatwierdzone NA TYM TORZE. Jeden artefakt, więc
-    --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.`;
+    --artifact niczego nie zawęża i nie jest wymagane nawet przy --regenerate.
+    Zatwierdzenie wymaga checklisty QC: --checks anatomy,master,style,continuity,
+    props albo --checks all; master tylko wtedy, gdy kadr dołącza hero:<id>.`;
 
 /** Which stage this file answers for, in the word `--stage` takes. */
 const STAGE = "opening-frame";

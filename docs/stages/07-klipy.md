@@ -19,6 +19,8 @@ pnpm dev clip generate dzielna-ewa 01-burza --track seedream
 pnpm dev check dzielna-ewa 01-burza --stage clips --track seedream
 pnpm dev approve dzielna-ewa 01-burza --stage clips --track seedream --artifact C01 \
   --note "ruch ręki czytelny, końcówka nadaje się na wejście C02"
+pnpm dev approve dzielna-ewa 01-burza --stage clips --track seedream --artifact entry:C02 \
+  --checks anatomy,master,style,continuity,props
 ```
 
 Dodatkowe flagi: `--artifact C01,entry:C02`, `--image-model <id>`, `--video-model <id>`,
@@ -53,6 +55,16 @@ Klip C01 czeka na zatwierdzoną klatkę otwarcia. Klatka wejściowa C02 czeka na
 **końcówkę** C01, jeśli lista ujęć mówi `previous-end-frame`; jeśli mówi
 `new-scene-frame`, czeka tylko na swoje referencje. Klip C02 czeka na swoją klatkę
 wejściową. **Każde ogniwo to zgoda człowieka, nie sama walidacja.**
+
+## Klatka wejściowa zatwierdza się z checklistą
+
+Klatka wejściowa jest, jak [klatka otwarcia](06-klatka-otwarcia.md#zatwierdzenie-to-checklista-nie-samo-tak),
+kadrem gotowym do animacji, więc `approve` z `entry:Cnn` w `--artifact` **wymaga
+`--checks`**: `anatomy`, `master`, `style`, `continuity`, `props` albo `all`. `master`
+obowiązuje tylko wtedy, gdy klatka dołącza jakiś `hero:<id>`. Jedno `--checks` dotyczy
+każdej klatki wskazanej w `--artifact` (`--artifact entry:C02,entry:C03 --checks all`
+zapisuje `review.checks` w obu rekordach). Klip (`C01`) zatwierdza się bez checklisty, także
+w tym samym poleceniu co klatkę.
 
 ## Końcówka klipu wraca razem z klipem
 

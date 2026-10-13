@@ -6,6 +6,7 @@ import {
   type WriteMode,
   writeNew,
 } from "../artifact/index.js";
+import { checksFlag } from "../checklist.js";
 import { attach, runImageStage } from "../image-model/index.js";
 import type { PlannedArtifact } from "../media-prompt/index.js";
 import type { Muxer } from "../muxer.js";
@@ -359,7 +360,7 @@ function idle(input: GenerateInput, stage7: Stage7Inputs): ClipsReport {
     created: [],
     nextStep:
       waiting.length > 0
-        ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${waiting.map((one) => one.name).join(",")}`
+        ? `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${waiting.map((one) => one.name).join(",")}${checksFlag(...waiting.map((one) => one.artifact.checks))}`
         : `etap 7 dla odcinka "${input.episodeId}" na torze ${input.track} jest kompletny, dalej etap 8, montaż`,
     notices: [],
     paidImages: 0,
@@ -531,6 +532,9 @@ async function runAll(
   }
 
   const bought = artifacts.filter((one) => one.state === "published" || one.state === "resumed");
+  const checks = targets
+    .filter((one) => bought.some((outcome) => outcome.id === one.name))
+    .map((one) => one.artifact.checks);
   // What this run did not touch and why. A chain means most of the episode is
   // waiting at any moment, and a report that only spoke about what it bought
   // would leave the next link unexplained.
@@ -547,7 +551,7 @@ async function runAll(
     created,
     nextStep:
       bought.length > 0
-        ? `oceń wyniki, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${bought.map((one) => one.id).join(",")}`
+        ? `oceń wyniki, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${bought.map((one) => one.id).join(",")}${checksFlag(...checks)}`
         : `usuń przeszkody i powtórz: aimator clip generate ${input.projectId} ${input.episodeId} --track ${input.track}`,
     notices: modelNotices(input, stage7, targets),
     paidImages: artifacts.filter((one) => one.state === "published" && one.kind === "entry-frame")

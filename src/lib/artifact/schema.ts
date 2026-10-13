@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CHECKS } from "../checklist.js";
 
 /**
  * Internal to the artifact module: the one shape every stage writes.
@@ -48,6 +49,12 @@ export const stageNames = [
 const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });
 
 const reviewSchema = z.strictObject({
+  /**
+   * The QC criteria a person confirmed, on the frames accepted against a
+   * checklist (the opening frame and every entry frame). Absent everywhere
+   * else, and on every approval older than the field.
+   */
+  checks: z.array(z.enum(CHECKS)).optional(),
   note: z.string().nullable(),
   reviewedAt: z.iso.datetime().nullable(),
   reviewer: z.string().nullable(),

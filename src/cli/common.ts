@@ -1,5 +1,6 @@
 import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
+import { CHECKS, type Checklist } from "../lib/checklist.js";
 import { env } from "../lib/env.js";
 import type { Stage0Report } from "../lib/project/index.js";
 import { err, ok, type Result } from "../lib/result.js";
@@ -333,6 +334,37 @@ export function trackOf(parsed: Parsed): Result<ImageTrack> {
     : err(new UsageError(`--track, dozwolone: ${imageTracks.join(", ")}`));
 }
 
+/**
+ * `--checks`: `all`, the criteria named, or `null` when the flag is absent.
+ *
+ * A name outside the vocabulary is refused here rather than ignored, because a
+ * misspelt `anatmy` would otherwise surface as "anatomy is missing" one step
+ * later, which blames the person for a check they did.
+ */
+export function checksOf(parsed: Parsed): Result<Checklist | null> {
+  const flag = parsed.values.checks;
+
+  if (typeof flag !== "string") {
+    return ok(null);
+  }
+
+  if (flag.trim() === "all") {
+    return ok("all");
+  }
+
+  const names = flag
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "");
+  const unknown = names.filter((name) => !CHECKS.some((check) => check === name));
+
+  return unknown.length > 0
+    ? err(
+        new UsageError(`--checks "${unknown.join(", ")}", dozwolone: ${CHECKS.join(", ")} albo all`)
+      )
+    : ok(CHECKS.filter((check) => names.includes(check)));
+}
+
 /** Reference ids, as `--artifact` writes them: `R01` or `R01,R02`. */
 export function referenceIdsOf(parsed: Parsed): readonly string[] {
   const flag = parsed.values.artifact;
@@ -369,6 +401,8 @@ export function imageModelOf(parsed: Parsed, track: ImageTrack): Result<string |
 export interface Approval {
   /** Prose or the stage's object; refused before this record is built. */
   readonly answer: Answer;
+  /** `--checks`: only frames ready for animation are accepted against one. */
+  readonly checks: Checklist | null;
   readonly mode: "apply" | "dry-run";
   readonly note: string | null;
   readonly projectId: string;
