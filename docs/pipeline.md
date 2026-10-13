@@ -800,7 +800,19 @@ nie scala scen scenariusza.
   `Expression`, `Camera`, `Cast`, `Audio`, `Text`, `Start state`, `End state`;
 - tekst ekranowy **przeniesiony, nie wymyślony**: ujęcie nie może mieć napisu, którego jego
   scena nie miała, przy `subtitles: none` każde `Text` brzmi `none`, a scena, która miała
-  napis, nie może stracić go w żadnym ze swoich ujęć.
+  napis, nie może stracić go w żadnym ze swoich ujęć;
+- kwestia postaci zapisana jako `<id>: "…"` w `Audio`: przy `audio` równym `dialogue` albo
+  `dialogue-and-narration` każde `<id>` jest identyfikatorem obsady, w pozostałych trybach
+  taki zapis jest odmową, bo ten film nie ma dialogu.
+
+**Kwestia postaci ma mówiącego.** W trybach z dialogiem prompt każe zapisać każdą kwestię
+postaci ze scenariusza w polu `Audio` ujęcia, w którym pada, jako `ewa: "…"`: dosłownie,
+w języku filmu, prostym cudzysłowem. To jedyna maszynowa postać mowy w liście ujęć, i
+istnieje z tego samego powodu co `Cast`: etap 11 ma dowieść, że jego skrypt podniósł każdą
+kwestię i żadnej nie wymyślił, a z prozy nie da się wyczytać, kto mówi. `validateShotList`
+zwraca te kwestie w `lines` każdego ujęcia. Narratora to nie dotyczy, bo etap 9 dowodzi
+podniesienia po samym tekście, a jego proza w „…” nie jest mylona z tym zapisem. Listy
+zatwierdzone przed tą regułą nie są ruszane; zapis dostają przy następnym `--regenerate`.
 
 **`Cast` wiąże ujęcie z postacią.** Każde ujęcie wymienia widoczne postacie
 **identyfikatorami obsady** (`ewa`, `tata`) z zamkniętego słownika podanego w promptcie,

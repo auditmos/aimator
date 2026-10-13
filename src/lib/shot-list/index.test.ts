@@ -60,6 +60,7 @@ interface ClipSpec {
 }
 
 interface ShotSpec {
+  readonly audio?: string;
   readonly cast?: string;
   readonly clip: string;
   readonly id: string;
@@ -101,7 +102,7 @@ function shotBlock(shot: ShotSpec): string {
     "- Expression: Zaciśnięte usta, wzrok w okno.",
     "- Camera: Statyczny kadr, cięcie na osi.",
     `- Cast: ${shot.cast ?? "ewa"}`,
-    "- Audio: Deszcz o szybę, narrator kończy zdanie.",
+    `- Audio: ${shot.audio ?? "Deszcz o szybę, narrator kończy zdanie."}`,
     `- Text: ${shot.text ?? "none"}`,
     "- Start state: Ewa stoi przy krześle, obie dłonie wolne.",
     "- End state: Ewa siedzi, dłonie na blacie.",
@@ -156,6 +157,7 @@ describe("validateShotList", () => {
       end: 10,
       hasText: false,
       id: "U01",
+      lines: [],
       scene: "S01",
       start: 0,
       text: expect.stringContaining("### U01 | S01 | C01 | 0-10s"),
@@ -343,6 +345,56 @@ describe("validateShotList", () => {
     });
   });
 
+  describe("character lines", () => {
+    const DIALOGUE: ShotListSettings = { ...SETTINGS, audio: "dialogue" };
+    const LINE = 'Deszcz o szybę; ewa: "Tato, czy burza już idzie?"';
+
+    function speaking(audio: string): string {
+      return shotList({
+        shots: SHOTS.map((shot) => (shot.id === "U01" ? { ...shot, audio } : shot)),
+      });
+    }
+
+    it("should accept a line attributed to a cast member and report who says what", () => {
+      const result = validate(speaking(LINE), DIALOGUE);
+
+      expect(result.ok ? result.data.shots[0]?.lines : reason(result)).toEqual([
+        { cast: "ewa", text: "Tato, czy burza już idzie?" },
+      ]);
+      expect(result.ok ? result.data.shots[1]?.lines : null).toEqual([]);
+    });
+
+    it("should refuse a line attributed to somebody the cast does not hold, naming the shot", () => {
+      const message = reason(validate(speaking('zosia: "Ja też chcę!"'), DIALOGUE));
+
+      expect(message).toContain("U01");
+      expect(message).toContain("zosia");
+    });
+
+    it("should refuse an attributed line in a film without dialogue", () => {
+      const settings: ShotListSettings = { ...SETTINGS, audio: "music-and-effects" };
+      const message = reason(validate(speaking(LINE), settings));
+
+      expect(message).toContain("U01");
+      expect(message).toContain("nie ma dialogu");
+    });
+
+    it("should judge every attribution by its prefix, even one never closed", () => {
+      const settings: ShotListSettings = { ...SETTINGS, audio: "music-and-effects" };
+
+      expect(reason(validate(speaking('ewa: "Tato, czy'), settings))).toContain("nie ma dialogu");
+      expect(reason(validate(speaking('ewa: "Tato, czy'), DIALOGUE))).toContain("U01");
+      expect(reason(validate(speaking('ewa: ""'), DIALOGUE))).toContain("U01");
+    });
+
+    /** What a narrated episode's Audio field really looks like in the workspace. */
+    it("should leave a narrator's quoted prose alone", () => {
+      const result = validate(speaking("Deszcz; narrator: „Ewa została sama”."));
+
+      expect(result.ok ? result.data.shots[0]?.lines : reason(result)).toEqual([]);
+    });
+  });
+
   it("should require every shot field exactly once and nonempty", () => {
     const broken = shotList().replace(
       "- Purpose: Pokazuje, że Ewa zostaje sama z burzą.",
@@ -363,7 +415,7 @@ describe("buildPrompt", () => {
   });
 
   it("should declare a version rather than derive one", () => {
-    expect(PROMPT_VERSION).toBe(1);
+    expect(PROMPT_VERSION).toBe(2);
   });
 
   it("should carry the clip limit as a production setting", () => {
@@ -383,6 +435,30 @@ describe("buildPrompt", () => {
   it("should embed the rules and the screenplay verbatim", () => {
     expect(prompt).toContain("Ewa jest rysowana płasko.");
     expect(prompt).toContain("### S01 | 10s | salon, wieczór");
+  });
+
+  describe("character lines", () => {
+    const RULE = '<cast-id>: "<line>"';
+
+    function promptFor(audio: ShotListSettings["audio"]): string {
+      return buildPrompt({
+        aspectRatio: "16:9",
+        cast: CAST,
+        rules: "# Zasady",
+        screenplay: screenplay(),
+        settings: { ...SETTINGS, audio },
+      });
+    }
+
+    it("should ask for every line attributed to its speaker when the film has dialogue", () => {
+      expect(promptFor("dialogue")).toContain(RULE);
+      expect(promptFor("dialogue-and-narration")).toContain(RULE);
+    });
+
+    it("should not ask for attributed lines when the film has no dialogue", () => {
+      expect(promptFor("narration")).not.toContain(RULE);
+      expect(promptFor("music-and-effects")).not.toContain(RULE);
+    });
   });
 
   it("should be deterministic for the same inputs", () => {

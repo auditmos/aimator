@@ -19,7 +19,7 @@ import type { CastMember, ShotListSettings } from "../project/index.js";
  * come from `project.md`, and the plan's shape comes from the screenplay.
  */
 
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 interface PromptInput {
   readonly aspectRatio: string;
@@ -32,7 +32,7 @@ interface PromptInput {
   readonly settings: ShotListSettings;
 }
 
-const TASK = `# Task: turn an approved screenplay into a filmable, timed shot plan
+const CRAFT = `# Task: turn an approved screenplay into a filmable, timed shot plan
 
 Your production inputs are exclusively artifacts from preceding stages: the
 screenplay, the project rules and the episode's production settings. Treat the
@@ -115,7 +115,31 @@ Markdown document, without a code fence.
   that opens a new place or time carries \`Reference: new-scene-frame\`.
 - These are requirements for assets the later stages must produce, not claims
   that any image exists. Continuation may only ever be seeded from reviewed,
-  accepted material.
+  accepted material.`;
+
+/**
+ * Only for an episode whose audio mode has characters speaking. The form is
+ * what lets stage 11 prove its script lifted every line and invented none: a
+ * line in prose has no speaker a validator could read.
+ */
+const LINES = `
+
+## Character lines
+
+- Write every line a cast member speaks in the screenplay into the \`Audio\`
+  field of the shot in which it is spoken, in the form \`<cast-id>: "<line>"\`.
+- Copy the line verbatim from the screenplay, in the production language. Do
+  not translate, paraphrase, shorten, merge or split it, and never write a line
+  the screenplay does not have. Every line belongs to exactly one shot.
+- \`<cast-id>\` is an identifier from the \`cast\` list, never a display name. A
+  cast member speaking from off screen is attributed all the same, whether or
+  not the identifier is in that shot's \`Cast\` field.
+- Use straight double quotes around the line, and never a straight double quote
+  inside one.
+- The narrator is not a cast member, and neither is a speaker the cast does not
+  hold: write their speech in prose, never in this form.`;
+
+const OUTPUT = `
 
 ## Before returning
 
@@ -176,6 +200,11 @@ verified files or rendered animation. Do not call the result approved. Name the
 assets the next stage will have to produce, without writing the final
 generation prompts and without generating anything.`;
 
+/** Whether characters speak in this episode, which is what attributed lines are for. */
+export function hasDialogue(settings: ShotListSettings): boolean {
+  return settings.audio === "dialogue" || settings.audio === "dialogue-and-narration";
+}
+
 /**
  * Task, then settings, then the upstream artifacts verbatim.
  *
@@ -198,7 +227,7 @@ export function buildPrompt(input: PromptInput): string {
     subtitles: input.settings.subtitles,
   };
 
-  return `${TASK}
+  return `${CRAFT}${hasDialogue(input.settings) ? LINES : ""}${OUTPUT}
 
 # Production settings
 

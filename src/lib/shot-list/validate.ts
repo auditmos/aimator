@@ -1,6 +1,7 @@
 import type { CastMember, ShotListSettings } from "../project/index.js";
 import { err, ok, type Result } from "../result.js";
 import { readScreenplayScenes, type ScreenplayScene } from "../screenplay/index.js";
+import { hasDialogue } from "./prompt.js";
 
 /**
  * Internal to the shot-list module: the structural verdict on a plan, and the
@@ -44,6 +45,12 @@ const SHOT_HEADING = /^### U(\d{2,}) \| S(\d{2,}) \| C(\d{2,}) \| (\d+)-(\d+)s\r
 const SHOT_LIST = /^U\d{2,}(?:,\s*U\d{2,})*$/;
 const CAST_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const COMMA = /,\s*/;
+/**
+ * A line attributed to a speaker, `ewa: "…"`. The lookbehind keeps an id from
+ * starting inside a word; straight quotes are the form, so the „…” a narrator's
+ * prose uses is never mistaken for one.
+ */
+const ATTRIBUTION = /(?<![\p{L}\p{N}_-])([A-Za-z0-9][A-Za-z0-9_-]*): "([^"]*)("?)/gu;
 
 const CLIP_FIELDS = ["Shots", "Reference", "Continuity"] as const;
 const SHOT_FIELDS = [
@@ -71,6 +78,13 @@ export interface ShotListClip {
   readonly text: string;
 }
 
+/** One line a cast member speaks, as the shot's Audio field attributes it. */
+export interface ShotListLine {
+  readonly cast: string;
+  /** The line between the quotes, exactly as written. */
+  readonly text: string;
+}
+
 /** One shot: a camera view inside exactly one scene and exactly one clip. */
 export interface ShotListShot {
   /** Cast ids visible in this shot, in roster order. Empty means nobody. */
@@ -79,6 +93,11 @@ export interface ShotListShot {
   readonly end: number;
   readonly hasText: boolean;
   readonly id: string;
+  /**
+   * What the cast says in this shot, in the order the Audio field says it.
+   * Empty in an episode without dialogue, where an attributed line is refused.
+   */
+  readonly lines: readonly ShotListLine[];
   readonly scene: string;
   readonly start: number;
   /**
@@ -331,6 +350,50 @@ function readCast(
   return ok(roster.filter((member) => seen.has(member.id)).map((member) => member.id));
 }
 
+/**
+ * The lines one Audio field attributes, `<cast-id>: "<line>"`.
+ *
+ * The form is the whole point: stage 11 proves its script lifted every line and
+ * invented none, and a line in prose has no speaker that proof could read.
+ */
+function readLines(
+  audio: string,
+  context: ShotContext,
+  shotId: string
+): Result<readonly ShotListLine[]> {
+  const lines: ShotListLine[] = [];
+
+  for (const match of audio.matchAll(ATTRIBUTION)) {
+    const cast = match[1] ?? "";
+    const text = match[2] ?? "";
+
+    if (!hasDialogue(context.settings)) {
+      return fail(
+        "lines",
+        `${shotId}: kwestia przypisana "${cast}", a ten film nie ma dialogu (audio=${context.settings.audio})`
+      );
+    }
+
+    if (!context.cast.some((member) => member.id === cast)) {
+      return fail(
+        "lines",
+        `${shotId}: kwestia przypisana "${cast}", a to nie jest identyfikator obsady, dozwolone: ${context.cast.map((member) => member.id).join(", ")}`
+      );
+    }
+
+    if (match[3] !== '"' || text.trim() === "") {
+      return fail(
+        "lines",
+        `${shotId}: kwestia przypisana "${cast}" musi być niepusta i zamknięta prostym cudzysłowem, ${cast}: "…"`
+      );
+    }
+
+    lines.push({ cast, text });
+  }
+
+  return ok(lines);
+}
+
 interface ShotContext {
   readonly cast: readonly CastMember[];
   readonly clips: readonly ShotListClip[];
@@ -435,6 +498,12 @@ function readShotBody(
     return cast;
   }
 
+  const lines = readLines(read.data.Audio, context, head.id);
+
+  if (!lines.ok) {
+    return lines;
+  }
+
   const hasText = !NOTHING.test(read.data.Text);
 
   if (hasText && context.settings.subtitles === "none") {
@@ -457,6 +526,7 @@ function readShotBody(
     end: head.end,
     hasText,
     id: head.id,
+    lines: lines.data,
     scene: head.sceneId,
     start: head.start,
     text: verbatim(item),

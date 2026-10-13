@@ -351,7 +351,7 @@ describe("generateShotList", () => {
     expect(stage.stage).toBe("shot-list");
     expect(stage.artifacts["shot-list"].status).toBe("completed");
     expect(stage.artifacts["shot-list"].review.status).toBe("pending");
-    expect(stage.artifacts["shot-list"].producer.promptVersion).toBe(1);
+    expect(stage.artifacts["shot-list"].producer.promptVersion).toBe(2);
   });
 
   it("should reference the screenplay by path and digest without copying it", async () => {

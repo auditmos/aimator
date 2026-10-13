@@ -84,7 +84,28 @@ etapu 3, a tego nikt nie zdecydował.
 - dziesięć pól ujęcia, każde dokładnie raz i niepuste: `Purpose`, `Frame`, `Action`,
   `Expression`, `Camera`, `Cast`, `Audio`, `Text`, `Start state`, `End state`;
 - tekst ekranowy **przeniesiony, nie wymyślony**: ujęcie nie może mieć napisu, którego
-  jego scena nie miała.
+  jego scena nie miała;
+- kwestie postaci zapisane jako `<id>: "…"` tylko w trybach z dialogiem i tylko
+  identyfikatorami obsady.
+
+## Kwestie postaci mają mówiącego
+
+Przy `--audio dialogue` albo `dialogue-and-narration` każda kwestia postaci ze scenariusza
+trafia do pola `Audio` ujęcia, w którym pada, w postaci identyfikator, dwukropek i kwestia
+w prostym cudzysłowie:
+
+```markdown
+- Audio: Deszcz o szybę; ewa: "Tato, czy burza już idzie?"
+```
+
+Dosłownie ze scenariusza i w języku filmu. Z tego zapisu etap 11 podnosi
+skrypt dialogu i dowodzi, że niczego nie wymyślił ani nie pominął; z prozy nie da się
+wyczytać, kto mówi. Narrator pisze dalej prozą (`narrator: „…”`), bo
+[etap 9](09-narracja.md) sprawdza go po samym tekście.
+
+Walidacja odmawia, gdy identyfikator nie należy do obsady, i gdy taki zapis pojawia się
+w odcinku z `--audio narration` albo `music-and-effects`, bo ten film nie ma dialogu.
+Listy zatwierdzone wcześniej zostają, jak są; nowy zapis dostają przy `--regenerate`.
 
 ## Poprawka ręczna
 

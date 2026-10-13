@@ -440,6 +440,7 @@ exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`
         "end": 10,
         "hasText": false,
         "id": "U01",
+        "lines": [],
         "scene": "S01",
         "start": 0,
         "text": "### U01 | S01 | C01 | 0-10s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: ewa\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
@@ -453,6 +454,7 @@ exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`
         "end": 15,
         "hasText": false,
         "id": "U02",
+        "lines": [],
         "scene": "S02",
         "start": 10,
         "text": "### U02 | S02 | C01 | 10-15s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: ewa,tata\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
@@ -465,6 +467,7 @@ exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`
         "end": 20,
         "hasText": false,
         "id": "U03",
+        "lines": [],
         "scene": "S02",
         "start": 15,
         "text": "### U03 | S02 | C02 | 15-20s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: tata\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
@@ -478,6 +481,7 @@ exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`
         "end": 30,
         "hasText": false,
         "id": "U04",
+        "lines": [],
         "scene": "S03",
         "start": 20,
         "text": "### U04 | S03 | C02 | 20-30s\\n\\n- Purpose: Pokazuje, że Ewa zostaje sama z burzą.\\n- Frame: Plan amerykański, Ewa po lewej.\\n- Action: Ewa odsuwa krzesło i siada.\\n- Expression: Zaciśnięte usta.\\n- Camera: Statyczny kadr.\\n- Cast: ewa,tata\\n- Audio: Deszcz o szybę.\\n- Text: none\\n- Start state: Ewa stoi przy krześle.\\n- End state: Ewa siedzi."
