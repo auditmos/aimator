@@ -1,4 +1,4 @@
-import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import { Action, Block, Field, Problems, Said, useArtifactText, useOwnRun } from "./panel";
 import type { EpisodeOverview, Refusal, RunDone, Stage0Report, StatusCell } from "./types";
@@ -365,15 +365,61 @@ function Episode(props: {
   );
 }
 
+/** Where a new episode's source comes from: a file on disk, or an idea typed here. */
+type SourceKind = "file" | "idea";
+
 /**
- * An episode the project does not have yet: its source file and its six
- * decisions.
+ * The idea itself, several lines because it becomes `source.md`, and the
+ * number and slug a file's name would have carried, which stay a decision.
+ */
+function IdeaFields(props: {
+  readonly episodeId: string;
+  readonly idea: string;
+  readonly onEpisodeId: (value: string) => void;
+  readonly onIdea: (value: string) => void;
+}): JSX.Element {
+  const { episodeId, idea, onEpisodeId, onIdea } = props;
+  const change = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => onIdea(event.target.value),
+    [onIdea]
+  );
+
+  return (
+    <>
+      <div className="field field-note">
+        <label htmlFor="episode-idea">Pomysł na odcinek</label>
+        <textarea
+          aria-describedby="episode-idea-hint"
+          id="episode-idea"
+          onChange={change}
+          rows={3}
+          value={idea}
+        />
+        <p className="field-hint" id="episode-idea-hint">
+          Trafia do <code>--idea</code> tak, jak go wpiszesz, i staje się <code>source.md</code>.
+        </p>
+      </div>
+      <Field
+        id="episode-number"
+        label="Numer i slug"
+        onValue={onEpisodeId}
+        placeholder="03-wanda"
+        value={episodeId}
+      />
+    </>
+  );
+}
+
+/**
+ * An episode the project does not have yet: its source and its six decisions.
  *
  * It is a screen of its own, the way a new project is, because it is asked
- * before there is an episode to be in. The identifier comes from the source's
- * file name and the CLI is what reads it, so this screen does not guess: it
- * remembers which episodes the project had when the command was sent, and the
- * one that appears in the listing afterwards is the one it created.
+ * before there is an episode to be in. The source is a file's path or an idea
+ * typed here; the identifier comes from the file's name or from the number
+ * given beside the idea, and the CLI is what reads either, so this screen does
+ * not guess: it remembers which episodes the project had when the command was
+ * sent, and the one that appears in the listing afterwards is the one it
+ * created.
  */
 export function NewEpisode(props: {
   readonly episodes: readonly string[];
@@ -384,13 +430,24 @@ export function NewEpisode(props: {
   readonly running: boolean;
 }): JSX.Element {
   const { episodes, onCreated, onRun, projectId, run, running } = props;
+  const [kind, setKind] = useState<SourceKind>("file");
   const [source, setSource] = useState("");
+  const [idea, setIdea] = useState("");
+  const [episodeId, setEpisodeId] = useState("");
   const { change, settings } = useSettings(EMPTY);
   /** The episodes that existed when the command was sent, or null before. */
   const [known, setKnown] = useState<readonly string[] | null>(null);
+  const chooseKind = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) =>
+      setKind(event.target.value === "idea" ? "idea" : "file"),
+    []
+  );
   const add = useMemo(
-    () => INTENTS.addEpisode({ ...settings, projectId, source }),
-    [projectId, settings, source]
+    () =>
+      kind === "idea"
+        ? INTENTS.addEpisodeIdea({ ...settings, episodeId, idea, projectId })
+        : INTENTS.addEpisode({ ...settings, projectId, source }),
+    [episodeId, idea, kind, projectId, settings, source]
   );
   const submit = useCallback(
     (one: readonly string[]) => {
@@ -416,19 +473,45 @@ export function NewEpisode(props: {
     <section aria-labelledby="new-episode-title" className="panel">
       <h2 id="new-episode-title">Nowy odcinek</h2>
       <p className="actions-note">
-        Plik podaje się <strong>ścieżką</strong>, wklejoną z Findera; trafia do{" "}
-        <code>--source</code> bez zmian, więc <code>episode.json</code> zapisuje prawdziwe
-        pochodzenie pliku. Numer i identyfikator odcinka biorą się z jego nazwy (
-        <code>NN-tytul.md</code>).
+        {kind === "idea" ? (
+          <>
+            Pomysł na jedno zdanie nie potrzebuje pliku. Numer i slug podajesz sam, w kształcie
+            nazwy pliku bez <code>.md</code> (<code>03-wanda</code>), bo numer odcinka to decyzja;
+            <code>episode.json</code> zapisze, że nic nie skopiowano.
+          </>
+        ) : (
+          <>
+            Plik podaje się <strong>ścieżką</strong>, wklejoną z Findera; trafia do{" "}
+            <code>--source</code> bez zmian, więc <code>episode.json</code> zapisuje prawdziwe
+            pochodzenie pliku. Numer i identyfikator odcinka biorą się z jego nazwy (
+            <code>NN-tytul.md</code>).
+          </>
+        )}
       </p>
       <div className="send">
-        <Field
-          id="episode-source"
-          label="Ścieżka do pliku źródłowego"
-          onValue={setSource}
-          placeholder="/Users/ktos/Filmy/01-burza.md"
-          value={source}
-        />
+        <div className="field">
+          <label htmlFor="episode-kind">Źródło</label>
+          <select id="episode-kind" onChange={chooseKind} value={kind}>
+            <option value="file">plik ze ścieżki</option>
+            <option value="idea">pomysł wpisany tutaj</option>
+          </select>
+        </div>
+        {kind === "idea" ? (
+          <IdeaFields
+            episodeId={episodeId}
+            idea={idea}
+            onEpisodeId={setEpisodeId}
+            onIdea={setIdea}
+          />
+        ) : (
+          <Field
+            id="episode-source"
+            label="Ścieżka do pliku źródłowego"
+            onValue={setSource}
+            placeholder="/Users/ktos/Filmy/01-burza.md"
+            value={source}
+          />
+        )}
       </div>
       <p className="actions-note">{SETTINGS_NOTE}</p>
       <SettingsFields change={change} settings={settings} />
@@ -558,12 +641,19 @@ export function PreparePanel(props: PrepareProps): JSX.Element {
               <dt>Numer</dt>
               <dd>{overview.number}</dd>
             </div>
-            <div>
-              <dt>Skopiowane z</dt>
-              <dd>
-                <code>{overview.source.originPath}</code>
-              </dd>
-            </div>
+            {overview.source.originPath === null ? (
+              <div>
+                <dt>Pochodzenie</dt>
+                <dd>pomysł wpisany w poleceniu</dd>
+              </div>
+            ) : (
+              <div>
+                <dt>Skopiowane z</dt>
+                <dd>
+                  <code>{overview.source.originPath}</code>
+                </dd>
+              </div>
+            )}
           </dl>
         )}
         {source === null ? (

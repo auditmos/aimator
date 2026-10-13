@@ -57,6 +57,7 @@ const scope = {
   effectsModel: "eleven-sfx",
   episodeId: "01-burza",
   failed: ["anatomy"],
+  idea: "Wanda boi się zasnąć",
   imageModel: "gpt-image-2.5-sunburst",
   instruction: "Ewa ma mieć czerwony szalik",
   language: "pl",
@@ -229,6 +230,40 @@ describe("the stage-0 forms", () => {
       "law-or-idea",
       "--max-clip",
       "15",
+    ]);
+  });
+
+  /**
+   * An idea typed instead of a file: the text reaches `--idea` as typed, line
+   * breaks included, because it becomes `source.md`, and the number a file's
+   * name would have carried goes to `--episode`, never derived on screen.
+   */
+  it("should hand a typed idea to --idea and its number to --episode, untouched", () => {
+    expect(
+      INTENTS.addEpisodeIdea({
+        ...scope,
+        episodeId: "03-wanda",
+        idea: "Wanda boi się zasnąć.\nA tata śpi.",
+        maxClip: "",
+      })
+    ).toEqual([
+      "episode",
+      "add",
+      "dzielna-ewa",
+      "--idea",
+      "Wanda boi się zasnąć.\nA tata śpi.",
+      "--episode",
+      "03-wanda",
+      "--duration",
+      "30",
+      "--audio",
+      "narration",
+      "--language",
+      "pl",
+      "--subtitles",
+      "none",
+      "--nature",
+      "law-or-idea",
     ]);
   });
 

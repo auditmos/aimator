@@ -602,7 +602,8 @@ export interface EpisodeOverview {
     readonly sourceNature: string | null;
     readonly subtitles: string | null;
   };
-  readonly source: { readonly originPath: string; readonly path: string };
+  /** `originPath` is null for an idea typed into `episode add --idea`: nothing was copied. */
+  readonly source: { readonly originPath: string | null; readonly path: string };
 }
 
 export interface WorkspaceListing {

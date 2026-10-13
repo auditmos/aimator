@@ -235,6 +235,8 @@ interface Everything extends Delivery, Failed, Judged, Levels, Send, Settings {
   readonly dryRun: boolean;
   /** Stage 10's third model: the one that renders one effect. */
   readonly effectsModel: string;
+  /** Stage 0: an episode's idea typed on screen, which becomes `source.md`. */
+  readonly idea: string;
   readonly imageModel: string;
   /** Stage 10's second model: the one that composes a bed. */
   readonly musicModel: string;
@@ -296,6 +298,24 @@ export const INTENTS = {
     one.projectId,
     "--source",
     one.source,
+    ...settings(one),
+  ],
+  /**
+   * Stage 0: the episode from an idea typed on screen rather than a file.
+   *
+   * `--episode` carries what a file's name would have, the number and the
+   * slug, and the screen never derives it: an episode's number is a decision.
+   * The text travels exactly as typed, line breaks included, because it is
+   * what `source.md` will hold.
+   */
+  addEpisodeIdea: (one: EpisodeRef & Settings & { readonly idea: string }): readonly string[] => [
+    "episode",
+    "add",
+    one.projectId,
+    "--idea",
+    one.idea,
+    "--episode",
+    one.episodeId,
     ...settings(one),
   ],
   /**

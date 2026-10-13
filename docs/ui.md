@@ -65,10 +65,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   na niej pojawia. Serwer odpowiada nią pod `/api/project/<id>` i nie czyta
   `project.json` sam: to ta sama zasada, dla której listę projektów dostała komenda
   `list`.
-- **Nowy odcinek** (`#/projekt/<id>/nowy-odcinek`): ścieżka do pliku źródłowego i sześć
-  decyzji, czyli `episode add`. Identyfikator odcinka czyta z nazwy pliku CLI, więc ekran
-  go nie zgaduje: pamięta, jakie odcinki projekt miał w chwili wysłania komendy, i
-  przechodzi do tego, który po niej pojawił się w `list`.
+- **Nowy odcinek** (`#/projekt/<id>/nowy-odcinek`): źródło i sześć decyzji, czyli
+  `episode add`. Źródło to ścieżka do pliku albo pomysł wpisany w polu tekstowym, razem
+  z numerem i slugiem (`03-wanda`), czyli `--idea` i `--episode`; numeru ekran nie
+  wylicza, bo numer odcinka to decyzja. Identyfikator odcinka czyta CLI, z nazwy pliku
+  albo z `--episode`, więc ekran go nie zgaduje: pamięta, jakie odcinki projekt miał
+  w chwili wysłania komendy, i przechodzi do tego, który po niej pojawił się w `list`.
 - **Wczytaj odcinek** (`#/projekt/<id>/odcinki`): odcinki projektu jako lista odnośników.
   Przy każdym stoi znak z jego `status`: zielone „gotowy”, gdy każdy etap jest zatwierdzony
   na każdym torze, albo pierścień wypełniony w części z napisem „wymaga pracy · N z 11
@@ -305,6 +307,9 @@ Upload przez przeglądarkę został w PRD odrzucony z jednego powodu i widać go
 naprawdę pochodzi, a bajty podane przez przeglądarkę zapisałyby katalog tymczasowy
 i odpowiedź na pytanie „skąd to jest" przestałaby istnieć. Klient niczego z tą ścieżką nie
 robi: nie przycina, nie rozwija i nie normalizuje, a pilnuje tego test słownika komend.
+Pomysł wpisany w polu trafia do `--idea` tak samo, łącznie z podziałami wierszy, a panel
+etapu 0 pokazuje wtedy w miejscu ścieżki „pomysł wpisany w poleceniu”, bo `originPath`
+jest `null`: nic nie skopiowano.
 
 Jedyne pole, którego ten panel nie zastępuje, to `project.md`: zasady wspólne pisze
 człowiek w edytorze, bo to jedyny artefakt tego narzędzia pisany ręcznie. Wywiadu też tu
