@@ -595,4 +595,48 @@ describe("the gate per clip", { timeout: 45_000 }, () => {
     ]);
     expect(result.ok ? result.data.paidLipSyncs : null).toBe(1);
   });
+
+  /**
+   * A track where no clip can move is refused, as stage 7 refuses a chain with
+   * nothing to buy: the other track has no accepted clip, so a face call and a
+   * job both say no there, and a check that put that in a note alone would let
+   * `status` call the track ready. A track with one clip that can move is not.
+   */
+  it("should refuse a track whose every clip waits for stage 7, and only that track", async () => {
+    await episode();
+    await makeDialogue({ workspace });
+    const stalled = await checkVersions({ ...scope(), track: "seedream" });
+    const moving = await checkVersions(scope());
+
+    expect(stalled.ok ? stalled.data.problems.join("\n") : reason(stalled)).toContain(
+      "klip nie ma ważnej zgody na torze seedream"
+    );
+    expect(moving.ok ? moving.data.problems : reason(moving)).toEqual([]);
+  });
+
+  /**
+   * A face call needs no line, so a clip whose line waits can still move until
+   * its faces are found and bound; only then is the job the one step left, and
+   * the job refuses an unaccepted line.
+   */
+  it("should refuse a track once every clip's one step left waits for a line", async () => {
+    await episode();
+    await makeDialogue({ pending: ["en:D01", "en:D02", "en:D03"], workspace });
+    const before = await checkVersions(scope());
+    for (const [clip, faces] of [
+      ["C01", { 0: "ewa" }],
+      ["C02", { 1: "tata" }],
+    ] as const) {
+      // biome-ignore lint/performance/noAwaitInLoops: one clip's faces at a time, as a person would
+      await findFaces({ ...paid(), artifact: clip, fetch: kling().fetch });
+      await bindFaces({ ...scope(), artifact: clip, faces, mode: "apply" });
+    }
+
+    const after = await checkVersions(scope());
+
+    expect(before.ok ? before.data.problems : reason(before)).toEqual([]);
+    expect(after.ok ? after.data.problems.join("\n") : reason(after)).toContain(
+      "kwestia nie ma ważnej zgody"
+    );
+  });
 });

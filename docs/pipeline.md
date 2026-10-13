@@ -2199,6 +2199,14 @@ przyjęty w etapie 7 werdyktem `check --stage clips`, przekład z ważną zgodą
 tego klipu przyjęta, twarze rozpoznane w klipie, który leży na dysku, i przypisanie
 obejmujące każdą postać mówiącą w kadrze.
 
+Rozpoznanie twarzy wymaga wyłącznie przyjętego klipu, a przyjętej kwestii wymaga dopiero
+zadanie lip-sync. Klip stoi więc na cudzej zgodzie, gdy etap 7 go nie przyjął, albo gdy
+twarze są rozpoznane i przypisane, a jedyny krok, jaki został, czeka na kwestię etapu 11.
+Takie przeszkody są odmową całego etapu na torze (`problems`) dopiero wtedy, gdy stoi każdy
+nieukończony klip, tak jak łańcuch etapu 7 odmawia dopiero bez niczego do kupienia. Dopóki
+choć jeden klip ma własny ruch, przeszkody reszty stoją w notatkach klipów, a `status`
+czyta tor jako gotowy.
+
 ### Które klipy
 
 Zbiór jest wyprowadzany z listy ujęć i przekładu, nigdy zapisywany (reguła 7, druga

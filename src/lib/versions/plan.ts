@@ -437,6 +437,34 @@ export async function readSourceClip(
   });
 }
 
+/**
+ * Why a line of this clip may not be lip-synced yet: it is the line a person
+ * has to accept. One copy for the purchase and the check, because a clip the
+ * purchase refuses over a line is one the check has to say waits for it.
+ */
+export function lineProblems(input: Stage12Scope, stage12: Stage12, target: ClipTarget): string[] {
+  const scope = `${input.projectId} ${input.episodeId}`;
+  const problems = stage12.translationApproved
+    ? []
+    : [
+        `${target.id}: przekład skryptu nie ma ważnej zgody: aimator check ${scope} --stage dialogue`,
+      ];
+
+  for (const line of target.lines) {
+    if (line.state !== "completed") {
+      problems.push(
+        `${line.key}: kwestia nie jest kupiona: aimator dialogue generate ${scope} --language ${stage12.language ?? "<kod>"}`
+      );
+    } else if (!line.approved) {
+      problems.push(
+        `${line.key}: kwestia nie ma ważnej zgody, odsłuchaj i zatwierdź: aimator approve ${scope} --stage dialogue --artifact ${line.key}`
+      );
+    }
+  }
+
+  return problems;
+}
+
 /** The clips whose mouths move, the ones that pass untouched, and the lines heard from off screen. */
 function derive(
   plan: ShotList | null,

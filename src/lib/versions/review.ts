@@ -10,6 +10,7 @@ import { err, ok, type Result } from "../result.js";
 import { type ImageTrack, versionClip, workspacePath } from "../workspace.js";
 import {
   type ClipTarget,
+  lineProblems,
   readClipFaces,
   readSourceClip,
   readStage12,
@@ -78,6 +79,12 @@ class VersionsStateError extends Error {
 }
 
 interface ClipInspection {
+  /**
+   * Why nothing on this clip can move until another stage says yes: its
+   * stage-7 clip, or, once its faces are found and bound, a line of stage 11.
+   * Empty while the clip has a move of its own left.
+   */
+  readonly blockers: readonly string[];
   /** What an approval of this clip may not write over. */
   readonly blocking: readonly string[];
   readonly problems: readonly string[];
@@ -96,12 +103,25 @@ function lipSyncCommand(input: Stage12Scope, clip: string): string {
   return `aimator versions lip-sync ${input.projectId} ${input.episodeId} --track ${input.track} --artifact ${clip}`;
 }
 
-/** A clip nobody lip-synced yet: what it waits for, in the command that gives it. */
+/** A clip nobody lip-synced yet: what it waits for, and whether that is another stage. */
+interface Waiting {
+  readonly blockers: readonly string[];
+  /** The one thing to do next, in the command that does it. */
+  readonly note: string;
+}
+
+/**
+ * The order the purchase meets them in, read the way a person moves: a face
+ * call wants an accepted clip and nothing else, binding wants the faces, and
+ * only the job wants each line accepted. So an unaccepted clip stops the clip
+ * outright, while an unaccepted line stops it only once the job is all that
+ * is left.
+ */
 async function waiting(
   input: Stage12Scope,
   stage12: Stage12,
   target: ClipTarget
-): Promise<Result<string>> {
+): Promise<Result<Waiting>> {
   const source = await readSourceClip(input, stage12, target.id);
 
   if (!source.ok) {
@@ -114,9 +134,20 @@ async function waiting(
     return faces;
   }
 
-  const [first] = [...source.data.problems, ...faces.data.problems];
+  const lines = lineProblems(input, stage12, target);
+  const [first] = [...source.data.problems, ...faces.data.problems, ...lines];
+  const blockers = ((): readonly string[] => {
+    if (source.data.problems.length > 0) {
+      return source.data.problems;
+    }
 
-  return ok(first ?? `gotowy do lip-syncu: ${lipSyncCommand(input, target.id)}`);
+    return faces.data.problems.length > 0 ? [] : lines;
+  })();
+
+  return ok({
+    blockers,
+    note: first ?? `gotowy do lip-syncu: ${lipSyncCommand(input, target.id)}`,
+  });
 }
 
 /** One clip's version: are its bytes the ones recorded, and is what it was made from unchanged. */
@@ -134,22 +165,24 @@ async function inspectClip(
   }
 
   if (record === undefined) {
-    const note = await waiting(input, stage12, target);
+    const wait = await waiting(input, stage12, target);
 
-    return note.ok
+    return wait.ok
       ? ok({
+          blockers: wait.data.blockers,
           blocking: [],
           problems: [],
-          remedy: note.data,
-          state: { ...base, approved: false, note: note.data, state: "absent" },
+          remedy: wait.data.note,
+          state: { ...base, approved: false, note: wait.data.note, state: "absent" },
         })
-      : note;
+      : wait;
   }
 
   if (record.status === "submitted") {
     const problem = `${target.id}: rekord "submitted" bez opublikowanego klipu, powtórz polecenie, żeby odebrać zadanie bez drugiej opłaty: ${lipSyncCommand(input, target.id)}`;
 
     return ok({
+      blockers: [],
       blocking: [],
       problems: [problem],
       remedy: lipSyncCommand(input, target.id),
@@ -188,6 +221,7 @@ async function inspectClip(
   const blocking = [...bytes, ...drift];
 
   return ok({
+    blockers: [],
     blocking,
     problems: blocking,
     remedy: null,
@@ -240,6 +274,16 @@ async function inspect(input: Stage12Scope): Promise<Result<Inspection>> {
     clips.push(clip.data);
   }
 
+  // What another stage owes a clip refuses the **stage** only when no clip on
+  // the track has a move left, as stage 7 refuses only a chain with nothing to
+  // buy: listing every waiting clip would call a track refused while a face
+  // call on its neighbour would go through this second.
+  const unfinished = clips.filter((one) => one.state.state === "absent");
+  const stalled =
+    unfinished.length > 0 && unfinished.every((one) => one.blockers.length > 0)
+      ? unfinished.flatMap((one) => one.blockers)
+      : [];
+
   return ok({
     clips,
     stage12: stage12.data,
@@ -248,7 +292,7 @@ async function inspect(input: Stage12Scope): Promise<Result<Inspection>> {
       clips: clips.map((one) => one.state),
       nextStep: nextStep(input, clips, gate[0] ?? ""),
       notices,
-      problems: [...gate, ...clips.flatMap((one) => one.problems)],
+      problems: [...gate, ...stalled, ...clips.flatMap((one) => one.problems)],
       track: input.track,
       untouched,
     },
