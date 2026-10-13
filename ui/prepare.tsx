@@ -189,7 +189,7 @@ function useSettings(base: Settings): {
  * A failed read keeps the last answer rather than blanking it, for the reason
  * the cast screen does: an old answer is still the answer somebody was reading.
  */
-function useEpisodeOverview(
+export function useEpisodeOverview(
   projectId: string,
   episodeId: string,
   revision: unknown

@@ -453,6 +453,8 @@ export function useOwnRun(props: {
  * a refusal leaves it as typed, like every form here.
  */
 export function Reject(props: {
+  /** What the next attempt does with the note, where that is not "Narysuj ponownie". */
+  readonly again?: string;
   /** The command for this note and these missed criteria, the panel's own intent. */
   readonly argvOf: (note: string, failed: readonly string[]) => readonly string[];
   /** What can be marked as missed; empty where nothing chosen has a checklist. */
@@ -462,7 +464,15 @@ export function Reject(props: {
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { argvOf, criteria, id, onRun, run, running } = props;
+  const {
+    again = "„Narysuj ponownie” bez własnej uwagi poprawi według niego; uwaga wpisana przy nowej próbie ma pierwszeństwo.",
+    argvOf,
+    criteria,
+    id,
+    onRun,
+    run,
+    running,
+  } = props;
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [failed, setFailed] = useState<readonly string[]>([]);
@@ -501,9 +511,7 @@ export function Reject(props: {
         <label htmlFor={id}>Powód odrzucenia</label>
         <textarea aria-describedby={`${id}-hint`} id={id} onChange={change} rows={3} value={note} />
         <p className="field-hint" id={`${id}-hint`}>
-          Zapisany w ocenie i widoczny na drabinie. „Narysuj ponownie” bez własnej uwagi poprawi
-          według niego; uwaga wpisana przy nowej próbie ma pierwszeństwo. Odrzucone można nadal
-          zatwierdzić.
+          Zapisany w ocenie i widoczny na drabinie. {again} Odrzucone można nadal zatwierdzić.
         </p>
       </div>
       {criteria.length > 0 ? (

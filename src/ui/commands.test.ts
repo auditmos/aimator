@@ -184,14 +184,15 @@ describe("the command dictionary", () => {
    * buys nothing at all, from anybody, and what it needs instead is a program
    * on this machine. Everything else that reaches a model has to arrive here
    * as a dry run, because a purchase is derived from one and is the only
-   * intent that cannot be built from a scope.
+   * intent that cannot be built from a scope. Stage 11's `translate` is a
+   * paid call under another verb, so it is held to the same rule.
    */
   it("should build no purchase from a scope alone", () => {
     const spending = Object.entries(INTENTS).filter(([, build]) => {
       const argv = build(scope);
 
       return (
-        argv.includes("generate") &&
+        (argv.includes("generate") || argv.includes("translate")) &&
         !(argv.includes("--dry-run") || argv.includes("--republish") || FREE.has(argv[0] ?? ""))
       );
     });
@@ -735,6 +736,8 @@ describe("a note on a new paid attempt", () => {
     "previewPromptPackage",
     "previewNarration",
     "previewSoundDesign",
+    "previewDialogue",
+    "previewTranslation",
     "previewCharacter",
     "previewReferences",
     "previewOpeningFrame",
@@ -1029,5 +1032,89 @@ describe("the stage-10 commands", () => {
         projectId: "dzielna-ewa",
       })
     ).toEqual(["sound-design", "levels", "dzielna-ewa", "--music-db", "-22"]);
+  });
+});
+
+/**
+ * Stage 11, shared like stage 9's words and with a second language in it.
+ *
+ * Its yes is one command over whatever was chosen, because the CLI takes the
+ * script, the translation and the lines of both languages in one list; each
+ * key still names exactly one decision. Which lines a purchase reads is the
+ * `--language` flag rather than a second command, and the translation is a
+ * paid text call of its own, previewed like every other one.
+ */
+describe("the stage-11 commands", () => {
+  it("should accept and refuse the script, its translation and lines of either language", () => {
+    const chosen = { ...scope, artifacts: ["script-en", "D01", "en:D01"] };
+
+    expect(INTENTS.approveDialogue(chosen)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "dialogue",
+      "--artifact",
+      "script-en,D01,en:D01",
+    ]);
+    expect(INTENTS.rejectDialogue(chosen)).toEqual([
+      "reject",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "dialogue",
+      "--artifact",
+      "script-en,D01,en:D01",
+      "--note",
+      "Za ciemno, Ewa ma sześć palców.",
+    ]);
+  });
+
+  it("should ask about the whole stage with no track", () => {
+    expect(INTENTS.checkDialogue(scope)).toEqual([
+      "check",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "dialogue",
+    ]);
+  });
+
+  it("should buy the lines of the mouths under --language, and the film's under none", () => {
+    const send = { ...scope, artifacts: ["en:D01"], maxOutputTokens: "", model: "" };
+
+    expect(INTENTS.previewDialogue({ ...send, language: "en" })).toEqual([
+      "dialogue",
+      "generate",
+      "dzielna-ewa",
+      "01-burza",
+      "--artifact",
+      "en:D01",
+      "--language",
+      "en",
+      "--voice-model",
+      "eleven_multilingual_v2",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(INTENTS.previewDialogue({ ...send, language: "" })).not.toContain("--language");
+  });
+
+  it("should preview the translation with no artifact and no language of its own", () => {
+    expect(INTENTS.previewTranslation(AGAIN)).toEqual([
+      "dialogue",
+      "translate",
+      "dzielna-ewa",
+      "01-burza",
+      "--model",
+      "gpt-6-astra",
+      "--max-output-tokens",
+      "12000",
+      "--regenerate",
+      "--instruction",
+      "Ewa ma mieć czerwony szalik",
+      "--dry-run",
+      "--json",
+    ]);
   });
 });

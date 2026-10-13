@@ -149,12 +149,25 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   Poziomy to formularz czterech suwaków mapowany na `sound-design levels`; jego zapis nie
   unieważnia zatwierdzonych nagrań etapu 9, bo mieszka w `mix.json`, a nie w
   `narration.json` ani w `project.json`.
+- **Panel etapu 11**, jeden i bez toru, bo skrypt, przekład i kwestie są wspólne dla obu
+  filmów: skrypt dialogu do przeczytania, kwestie w języku filmu, a gdy odcinek wskazuje
+  język ust (`lip-sync.json`), także przekład (`dialogue.<język>.md`) i kwestie w tym
+  języku. Kwestia stoi ze swoimi słowami, postacią, ujęciem i sekundą planu nad
+  odtwarzaczem, bo słucha się jej względem tego, co ma powiedzieć. **Jeden wybór i jedno
+  „tak”**: CLI bierze skrypt, przekład i kwestie obu języków jedną listą `--artifact`
+  (`script-en,D01,en:D01`), więc panel ma jedno zaznaczenie na czterech listach, jedno
+  „Zatwierdź” i obok „Odrzuć…”. Płatny blok kupuje jedną z trzech rzeczy, wybieraną polem
+  „Co kupić”: skrypt i kwestie w języku filmu (`dialogue generate`), przekład
+  (`dialogue translate`) albo kwestie w języku ust (`dialogue generate --language
+  <kod>`). Jeden blok zamiast trzech, bo „Kup” bierze się z ostatniego podglądu, a trzy
+  bloki proponowałyby kupno cudzych podglądów. Rachunek kwestii stoi w **kwestiach
+  i znakach**, rachunek skryptu i przekładu w wywołaniach tekstowych.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
 
-Tym etapem drabina domyka się w panelach: każdy zaimplementowany etap, od 0 do 10, ma swój
-ekran, a dwa ostatnie mają po dwa, bo ich artefakty leżą na dwóch poziomach drzewa.
+Każdy zaimplementowany etap od 0 do 11 ma swój ekran, a etapy 9 i 10 mają po dwa, bo ich
+artefakty leżą na dwóch poziomach drzewa. Etap 12 panelu jeszcze nie ma.
 
 ## Gdzie stoi panel
 
@@ -169,8 +182,8 @@ odległości. Z daleka to trzynaście wierszy. Z bliska to jeden etap:
   niż jeden;
 - powód blokady w słowach etapu albo decyzja odcinka, która go wyklucza;
 - i sam panel, na całą szerokość. Etap, który odcinka nie dotyczy, panelu nie ma, bo nie
-  ma w nim czego kupić ani przyjąć. Etapy 11 i 12 nie mają jeszcze paneli: ich strona
-  pokazuje stan i polecenie, które złożył dla nich `status`, do uruchomienia w terminalu;
+  ma w nim czego kupić ani przyjąć. Etap 12 nie ma jeszcze panelu: jego strona pokazuje
+  stan i polecenie, które złożył dla niego `status`, do uruchomienia w terminalu;
 - na dole odnośniki do etapu poprzedniego i następnego.
 
 Przejście do innego etapu albo zakładki to nowa strona. Ekran wraca wtedy na górę, a
@@ -216,7 +229,7 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    inny wybór ogniw czyści zaznaczenia, bo dotyczyły obrazu, którego już nie ma. Dryf wejść nie
    chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
    wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje. W etapach, które
-   rysują (2, 5, 6 i 7), obok „Zatwierdź” stoi **„Odrzuć…”** (`reject`): otwiera pole na
+   rysują (2, 5, 6 i 7), i w etapie 11 obok „Zatwierdź” stoi **„Odrzuć…”** (`reject`): otwiera pole na
    powód, bez którego terminal odrzucenia nie przyjmie, a przy klatce otwarcia i samych
    klatkach wejściowych także pola na niespełnione kryteria QC (`--fail`). Powód trafia do
    oceny i na drabinę („odrzucone: …”). Odrzucenie niczego nie kupuje ani nie rysuje;
@@ -487,6 +500,13 @@ drugiego. Etap 10 czyta się tak samo: `cues` i stemy (`M01`, `E01`) bez toru, `
 z torem. Stemy wracają jako `audio/mpeg`, bo tylko taki kontener dają oba endpointy tego
 dostawcy; wybór jest jego, nie tego potoku, i dlatego werdykt na stemie chodzi po nagłówkach
 ramek, a nie po nagłówku RIFF.
+
+Etap 11 nie ma toru wcale. `script` i `script-en` to klucze z jego pliku etapu, a kwestia
+jest jedynym słowem zapisanym inaczej niż w nim: etap kluczuje kwestie filmu `D01`, a drugiego
+języka `en:D01`, ale obie leżą w katalogu nazwanym od swojego języka, więc kwestię filmu prosi
+się jako `pl:D01`. Inaczej resolver musiałby czytać `episode.json`, żeby wiedzieć, w jakim
+języku mówi film, a resolver buduje ścieżki i niczego nie rozstrzyga. Język filmu panel bierze
+z `episode show --json`.
 
 Od etapu 7 dochodzi film, a film się **przewija**, więc artefakt odpowiada na nagłówek
 `Range`: bez niego 200 i całość, z czytelnym zakresem 206 i dokładnie te bajty (200 kazałoby

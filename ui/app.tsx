@@ -3,6 +3,7 @@ import { AssemblyPanel } from "./assembly";
 import { ProjectCast } from "./cast";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
+import { DialoguePanel } from "./dialogue";
 import {
   defaultCell,
   EpisodeOverview,
@@ -304,11 +305,17 @@ function StagePanel(props: PanelProps): JSX.Element | null {
     return props.cell.track === null ? <SoundDesignPanel {...props} /> : <MasterPanel {...props} />;
   }
 
+  // Stage 11 has one panel and no track: the script, its translation and every
+  // line are shared by both films, like stage 9's words.
+  if (props.cell.stage === 11) {
+    return <DialoguePanel {...props} />;
+  }
+
   return <TerminalStage cell={props.cell} />;
 }
 
 /**
- * A stage this screen draws no panel for, which today is 11 and 12.
+ * A stage this screen draws no panel for, which today is 12.
  *
  * Where it stands is on the ladder like any other; what moves it is the one
  * command `status` composed for its cell, and the terminal is where that runs.

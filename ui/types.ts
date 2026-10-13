@@ -434,6 +434,86 @@ export interface MasterReport {
 }
 
 /**
+ * One line of stage 11's script and where its recording stands.
+ *
+ * Unlike stage 9's it carries its words, because the line *is* what a person
+ * judges a recording against: who says it, in which shot, from which second.
+ * `key` is what `--artifact` names, `D01` in the film's language and `en:D01`
+ * in the language of the mouths; `id` is the line's own, the same in both.
+ */
+export interface DialogueLineState {
+  readonly approved: boolean;
+  /** Where it begins, in the seconds of the approved plan. */
+  readonly atSeconds: number;
+  readonly cast: string;
+  readonly id: string;
+  readonly inputsChanged: readonly string[];
+  readonly key: string;
+  readonly note: string;
+  /** Whether the speaker is in the shot; a voice from off screen has no mouth to move. */
+  readonly onScreen: boolean;
+  readonly seconds: number | null;
+  readonly shot: string;
+  readonly state: "absent" | "completed" | "submitted";
+  readonly text: string;
+}
+
+/** Stage 11's script, or its translation, and where its own yes stands. */
+export interface DialogueScriptState {
+  readonly approved: boolean;
+  /** Its key: `script`, or `script-en` for the translation. */
+  readonly id: string;
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  readonly state: "absent" | "completed" | "submitted";
+}
+
+/**
+ * Stage 11, shared by both tracks: the script and its lines, and, once the
+ * episode names a language for the mouths, the translation and its lines.
+ * `approved` is the film's language only; the translation answers for itself.
+ */
+export interface DialogueStatus {
+  readonly amended: readonly string[];
+  readonly approved: boolean;
+  readonly lines: readonly DialogueLineState[];
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly problems: readonly string[];
+  readonly script: DialogueScriptState;
+  /** Null while the episode names no second language. */
+  readonly translation:
+    | (DialogueScriptState & {
+        readonly language: string;
+        readonly lines: readonly DialogueLineState[];
+      })
+    | null;
+}
+
+/**
+ * Stage 11's report, which is one of two purchases and says which.
+ *
+ * A text call (the script, or its translation) carries the prompt and no
+ * lines; a purchase of lines carries the lines and bills in characters, which
+ * is what this provider charges for, beside the count of calls.
+ */
+export interface DialogueReport {
+  readonly characters: number;
+  readonly lines: readonly {
+    readonly cast: string;
+    readonly characters: number;
+    readonly id: string;
+    readonly note: string;
+    readonly state: string;
+  }[];
+  readonly notices: readonly string[];
+  readonly paidCalls: number;
+  readonly problems: readonly string[];
+  /** `--dry-run` only: the exact text the script's or the translation's call would send. */
+  readonly prompt: string | null;
+}
+
+/**
  * What every paid stage's report says that a panel has to show.
  *
  * The bill is deliberately **not** here, and that is the interesting part.

@@ -408,6 +408,7 @@ ui/                    # The client: browser files where the browser files go
 ├── assembly.tsx       # Etap 8
 ├── narration.tsx      # Etap 9
 ├── sound-design.tsx   # Etap 10
+├── dialogue.tsx       # Etap 11: the script, its translation, the lines of both languages
 └── tsconfig.json      # Its own project: the DOM and JSX that src must not have
 ```
 

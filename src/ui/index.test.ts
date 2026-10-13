@@ -3,16 +3,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "../cli/index.js";
+import { generateDialogue } from "../lib/dialogue/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
 import {
+  API_KEY,
   EPISODE,
   makeCut,
+  makeDialogue,
   makeNarration,
   makeSoundDesign,
   makeUpstream,
+  makeVoices,
   PROJECT,
   png,
   VOICE,
+  wav,
 } from "../test/fixture.js";
 import { INTENTS } from "./commands.js";
 import { createUi } from "./index.js";
@@ -866,6 +871,142 @@ describe("the artifact resolver", () => {
     } finally {
       await writeFile(cut, original);
     }
+  });
+});
+
+/**
+ * Stage 11, on an episode whose cast speaks, which the narrated one above
+ * cannot be: its audio mode is the one decision that rules a dialogue out.
+ *
+ * Everything here is shared, so nothing takes a track. A line is the one word
+ * spelled with its language even in the film's own (`pl:D01`), because both
+ * languages' lines live under a directory named for theirs and the resolver
+ * builds paths rather than reading `episode.json` to learn which one the film
+ * speaks.
+ */
+describe("the artifact resolver, stage 11", () => {
+  let spoken = "";
+  let spokenScratch = "";
+  let spokenWorkspace: Workspace = { root: "" };
+
+  function dialogueRoot(): string {
+    const project = projectPaths(spokenWorkspace, PROJECT);
+    const episode = project.ok ? episodePaths(project.data, EPISODE) : project;
+
+    if (!episode.ok) {
+      throw episode.error;
+    }
+
+    return episode.data.root;
+  }
+
+  beforeAll(async () => {
+    spokenScratch = await mkdtemp(join(tmpdir(), "aimator-ui-dialogue-"));
+    spoken = join(spokenScratch, "workspace");
+    const resolved = resolveWorkspace(spoken);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    spokenWorkspace = resolved.data;
+    await makeUpstream({
+      answer: answer(),
+      approvePackage: true,
+      dialogue: true,
+      root: spoken,
+      scratch: spokenScratch,
+      workspace: spokenWorkspace,
+    });
+    // The script lifted and accepted, translated into English and accepted, and
+    // every English line bought; then the Polish lines too, in Polish voices.
+    await makeDialogue({ workspace: spokenWorkspace });
+    await makeVoices({ workspace: spokenWorkspace });
+
+    const film = await generateDialogue({
+      apiKey: null,
+      artifacts: [],
+      episodeId: EPISODE,
+      fetch: (() =>
+        Promise.resolve(
+          new Response(wav({ seconds: 1 }), {
+            headers: { "content-type": "audio/wav" },
+            status: 200,
+          })
+        )) as unknown as typeof fetch,
+      maxOutputTokens: 8000,
+      mode: "apply",
+      model: null,
+      projectId: PROJECT,
+      regenerate: false,
+      voiceKey: API_KEY,
+      voiceModel: "eleven_multilingual_v2",
+      workspace: spokenWorkspace,
+    });
+
+    if (!film.ok) {
+      throw film.error;
+    }
+  }, 240_000);
+
+  afterAll(async () => {
+    await rm(spokenScratch, { force: true, recursive: true });
+  });
+
+  it("should serve both scripts as markdown and a line of either language as the wav it is", async () => {
+    const app = createUi({ workspace: spokenWorkspace });
+    const [script, translation, line, translated] = await Promise.all(
+      [
+        `/api/artifact/${PROJECT}/dialogue/script?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/dialogue/script-en?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/dialogue/${encodeURIComponent("pl:D01")}?episode=${EPISODE}`,
+        `/api/artifact/${PROJECT}/dialogue/${encodeURIComponent("en:D01")}?episode=${EPISODE}`,
+      ].map(async (path) => {
+        const response = await app.request(path);
+
+        return {
+          bytes: Buffer.from(await response.arrayBuffer()),
+          status: response.status,
+          type: response.headers.get("content-type") ?? "",
+        };
+      })
+    );
+
+    expect([script?.status, translation?.status, line?.status, translated?.status]).toEqual([
+      200, 200, 200, 200,
+    ]);
+    expect(script?.type).toContain("text/markdown");
+    expect(translation?.type).toContain("text/markdown");
+    expect(line?.type).toBe("audio/wav");
+    expect(script?.bytes).toEqual(await readFile(join(dialogueRoot(), "dialogue.md")));
+    expect(translation?.bytes).toEqual(await readFile(join(dialogueRoot(), "dialogue.en.md")));
+    expect(line?.bytes).toEqual(await readFile(join(dialogueRoot(), "dialogue", "pl", "D01.wav")));
+    expect(translated?.bytes).toEqual(
+      await readFile(join(dialogueRoot(), "dialogue", "en", "D01.wav"))
+    );
+  });
+
+  it("should answer 404 for a line without its language and for anything else it does not name", async () => {
+    const app = createUi({ workspace: spokenWorkspace });
+    const answers = await Promise.all(
+      [
+        // The stage's own key for a line of the film, which names no directory.
+        "D01",
+        "pl:D01:en",
+        `pl:${"../../D01"}`,
+        `${"../.."}:D01`,
+        `script-${"../../dialogue"}`,
+        "dialogue.md",
+      ].map(async (artifact) => {
+        const response = await app.request(
+          `/api/artifact/${PROJECT}/dialogue/${encodeURIComponent(artifact)}?episode=${EPISODE}`
+        );
+
+        return response.status;
+      })
+    );
+
+    expect(answers).toEqual(Array.from({ length: 6 }, () => 404));
   });
 });
 

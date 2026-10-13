@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { asMedia } from "./clips";
+import { asDialogue } from "./dialogue";
 import { approvable, asImages } from "./panel";
 import type { DrawnReport, MediaReport, TextStatus } from "./types";
 
@@ -99,6 +100,58 @@ describe("stage 7's reader", () => {
 
   it("should carry what the purchase says without refusing, beside the bill", () => {
     expect(asMedia(MIXED).notices).toEqual(MIXED.notices);
+  });
+});
+
+/**
+ * Stage 11's reader, which reads one shape two ways. A text call, the
+ * script's or the translation's, has a prompt and no lines and is billed in
+ * calls; a purchase of lines is billed in calls **and** characters, because the
+ * speech provider charges for characters, and the two are never summed.
+ */
+describe("stage 11's reader", () => {
+  it("should bill a text call in calls, with the prompt it would send", () => {
+    const priced = asDialogue({
+      characters: 0,
+      lines: [],
+      notices: [],
+      paidCalls: 1,
+      problems: [],
+      prompt: "# Task: translate",
+    });
+
+    expect(priced.billed.map((line) => [line.count, line.unit[2]])).toEqual([
+      [1, "płatnych wywołań tekstowych"],
+    ]);
+    expect(priced.prompts).toEqual([
+      { label: "Prompt, który poleci do modelu tekstowego", text: "# Task: translate" },
+    ]);
+  });
+
+  it("should bill lines in lines and characters, apart", () => {
+    const priced = asDialogue({
+      characters: 42,
+      lines: [
+        { cast: "ewa", characters: 20, id: "en:D01", note: "gotowa do kupienia", state: "planned" },
+        {
+          cast: "tata",
+          characters: 22,
+          id: "en:D02",
+          note: "gotowa do kupienia",
+          state: "planned",
+        },
+      ],
+      notices: [],
+      paidCalls: 2,
+      problems: [],
+      prompt: null,
+    });
+
+    expect(priced.billed.map((line) => [line.count, line.unit[2]])).toEqual([
+      [2, "kwestii"],
+      [42, "znaków"],
+    ]);
+    expect(priced.prompts).toEqual([]);
   });
 });
 

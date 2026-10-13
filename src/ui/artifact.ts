@@ -5,6 +5,8 @@ import {
   characterViewImage,
   clipFrame,
   clipVideo,
+  dialogueAudio,
+  dialogueTranslation,
   type EpisodePaths,
   episodePaths,
   episodeTrackPaths,
@@ -93,6 +95,9 @@ const NARRATED = "narrated";
 /** Stage 10's two, read the same way one row down: the sheet, and the mix. */
 const CUES = "cues";
 const MIXED = "mixed";
+
+/** Stage 11's script in the language of the mouths: `script-en`, as its stage file keys it. */
+const TRANSLATED = "script-";
 
 /** What each episode stage publishes, in the stage's own word for it. */
 const UNDER_EPISODE: Readonly<
@@ -304,6 +309,44 @@ function underSoundDesign(project: ProjectPaths, request: ArtifactRequest): Loca
 }
 
 /**
+ * Stage 11: the script, its translation and every line, all shared, none with a track.
+ *
+ * `script` and `script-en` are the stage file's own keys. A line is the one
+ * word spelled differently, and on purpose: the stage keys the film's lines
+ * `D01` and the second language's `en:D01`, but both live under a directory
+ * named for their language, so the film's line is asked for as `pl:D01`. The
+ * alternative was this table reading `episode.json` to learn which language
+ * the film is in, which is a resolver deciding something rather than building
+ * a path. Both halves of the pair are checked by the layout module, so `..`
+ * on either side is a refusal before a path exists.
+ */
+function underDialogue(project: ProjectPaths, request: ArtifactRequest): LocatedArtifact | null {
+  const episode = episodePaths(project, request.episodeId);
+
+  if (!episode.ok) {
+    return null;
+  }
+
+  if (request.artifact === SCRIPT) {
+    return { contentType: MARKDOWN, path: episode.data.dialogueScript };
+  }
+
+  if (request.artifact.startsWith(TRANSLATED)) {
+    const translation = dialogueTranslation(
+      episode.data,
+      request.artifact.slice(TRANSLATED.length)
+    );
+
+    return translation.ok ? { contentType: MARKDOWN, path: translation.data } : null;
+  }
+
+  const [language = "", id = "", ...rest] = request.artifact.split(":");
+  const line = rest.length === 0 ? dialogueAudio(episode.data, language, id) : null;
+
+  return line?.ok === true ? { contentType: WAV, path: line.data } : null;
+}
+
+/**
  * Stage 2's images: one character, one track, one of the ten pictures.
  *
  * It is a function rather than a row in the table above because its artifacts
@@ -410,6 +453,10 @@ export function locateArtifact(
 
   if (request.stage === "sound-design") {
     return underSoundDesign(project.data, request);
+  }
+
+  if (request.stage === "dialogue") {
+    return underDialogue(project.data, request);
   }
 
   const locate = UNDER_EPISODE[request.stage]?.[request.artifact];

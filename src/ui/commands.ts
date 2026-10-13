@@ -394,6 +394,26 @@ export const INTENTS = {
     "cues",
   ],
   /**
+   * Stage 11, accepted: whatever was chosen, in one command.
+   *
+   * Unlike stages 9 and 10 the script and the lines share one command,
+   * because the CLI takes them in one list (`script,D01,en:D01`) and each key
+   * still names exactly one yes: the script's opens buying the film's lines,
+   * the translation's opens buying the lines in the language of the mouths,
+   * and a line's is about the recording someone listened to. An empty choice
+   * spells no flag, and the CLI refuses that rather than reading it as all.
+   */
+  approveDialogue: (
+    one: EpisodeRef & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "dialogue",
+    ...artifacts(one.artifacts),
+  ],
+  /**
    * Stage 10, accepted: this track's full mix, and nothing to narrow.
    *
    * `--track` is the choice of question rather than a narrowing, exactly as
@@ -607,6 +627,14 @@ export const INTENTS = {
     "clips",
     "--track",
     one.track,
+  ],
+  /** Stage 11, verified: the script, its translation and every line, shared, with no track. */
+  checkDialogue: ({ episodeId, projectId }: EpisodeRef): readonly string[] => [
+    "check",
+    projectId,
+    episodeId,
+    "--stage",
+    "dialogue",
   ],
   /** Stage 10, verified: this track's full mix, where every sound landed. */
   checkMaster: (one: TrackRef): readonly string[] => [
@@ -828,6 +856,38 @@ export const INTENTS = {
     "--json",
   ],
   /**
+   * Stage 11, previewed: the script's one text call, or the lines' bill, in
+   * either language.
+   *
+   * Stage 9's shape one row down, with one flag more. `--language` is what
+   * chooses which lines are bought: none, or the film's own, means the lines of
+   * the script; the language of the mouths means the lines of the accepted
+   * translation, keyed `en:D01`. It is a flag rather than a second command
+   * because the CLI made it one: both are the same purchase read from a
+   * different script. An empty language is not spelled, rule 7 at the edge of
+   * the screen, so the CLI's own answer stands.
+   */
+  previewDialogue: (
+    one: Send & {
+      readonly artifacts: readonly string[];
+      readonly language: string;
+      readonly voiceModel: string;
+    }
+  ): readonly string[] => [
+    "dialogue",
+    "generate",
+    one.projectId,
+    one.episodeId,
+    ...artifacts(one.artifacts),
+    ...flag("--language", one.language),
+    ...flag("--model", one.model),
+    ...flag("--voice-model", one.voiceModel),
+    ...flag("--max-output-tokens", one.maxOutputTokens),
+    ...attempt(one),
+    "--dry-run",
+    "--json",
+  ],
+  /**
    * Stage 9, previewed: the script's one text call, or the recordings' bill.
    *
    * One command covers both halves, and which one it is doing is the report's
@@ -966,6 +1026,25 @@ export const INTENTS = {
     "--json",
   ],
   /**
+   * Stage 11, previewed: the script in the language of the mouths, one text call.
+   *
+   * No `--artifact`, because there is one translation per episode and a flag
+   * with one legal value is ceremony; no language either, because which one
+   * is the episode's `lip-sync.json`, a decision stage 0 stores and this
+   * screen never makes on its behalf.
+   */
+  previewTranslation: (send: Send): readonly string[] => [
+    "dialogue",
+    "translate",
+    send.projectId,
+    send.episodeId,
+    ...flag("--model", send.model),
+    ...flag("--max-output-tokens", send.maxOutputTokens),
+    ...attempt(send),
+    "--dry-run",
+    "--json",
+  ],
+  /**
    * Stage 2, refused: the chosen pictures of one character, and why.
    *
    * Every rejection below names what it refuses, and the panels offer it only
@@ -999,6 +1078,25 @@ export const INTENTS = {
     "--note",
     one.note,
     ...failing(one.failed),
+  ],
+  /**
+   * Stage 11, refused: the chosen script, translation or lines, and why.
+   *
+   * The script's note and the translation's are what the next new attempt
+   * corrects by, through the text call; a line's has no model to read it, so
+   * there it is the reason on record and the next purchase simply buys again.
+   */
+  rejectDialogue: (
+    one: EpisodeRef & Refusal & { readonly artifacts: readonly string[] }
+  ): readonly string[] => [
+    "reject",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "dialogue",
+    ...artifacts(one.artifacts),
+    "--note",
+    one.note,
   ],
   /** Stage 6, refused: the one frame, so no `--artifact`, as on its yes. */
   rejectOpeningFrame: (one: TrackRef & Failed): readonly string[] => [
