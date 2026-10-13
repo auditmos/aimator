@@ -77,7 +77,8 @@ obowiązuje tylko wtedy, gdy klatka dołącza jakiś `hero:<id>`. Kadr bez posta
 ma czego porównywać z Character Master. Bez `--checks` albo z niepełną listą `approve`
 odmawia i wymienia brakujące kryteria; nazwa spoza słownika to błąd użycia. `--checks all`
 znaczy „wszystkie wymagane dla tej klatki". Rekord zapisuje je w `review.checks`.
-Podpowiedź „Dalej:" w `check` i `generate` niesie już tę listę.
+Podpowiedź „Dalej:" w `check` i `generate` niesie już tę listę, a `check --json` podaje ją
+w `artifact.checks`, z którego panel UI buduje swoją checklistę.
 
 ## Czym różni się od referencji
 

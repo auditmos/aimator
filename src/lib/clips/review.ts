@@ -42,6 +42,8 @@ import {
 
 export interface ClipState {
   readonly approved: boolean;
+  /** The QC criteria a yes is given against: an entry frame's, never a clip's. */
+  readonly checks: readonly Check[];
   readonly id: string;
   /** Recorded inputs whose bytes on disk no longer match what this run used. */
   readonly inputsChanged: readonly string[];
@@ -84,8 +86,6 @@ class ClipStateError extends Error {
 interface Inspection {
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
-  /** The QC criteria each target is accepted against; empty for a clip. */
-  readonly checks: Map<string, readonly Check[]>;
   /** The inputs as they now stand, per target, what an approval re-records. */
   readonly inputs: Map<string, readonly RecordedFile[]>;
   readonly stage: StageFile;
@@ -202,6 +202,7 @@ async function inspectOne(
       blocking: [],
       status: {
         approved: false,
+        checks: target.artifact.checks,
         id: target.name,
         inputsChanged: [],
         kind: target.kind,
@@ -218,6 +219,7 @@ async function inspectOne(
       blocking: [unfinished],
       status: {
         approved: false,
+        checks: target.artifact.checks,
         id: target.name,
         inputsChanged: [],
         kind: target.kind,
@@ -237,6 +239,7 @@ async function inspectOne(
       // verifies is not an approval; it is a stale claim.
       approved:
         record.review.status === "approved" && blocking.length === 0 && inputsChanged.length === 0,
+      checks: target.artifact.checks,
       id: target.name,
       inputsChanged,
       kind: target.kind,
@@ -257,12 +260,10 @@ async function inspect(input: Stage7Scope): Promise<Result<Inspection>> {
   const problems: string[] = [];
   const artifacts: ClipState[] = [];
   const inputs = new Map<string, readonly RecordedFile[]>();
-  const checks = new Map<string, readonly Check[]>();
   const seen = new Map<string, string | null>();
 
   for (const target of stage7.data.targets) {
     inputs.set(target.name, target.artifact.inputs);
-    checks.set(target.name, target.artifact.checks);
     // biome-ignore lint/performance/noAwaitInLoops: one target at a time, in order
     const one = await inspectOne(input, stage7.data, target, seen);
 
@@ -296,29 +297,24 @@ async function inspect(input: Stage7Scope): Promise<Result<Inspection>> {
 
   return ok({
     blocking,
-    checks,
     inputs,
     stage: stage7.data.stage,
     stagePath: stage7.data.paths.track.clipsStage,
     status: {
       approved: artifacts.length > 0 && artifacts.every((one) => one.approved),
       artifacts,
-      nextStep: nextStepOf(input, artifacts, checks),
+      nextStep: nextStepOf(input, artifacts),
       problems: [...stage7.data.gate, ...stalled, ...problems],
       track: input.track,
     },
   });
 }
 
-function nextStepOf(
-  input: Stage7Scope,
-  artifacts: readonly ClipState[],
-  checks: Map<string, readonly Check[]>
-): string {
+function nextStepOf(input: Stage7Scope, artifacts: readonly ClipState[]): string {
   const waiting = artifacts.filter((one) => one.state === "completed" && !one.approved);
 
   if (waiting.length > 0) {
-    return `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${waiting.map((one) => one.id).join(",")}${checksFlag(...waiting.map((one) => checks.get(one.id) ?? []))}`;
+    return `oceń i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${waiting.map((one) => one.id).join(",")}${checksFlag(...waiting.map((one) => one.checks))}`;
   }
 
   const missing = artifacts.filter((one) => one.state !== "completed");
@@ -362,13 +358,13 @@ export async function approveClips(input: ApproveScope): Promise<Result<ClipsSta
     return inspection;
   }
 
-  const { blocking, checks, inputs, stage, stagePath, status } = inspection.data;
+  const { blocking, inputs, stage, stagePath, status } = inspection.data;
   const problems: string[] = [];
   const confirmed: Record<string, readonly Check[]> = {};
 
   for (const id of input.artifacts) {
     const entry = status.artifacts.find((one) => one.id === id);
-    const required = checks.get(id) ?? [];
+    const required = entry?.checks ?? [];
 
     if (entry === undefined || entry.state !== "completed") {
       problems.push(`${id}: nie ma czego zatwierdzić (${entry?.state ?? "brak"})`);
@@ -422,6 +418,6 @@ export async function approveClips(input: ApproveScope): Promise<Result<ClipsSta
     ...status,
     approved: settled.every((one) => one.approved),
     artifacts: settled,
-    nextStep: nextStepOf(input, settled, checks),
+    nextStep: nextStepOf(input, settled),
   });
 }

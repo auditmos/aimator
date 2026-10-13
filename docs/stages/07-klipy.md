@@ -64,7 +64,8 @@ kadrem gotowym do animacji, więc `approve` z `entry:Cnn` w `--artifact` **wymag
 obowiązuje tylko wtedy, gdy klatka dołącza jakiś `hero:<id>`. Jedno `--checks` dotyczy
 każdej klatki wskazanej w `--artifact` (`--artifact entry:C02,entry:C03 --checks all`
 zapisuje `review.checks` w obu rekordach). Klip (`C01`) zatwierdza się bez checklisty, także
-w tym samym poleceniu co klatkę.
+w tym samym poleceniu co klatkę. `check --json` podaje wymagane kryteria każdego ogniwa w
+`artifacts[].checks` (pusta lista przy klipie); z niej panel UI buduje swoją checklistę.
 
 ## Końcówka klipu wraca razem z klipem
 

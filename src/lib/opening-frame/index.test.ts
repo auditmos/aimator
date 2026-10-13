@@ -425,6 +425,39 @@ describe("checkOpeningFrame", () => {
     }
   });
 
+  /** A screen builds its checklist from this, not from the sentence above. */
+  it("should list the criteria a yes on the frame is given against", async () => {
+    await upstream();
+    await makeReferences("gpt-image");
+    const absent = await inspect();
+    await generate();
+    const drawn = await inspect();
+
+    for (const status of [absent, drawn]) {
+      expect(status.ok ? status.data.artifact.checks : null).toEqual([
+        "anatomy",
+        "master",
+        "style",
+        "continuity",
+        "props",
+      ]);
+    }
+  });
+
+  it("should leave master off the list of a frame that attaches no hero", async () => {
+    await upstream("empty-opening", [OPENING_NEEDS]);
+    await makeReferences("gpt-image");
+    await generate();
+    const status = await inspect();
+
+    expect(status.ok ? status.data.artifact.checks : null).toEqual([
+      "anatomy",
+      "style",
+      "continuity",
+      "props",
+    ]);
+  });
+
   it("should report a frame that was never drawn", async () => {
     await upstream();
     await makeReferences("gpt-image");

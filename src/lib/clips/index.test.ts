@@ -706,6 +706,25 @@ describe("checkClips", () => {
     ]);
   });
 
+  /** A screen builds its checklist from this; a clip is accepted without one. */
+  it("should list the criteria each entry frame is accepted against, and none for a clip", async () => {
+    await upstream();
+    await makeOpeningFrame("gpt-image");
+
+    const result = await status();
+    const full = ["anatomy", "master", "style", "continuity", "props"];
+
+    expect(
+      result.ok ? result.data.artifacts.map((one) => [one.id, one.checks]) : reason(result)
+    ).toEqual([
+      ["C01", []],
+      ["entry:C02", full],
+      ["C02", []],
+      ["entry:C03", full],
+      ["C03", []],
+    ]);
+  });
+
   /**
    * A blocker refuses the **stage** only when the stage has nothing left to buy.
    *

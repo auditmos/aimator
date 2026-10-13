@@ -7,7 +7,7 @@ import {
   type WriteMode,
   withInputs,
 } from "../artifact/index.js";
-import { type Checklist, checksFlag, confirmChecks } from "../checklist.js";
+import { type Check, type Checklist, checksFlag, confirmChecks } from "../checklist.js";
 import { type ImageVerdict, validateImage } from "../image-model/index.js";
 import { err, ok, type Result } from "../result.js";
 import { type ImageTrack, workspacePath } from "../workspace.js";
@@ -39,6 +39,8 @@ import {
 
 export interface OpeningFrameState {
   readonly approved: boolean;
+  /** The QC criteria a yes on this frame is given against, derived from the plan. */
+  readonly checks: readonly Check[];
   readonly id: string;
   /** Recorded inputs whose bytes on disk no longer match what this run used. */
   readonly inputsChanged: readonly string[];
@@ -132,6 +134,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
         approved: false,
         artifact: {
           approved: false,
+          checks: opening.checks,
           id: OPENING_FRAME,
           inputsChanged: [],
           note: opening.blockers.length > 0 ? opening.blockers.join("; ") : "jeszcze nie powstała",
@@ -156,6 +159,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
         approved: false,
         artifact: {
           approved: false,
+          checks: opening.checks,
           id: OPENING_FRAME,
           inputsChanged: [],
           note: `próba ${record.runId} nieukończona`,
@@ -216,6 +220,7 @@ async function inspect(input: Stage6Scope): Promise<Result<Inspection>> {
       approved,
       artifact: {
         approved,
+        checks: opening.checks,
         id: OPENING_FRAME,
         inputsChanged,
         note:
