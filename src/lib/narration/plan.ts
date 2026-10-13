@@ -10,7 +10,7 @@ import {
 import { type EpisodeSettings, readStage0Inputs } from "../project/index.js";
 import { ok, type Result } from "../result.js";
 import { checkShotList } from "../shot-list/index.js";
-import type { PlanClock } from "../timeline.js";
+import { type PlanClock, placeSpeech } from "../timeline.js";
 import { validateVideo } from "../video-model/index.js";
 import { validateSpeech } from "../voice-model/index.js";
 import {
@@ -430,11 +430,6 @@ export async function readTrackTimeline(
   });
 }
 
-/** Seconds, to the thousandth, the precision an audio delay is spelled in. */
-function round(seconds: number): number {
-  return Math.round(seconds * 1000) / 1000;
-}
-
 /**
  * Where each line lands on this track, and every reason it may not land there.
  *
@@ -445,7 +440,8 @@ function round(seconds: number): number {
  * **where** a line sits comes from a plan a human approved, so a line that would
  * talk over the next one, or run past the end of the film, is refused and the
  * message names the remedy. The refusal costs nothing: the recordings stay, and
- * re-mixing after a fix is free.
+ * re-mixing after a fix is free. The arithmetic is `lib/timeline`'s, because
+ * stage 10 lays characters' lines by the same rule; the words are this stage's.
  */
 export function placeLines(input: {
   readonly actualSeconds: number;
@@ -453,36 +449,27 @@ export function placeLines(input: {
   readonly clock: PlanClock;
   readonly lines: readonly (NarrationLine & { readonly path: string; readonly seconds: number })[];
 }): { placed: readonly PlacedLine[]; problems: readonly string[] } {
-  const placed: PlacedLine[] = [];
-  const problems: string[] = [];
+  const placement = placeSpeech({ ...input, speech: input.lines });
 
-  for (const line of input.lines) {
-    const atSeconds = input.clock.at(line.atSeconds);
-    const ends = round(atSeconds + line.seconds);
-    const previous = placed.at(-1);
-
-    if (previous !== undefined && atSeconds < round(previous.atSeconds + previous.seconds)) {
-      problems.push(
-        `${previous.id} kończy się w ${round(previous.atSeconds + previous.seconds)}s, a ${line.id} zaczyna w ${atSeconds}s, narrator mówiłby sam przez siebie; skróć wcześniejszą kwestię w skrypcie albo przesuń kotwicę późniejszej`
-      );
-    }
-
-    if (ends > input.actualSeconds) {
-      problems.push(
-        `${line.id} kończy się w ${ends}s, a film trwa ${input.actualSeconds}s, kwestia nie mieści się w odcinku; skróć ją w skrypcie narracji albo przesuń jej kotwicę`
-      );
-    }
-
-    placed.push({
-      atSeconds,
-      id: line.id,
-      path: line.path,
-      plannedSeconds: line.atSeconds,
-      seconds: line.seconds,
-    });
-  }
-
-  return { placed, problems };
+  return {
+    placed: placement.placed.map((one, index) => ({
+      atSeconds: one.atSeconds,
+      id: one.id,
+      path: input.lines[index]?.path ?? "",
+      plannedSeconds: one.plannedSeconds,
+      seconds: one.seconds,
+    })),
+    problems: [
+      ...placement.overlaps.map(
+        ({ earlier, later }) =>
+          `${earlier.id} kończy się w ${earlier.ends}s, a ${later.id} zaczyna w ${later.atSeconds}s, narrator mówiłby sam przez siebie; skróć wcześniejszą kwestię w skrypcie albo przesuń kotwicę późniejszej`
+      ),
+      ...placement.overruns.map(
+        (one) =>
+          `${one.id} kończy się w ${one.ends}s, a film trwa ${input.actualSeconds}s, kwestia nie mieści się w odcinku; skróć ją w skrypcie narracji albo przesuń jej kotwicę`
+      ),
+    ],
+  };
 }
 
 /**

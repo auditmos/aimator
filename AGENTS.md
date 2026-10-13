@@ -23,10 +23,10 @@ build when a documented command or flag is missing from `--help`, when a local l
 at nothing, and when an implemented stage has no page, so this is enforced rather than
 remembered. It cannot check prose, so a renamed concept is still yours to carry across.
 
-Stages 0 through 10 are implemented. Stage 11 has its script and its bought lines: which
-line each character says, where, and when, lifted from the attributed lines stage 3 writes,
-then each line bought in its speaker's voice; laying them in stage 10's mix is a declared
-contract, not working code yet.
+Stages 0 through 11 are implemented. Stage 11 lifts which line each character says, where,
+and when, from the attributed lines stage 3 writes, buys each line in its speaker's voice,
+and hands the accepted lines to stage 10's mix as one more stem of speech, which is what
+makes all four sound modes complete.
 Stage 1 is the first that spends money, and it refuses to call the API until stage 0 is
 approved for that project and episode. Stage 2 is the first image stage and the first to
 branch into two model tracks; it does not depend on stage 1 and may run alongside it.
@@ -326,9 +326,11 @@ src/
     │   ├── generate.ts    # Internal: the cue sheet, then the stems it authorises
     │   ├── mix.ts         # Internal: the per-track half; buys nothing
     │   ├── review.ts      # Internal: two reviews, because there are two levels
-    │   └── index.test.ts  # Wiring/gate/bill/refusal, through the entry
+    │   ├── index.test.ts  # Wiring/gate/bill/refusal, through the entry
+    │   └── mix.test.ts    # The full mix with the cast speaking, through the entry
     ├── dialogue/      # Folder form: index.ts is the only entry (stage 11)
-    │   ├── index.ts       # Public: generateDialogue, checkDialogue, approveDialogue
+    │   ├── index.ts       # Public: generateDialogue, checkDialogue, approveDialogue,
+    │   │                  #         readAcceptedDialogue
     │   ├── prompt.ts      # Internal: the instruction that forbids writing a line
     │   ├── validate.ts    # Internal: lifted, not invented, nothing left behind
     │   ├── plan.ts        # Internal: two gates: a plan and a film that speaks, then voices
@@ -340,7 +342,8 @@ src/
     ├── instruction.ts # Single-file form: the marked block a person's note travels in
     ├── checklist.ts  # Single-file form: the QC criteria a frame ready for animation
     │                 #                   is accepted against, stages 6 and 7
-    ├── timeline.ts   # Single-file form: the plan's clock as one film's, stages 9 and 10
+    ├── timeline.ts   # Single-file form: the plan's clock as one film's, and where speech
+    │                 #                   lands on it without colliding, stages 9 and 10
     ├── byte-range.ts # Single-file form: one HTTP range, parsed; the published
     │                 #                   page's worker and the local screen
     ├── byte-range.test.ts
@@ -503,7 +506,15 @@ for a third caller would have been choosing to make an invariant into a coincide
 purpose. `readAcceptedLines` moved the other way and is worth distinguishing: it was not
 promoted into a module but **exported from stage 9's own entry**, because "which lines did a
 human accept" is a question about stage 9's artifact, and a later stage consuming an earlier
-stage's artifact through its public entry is the ordinary direction.
+stage's artifact through its public entry is the ordinary direction. Stage 11's
+`readAcceptedDialogue` is the same move one row on.
+
+`placeSpeech` grew into `lib/timeline` at its second caller for the clock's reason. Stage 9
+refused a narrator talking over himself; stage 10 had to refuse a character talking over
+the narrator or over another character, across two scripts, and "does this voice start
+before that one has finished" is one comparison, now made against whichever utterance ends
+latest rather than only the previous one. The words of each refusal stay with each stage,
+because which script a person goes back to is the stage's to say.
 
 `lib/byte-range` is the same promotion at the same threshold, and it is worth noting because
 its two callers are not two stages: the published page's worker serves a film out of a
@@ -757,8 +768,8 @@ It deliberately does **not** rebuild the gate graph; a second copy of it would d
 the first at the first hand correction. What it reads instead is `problems`, which makes
 the split between a **refusal** and a **report** load-bearing rather than cosmetic: a stage
 puts every reason it would refuse in `problems`, and everything it says without refusing in
-`notices`. Stage 8's silent cut, stage 9's missing music and stage 10's missing dialogue are
-notices; the ladder would call all three tracks blocked if they were not. The CLI prints
+`notices`. Stage 8's silent cut, stage 9's missing music and stage 10's not yet accepted
+dialogue are notices; the ladder would call all three tracks blocked if they were not. The CLI prints
 `!` for the first and `·` for the second, and [docs/pipeline.md](docs/pipeline.md) carries
 the invariant.
 

@@ -21,6 +21,7 @@ import { hasSound, validateVideo } from "../video-model/index.js";
 import { type ImageTrack, mixRunPaths, type Workspace } from "../workspace.js";
 import { type MixLevels, readLevels } from "./levels.js";
 import {
+  carriesNarration,
   MIXED,
   missingDialogue,
   musicGap,
@@ -46,9 +47,9 @@ import {
  * Laying music over the narrated cut would encode the speech a second time,
  * and would make the ducking dishonest: the voice would already be inside the
  * signal the music is supposed to step back under. So the picture is a stream
- * copy of the approved cut, the speech comes from the lossless lines stage 9
- * bought, and everything is encoded exactly once into the file a human is
- * about to accept.
+ * copy of the approved cut, the speech comes from the lossless lines stages 9
+ * and 11 bought, the narrator's and the characters', and everything is encoded
+ * exactly once into the file a human is about to accept.
  *
  * **`narrated.mp4` is neither overwritten nor invalidated.** It becomes a
  * reviewed intermediate, the only artifact anywhere in which the narration's
@@ -276,22 +277,27 @@ export async function generateMaster(input: MasterInput): Promise<Result<MasterR
     return levels;
   }
 
-  // The narration is only required where the episode declared a voice. Where
-  // it did not, stage 9 never ran and its gate would be a gate with nothing
-  // behind it.
-  const speaks = stage10.data.settings.audio !== "music-and-effects";
+  // The narration is only required where the episode declared a narrator, and
+  // the characters' lines only where it declared dialogue. Where it did not,
+  // that stage never ran and its gate would be a gate with nothing behind it.
+  // Both are speech, so both reach the engine in one list and the music steps
+  // back under either by the same ducking.
+  const narrated = carriesNarration(stage10.data.settings);
+  const { dialogue } = stage10.data;
+  const speech = [...(narrated ? lines.data.lines : []), ...dialogue.lines].map((line) => ({
+    ...line,
+    kind: "speech" as const,
+  }));
   const placement = placeSounds({
     actualSeconds: track.data.actualSeconds,
     clock: clock.data,
-    sounds: [
-      ...stems.data.stems,
-      ...(speaks ? lines.data.lines.map((line) => ({ ...line, kind: "speech" as const })) : []),
-    ],
+    sounds: [...stems.data.stems, ...speech],
   });
   const engine = await input.mux.version();
   const problems = [
     ...stems.data.gate,
-    ...(speaks ? lines.data.gate : []),
+    ...(narrated ? lines.data.gate : []),
+    ...dialogue.gate,
     ...track.data.gate,
     ...placement.problems,
     ...(engine.ok ? [] : [engine.error.message]),
@@ -300,12 +306,13 @@ export async function generateMaster(input: MasterInput): Promise<Result<MasterR
   const finished = record?.status === "completed" && !input.regenerate;
   const inputs = [
     ...stems.data.inputs,
-    ...(speaks ? lines.data.inputs : []),
+    ...(narrated ? lines.data.inputs : []),
+    ...dialogue.inputs,
     ...track.data.inputs,
     ...(levels.data.input === null ? [] : [levels.data.input]),
   ];
   const notes = [
-    ...missingDialogue(stage10.data.settings),
+    ...missingDialogue(stage10.data),
     ...musicGap(placement.placed, track.data.actualSeconds),
     ...drift(placement.placed),
   ];

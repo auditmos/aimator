@@ -1,13 +1,13 @@
 # Etap 10: muzyka i efekty
 
-Ostatni zaimplementowany etap. Pisze arkusz cue, kupuje podkład i efekty, i składa
-`<tor>/mixed.mp4`, czyli film ze wszystkim.
+Pisze arkusz cue, kupuje podkład i efekty, i składa `<tor>/mixed.mp4`, czyli film ze
+wszystkim: obrazem, narracją, kwestiami postaci, muzyką i efektami.
 
 | | |
 |---|---|
-| **Wejście** | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie [etapu 9](09-narracja.md) |
+| **Wejście** | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, przy narracji zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie [etapu 9](09-narracja.md), przy dialogu przyjęte kwestie [etapu 11](11-dialog.md) |
 | **Wyjście** | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` |
-| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md); miks czeka na zgodę na `narrated.mp4` |
+| **Bramka** | zatwierdzony [etap 3](03-lista-ujec.md); miks czeka na zgodę na `narrated.mp4` (z narracją) i na każdą kwestię dialogu (z dialogiem) |
 | **Koszt** | płatny; rachunek liczy się w **sekundach dźwięku**, nie w wywołaniach |
 
 ## Komendy
@@ -121,7 +121,29 @@ byłby już w sygnale, pod który muzyka ma ustępować.
 
 `narrated.mp4` nie jest ani nadpisywany, ani unieważniany; staje się przyjętym produktem
 pośrednim, a etap 10 bramkuje od **zgody** na niego, bo to jedyny dowód, że narracja siedzi
-we właściwym miejscu nad tym filmem.
+we właściwym miejscu nad tym filmem. Ta bramka obowiązuje wyłącznie w trybach z narratorem,
+`narration` i `dialogue-and-narration`: film samego dialogu nie ma czego czekać od etapu 9.
+
+## Kwestie postaci w pełnej ścieżce
+
+W trybach `dialogue` i `dialogue-and-narration` miks kładzie przyjęte kwestie
+[etapu 11](11-dialog.md) jako kolejny stem mowy, obok narracji, a nie jako drugi miks.
+Silnik dostaje je w tej samej liście mowy co narratora, więc podkład ustępuje pod kwestią
+postaci tak samo jak pod lektorem.
+
+- **Bramka:** każda kwestia skryptu dialogu z ważną zgodą. Odmowa wymienia każdą brakującą,
+  z powodem: niekupiona albo bez zgody. `check --stage sound-design --track <tor>` mówi to
+  samo, zanim ktoś spróbuje miksu.
+- **Umieszczenie:** kotwica z planu przeliczona na zegar filmu tego toru, tą samą
+  arytmetyką co narracja etapu 9 (`lib/timeline`). Kwestia startuje tam, gdzie wypada jej
+  sekunda planu po dryfie klipów.
+- **Odmowa:** gdy **dowolne** dwie wypowiedzi brzmiałyby naraz, dwie kwestie albo kwestia
+  i narracja, komunikat podaje obie nazwy i obie sekundy. Gdy wypowiedź kończy się po
+  filmie, też. Poprawka to krótsza kwestia tam, gdzie powstała (scenariusz, etap 1) albo
+  przesunięta kotwica w jej skrypcie; nagrań nikt nie przyspiesza ani nie przycina.
+
+Dopóki kwestie nie są wszystkie przyjęte, `check --stage sound-design` melduje, że pełna
+ścieżka nie położy mowy postaci. Gdy są, meldunek znika.
 
 ## Odmowa i meldunek to dwie różne rzeczy
 
@@ -133,9 +155,8 @@ wyjścia.
 ## Gdzie kończy się ten etap
 
 `mixed.mp4` jest ostatnim plikiem, jaki produkuje ten proces: film z obrazem, narracją,
-podkładem i efektami. Tryby dźwięku, które proces obsługuje w całości, to
-`music-and-effects` i `narration`; przy każdym innym `check` wypisuje, czego w miksie nie
-ma, zamiast milczeć.
+kwestiami postaci, podkładem i efektami. Proces obsługuje w całości wszystkie cztery tryby
+dźwięku: `music-and-effects`, `narration`, `dialogue` i `dialogue-and-narration`.
 
 ---
 

@@ -156,3 +156,81 @@ function resolve(plannedSeconds: number, drift: readonly ClipDrift[]): number {
 
   return round(elapsed);
 }
+
+/** One utterance as a script hands it over: who, when the plan starts it, how long it runs. */
+interface Utterance {
+  readonly atSeconds: number;
+  readonly id: string;
+  readonly seconds: number;
+}
+
+/** One utterance on one track's film. */
+interface SpokenAt {
+  /** The second of this track's finished film it begins at. */
+  readonly atSeconds: number;
+  readonly ends: number;
+  readonly id: string;
+  /** What the plan said, before the track's own drift was applied. */
+  readonly plannedSeconds: number;
+  readonly seconds: number;
+}
+
+interface SpeechPlacement {
+  /** Two utterances heard at once: the one still speaking, and the one that starts over it. */
+  readonly overlaps: readonly { readonly earlier: SpokenAt; readonly later: SpokenAt }[];
+  /** Utterances that end after the film does. */
+  readonly overruns: readonly SpokenAt[];
+  /** Every utterance, in the order it was given. */
+  readonly placed: readonly SpokenAt[];
+}
+
+/**
+ * Speech laid on one track's film: where each utterance lands, which two would
+ * talk over each other, and which would run past the end.
+ *
+ * The second half of crossing the gap between the two clocks, and promoted for
+ * the first half's reason: stage 9 lays a narrator's lines here and stage 10
+ * lays a character's lines beside them, and "does this voice start before that
+ * one has finished" is not a comparison anybody should write twice.
+ *
+ * **Any two** utterances are compared, not neighbours in the list. Two scripts
+ * feed stage 10, and a long line can still be sounding when the one after next
+ * begins, so each start is held against whichever utterance ends latest so
+ * far. Nothing is moved: what a refusal says, and which script it sends a
+ * person back to, is the caller's.
+ */
+export function placeSpeech(input: {
+  readonly actualSeconds: number;
+  readonly clock: PlanClock;
+  readonly speech: readonly Utterance[];
+}): SpeechPlacement {
+  const placed = input.speech.map((one) => {
+    const atSeconds = input.clock.at(one.atSeconds);
+
+    return {
+      atSeconds,
+      ends: round(atSeconds + one.seconds),
+      id: one.id,
+      plannedSeconds: one.atSeconds,
+      seconds: one.seconds,
+    };
+  });
+  const overlaps: { earlier: SpokenAt; later: SpokenAt }[] = [];
+  let latest: SpokenAt | null = null;
+
+  for (const one of [...placed].sort((a, b) => a.atSeconds - b.atSeconds)) {
+    if (latest !== null && one.atSeconds < latest.ends) {
+      overlaps.push({ earlier: latest, later: one });
+    }
+
+    if (latest === null || one.ends > latest.ends) {
+      latest = one;
+    }
+  }
+
+  return {
+    overlaps,
+    overruns: placed.filter((one) => one.ends > input.actualSeconds),
+    placed,
+  };
+}

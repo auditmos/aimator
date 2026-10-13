@@ -308,7 +308,7 @@ function preview(
     nextStep: blocked
       ? "usuń powyższe przeszkody przed płatnym wywołaniem"
       : `aimator sound-design generate ${input.projectId} ${input.episodeId}`,
-    notices: [...missingDialogue(stage10.settings), BILLING],
+    notices: [...missingDialogue(stage10), BILLING],
     problems,
     prompt: stage10.prompt,
     ready: !blocked,
@@ -333,7 +333,7 @@ function waiting(
     created: [],
     cues,
     nextStep: `przeczytaj arkusz i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${CUES}`,
-    notices: missingDialogue(stage10.settings),
+    notices: missingDialogue(stage10),
     problems: [],
     prompt: null,
     ready: false,
@@ -395,7 +395,7 @@ async function write(
       state: "blocked" as const,
     })),
     nextStep: `przeczytaj arkusz i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${CUES}`,
-    notices: [...missingDialogue(stage10.settings), BILLING],
+    notices: [...missingDialogue(stage10), BILLING],
     problems: [],
     prompt: null,
     ready: true,
@@ -602,7 +602,7 @@ async function buy(
     nextStep: pending
       ? `odsłuchaj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${done.map((cue) => cue.id).join(",")}`
       : `aimator sound-design mix ${input.projectId} ${input.episodeId} --track <tor>`,
-    notices: missingDialogue(stage10.settings),
+    notices: missingDialogue(stage10),
     problems: [],
     prompt: null,
     ready: true,

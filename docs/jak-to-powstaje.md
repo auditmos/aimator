@@ -150,8 +150,8 @@ idzie od początku filmu do końca i każde ogniwo wymaga osobnej zgody.
 
 ## Postprodukcja
 
-Faza sklejania. Nic się tu już nie rysuje, a dwa z trzech etapów niczego nie kupują, bo
-liczy je lokalny ffmpeg.
+Faza sklejania i dźwięku. Nic się tu już nie rysuje; montaż i oba miksy niczego nie kupują,
+bo liczy je lokalny ffmpeg.
 
 ### 8. Montaż
 
@@ -174,10 +174,11 @@ umieszczenie narracji, bez muzyki pod spodem, i dlatego jest osobnym plikiem do 
 ### 10. Muzyka i efekty
 
 Udźwiękowienie i mix. Muzyka oraz efekty są kupowane, a nie przynoszone z zewnątrz, i kładą
-się na niemym cięciu razem z narracją. Dzięki temu mowa jest kodowana raz, a podkład może
-uczciwie ustąpić pod głosem.
+się na niemym cięciu razem z narracją i kwestiami postaci. Dzięki temu mowa jest kodowana
+raz, a podkład może uczciwie ustąpić pod każdym głosem.
 
-- **Potrzebuje:** zatwierdzonej listy ujęć i zatwierdzonego `narrated.mp4`.
+- **Potrzebuje:** zatwierdzonej listy ujęć, zatwierdzonego `narrated.mp4`, gdy film ma
+  narratora, i przyjętych kwestii [etapu 11](stages/11-dialog.md), gdy mówią postacie.
 - **Produkuje:** `sound/*.mp3` i `mixed.mp4`, czyli film ze wszystkim.
 - **Koszt:** rozliczany w sekundach wygenerowanego dźwięku.
 - [Komendy tego etapu](stages/10-muzyka-i-efekty.md)

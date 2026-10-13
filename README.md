@@ -14,12 +14,16 @@ scenariusz i assety, po gotowy film sklejony z klipów.
   scenariusza.
 - **Oddaje film w trzech wersjach**, z których każda nosi własną zgodę: `episode.mp4` to
   nieme cięcie obrazu, `narrated.mp4` dokłada narrację i jest jedynym miejscem, gdzie
-  słychać samo jej umieszczenie, a `mixed.mp4` ma wszystko.
+  słychać samo jej umieszczenie, a `mixed.mp4` ma wszystko: narrację, kwestie postaci,
+  muzykę i efekty.
 - **Nigdy nie wydaje pieniędzy po cichu.** Każde płatne polecenie ma `--dry-run`, który
   pokazuje pełny prompt bez sięgania po klucz, i mówi, ile wywołań wykona, zanim je
   wykona.
 
-Tryby dźwięku, które ten proces obsługuje w całości, to `music-and-effects` i `narration`.
+Proces obsługuje w całości wszystkie cztery tryby dźwięku: `music-and-effects`, `narration`,
+`dialogue` i `dialogue-and-narration`. Kwestie postaci kupuje
+[etap 11: dialog](docs/stages/11-dialog.md), każdą głosem swojej postaci, a pełna ścieżka
+etapu 10 kładzie je obok narracji, muzyki i efektów.
 
 **„Krótka" znaczy tu kilkanaście minut.** `--duration` przyjmuje formalnie do 3600 s, ale
 praktyczna granica leży niżej i bierze się stąd, że etapy 1, 3 i 4 mieszczą **cały film
@@ -72,7 +76,7 @@ plików stanu i szczegóły walidacji, jest w [docs/pipeline.md](docs/pipeline.m
 | [7. klipy](docs/stages/07-klipy.md) | zatwierdzona klatka poprzednika | `clips/Cxx.mp4` + klatki wejściowe i końcowe | obrazy **i** wideo |
 | [8. montaż](docs/stages/08-montaz.md) | wszystkie zatwierdzone klipy tego toru | `episode.mp4`: nieme cięcie obrazu | darmowy (ffmpeg) |
 | [9. narracja](docs/stages/09-narracja.md) | zatwierdzona lista ujęć, obsadzony głos, zatwierdzony montaż | `narration/Nnn.wav` + `narrated.mp4` | rozliczany w znakach |
-| [10. muzyka i efekty](docs/stages/10-muzyka-i-efekty.md) | zatwierdzona lista ujęć, zatwierdzony `narrated.mp4` | `sound/*.mp3` + `mixed.mp4`: film ze wszystkim | rozliczany w sekundach |
+| [10. muzyka i efekty](docs/stages/10-muzyka-i-efekty.md) | zatwierdzona lista ujęć, zatwierdzony `narrated.mp4` (z narracją), przyjęte kwestie etapu 11 (z dialogiem) | `sound/*.mp3` + `mixed.mp4`: film ze wszystkim | rozliczany w sekundach |
 
 Etapy tekstowe (1, 3, 4) są **wspólne dla obu torów**, bo opisują historię, a nie obrazy.
 Rozejście zaczyna się przy pierwszym obrazie odcinka i kończy dwiema niezależnymi

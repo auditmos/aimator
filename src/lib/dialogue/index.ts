@@ -19,4 +19,9 @@
  */
 
 export { type DialogueReport, generateDialogue } from "./generate.js";
-export { approveDialogue, checkDialogue, type DialogueStatus } from "./review.js";
+export {
+  approveDialogue,
+  checkDialogue,
+  type DialogueStatus,
+  readAcceptedDialogue,
+} from "./review.js";

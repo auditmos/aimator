@@ -5,6 +5,7 @@ import {
   type RecordedFile,
   readDigest,
   serialize,
+  toWorkspacePath,
   type WriteMode,
   withAmendments,
   withInputs,
@@ -243,7 +244,7 @@ function nextStep(
 
   return pending.length > 0
     ? `odsłuchaj kwestie i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${pending.map((one) => one.id).join(",")}`
-    : "skrypt i wszystkie kwestie przyjęte";
+    : `skrypt i wszystkie kwestie przyjęte; pełna ścieżka położy je obok muzyki: aimator sound-design mix ${input.projectId} ${input.episodeId} --track <gpt-image|seedream>`;
 }
 
 interface LineStates {
@@ -441,4 +442,109 @@ export async function approveDialogue(input: ApproveScope): Promise<Result<Dialo
   const after = await inspect(input);
 
   return after.ok ? ok(after.data.status) : after;
+}
+
+/** One accepted line as a mixer needs it: where the plan starts it, and its bytes. */
+interface AcceptedLine {
+  /** Where the plan puts it, before any track's drift is applied. */
+  readonly atSeconds: number;
+  readonly cast: string;
+  readonly id: string;
+  /** Absolute, for a mixer. */
+  readonly path: string;
+  /** How long the bought recording runs, from its own header. */
+  readonly seconds: number;
+}
+
+interface AcceptedDialogue {
+  /** Why these lines may not be laid down yet, line by line. Empty means they may. */
+  readonly gate: readonly string[];
+  readonly inputs: readonly RecordedFile[];
+  readonly lines: readonly AcceptedLine[];
+}
+
+/**
+ * Every line of the accepted script, with the recording somebody accepted.
+ *
+ * Exported for stage 9's `readAcceptedLines` reason: stage 10 lays these lines
+ * in the full mix, and "which lines did a human accept" is a question about
+ * this stage's artifact, answered here through the same verdict `check` prints
+ * rather than by a second copy of it one row down. Every line of the script
+ * has to be accepted, not merely the ones that are: a film missing a line is a
+ * film saying less than the script a person approved.
+ */
+export async function readAcceptedDialogue(input: Stage11Scope): Promise<Result<AcceptedDialogue>> {
+  const inspection = await inspect(input);
+
+  if (!inspection.ok) {
+    return inspection;
+  }
+
+  const { stage11, status } = inspection.data;
+  const scope = `${input.projectId} ${input.episodeId}`;
+
+  if (status.script.state !== "completed") {
+    return ok({
+      gate: [`nie ma skryptu dialogu, uruchom najpierw: aimator dialogue generate ${scope}`],
+      inputs: [],
+      lines: [],
+    });
+  }
+
+  const script = await readDigest(stage11.episode.dialogueScript);
+  const gate: string[] = status.script.approved
+    ? []
+    : [`skrypt dialogu nie ma ważnej zgody: ${status.nextStep}`];
+  const inputs: RecordedFile[] = script.ok
+    ? [
+        {
+          path: toWorkspacePath(input.workspace.root, stage11.episode.dialogueScript),
+          sha256: script.data.sha256,
+        },
+      ]
+    : [];
+  const lines: AcceptedLine[] = [];
+
+  for (const line of status.lines) {
+    const file = dialogueAudio(stage11.episode, stage11.language, line.id);
+
+    if (!file.ok) {
+      return file;
+    }
+
+    if (line.state !== "completed") {
+      gate.push(
+        `${line.id}: kwestia dialogu nie została kupiona: aimator dialogue generate ${scope}`
+      );
+      continue;
+    }
+
+    if (!line.approved || line.seconds === null) {
+      gate.push(
+        `${line.id}: kwestia dialogu nie ma ważnej zgody, szczegóły: aimator check ${scope} --stage ${STAGE}`
+      );
+      continue;
+    }
+
+    // biome-ignore lint/performance/noAwaitInLoops: one recording read at a time, in the script's order
+    const bytes = await readDigest(file.data);
+
+    if (!bytes.ok) {
+      return bytes;
+    }
+
+    inputs.push({
+      path: toWorkspacePath(input.workspace.root, file.data),
+      sha256: bytes.data.sha256,
+    });
+    lines.push({
+      atSeconds: line.atSeconds,
+      cast: line.cast,
+      id: line.id,
+      path: file.data,
+      seconds: line.seconds,
+    });
+  }
+
+  return ok({ gate, inputs, lines });
 }

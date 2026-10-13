@@ -2,7 +2,8 @@
 
 Kwestie, które mówią postacie, w języku filmu. Etap ma dwie połowy, tak jak etap 9: najpierw
 **skrypt**, czyli które kwestie, kto je mówi, w którym ujęciu i od której sekundy planu;
-potem **kwestie**, każda kupiona głosem swojej postaci.
+potem **kwestie**, każda kupiona głosem swojej postaci. Przyjęte kwestie kładzie w filmie
+miks [etapu 10](10-muzyka-i-efekty.md).
 
 | | |
 |---|---|
@@ -121,7 +122,8 @@ zwykle kogoś innego. Sposób czytania to domyślne ustawienia dostawcy, wysłan
 same, na których przyjęto próbkę: kwestia ma brzmieć jak głos, który ktoś usłyszał.
 
 Bajty są publikowane **tak, jak przyszły**: bez rozciągania i bez przyspieszania. Gdzie
-kwestia usiądzie w filmie i co, jeśli nachodzi na następną, rozstrzyga miks, nie zakup.
+kwestia usiądzie w filmie i co, jeśli nachodzi na następną, rozstrzyga miks, nie zakup
+([W pełnej ścieżce](#w-pełnej-ścieżce)).
 
 Przerwana próba zostawia rekord `submitted` przy tej jednej kwestii. Powtórzenie polecenia
 dokańcza ją z nagrania zapisanego w `runs/<runId>/`, **bez drugiej opłaty**. Nową płatną
@@ -163,6 +165,19 @@ w tym języku. `project.json` nim nie jest, więc zmiana narratora nie cofa żad
 Zmiana głosu `ewa` cofa zgody na kwestie `ewa` i nie rusza kwestii `tata`. Zgody na
 kwestię przeczytaną głosem, którego już nie ma, nie da się wydać ponownie: to nagranie
 kogoś innego, więc `approve` odmawia i wskazuje `--regenerate --artifact Dnn`.
+
+## W pełnej ścieżce
+
+Kwestie nie mają własnego miksu. Gdy każda ma ważną zgodę, `sound-design mix` z
+[etapu 10](10-muzyka-i-efekty.md#kwestie-postaci-w-pełnej-ścieżce) kładzie je w
+`<tor>/mixed.mp4` jako mowę, obok narracji, muzyki i efektów, a podkład ustępuje pod nimi
+jak pod lektorem. Tak powstaje pełny polski film z dialogiem, na każdym torze osobno.
+
+Kotwica kwestii to sekunda planu; miks przelicza ją na zegar filmu tego toru, bo klipy
+wróciły z dryfem. Dwie wypowiedzi, które brzmiałyby naraz, dwie kwestie albo kwestia
+i narracja, oraz wypowiedź kończąca się po filmie to **odmowa** z obiema nazwami i poprawką:
+krótsza kwestia w scenariuszu albo przesunięta kotwica w `dialogue.md`. Miks nic nie
+kosztuje, więc powtórzenie po poprawce jest darmowe.
 
 ---
 

@@ -176,7 +176,7 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
         approved: false,
         cues: [],
         nextStep: `aimator sound-design generate ${input.projectId} ${input.episodeId}`,
-        notices: missingDialogue(stage10.data.settings),
+        notices: missingDialogue(stage10.data),
         problems: stage10.data.gate,
         sheet: {
           ...ABSENT,
@@ -239,7 +239,7 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
       approved,
       cues: cues.states,
       nextStep: nextStep(input, sheetApproved, cues.states),
-      notices: missingDialogue(stage10.data.settings),
+      notices: missingDialogue(stage10.data),
       problems: [
         ...stage10.data.gate,
         ...blocking,
@@ -508,17 +508,18 @@ async function inspectMaster(
     return track;
   }
 
-  // Two gates here as well, and for stage 9's reason: the narrated cut has
-  // to be accepted and so does every stem that would sit on it. A check that
-  // reported only the first would call a track ready that the mix command
-  // refuses, which is the one thing the ladder above must never be told.
+  // The mix's gates here as well, and for stage 9's reason: the narrated cut
+  // has to be accepted, so does every stem that would sit on it, and so does
+  // every line the characters say. A check that reported fewer would call a
+  // track ready that the mix command refuses, which is the one thing the
+  // ladder above must never be told.
   const stems = await readAcceptedStems(input);
 
   if (!stems.ok) {
     return stems;
   }
 
-  const gate = [...track.data.gate, ...stems.data.gate];
+  const gate = [...track.data.gate, ...stems.data.gate, ...stage10.data.dialogue.gate];
   const paths = episodeTrackPaths(stage10.data.paths.episode, input.track);
   const record = track.data.stage.artifacts[MIXED];
 
@@ -532,7 +533,7 @@ async function inspectMaster(
         approved: false,
         artifact: { ...ABSENT, id: MIXED, note: "jeszcze nie zmiksowany", state: "absent" },
         nextStep: `aimator sound-design mix ${input.projectId} ${input.episodeId} --track ${input.track}`,
-        notices: missingDialogue(stage10.data.settings),
+        notices: missingDialogue(stage10.data),
         problems: gate,
         track: input.track,
       },
@@ -606,7 +607,7 @@ async function inspectMaster(
       nextStep: approved
         ? `odcinek "${input.episodeId}" na torze ${input.track} ma pełną ścieżkę i jest przyjęty`
         : `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track}`,
-      notices: missingDialogue(stage10.data.settings),
+      notices: missingDialogue(stage10.data),
       problems: [
         ...gate,
         ...blocking,

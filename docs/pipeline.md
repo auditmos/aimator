@@ -213,7 +213,7 @@ Obowiązują we wszystkich etapach.
 - **Odmowa to nie meldunek, i mieszkają w osobnych polach.** `problems` niesie wyłącznie to,
   co zatrzymuje etap: zamkniętą bramkę, nieprzechodzącą walidację, rozjazd wejścia.
   `notices` niesie to, co etap mówi, nie odmawiając: deklarację, której nikt w tym potoku
-  nie spełnia (niemy `episode.mp4` etapu 8, brak muzyki w etapie 9, brak dialogów
+  nie spełnia (niemy `episode.mp4` etapu 8, brak muzyki w etapie 9, nieprzyjęte kwestie dialogu
   w etapie 10), dryf długości po zmiksowaniu, cennik dostawcy przed zakupem. W tekście
   `!` to odmowa, `·` to meldunek. Rozdział istnieje, bo czyta je maszyna: `status`
   wyprowadza „zablokowany" wyłącznie z `problems`, więc meldunek wrzucony między odmowy
@@ -305,8 +305,8 @@ Obowiązują we wszystkich etapach.
 | 7 klipy | `project.json`, `project.md`, `style.json` i obrazy stylu (przy klatkach wejściowych), zatwierdzony `prompt-package.json` z `prompts/clips/Cnn.md` i `prompts/entry-frames/Cnn.md`, zatwierdzona `shot-list.md`, zatwierdzona klatka, od której klip się zaczyna, i, przy `previous-end-frame`, zatwierdzona końcówka poprzednika **na tym torze** | `<tor>/clips/Cxx.mp4`, `<tor>/frames/Cxx/entry.png`, `<tor>/frames/Cxx/end.jpg` albo `end.png` (format oddaje dostawca; przy Klingu wycina ją ffmpeg), `<tor>/clips.stage.json`, `<tor>/runs/<runId>/` | decyzja o obrazach stylu, zatwierdzony etap 4 i zatwierdzona klatka wejściowa albo końcówka poprzednika przed wywołaniem; model z tabeli dostawców, jego klucz i, przy Klingu, ffmpeg; potem ocena klipu i klatek z osobna | **zaimplementowany** |
 | 8 montaż | zatwierdzona `shot-list.md`, zatwierdzone klipy **na tym torze** | `<tor>/episode.mp4`, `<tor>/assembly.stage.json`, `<tor>/runs/<runId>/` | zatwierdzony każdy klip przed sklejeniem; potem ocena całości | **zaimplementowany** |
 | 9 dźwięk | zatwierdzona `shot-list.md`, `narratorVoiceId` z `project.json`, `narration.json` (sposób czytania), a do miksu zatwierdzony `<tor>/episode.mp4` | `narration.md`, `narration/Nnn.wav`, `soundtrack.stage.json` (wspólne); `<tor>/narrated.mp4`, `<tor>/soundtrack.stage.json` | zatwierdzony etap 3 i obsadzony głos przed wywołaniem; potem ocena skryptu, ocena każdej kwestii, ocena odsłuchu całości per tor | **zaimplementowany** |
-| 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
-| 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json` | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; przyjęty skrypt i przyjęta próbka głosu postaci przed kupnem jej kwestii; potem ocena skryptu, ocena każdej kwestii | **skrypt i kwestie zaimplementowane**, miks nie |
+| 10 muzyka i efekty | zatwierdzona `shot-list.md`, `mix.json` (poziomy), a do miksu zatwierdzony `<tor>/episode.mp4`, przy narracji zatwierdzony `<tor>/narrated.mp4` i przyjęte kwestie etapu 9, przy dialogu przyjęte kwestie etapu 11 | `sound-design.md`, `sound/Mnn.mp3`, `sound/Enn.mp3`, `sound-design.stage.json` (wspólne); `<tor>/mixed.mp4`, `<tor>/sound-design.stage.json` | zatwierdzony etap 3 przed wywołaniem; potem ocena arkusza, ocena każdego stemu, ocena odsłuchu całości per tor | **zaimplementowany** |
+| 11 dialog | zatwierdzona `shot-list.md` z kwestiami zapisanymi jako `<id>: "…"`, a do kwestii głos postaci w języku filmu z `characters/<c>/voices/<język>/voice.json` | `dialogue.md`, `dialogue/<język>/Dnn.wav`, `dialogue.stage.json` (wspólne); kwestie postaci, dosypywane do miksu etapu 10 | zatwierdzony etap 3 i `audio` równe `dialogue` albo `dialogue-and-narration` przed wywołaniem; przyjęty skrypt i przyjęta próbka głosu postaci przed kupnem jej kwestii; potem ocena skryptu, ocena każdej kwestii | **zaimplementowany** |
 
 **Wiersz 10 zmienił się przy implementacji i to jest zapisane tutaj, a nie przemilczane.**
 Mówił, że muzyka i efekty są **wejściem** wnoszonym przez człowieka, i sam przyznawał, że
@@ -316,19 +316,18 @@ inną nazwą, a nie wierszem 10. Stemy kupuje więc etap 10, z ElevenLabs, co ni
 czwartym dostawcą, tylko **czwartym i piątym miejscem wywołania u dostawcy, którego potok
 już ma** na mowę. Dostawców dalej jest trzech: OpenAI, BytePlus, ElevenLabs.
 
-Etap 11 jest **zaimplementowany do miksu**: istnieje skrypt, czyli które kwestie, kto je
-mówi, w którym ujęciu i od której sekundy planu, i istnieją kupione kwestie, każda głosem
-swojej postaci ([Etap 11: szczegóły](#etap-11-szczegóły)). Reszta wiersza jest
-zadeklarowanym kontraktem, tak jak wiersz etapu 9, a potem 10, istniał zanim powstał: mowa
-postaci ma się wpiąć w ustalony układ zamiast wymyślać własny, kupowana wspólnie dla obu
-torów jak narracja i lądująca w miksie etapu 10 jako kolejny stem, a nie jako drugi miks.
+Etap 11 jest **zaimplementowany**: istnieje skrypt, czyli które kwestie, kto je mówi,
+w którym ujęciu i od której sekundy planu, istnieją kupione kwestie, każda głosem swojej
+postaci, i lądują one w miksie etapu 10 jako kolejny stem mowy, a nie jako drugi miks
+([Etap 11: szczegóły](#etap-11-szczegóły)). Mowa postaci wpięła się w układ, który wiersz
+zadeklarował, zanim powstała: kupowana wspólnie dla obu torów jak narracja, kładziona per
+tor przez miks, który już istniał.
 
 Głos każdej postaci rozstrzyga obsada głosów obok etapu 0
 ([Głosy postaci](#głosy-postaci)): osobny `voice.json` na postać i język, z próbką i własną
-zgodą, **nie** `project.json`. Kwestii nie kładzie jeszcze na film żaden miks, więc reguła 7
-nadal obowiązuje: brak odpowiedzi nie udaje odpowiedzi, dialogi są w `mixed.mp4`
-**nieobecne**, a ich brak jest raportowany przy każdym `check` i przy każdej generacji etapu
-10, ale wyłącznie w dwóch trybach, które go deklarują.
+zgodą, **nie** `project.json`. Reguła 7 obowiązuje dalej: dopóki każda kwestia skryptu nie
+ma ważnej zgody, dialogu w `mixed.mp4` nie ma, miks odmawia z listą brakujących, a `check`
+etapu 10 melduje brak, wyłącznie w dwóch trybach, które dialog deklarują.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
 Jedyne, co je wiąże, to wspólna bramka etapu 0. Etap 3 też nie zależy od etapu 2; nazywa
@@ -1876,10 +1875,10 @@ byłoby płaceniem za katalog.
 ### Skąd się miksuje, i co się dzieje ze zgodą na `narrated.mp4`
 
 **Etap 10 nie miksuje na `narrated.mp4`. Składa od nowa** z `episode.mp4` i stemów: obraz
-idzie kopią strumieniową, mowa bierze się z bezstratnych `narration/Nnn.wav`, a wszystko
-koduje się **dokładnie raz**, do pliku, który ktoś zaraz przyjmie. Miksowanie na narracji
-kodowałoby mowę po raz drugi, i, co gorsza, czyniłoby ducking nieuczciwym, bo głos byłby
-już w sygnale, pod który muzyka ma ustępować.
+idzie kopią strumieniową, mowa bierze się z bezstratnych `narration/Nnn.wav` i
+`dialogue/<język>/Dnn.wav`, a wszystko koduje się **dokładnie raz**, do pliku, który ktoś
+zaraz przyjmie. Miksowanie na narracji kodowałoby mowę po raz drugi, i, co gorsza, czyniłoby
+ducking nieuczciwym, bo głos byłby już w sygnale, pod który muzyka ma ustępować.
 
 **Ze zgodą na `narrated.mp4` nie dzieje się nic, i to jest powiedziane wprost.** Plik nie
 jest nadpisywany, przekodowywany ani unieważniany, a zgoda dalej znaczy to, co znaczyła:
@@ -1892,7 +1891,26 @@ zakładnikiem" bramkę na pliku, którego etap nigdy nie otwiera. Etap 10 faktyc
 otwiera tych bajtów. Czyta **zgodę** na nie, a ta zgoda jest jedynym dowodem, że narracja
 siedzi tam, gdzie ma siedzieć nad *tym* filmem. Etap 10 ten fakt wykorzystuje, zamiast
 ustalać go po raz drugi. Bramka na klatce wejściowej w etapie 8 nie miała takiego dowodu za
-sobą; ta ma.
+sobą; ta ma. Obowiązuje wyłącznie w trybach z narratorem, `narration` i
+`dialogue-and-narration`: w trybie `dialogue` etap 9 nigdy nie biegł, więc taka bramka nie
+miałaby nic za sobą.
+
+### Kwestie postaci: kolejny stem mowy, nie drugi miks
+
+W trybach `dialogue` i `dialogue-and-narration` miks kładzie przyjęte kwestie etapu 11 obok
+narracji, muzyki i efektów, czytając je przez wejście etapu 11 (`readAcceptedDialogue`),
+tak jak kwestie narracji czyta przez wejście etapu 9. Silnik dostaje je w tej samej liście
+mowy co narratora, więc ducking obejmuje także dialog. Bramka: **każda** kwestia skryptu
+z ważną zgodą, a odmowa wymienia każdą brakującą z powodem; `check --stage sound-design
+--track <tor>` zgłasza to samo, bo drabina czyta ten check.
+
+Umieszczenie liczy `lib/timeline` (`placeSpeech`), ta sama arytmetyka, którą kładzie
+narrację etap 9: kotwica z planu przeliczona na zegar filmu tego toru. Porównywane są
+**dowolne dwie wypowiedzi**, nie tylko sąsiednie w liście, bo mowę dostarczają dwa skrypty,
+a długa kwestia może jeszcze brzmieć, gdy zaczyna się następna po następnej. Dwie
+wypowiedzi naraz, dwie kwestie albo kwestia i narracja, oraz wypowiedź kończąca się po
+filmie to odmowa z obiema nazwami i poprawką w scenariuszu albo w kotwicy skryptu.
+Nagrania idą tak, jak przyszły.
 
 ### Poziomy i ducking
 
@@ -1952,8 +1970,8 @@ sekundy przed obrazem. To dziura, nie zderzenie, a odmowa z powodu, którego nik
 naprawi, byłaby odmową bez wyjścia. Cisza na końcu jest ciszą, którą da się usłyszeć
 i o której da się zdecydować.
 
-**Efekty mogą na siebie nachodzić**, dwie rzeczy mogą dziać się naraz, a tylko narrator nie
-może mówić sam przez siebie.
+**Efekty mogą na siebie nachodzić**, dwie rzeczy mogą dziać się naraz, a tylko głos nie może
+mówić przez inny głos.
 
 ### Trzy rodzaje pochodzenia, tak jak w etapie 9
 
@@ -1982,12 +2000,12 @@ przyjęcie stemu otwiera miks, a druga próba u tego dostawcy kosztuje pełną c
 się z narratorem, a tylko ten plik ma oba naraz. `--artifact` nie jest tu wymagane: jeden
 artefakt na tor i nic poniżej, co przyjęcie mogłoby kupić.
 
-### Czego ten etap nie domyka
+### Co ten etap domyka
 
-Po etapie 10 tryby `music-and-effects` i `narration` są **domknięte**: to dokładnie to, co
-etapy 9 i 10 produkują między sobą. `dialogue` i `dialogue-and-narration` nie są:
-**mowę postaci kupuje etap 11, ale miks tego etapu jeszcze jej nie kładzie.**
-Raportowane, nie egzekwowane, jak wszędzie.
+Po etapie 10 domknięte są **wszystkie cztery tryby dźwięku**: `music-and-effects`
+i `narration` to dokładnie to, co etapy 9 i 10 produkują między sobą, a `dialogue`
+i `dialogue-and-narration` dokładają przyjęte kwestie etapu 11. Dopóki ich nie ma,
+meldunek i bramka mówią to samo dwa razy: czego film jeszcze nie ma i co blokuje miks.
 
 ## Etap 11: szczegóły
 
@@ -2065,3 +2083,13 @@ Kwestii, której wejście zmieniło się od nagrania, nie da się przyjąć pono
 głosu to nagranie kogoś innego, więc `approve` odmawia i wskazuje
 `--regenerate --artifact Dnn`. `approved` w obiekcie `check` oznacza skrypt i wszystkie
 kwestie; sam skrypt to `script.approved`.
+
+### W miksie etapu 10
+
+Kwestie nie mają własnego miksu: `sound-design mix` kładzie je w `<tor>/mixed.mp4` jako
+kolejny stem mowy, obok narracji, muzyki i efektów
+([Kwestie postaci: kolejny stem mowy, nie drugi miks](#kwestie-postaci-kolejny-stem-mowy-nie-drugi-miks)).
+Etap 10 czyta je przez `readAcceptedDialogue` z wejścia etapu 11, tym samym werdyktem, który
+drukuje `check --stage dialogue`, więc kwestia liczy się jako przyjęta w miksie dokładnie
+wtedy, gdy liczy się jako przyjęta tutaj. Wymagana jest **każda** kwestia skryptu: film bez
+jednej z nich mówiłby mniej niż skrypt, który ktoś zatwierdził.

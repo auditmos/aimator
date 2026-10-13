@@ -8,10 +8,11 @@ import {
   toWorkspacePath,
 } from "../artifact/index.js";
 import { validateAudio } from "../audio-model/index.js";
+import { readAcceptedDialogue } from "../dialogue/index.js";
 import { type EpisodeSettings, readStage0Inputs } from "../project/index.js";
 import { ok, type Result } from "../result.js";
 import { checkShotList } from "../shot-list/index.js";
-import type { PlanClock } from "../timeline.js";
+import { type PlanClock, placeSpeech } from "../timeline.js";
 import { validateVideo } from "../video-model/index.js";
 import {
   type EpisodePaths,
@@ -41,8 +42,9 @@ import { validateSoundDesign } from "./validate.js";
  * narrator yet. The two stages can run side by side.
  *
  * **Mixing** waits on this track's approved `episode.mp4`, on every stem, and,
- * when the episode's mode carries speech, on this track's approved
- * `narrated.mp4` and on the accepted lines behind it.
+ * when the episode's mode has a narrator, on this track's approved
+ * `narrated.mp4` and on the accepted lines behind it; when it has dialogue, on
+ * every line of stage 11's script, accepted, read through stage 11's entry.
  *
  * That last gate is the one worth defending, because it looks like the mistake
  * stage 8 names: holding a stage hostage to a file it never opens. Stage 10
@@ -87,6 +89,21 @@ export interface Stage10Paths {
 
 export interface Stage10Inputs {
   readonly aspectRatio: string;
+  /**
+   * Stage 11's accepted lines, read through its entry, and why any line is not
+   * accepted yet. Empty in a mode without dialogue, where there is nothing to
+   * wait for and nothing to lay down.
+   */
+  readonly dialogue: {
+    readonly gate: readonly string[];
+    readonly inputs: readonly RecordedFile[];
+    readonly lines: readonly {
+      readonly atSeconds: number;
+      readonly id: string;
+      readonly path: string;
+      readonly seconds: number;
+    }[];
+  };
   /** Why the cue sheet may not be bought yet. Empty means it may. */
   readonly gate: readonly string[];
   /** project.json, project.md, episode.json and shot-list.md, with digests. */
@@ -124,6 +141,16 @@ function resolvePaths(input: Stage10Scope): Result<Stage10Paths> {
 /** Whether this episode's declared mode puts a human voice in the film. */
 function carriesSpeech(settings: EpisodeSettings): boolean {
   return settings.audio !== "music-and-effects";
+}
+
+/** Whether a narrator speaks, which is what makes stage 9 a gate of the mix. */
+export function carriesNarration(settings: EpisodeSettings): boolean {
+  return settings.audio === "narration" || settings.audio === "dialogue-and-narration";
+}
+
+/** Whether the characters speak, which is what makes stage 11 a gate of the mix. */
+function carriesDialogue(settings: EpisodeSettings): boolean {
+  return settings.audio === "dialogue" || settings.audio === "dialogue-and-narration";
 }
 
 /**
@@ -175,9 +202,17 @@ export async function readStage10Inputs(input: Stage10Scope): Promise<Result<Sta
 
   const stage = await readJson(paths.data.episode.soundDesignStage, stageFileSchema);
   const text = shotList.ok ? shotList.data.bytes.toString("utf8") : null;
+  const dialogue = carriesDialogue(stage0.data.settings)
+    ? await readAcceptedDialogue(input)
+    : ok({ gate: [], inputs: [], lines: [] });
+
+  if (!dialogue.ok) {
+    return dialogue;
+  }
 
   return ok({
     aspectRatio: stage0.data.aspectRatio,
+    dialogue: dialogue.data,
     gate,
     inputs: [
       ...stage0.data.inputs.filter((entry) => entry.path !== sourcePath),
@@ -443,7 +478,7 @@ export async function readTrackState(
     gate.push(`zmontowany odcinek czeka na ocenę człowieka na torze ${input.track}`);
   }
 
-  if (carriesSpeech(stage10.settings)) {
+  if (carriesNarration(stage10.settings)) {
     const narrated = soundtrack.ok ? soundtrack.data.artifacts.narrated : undefined;
 
     if (narrated === undefined || narrated.status !== "completed") {
@@ -499,9 +534,16 @@ export interface PlacedSound {
  * sound sits comes from a plan a human approved, so one that runs past the end
  * of the film is refused and the message names the remedy.
  *
+ * Speech is held to both of stage 9's refusals, and across scripts: **no two
+ * utterances may sound at once**, two characters' lines or a line and the
+ * narrator, and none may run past the film. The arithmetic is
+ * `lib/timeline`'s, shared with stage 9, and the remedy named is the script:
+ * a line too long is shortened where it was written, an anchor too early is
+ * moved in the script that holds it.
+ *
  * Two things differ from speech, and both are the nature of the material
  * rather than an exception. **Effects may overlap each other**, two things
- * can happen at once, and only a narrator cannot talk over himself. And **a
+ * can happen at once, and only a voice cannot talk over another voice. And **a
  * bed that falls short of the film is reported, not refused**: that is a gap,
  * which is stage 8's kind of drift, rather than an overlap, which is stage 7's
  * kind of collision. Refusing a film for a tenth of a second of silence at the
@@ -550,7 +592,26 @@ export function placeSounds(input: {
     });
   }
 
-  return { placed, problems };
+  const speech = placeSpeech({
+    actualSeconds: input.actualSeconds,
+    clock: input.clock,
+    speech: input.sounds.filter((sound) => sound.kind === "speech"),
+  });
+
+  return {
+    placed,
+    problems: [
+      ...problems,
+      ...speech.overlaps.map(
+        ({ earlier, later }) =>
+          `${earlier.id} kończy się w ${earlier.ends}s, a ${later.id} zaczyna w ${later.atSeconds}s, dwie wypowiedzi brzmiałyby naraz; skróć wcześniejszą tam, gdzie powstała (scenariusz, etap 1), albo przesuń kotwicę późniejszej w jej skrypcie`
+      ),
+      ...speech.overruns.map(
+        (one) =>
+          `${one.id} kończy się w ${one.ends}s, a film trwa ${input.actualSeconds}s, wypowiedź nie mieści się w odcinku; skróć ją tam, gdzie powstała (scenariusz, etap 1), albo przesuń jej kotwicę w skrypcie`
+      ),
+    ],
+  };
 }
 
 /** Seconds, to the thousandth, the precision an audio delay is spelled in. */
@@ -585,24 +646,26 @@ export function musicGap(placed: readonly PlacedSound[], actualSeconds: number):
 }
 
 /**
- * What the episode declared it would sound like, against what stage 10 can
- * make.
+ * What the episode declared it would sound like, against what stage 10 has.
  *
- * Two of the four modes are closed by this stage: `music-and-effects` and
- * `narration` are exactly what stages 9 and 10 produce between them. The other
- * two are not, and the missing half is not music; it is **character
- * dialogue**, which no stage in this pipeline produces and none does after
- * this one. Rule 7 says an absence is reported rather than filled with a
- * guess, so it is stated the way stage 8 states silence and stage 2 states a
- * missing alpha channel. The row that would close it is declared, not
- * half-built.
+ * All four modes are closed once their speech is accepted: stage 9 brings the
+ * narrator, stage 11 the characters, and this stage lays both beside the music
+ * and the effects. What is reported here is the one absence left, character
+ * dialogue that stage 11 has not delivered yet, in the two modes that declare
+ * it, and only until every line of its script is accepted. Rule 7 says an
+ * absence is reported rather than filled with a guess; the gate of the mix
+ * refuses the same thing line by line.
  */
-export function missingDialogue(settings: EpisodeSettings): readonly string[] {
-  if (settings.audio !== "dialogue" && settings.audio !== "dialogue-and-narration") {
+export function missingDialogue(
+  stage10: Pick<Stage10Inputs, "dialogue" | "settings">
+): readonly string[] {
+  const { audio } = stage10.settings;
+
+  if (!carriesDialogue(stage10.settings) || stage10.dialogue.gate.length === 0) {
     return [];
   }
 
   return [
-    `odcinek deklaruje audio: ${settings.audio}, czyli mowę postaci, etap 10 składa muzykę, efekty i narrację, a dialogów postaci nie wytwarza żaden etap tego potoku`,
+    `odcinek deklaruje audio: ${audio}, czyli mowę postaci, a kwestie dialogu z etapu 11 nie są jeszcze wszystkie przyjęte, więc pełna ścieżka ich nie położy; stan kwestii pokazuje check --stage dialogue`,
   ];
 }
