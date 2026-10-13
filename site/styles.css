@@ -323,7 +323,7 @@ h1 {
 }
 /* The diagram is one drawing, not a layout that reflows, so on a narrow screen
    it scrolls sideways rather than shrinking its labels below reading size. The
-   cards under it carry the same twelve stages in a single column. */
+   cards under it carry the same thirteen stages in a single column. */
 .diagram-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;

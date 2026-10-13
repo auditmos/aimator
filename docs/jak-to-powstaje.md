@@ -3,7 +3,7 @@
 Ta strona jest dla osoby, która zna produkcję wideo i nie musi znać kodu. Opisuje, co
 narzędzie robi po kolei, czego każdy etap potrzebuje i co oddaje.
 
-Krótko: dwanaście etapów w trzech fazach. Każdy zostawia na dysku plik, a następny rusza
+Krótko: trzynaście etapów w trzech fazach. Każdy zostawia na dysku plik, a następny rusza
 dopiero wtedy, gdy człowiek ten plik obejrzał i się na niego zgodził.
 
 ## Cała produkcja na jednym obrazku
@@ -37,8 +37,10 @@ flowchart TB
     S9["9. Narracja<br/>narrated.mp4, lektor na obrazie"]
     S11["11. Dialog<br/>kwestie postaci, głosem obsady"]
     S10["10. Muzyka i efekty<br/>mixed.mp4, film ze wszystkim"]
+    S12["12. Wersje językowe<br/>usta postaci w drugim języku, klip po klipie"]
     S8 --> S9 --> S10
     S11 --> S10
+    S11 --> S12
   end
 
   OUT(["Dwa filmy, po jednym na każdy tor obrazu"])
@@ -46,6 +48,7 @@ flowchart TB
   IN --> S0
   S4 --> S5
   S7 --> S8
+  S7 --> S12
   S3 --> S11
   S10 --> OUT
 ```
@@ -153,8 +156,9 @@ idzie od początku filmu do końca i każde ogniwo wymaga osobnej zgody.
 
 ## Postprodukcja
 
-Faza sklejania i dźwięku. Nic się tu już nie rysuje; montaż i oba miksy niczego nie kupują,
-bo liczy je lokalny ffmpeg.
+Faza sklejania, dźwięku i wersji językowych. Nic się tu już nie rysuje od nowa; montaż
+i oba miksy niczego nie kupują, bo liczy je lokalny ffmpeg, a wersja językowa zmienia
+w gotowych klipach tylko usta.
 
 ### 8. Montaż
 
@@ -194,11 +198,35 @@ nie dopisano i żadnej nie pominięto. Numer stoi po etapie 10, ale nagrania tra
 miksu: dwie wypowiedzi, które brzmiałyby naraz, to odmowa, nie przesunięcie. Kwestie są
 wspólne dla obu torów, bo głos nie wie, nad którym filmem usiądzie.
 
+Gdy odcinek ma dostać drugą wersję językową, ten etap tłumaczy też przyjęty skrypt na język
+ust, każdą kwestię w jej oknie czasowym, i nagrywa kwestie w tym języku. Przekład to osobny
+plik z osobną zgodą, a nie przeróbka oryginału.
+
 - **Potrzebuje:** zatwierdzonej listy ujęć z kwestiami przypisanymi postaciom i przyjętej
-  próbki głosu każdej mówiącej postaci.
-- **Produkuje:** `dialogue.md` i `dialogue/<język>/Dnn.wav`.
-- **Koszt:** jedno wywołanie tekstowe na skrypt, potem kwestie rozliczane w znakach.
+  próbki głosu każdej mówiącej postaci; do przekładu decyzji, w jakim języku ruszają się usta.
+- **Produkuje:** `dialogue.md` i `dialogue/<język>/Dnn.wav`, a przy przekładzie
+  `dialogue.<język ust>.md`.
+- **Koszt:** po jednym wywołaniu tekstowym na skrypt i na przekład, potem kwestie rozliczane
+  w znakach.
 - [Komendy tego etapu](stages/11-dialog.md)
+
+### 12. Wersje językowe
+
+Wersja językowa jak w dubbingu, tylko odwrotnie: to obraz dopasowuje się do głosu. Usta
+postaci ruszają się do jej kwestii w drugim języku. Etap pracuje osobno na każdym torze
+i klip po klipie. Najpierw dostawca znajduje twarze w przyjętym klipie, potem człowiek mówi,
+która twarz jest którą postacią, i dopiero wtedy usta są poruszane, zawsze jedna postać
+naraz. Klip, w którym nikt widoczny nie mówi, przechodzi bez zmian, a kwestia spoza kadru
+zostaje bez lip-syncu, bo nie ma czyich ust poruszyć. Etap oddaje wersję każdego klipu, nie
+gotowy film.
+
+- **Potrzebuje:** decyzji, w jakim języku ruszają się usta, przyjętych klipów tego toru oraz
+  przyjętego przekładu i kwestii [etapu 11](stages/11-dialog.md) w tym języku.
+- **Produkuje:** twarze każdego klipu z ich przypisaniem do postaci i `versions/clips/Cnn.mp4`,
+  czyli klip z ustami w drugim języku.
+- **Koszt:** jedno rozpoznanie twarzy na klip i jedno zadanie lip-sync na każdą mówiącą
+  postać; każda kolejna postać w tym samym klipie dokłada jedno rozpoznanie.
+- [Komendy tego etapu](stages/12-wersje-jezykowe.md)
 
 ## Projekcja i podpis
 
