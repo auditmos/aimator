@@ -35,14 +35,27 @@ const SKIPPED = new Set(["site"]);
  * which are nobody's documentation; a walk of the disk read a regex quoted in
  * one of them as a broken link. Output directories are ignored the same way.
  */
-const MARKDOWN = execFileSync(
+const COMMITTED = execFileSync(
   "git",
   ["ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
   { cwd: repoRoot, encoding: "utf8" }
 )
   .split("\n")
-  .filter((path) => path !== "" && existsSync(join(repoRoot, path)))
-  .filter((path) => !path.split("/").some((part) => SKIPPED.has(part) || part.startsWith(".")));
+  .filter((path) => path !== "" && existsSync(join(repoRoot, path)));
+
+const MARKDOWN = COMMITTED.filter(
+  (path) => !path.split("/").some((part) => SKIPPED.has(part) || part.startsWith("."))
+);
+
+/**
+ * The one dotted directory read here, and only for its links. A skill points
+ * the conversation at files, so a pointer that broke is found in conversation,
+ * the moment it was meant to help. Commands and flags stay unchecked: a skill
+ * speaks of `/prepare-project`, not of `pnpm dev`, so they would only cry wolf.
+ */
+const SKILLS = COMMITTED.filter((path) => path.startsWith(".claude/skills/")).map((file) =>
+  join(repoRoot, file)
+);
 
 function markdownUnder(path: string): string[] {
   const prefix = `${relative(repoRoot, path)}/`;
@@ -158,7 +171,7 @@ beforeAll(async () => {
 describe("documentation", () => {
   it("should link only to files that exist", () => {
     const broken: string[] = [];
-    for (const file of everyMarkdownFile()) {
+    for (const file of [...everyMarkdownFile(), ...SKILLS]) {
       for (const [, target] of readFileSync(file, "utf8").matchAll(LOCAL_LINK)) {
         const path = target?.split("#")[0];
         if (!path || ABSOLUTE_LINK.test(target)) {
@@ -169,7 +182,19 @@ describe("documentation", () => {
         }
       }
     }
+    expect(SKILLS.length).toBeGreaterThan(0);
     expect(broken).toEqual([]);
+  });
+
+  /**
+   * Instructions like these arrive wrapped in a note that they may or may not
+   * be relevant, and the longer the file, the more of it is read as optional.
+   * What does not fit goes to a reference file the skill loads on a stated
+   * condition, which is the only way it stays short while it grows.
+   */
+  it("should keep the develop-series skill to a hundred lines", () => {
+    const skill = readRepoFile(".claude/skills/develop-series/SKILL.md");
+    expect(skill.trimEnd().split("\n").length).toBeLessThanOrEqual(100);
   });
 
   /**
