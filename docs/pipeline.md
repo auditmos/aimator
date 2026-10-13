@@ -111,7 +111,8 @@ Jeden kształt dla wszystkich etapów. Klucz `artifacts` pozwala objąć zbiór 
         { "path": "projects/demo/episodes/01-tytul/episode.json", "sha256": "4ab1…" }
       ],
       "review": { "status": "pending", "reviewer": null, "reviewedAt": null, "note": null },
-      "needsReview": []
+      "needsReview": [],
+      "amendments": []
     }
   }
 }
@@ -139,6 +140,22 @@ Pliki nadal się zgadzają, po prostu tych bajtów nikt jeszcze nie przyjął, w
 działa i zapisuje nowy hash. Gdyby liczyć to jako błąd walidacji, `approve` odmawiałby
 w jedynym miejscu, które potrafi tę sytuację naprawić, i projekt zostawałby zablokowany
 na zawsze. Każdy etap zapisuje hashe swoich własnych wejść w chwili, gdy je konsumuje.
+
+Tak samo czyta się **wynik etapu, który wolno poprawić ręcznie**. Etap sam deklaruje, które
+to wyjścia: dziś `screenplay.md` (etap 1) i `shot-list.md` (etap 3). Każde inne wyjście, a
+więc każdy obraz, klip i nagranie, przy niezgodnym hashu dalej daje błąd „wynik został
+zmieniony poza narzędziem”. Poprawiony plik jest walidowany **tak, jak leży**. Jeśli
+przechodzi werdykt swojego etapu, `check` zgłasza wygaśnięcie zgody („poprawiony ręcznie po
+generacji, tej wersji nikt jeszcze nie przyjął”), a `--json` wymienia go w `amended`. Jeśli
+nie przechodzi, zostaje błąd walidatora i `approve` odmawia. `approve` przyjmuje bieżące
+bajty: przepina `sha256` w `outputs` i dopisuje do `amendments` wpis
+`{ path, from, to, at, reviewer }`, gdzie `from` i `to` to hashe sprzed i po poprawce.
+`producer` się nie zmienia, bo dalej mówi, co wygenerowało pierwszą wersję. `amendments`
+mówi, że człowiek ją potem zmienił, i razem odpowiadają na pytanie, co trzeba uruchomić,
+żeby dostać te bajty. Kaskada nie ma własnego mechanizmu: etap, który zapisał hash
+poprawionego pliku jako wejście, widzi poprawkę jako `inputsChanged` i traci zgodę jak przy
+każdej zmianie wejścia. `--regenerate` traktuje wersję poprawioną jako poprzednią: to ona
+trafia do `previous/`, a z `--instruction` to ją model poprawia.
 
 ## Niezmienniki
 

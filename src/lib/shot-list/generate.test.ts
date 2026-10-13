@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -507,7 +508,7 @@ describe("checkShotList and approveShotList", () => {
     const status = await checkShotList({ episodeId: EPISODE, projectId: PROJECT, workspace });
 
     expect(status.ok ? status.data.approved : null).toBe(false);
-    expect(status.ok ? status.data.problems.join("\n") : "").toContain("zmieniony poza narzędziem");
+    expect(status.ok ? status.data.problems.join("\n") : "").toContain("poprawiony ręcznie");
   });
 
   it("should refuse to approve what does not validate", async () => {
@@ -591,5 +592,123 @@ describe("checkShotList and approveShotList", () => {
 
     expect(again.ok).toBe(false);
     expect(again.ok ? "" : again.error.message).toContain("nie przechodzi walidacji");
+  });
+});
+
+/**
+ * A shot list a person corrected by hand, read the way stage 1 reads its own.
+ *
+ * The correction is validated against the screenplay as it stands; one that
+ * still validates is a lapsed consent that `approve` accepts and records, and
+ * one that breaks the plan is still a refusal. The second half is the cascade,
+ * which needs no code of its own: stage 3 recorded the screenplay's digest as
+ * an input, so correcting the screenplay lapses the plan's approval through
+ * `inputsChanged`, exactly as stage 4 then does for the shot list.
+ */
+describe("a shot list corrected by hand", () => {
+  const PATH = `projects/${PROJECT}/episodes/${EPISODE}/shot-list.md`;
+  const scope = (): { episodeId: string; projectId: string; workspace: Workspace } => ({
+    episodeId: EPISODE,
+    projectId: PROJECT,
+    workspace,
+  });
+
+  function approve(): ReturnType<typeof approveShotList> {
+    return approveShotList({ ...scope(), mode: "apply", note: null, reviewer: "tester" });
+  }
+
+  /** The same plan, one expression reworded: it still validates. */
+  async function correct(): Promise<string> {
+    const text = plan().replace("Zaciśnięte usta", "Lekki uśmiech");
+    await writeFile(join(episodeDir(), "shot-list.md"), text, "utf8");
+
+    return text;
+  }
+
+  function digest(text: string): string {
+    return createHash("sha256").update(text).digest("hex");
+  }
+
+  it("should report a correction that validates as a lapsed consent, not an error", async () => {
+    await makeUpstream();
+    await generate();
+    await approve();
+    await correct();
+
+    const result = await checkShotList(scope());
+    const problems = result.ok ? result.data.problems.join("\n") : "";
+
+    expect(result.ok ? result.data.amended : null).toEqual([PATH]);
+    expect(result.ok ? result.data.approved : null).toBe(false);
+    expect(problems).toContain(`${PATH}: poprawiony ręcznie po generacji`);
+    expect(problems).toContain(`aimator approve ${PROJECT} ${EPISODE} --stage shot-list`);
+    expect(problems).not.toContain("poza narzędziem");
+  });
+
+  it("should accept the correction, rebinding its digest and recording who made it", async () => {
+    await makeUpstream();
+    await generate();
+    const text = await correct();
+
+    const result = await approve();
+
+    expect(result.ok ? result.data.approved : result.error.message).toBe(true);
+
+    const record = (await readStage()).artifacts[
+      "shot-list"
+    ] as StageJson["artifacts"]["shot-list"] & {
+      readonly amendments: readonly Record<string, string>[];
+    };
+
+    expect(record.outputs).toEqual([{ path: PATH, sha256: digest(text) }]);
+    expect(record.amendments).toEqual([
+      {
+        at: expect.any(String),
+        from: digest(plan()),
+        path: PATH,
+        reviewer: "tester",
+        to: digest(text),
+      },
+    ]);
+
+    const after = await checkShotList(scope());
+
+    expect(after.ok ? after.data.amended : null).toEqual([]);
+    expect(after.ok ? after.data.approved : null).toBe(true);
+  });
+
+  it("should refuse a correction that breaks the plan, and say why", async () => {
+    await makeUpstream();
+    await generate();
+    await writeFile(
+      join(episodeDir(), "shot-list.md"),
+      plan().replace("### U04 | S03 | C02 | 20-30s", "### U04 | S03 | C02 | 20-28s"),
+      "utf8"
+    );
+
+    const checked = await checkShotList(scope());
+    const result = await approve();
+
+    expect(checked.ok ? checked.data.problems.join("\n") : "").toContain("shot-list.md: ");
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.error.message).toContain("nie przechodzi walidacji");
+  });
+
+  it("should lapse when the screenplay under it is corrected by hand", async () => {
+    await makeUpstream();
+    await generate();
+    await approve();
+    await writeFile(
+      join(episodeDir(), "screenplay.md"),
+      screenplay().replace("Narrator opisuje ciszę.", "Narrator milczy."),
+      "utf8"
+    );
+
+    const result = await checkShotList(scope());
+
+    expect(result.ok ? result.data.inputsChanged : null).toContain(
+      `projects/${PROJECT}/episodes/${EPISODE}/screenplay.md`
+    );
+    expect(result.ok ? result.data.approved : null).toBe(false);
   });
 });

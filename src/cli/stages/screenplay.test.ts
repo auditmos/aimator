@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -105,6 +105,26 @@ describe("check --stage screenplay", () => {
     }
 
     expect(printed).toEqual({ command: "check", stage: "screenplay", ...stage.data });
+  });
+
+  // The fixture is shared, so the correction is undone before anything else reads it.
+  it("should name a hand correction under --json as amended, not as an error", async () => {
+    const path = join(root, "projects", PROJECT, "episodes", EPISODE, "screenplay.md");
+    const original = await readFile(path, "utf8");
+
+    try {
+      await writeFile(path, original.replace("Ewa siada przy stole.", "Ewa staje przy oknie."));
+
+      const printed = JSON.parse(
+        await cli("check", PROJECT, EPISODE, "--stage", "screenplay", "--json")
+      ) as { amended: readonly string[]; approved: boolean; problems: readonly string[] };
+
+      expect(printed.amended).toEqual([`projects/${PROJECT}/episodes/${EPISODE}/screenplay.md`]);
+      expect(printed.approved).toBe(false);
+      expect(printed.problems.join("\n")).not.toContain("poza narzędziem");
+    } finally {
+      await writeFile(path, original);
+    }
   });
 });
 

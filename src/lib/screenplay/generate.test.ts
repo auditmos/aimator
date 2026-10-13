@@ -620,7 +620,7 @@ describe("checkScreenplay and approveScreenplay", () => {
     const result = await checkScreenplay(scope());
 
     expect(result.ok ? result.data.approved : true).toBe(false);
-    expect(result.ok ? result.data.problems.join("\n") : "").toContain("hashem");
+    expect(result.ok ? result.data.problems.join("\n") : "").toContain("screenplay.md: ");
   });
 
   it("should refuse to approve a screenplay that no longer validates", async () => {
@@ -700,6 +700,117 @@ describe("checkScreenplay and approveScreenplay", () => {
 
     expect(again.ok).toBe(false);
     expect(again.ok ? "" : again.error.message).toContain("nie przechodzi walidacji");
+  });
+});
+
+/**
+ * A screenplay a person corrected by hand, which is a lapsed consent, not a forgery.
+ *
+ * The digest still guards the bytes: a changed file is never silently carried
+ * forward as what the model wrote. What changes is the reading. A correction
+ * that still passes the stage's own verdict is unread rather than broken, the
+ * same situation as an edited `project.md`, so `approve` is what accepts it,
+ * and the record says both things at once: `producer` names what generated the
+ * first version, `amendments` that a person changed it afterwards.
+ *
+ * Assumptions: the correction is made in place, on the published file; one
+ * that breaks the verdict is still a refusal, and the validator says why.
+ */
+describe("a screenplay corrected by hand", () => {
+  const PATH = `projects/${PROJECT}/episodes/${EPISODE}/screenplay.md`;
+  const scope = (): { episodeId: string; projectId: string; workspace: Workspace } => ({
+    episodeId: EPISODE,
+    projectId: PROJECT,
+    workspace,
+  });
+
+  function approve(): ReturnType<typeof approveScreenplay> {
+    return approveScreenplay({ ...scope(), mode: "apply", note: null, reviewer: "test" });
+  }
+
+  /** The same draft, one sentence of action reworded: it still validates. */
+  async function correct(): Promise<string> {
+    const text = draft().replace("Ewa siada przy stole", "Ewa staje przy oknie");
+    await writeFile(join(episodeDir(), "screenplay.md"), text, "utf8");
+
+    return text;
+  }
+
+  function digest(text: string): string {
+    return createHash("sha256").update(text).digest("hex");
+  }
+
+  it("should report a correction that validates as a lapsed consent, not an error", async () => {
+    await generate();
+    await approve();
+    await correct();
+
+    const result = await checkScreenplay(scope());
+    const problems = result.ok ? result.data.problems.join("\n") : "";
+
+    expect(result.ok ? result.data.amended : null).toEqual([PATH]);
+    expect(result.ok ? result.data.approved : null).toBe(false);
+    expect(problems).toContain(`${PATH}: poprawiony ręcznie po generacji`);
+    expect(problems).toContain(`aimator approve ${PROJECT} ${EPISODE} --stage screenplay`);
+    expect(problems).not.toContain("poza narzędziem");
+  });
+
+  it("should accept the correction, rebinding its digest and recording who made it", async () => {
+    await generate();
+    const generated = await readFile(join(episodeDir(), "screenplay.md"), "utf8");
+    const text = await correct();
+
+    const result = await approve();
+
+    expect(result.ok ? result.data.approved : result.error.message).toBe(true);
+
+    const record = (await readStage()).artifacts
+      .screenplay as StageJson["artifacts"]["screenplay"] & {
+      readonly amendments: readonly Record<string, string>[];
+    };
+
+    expect(record.outputs).toEqual([{ path: PATH, sha256: digest(text) }]);
+    expect(record.producer.kind).toBe("model");
+    expect(record.amendments).toEqual([
+      {
+        at: expect.any(String),
+        from: digest(generated),
+        path: PATH,
+        reviewer: "test",
+        to: digest(text),
+      },
+    ]);
+
+    const after = await checkScreenplay(scope());
+
+    expect(after.ok ? after.data.amended : null).toEqual([]);
+    expect(after.ok ? after.data.approved : null).toBe(true);
+  });
+
+  it("should refuse a correction that breaks the verdict, and say why", async () => {
+    await generate();
+    await writeFile(
+      join(episodeDir(), "screenplay.md"),
+      draft().replace("| 10s |", "| 12s |"),
+      "utf8"
+    );
+
+    const checked = await checkScreenplay(scope());
+    const result = await approve();
+
+    expect(checked.ok ? checked.data.problems.join("\n") : "").toContain("screenplay.md: ");
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.error.message).toContain("nie przechodzi walidacji");
+  });
+
+  it("should regenerate from the corrected version, which is the one replaced", async () => {
+    await generate();
+    await approve();
+    const text = await correct();
+
+    const result = await generate({ instruction: "Skróć S02.", mode: "dry-run", regenerate: true });
+
+    expect(result.ok ? result.data.prompt : "").toContain(text.trim());
   });
 });
 

@@ -2,6 +2,7 @@
 
 exports[`approve --stage shot-list > should print the stage's own object under --json 1`] = `
 {
+  "amended": [],
   "approved": true,
   "command": "approve",
   "inputsChanged": [],

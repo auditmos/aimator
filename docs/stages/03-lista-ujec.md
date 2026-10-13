@@ -86,6 +86,19 @@ etapu 3, a tego nikt nie zdecydował.
 - tekst ekranowy **przeniesiony, nie wymyślony**: ujęcie nie może mieć napisu, którego
   jego scena nie miała.
 
+## Poprawka ręczna
+
+`shot-list.md` można poprawić wprost w pliku, jak [scenariusz](01-scenariusz.md#poprawka-ręczna).
+Poprawka, która dalej przechodzi walidację względem scenariusza w obecnym kształcie, jest
+wygaśnięciem zgody, nie błędem. `check` mówi „poprawiony ręcznie po generacji”, a `--json`
+wymienia plik w `amended`. `aimator approve <id> <episode-id> --stage shot-list` przepina
+hash i dopisuje wpis w `amendments`. Poprawka, która łamie plan (na przykład ujęcia
+przestają sumować się do `durationSeconds`), daje błąd walidatora, a `approve` odmawia.
+
+Kaskada działa w obie strony bez nowego kodu. Poprawiony scenariusz cofa zgodę na listę ujęć
+przez `inputsChanged`, bo lista zapisała jego hash jako wejście. Poprawiona lista ujęć cofa
+w ten sam sposób zgodę na [pakiet promptów](04-pakiet-promptow.md).
+
 ## `Cast` wiąże ujęcie z postacią
 
 Każde ujęcie wymienia widoczne postacie **identyfikatorami obsady** (`ewa`, `tata`) albo

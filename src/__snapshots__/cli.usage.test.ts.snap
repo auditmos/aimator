@@ -313,6 +313,7 @@ exports[`every command >   check <id> <episode-id> --stage screenplay [--json] 1
 {
   "command": "check",
   "stage": "screenplay",
+  "amended": [],
   "approved": true,
   "inputsChanged": [],
   "problems": [],
@@ -332,6 +333,7 @@ exports[`every command >   check <id> <episode-id> --stage shot-list [--json] 1`
 {
   "command": "check",
   "stage": "shot-list",
+  "amended": [],
   "approved": true,
   "inputsChanged": [],
   "problems": [],

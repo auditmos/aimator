@@ -23,31 +23,85 @@ interface Approval {
  * The honesty gate: an artifact is only what the stage recorded if its bytes
  * still hash to the digest written beside it. Editing a result outside the
  * tool is allowed, silently carrying its old provenance forward is not.
+ *
+ * A stage may name outputs a person is allowed to correct by hand, through
+ * `amendable`, which is asked about each recorded path. For those, changed
+ * bytes are a lapsed consent rather than a forgery, the same reading
+ * `project.md` gets: they are returned with the digest they have now, for the
+ * stage to validate as they stand and for `approve` to accept, instead of
+ * being pushed onto `problems`. Every other output, which is every picture,
+ * clip and recording, still fails here.
  */
 export async function verifyOutputs(
   workspace: Workspace,
   stage: StageFile,
   label: string,
-  problems: string[]
-): Promise<void> {
+  problems: string[],
+  amendable: (path: string) => boolean = () => false
+): Promise<readonly RecordedFile[]> {
   const outputs = Object.values(stage.artifacts).flatMap((artifact) => artifact.outputs);
   // Hashed in parallel, reported in declaration order: the verdict a user
   // reads must not depend on which read happened to finish first.
   const digests = await Promise.all(
     outputs.map((output) => readDigest(join(workspace.root, output.path)))
   );
+  const amended: RecordedFile[] = [];
 
   for (const [index, output] of outputs.entries()) {
     const digest = digests[index];
 
     if (digest === undefined || !digest.ok) {
       problems.push(`${label}: brakuje ${output.path}`);
+    } else if (digest.data.sha256 !== output.sha256 && amendable(output.path)) {
+      amended.push({ path: output.path, sha256: digest.data.sha256 });
     } else if (digest.data.sha256 !== output.sha256) {
       problems.push(
         `${label}: ${output.path} nie zgadza się z zapisanym hashem, wynik został zmieniony poza narzędziem`
       );
     }
   }
+
+  return amended;
+}
+
+/**
+ * Accepts hand corrections: each named output takes the digest it has now, and
+ * its record says who changed it from what.
+ *
+ * Called by an `approve` that has already validated the corrected bytes as they
+ * stand, never by `check`. `producer` is left alone on purpose: it still says
+ * what generated the first version, and `amendments` says that a person
+ * changed it afterwards.
+ */
+export function withAmendments(
+  stage: StageFile,
+  amended: readonly RecordedFile[],
+  reviewer: string
+): StageFile {
+  const at = nowIso();
+  const artifacts = Object.fromEntries(
+    Object.entries(stage.artifacts).map(([key, artifact]) => {
+      const changes = artifact.outputs.flatMap((output) => {
+        const now = amended.find((one) => one.path === output.path);
+
+        return now === undefined
+          ? []
+          : [{ at, from: output.sha256, path: output.path, reviewer, to: now.sha256 }];
+      });
+
+      if (changes.length === 0) {
+        return [key, artifact];
+      }
+
+      const outputs = artifact.outputs.map(
+        (output) => amended.find((one) => one.path === output.path) ?? output
+      );
+
+      return [key, { ...artifact, amendments: [...artifact.amendments, ...changes], outputs }];
+    })
+  );
+
+  return { ...stage, artifacts };
 }
 
 /** True once every artifact in the file carries an explicit approval. */

@@ -107,6 +107,26 @@ suma czasów **dokładnie** równa `durationSeconds`. W każdej scenie dokładni
 niepuste pole `Action`, `Audio`, `Text` i `End state`. Przy `subtitles: none` każde pole
 `Text` musi brzmieć `none`; przy zamówionych napisach co najmniej jedno nie może.
 
+## Poprawka ręczna
+
+Dialog, akcję albo opis sceny można poprawić wprost w `screenplay.md`, bez płacenia za
+nową próbę. Zmienione bajty nie zgadzają się wtedy z zapisanym hashem, ale to **wygaśnięcie
+zgody, nie błąd**, tak samo jak edycja `project.md`. Poprawiony plik przechodzi walidację
+w takim kształcie, w jakim leży:
+
+- Jeśli przechodzi, `check` mówi „poprawiony ręcznie po generacji, tej wersji nikt jeszcze
+  nie przyjął” i podaje komendę `approve`, a `--json` wymienia plik w `amended`.
+  `aimator approve <id> <episode-id> --stage screenplay` przyjmuje bieżące bajty: przepina
+  hash i dopisuje do rekordu wpis w `amendments` (`path`, `from`, `to`, `at`, `reviewer`).
+  `producer` zostaje, bo dalej mówi, co wygenerowało pierwszą wersję.
+- Jeśli nie przechodzi, na przykład suma czasów różni się od `durationSeconds`, `check`
+  pokazuje błąd walidatora, a `approve` odmawia.
+
+Lista ujęć zapisała hash scenariusza jako wejście, więc poprawka scenariusza cofa zgodę na
+[etap 3](03-lista-ujec.md) przez `inputsChanged`, bez osobnego mechanizmu. `--regenerate` po
+poprawce traktuje poprawioną wersję jako poprzednią, więc z `--instruction` model poprawia
+właśnie ją.
+
 ## Poprawka z uwagą
 
 Samo `--regenerate` kupuje nową próbę z tym samym promptem, więc poprawka jednej sceny to

@@ -74,7 +74,28 @@ const producerSchema = z.strictObject({
   tool: z.string().min(1),
 });
 
+/**
+ * One correction a person made by hand to a published output, accepted by an
+ * `approve`: which file, the digest it had and the one it has now (`from`,
+ * `to`), when, and who said yes.
+ */
+const amendmentSchema = z.strictObject({
+  at: z.iso.datetime(),
+  from: sha256Schema,
+  path: z.string().min(1),
+  reviewer: z.string().min(1),
+  to: sha256Schema,
+});
+
 const artifactRecordSchema = z.strictObject({
+  /**
+   * The hand corrections accepted since the outputs were produced, oldest
+   * first. `producer` keeps answering what generated the first version; this
+   * says a person changed it afterwards, and together they answer what would
+   * have to run again to get these bytes. Defaults to empty because every
+   * record older than the field was uncorrected.
+   */
+  amendments: z.array(amendmentSchema).default([]),
   inputs: z.array(recordedFileSchema),
   /**
    * A person's note this attempt corrected the previous version by, verbatim,

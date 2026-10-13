@@ -18,6 +18,7 @@ export {
   driftableInputs,
   isApproved,
   verifyOutputs,
+  withAmendments,
   withInputs,
   withOutputs,
 } from "./review.js";
@@ -117,6 +118,7 @@ export function modelProducer(input: {
  */
 export function newRecord(input: NewRecordInput): ArtifactRecord {
   return {
+    amendments: [],
     inputs: [...input.inputs],
     instruction: input.instruction ?? null,
     jobId: input.jobId ?? null,

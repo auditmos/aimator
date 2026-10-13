@@ -9,8 +9,10 @@ import {
   type StageFile,
   serialize,
   stageFileSchema,
+  toWorkspacePath,
   verifyOutputs,
   type WriteMode,
+  withAmendments,
   withInputs,
 } from "../artifact/index.js";
 import { readStage0Inputs } from "../project/index.js";
@@ -39,6 +41,12 @@ import { type ScreenplayVerdict, validateScreenplay } from "./validate.js";
 const ARTIFACT = "screenplay";
 
 export interface ScreenplayStatus {
+  /**
+   * Published files a person corrected by hand that nobody has accepted yet.
+   * A lapsed consent like `inputsChanged`, not an error: the corrected bytes
+   * are validated as they stand, and `approve` is what accepts them.
+   */
+  readonly amended: readonly string[];
   readonly approved: boolean;
   /** Stage-0 artifacts whose bytes no longer match what this run consumed. */
   readonly inputsChanged: readonly string[];
@@ -72,6 +80,8 @@ class ScreenplayStateError extends Error {
 }
 
 interface Inspection {
+  /** Hand corrections, with the digest each has now, what an approval accepts. */
+  readonly amended: readonly RecordedFile[];
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
   /** The stage-0 inputs as they stand now, what an approval re-records. */
@@ -114,10 +124,12 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
 
   if (!stage.ok) {
     return ok({
+      amended: [],
       blocking: [],
       inputs: stage0.data.inputs,
       stage: null,
       status: {
+        amended: [],
         approved: false,
         inputsChanged: [],
         problems: [
@@ -142,10 +154,12 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
     );
 
     return ok({
+      amended: [],
       blocking,
       inputs: stage0.data.inputs,
       stage: stage.data,
       status: {
+        amended: [],
         approved: false,
         inputsChanged: changedInputs(driftableInputs(record), stage0.data.inputs),
         problems: blocking,
@@ -155,7 +169,16 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
     });
   }
 
-  await verifyOutputs(input.workspace, stage.data, `odcinek "${input.episodeId}"`, blocking);
+  // The screenplay is a document a person may correct by hand: changed bytes
+  // are validated as they stand, and an approval is what accepts them.
+  const published = toWorkspacePath(input.workspace.root, paths.data.screenplay);
+  const amended = await verifyOutputs(
+    input.workspace,
+    stage.data,
+    `odcinek "${input.episodeId}"`,
+    blocking,
+    (path) => path === published
+  );
 
   const screenplay = await readDigest(paths.data.screenplay);
   const verdict = screenplay.ok
@@ -174,13 +197,19 @@ async function inspect(input: EpisodeScope): Promise<Result<Inspection>> {
     (path) =>
       `${path}: zmienił się od czasu generacji scenariusza, tych wejść nikt jeszcze nie przyjął; przeczytaj scenariusz jeszcze raz i zatwierdź go ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`
   );
-  const problems = [...blocking, ...lapsed];
+  const corrected = amended.map(
+    (one) =>
+      `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`
+  );
+  const problems = [...blocking, ...lapsed, ...corrected];
 
   return ok({
+    amended,
     blocking,
     inputs: stage0.data.inputs,
     stage: stage.data,
     status: {
+      amended: amended.map((one) => one.path),
       // Approval is bound to bytes: a recorded "approved" that no longer
       // verifies is not an approval; it is a stale claim.
       approved: isApproved(stage.data) && problems.length === 0,
@@ -218,7 +247,7 @@ export async function approveScreenplay(input: ApproveScope): Promise<Result<Scr
     return inspection;
   }
 
-  const { blocking, inputs, stage, status } = inspection.data;
+  const { amended, blocking, inputs, stage, status } = inspection.data;
 
   if (stage === null || status.status !== "completed") {
     return err(
@@ -247,12 +276,16 @@ export async function approveScreenplay(input: ApproveScope): Promise<Result<Scr
     return paths;
   }
 
-  const rebound = withInputs(stage, ARTIFACT, inputs);
+  // A hand correction that validated is accepted here, the one place able to:
+  // its digest is rebound and the record says who changed it from what.
+  const rebound = withAmendments(withInputs(stage, ARTIFACT, inputs), amended, input.reviewer);
   const approved = approveAll(rebound, { note: input.note, reviewer: input.reviewer });
   const written = await applyWrites(
     [{ kind: "text", text: serialize(approved), to: paths.data.screenplayStage }],
     input.mode
   );
 
-  return written.ok ? ok({ ...status, approved: true, inputsChanged: [], problems: [] }) : written;
+  return written.ok
+    ? ok({ ...status, amended: [], approved: true, inputsChanged: [], problems: [] })
+    : written;
 }
