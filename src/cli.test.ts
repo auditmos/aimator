@@ -643,6 +643,45 @@ describe("screenplay generate", () => {
 
     expect(result.text).toContain("--max-output-tokens");
   });
+
+  /** `--verbatim` buys nothing, so a flag that only shapes a purchase has no meaning beside it. */
+  it.each([
+    ["--model", "gpt-6-astra"],
+    ["--max-output-tokens", "4096"],
+    ["--instruction", "krócej"],
+  ])("should refuse --verbatim with %s, which only a paid call reads", async (flag, value) => {
+    const result = await run([
+      "screenplay",
+      "generate",
+      "demo",
+      "01-burza",
+      "--verbatim",
+      "--regenerate",
+      flag,
+      value,
+      "--workspace",
+      root,
+    ]);
+
+    expect(result.ok ? null : result.error.name).toBe("UsageError");
+    expect(result.ok ? null : result.error.message).toContain(flag);
+  });
+
+  it("should preview --verbatim as zero paid calls, naming why it refuses", async () => {
+    await approvedProject();
+    const result = await cli(
+      "screenplay",
+      "generate",
+      "demo",
+      "01-burza",
+      "--verbatim",
+      "--dry-run"
+    );
+
+    expect(result.text).toContain("płatnych wywołań do wykonania: 0");
+    expect(result.text).toContain('sourceNature "law-or-idea"');
+    expect(result.text).not.toContain("prompt wysłany do modelu");
+  });
 });
 
 describe("approve --stage", () => {

@@ -42,6 +42,9 @@ Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                                         [--dry-run] [--json]
                                         [--regenerate [--instruction <uwaga>]]
+  screenplay generate <id> <episode-id> --verbatim [--regenerate] [--dry-run] [--json]
+    Gotowy scenariusz (sourceNature: screenplay) przyjęty takim, jaki jest:
+    source.md staje się screenplay.md bez modelu, bez klucza i bez opłaty.
 
 Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
   character generate <id> <character-id> --track <gpt-image|seedream>

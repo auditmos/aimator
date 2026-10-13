@@ -28,7 +28,10 @@ import {
 export const USAGE = `Etap 1. Scenariusz (płatny):
   screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]
                                         [--dry-run] [--json]
-                                        [--regenerate [--instruction <uwaga>]]`;
+                                        [--regenerate [--instruction <uwaga>]]
+  screenplay generate <id> <episode-id> --verbatim [--regenerate] [--dry-run] [--json]
+    Gotowy scenariusz (sourceNature: screenplay) przyjęty takim, jaki jest:
+    source.md staje się screenplay.md bez modelu, bez klucza i bez opłaty.`;
 
 /**
  * `--dry-run` prints the prompt itself, not a byte count. The whole point of
@@ -38,18 +41,22 @@ function renderGenerate(
   report: ScreenplayReport,
   projectId: string,
   episodeId: string,
-  mode: "apply" | "dry-run"
+  mode: "apply" | "dry-run",
+  verbatim: boolean
 ): string {
+  const what = `Scenariusz ${projectId}/${episodeId}${verbatim ? " dosłownie z source.md" : ""}`;
   const lines =
     mode === "dry-run"
       ? [
-          `Próba na sucho: nic nie zapisano, nic nie wysłano. Scenariusz ${projectId}/${episodeId}`,
+          `Próba na sucho: nic nie zapisano, nic nie wysłano. ${what}`,
           `  płatnych wywołań do wykonania: ${report.paidCalls}`,
           `  wymagane co najmniej ${report.minimumScenes} scen, każda 1–15 s, suma dokładnie równa durationSeconds`,
-          "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+          verbatim
+            ? "  bez modelu, bez klucza i bez sieci: source.md staje się screenplay.md bajt w bajt"
+            : "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
         ]
       : [
-          `Scenariusz ${projectId}/${episodeId}, próba ${report.runId ?? ""}`,
+          `${what}, próba ${report.runId ?? ""}`,
           `  płatnych wywołań wykonanych: ${report.paidCalls}`,
         ];
 
@@ -118,10 +125,22 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
     "max-output-tokens": { type: "string" },
     model: { type: "string" },
     regenerate: { type: "boolean" },
+    verbatim: { type: "boolean" },
   });
 
   if (!parsed.ok) {
     return parsed;
+  }
+
+  const verbatim = parsed.data.values.verbatim === true;
+  const paidOnly = PAID_ONLY.filter((flag) => parsed.data.values[flag] !== undefined);
+
+  if (verbatim && paidOnly.length > 0) {
+    return err(
+      new UsageError(
+        `--verbatim niczego nie kupuje, więc ${paidOnly.map((flag) => `--${flag}`).join(", ")} nie ma tu znaczenia: kształtuje tylko płatne wywołanie`
+      )
+    );
   }
 
   const instruction = instructionOf(parsed.data);
@@ -155,9 +174,10 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
   }
 
   const mode = modeOf(parsed.data);
-  // The key is read only on the paid path: a dry run must never need a secret.
+  // The key is read only on the paid path: a dry run must never need a secret,
+  // and `--verbatim` never pays.
   const result = await generateScreenplay({
-    apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    apiKey: mode === "dry-run" || verbatim ? null : (env.OPENAI_API_KEY ?? null),
     episodeId: episodeId.data,
     fetch,
     instruction: instruction.data,
@@ -166,6 +186,7 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
     model: model.data,
     projectId: projectId.data,
     regenerate: parsed.data.values.regenerate === true,
+    verbatim,
     workspace: workspace.data,
   });
 
@@ -181,9 +202,12 @@ export async function runScreenplay(argv: readonly string[]): Promise<Result<str
   return ok(
     parsed.data.values.json === true
       ? asJson("generate", STAGE, result.data)
-      : renderGenerate(result.data, projectId.data, episodeId.data, mode)
+      : renderGenerate(result.data, projectId.data, episodeId.data, mode, verbatim)
   );
 }
+
+/** Flags that only shape a purchase, so `--verbatim`, which buys nothing, refuses them. */
+const PAID_ONLY = ["model", "max-output-tokens", "instruction"] as const;
 
 /** `--model` wins over the environment; neither has a default. */
 function modelOf(parsed: Parsed): Result<string | null> {

@@ -25,7 +25,33 @@ pnpm dev approve dzielna-ewa 01-burza --stage screenplay --note "rytm się zgadz
 ```
 
 Dodatkowe flagi: `--model <id>`, `--max-output-tokens <n>`, `--json`, `--regenerate`,
-`--instruction <uwaga>` (tylko razem z `--regenerate`).
+`--instruction <uwaga>` (tylko razem z `--regenerate`), `--verbatim` (opisane niżej).
+
+## Gotowy scenariusz bez płatnej adaptacji
+
+Scenariusz napisany już w formacie aimatora nie musi przechodzić przez model, który by go
+przepisał. `--verbatim` publikuje `source.md` jako `screenplay.md` **bajt w bajt**, bez
+wywołania modelu: `płatnych wywołań: 0`, bez klucza i bez sieci.
+
+```bash
+pnpm dev screenplay generate dzielna-ewa 03-wanda --verbatim --dry-run
+pnpm dev screenplay generate dzielna-ewa 03-wanda --verbatim
+pnpm dev approve dzielna-ewa 03-wanda --stage screenplay
+```
+
+Działa tylko wtedy, gdy odcinek ma `sourceNature: screenplay`, a `source.md` przechodzi
+[walidację](#co-sprawdza-walidacja) wobec decyzji odcinka. Inaczej odmawia, podając błąd
+walidatora i podpowiedź, że zwykłe `screenplay generate` kupi adaptację. Bramka jest ta
+sama co przy generacji: zatwierdzony etap 0 projektu i odcinka. Etap 1 czyta przy tym
+wyłącznie `source.md`, artefakt etapu 0, więc **monopol etapu 0** na wnoszenie plików
+spoza katalogu roboczego zostaje nietknięty.
+
+Rekord ma `producer.kind: "manual"`, bo te bajty napisał człowiek, w `inputs` sam
+`source.md` ze ścieżką i hashem, status `completed` i ocenę `pending`. Dalej jest zwykłe
+`approve --stage screenplay`, po którym rusza [etap 3](03-lista-ujec.md). Istniejący
+scenariusz `--verbatim` zastępuje tylko z `--regenerate`, a poprzednia wersja trafia do
+`runs/<runId>/previous/`. `--model`, `--max-output-tokens` i `--instruction` kształtują
+wyłącznie płatne wywołanie, więc obok `--verbatim` są błędem użycia.
 
 ## Dwa kroki i rachunek
 

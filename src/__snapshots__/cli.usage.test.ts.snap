@@ -1446,6 +1446,16 @@ Ewa boi się burzy.
 "
 `;
 
+exports[`every command >   screenplay generate <id> <episode-id> --verbatim [--regenerate] [--dry-run] [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Scenariusz ewa/01-burza dosłownie z source.md
+  płatnych wywołań do wykonania: 0
+  wymagane co najmniej 2 scen, każda 1–15 s, suma dokładnie równa durationSeconds
+  bez modelu, bez klucza i bez sieci: source.md staje się screenplay.md bajt w bajt
+  ! --verbatim przyjmuje tylko gotowy scenariusz, a odcinek ma sourceNature "law-or-idea"; zwykłe screenplay generate kupi adaptację
+Dalej: usuń powyższe przeszkody przed przyjęciem scenariusza"
+`;
+
 exports[`every command >   shot-list generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano, nic nie wysłano. Lista ujęć ewa/01-burza

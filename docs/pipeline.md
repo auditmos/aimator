@@ -528,6 +528,12 @@ a hashe ich wyników się zgadzają. Edycja `project.md` po akceptacji unieważn
 arytmetycznie i etap 1 znów blokuje. `--dry-run` tej bramki nie omija: raportuje ją jako
 przeszkodę, ale i tak pokazuje prompt, bo po to jest podgląd.
 
+**Gotowy scenariusz.** `--verbatim` publikuje `source.md` jako `screenplay.md` bajt w bajt,
+bez wywołania modelu, gdy odcinek ma `sourceNature: screenplay`, a źródło przechodzi
+walidację strukturalną poniżej; inaczej odmawia. Bramka etapu 0 jest ta sama. Rekord ma
+`producer.kind: "manual"`, w `inputs` sam `source.md`, i czeka na `approve` jak każdy
+scenariusz. Czyta wyłącznie artefakt etapu 0, więc niczego spoza katalogu roboczego.
+
 **Skąd bierze się model.** `--model <id>`, a bez tej flagi `AIMATOR_SCREENPLAY_MODEL`.
 Wartości domyślnej nie ma i nie będzie: model, którego nikt nie wybrał, nie jest decyzją.
 Klucz czytany jest wyłącznie na ścieżce płatnej, z `OPENAI_API_KEY`; `--dry-run` nie

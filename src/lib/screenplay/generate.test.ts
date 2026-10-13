@@ -11,6 +11,7 @@ import {
   setCharacterBasis,
   setEpisodeSettings,
 } from "../project/index.js";
+import { generateShotList } from "../shot-list/index.js";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
 import { approveScreenplay, checkScreenplay, generateScreenplay } from "./index.js";
 
@@ -946,5 +947,198 @@ describe("generateScreenplay refusals", () => {
 
     expect(result.ok ? null : result.error.message).toContain("HTTP 503");
     expect(result.ok ? null : result.error.message).toContain("--regenerate");
+  });
+});
+
+/**
+ * A screenplay already written in this pipeline's format, accepted as it is.
+ *
+ * Assumptions: `--verbatim` reads `source.md` and nothing outside the
+ * workspace, so stage 0's monopoly on bringing files in stays intact. The gate
+ * is generation's own (stage 0 approved), plus two of its own: the episode says
+ * its source *is* a screenplay, and that source passes the same verdict a paid
+ * answer has to. It buys nothing, so it needs no model, no key and no network.
+ * Not tested here: the CLI's refusal of paid-only flags, which is grammar.
+ */
+describe("generateScreenplay --verbatim", () => {
+  const READY = "02-gotowy";
+
+  function readyDir(): string {
+    return join(root, "projects", PROJECT, "episodes", READY);
+  }
+
+  /** A second episode whose source is a screenplay, and stage 0 approved again. */
+  async function makeReady(text = draft(), nature: "screenplay" | "synopsis" = "screenplay") {
+    const source = join(scratch, `${READY}.md`);
+    await writeFile(source, text, "utf8");
+    await addEpisode({
+      mode: "apply",
+      projectId: PROJECT,
+      settings: {
+        audio: "narration",
+        durationSeconds: 30,
+        language: "pl",
+        maxClipSeconds: 10,
+        sourceNature: nature,
+        subtitles: "none",
+      },
+      sourcePath: source,
+      workspace,
+    });
+    await approveStage0({
+      mode: "apply",
+      note: null,
+      projectId: PROJECT,
+      reviewer: "test",
+      workspace,
+    });
+  }
+
+  function verbatim(
+    overrides: Partial<Parameters<typeof generateScreenplay>[0]> = {}
+  ): ReturnType<typeof generateScreenplay> {
+    return generate({
+      apiKey: null,
+      episodeId: READY,
+      fetch: respondWith(completion(draft())),
+      model: null,
+      verbatim: true,
+      ...overrides,
+    });
+  }
+
+  it("should publish source.md as screenplay.md byte for byte, buying nothing", async () => {
+    await makeReady();
+
+    const result = await verbatim();
+    const stage = JSON.parse(await readFile(join(readyDir(), "screenplay.stage.json"), "utf8"));
+    const record = stage.artifacts.screenplay;
+
+    expect(result.ok ? result.data.paidCalls : result.error.message).toBe(0);
+    expect(calls).toBe(0);
+    expect(await readFile(join(readyDir(), "screenplay.md"))).toEqual(
+      await readFile(join(readyDir(), "source.md"))
+    );
+    expect(record).toMatchObject({
+      producer: { kind: "manual" },
+      review: { status: "pending" },
+      status: "completed",
+    });
+    expect(record.inputs).toEqual([
+      {
+        path: `projects/${PROJECT}/episodes/${READY}/source.md`,
+        sha256: createHash("sha256")
+          .update(await readFile(join(readyDir(), "source.md")))
+          .digest("hex"),
+      },
+    ]);
+  });
+
+  it("should refuse an episode whose source is not a screenplay", async () => {
+    await makeReady(draft(), "synopsis");
+
+    const result = await verbatim();
+
+    expect(result.ok ? null : result.error.message).toContain('sourceNature "synopsis"');
+    expect(result.ok ? null : result.error.message).toContain("kupi adaptację");
+    expect(await readdir(readyDir())).not.toContain("screenplay.md");
+  });
+
+  it("should refuse a source the verdict rejects, naming why, and write nothing", async () => {
+    await makeReady(draft([16, 14]));
+    const before = await readdir(readyDir());
+
+    const result = await verbatim();
+
+    expect(result.ok ? null : result.error.message).toContain("source.md:");
+    expect(result.ok ? null : result.error.message).toContain("16");
+    expect(result.ok ? null : result.error.message).toContain("kupi adaptację");
+    expect(await readdir(readyDir())).toEqual(before);
+  });
+
+  it("should refuse while stage 0 is not approved, as generation does", async () => {
+    await makeReady();
+    await setEpisodeSettings({
+      episodeId: READY,
+      mode: "apply",
+      projectId: PROJECT,
+      settings: { durationSeconds: 30 },
+      workspace,
+    });
+
+    const result = await verbatim();
+
+    expect(result.ok ? null : result.error.message).toContain(
+      `etap 0 musi mieć review.status = "approved"`
+    );
+    expect(result.ok ? null : result.error.message).toContain(`aimator approve ${PROJECT}`);
+    expect(await readdir(readyDir())).not.toContain("screenplay.md");
+  });
+
+  it("should be approved like any screenplay, after which stage 3 may pay", async () => {
+    await makeReady();
+    await verbatim();
+
+    const approved = await approveScreenplay({
+      episodeId: READY,
+      mode: "apply",
+      note: null,
+      projectId: PROJECT,
+      reviewer: "test",
+      workspace,
+    });
+    const next = await generateShotList({
+      apiKey: null,
+      episodeId: READY,
+      fetch: respondWith(completion(draft())),
+      maxOutputTokens: 12_000,
+      mode: "dry-run",
+      model: "gpt-6-astra",
+      projectId: PROJECT,
+      regenerate: false,
+      workspace,
+    });
+
+    expect(approved.ok ? approved.data.approved : approved.error.message).toBe(true);
+    expect(next.ok ? next.data.problems : next.error.message).toEqual([]);
+    expect(next.ok && next.data.paidCalls).toBe(1);
+  });
+
+  it("should refuse to replace a screenplay without --regenerate", async () => {
+    await makeReady();
+    await verbatim();
+
+    const again = await verbatim();
+
+    expect(again.ok ? null : again.error.message).toContain("--verbatim --regenerate");
+  });
+
+  it("should replace a screenplay under --regenerate, keeping the old one in previous/", async () => {
+    await makeReady();
+    await verbatim();
+    await writeFile(join(readyDir(), "screenplay.md"), "poprawione ręcznie\n", "utf8");
+
+    const again = await verbatim({ regenerate: true });
+    const runId = again.ok ? String(again.data.runId) : again.error.message;
+
+    expect(
+      await readFile(join(readyDir(), "runs", runId, "previous", "screenplay.md"), "utf8")
+    ).toBe("poprawione ręcznie\n");
+    expect(await readFile(join(readyDir(), "screenplay.md"), "utf8")).toBe(draft());
+  });
+
+  it("should write nothing under --dry-run and say it buys nothing", async () => {
+    await makeReady();
+    const before = await readdir(readyDir());
+
+    const preview = await verbatim({ mode: "dry-run" });
+
+    expect(preview.ok ? preview.data : preview.error.message).toMatchObject({
+      paidCalls: 0,
+      problems: [],
+      prompt: null,
+      ready: true,
+    });
+    expect(await readdir(readyDir())).toEqual(before);
   });
 });

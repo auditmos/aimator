@@ -1,11 +1,18 @@
 import {
   applyWrites,
   type Correction,
+  emptyStage,
+  manualProducer,
+  newRecord,
+  newRunId,
   nowIso,
   type RecordedFile,
   readDigest,
+  readJson,
+  removeFile,
   serialize,
   sha256Of,
+  stageFileSchema,
   toWorkspacePath,
   type WriteMode,
   writeNew,
@@ -20,7 +27,14 @@ import {
   type TextStage,
   textPrompt,
 } from "../text-model/index.js";
-import { type EpisodePaths, episodePaths, projectPaths, type Workspace } from "../workspace.js";
+import {
+  type EpisodePaths,
+  episodePaths,
+  previousFile,
+  projectPaths,
+  runPaths,
+  type Workspace,
+} from "../workspace.js";
 import { buildPrompt, PROMPT_VERSION } from "./prompt.js";
 import { minimumScenes, type ScreenplayVerdict, validateScreenplay } from "./validate.js";
 
@@ -71,16 +85,19 @@ interface GenerateInput {
   readonly model: string | null;
   readonly projectId: string;
   readonly regenerate: boolean;
+  /** Publish `source.md` as it is, buying nothing; see `adopt`. */
+  readonly verbatim?: boolean;
   readonly workspace: Workspace;
 }
 
 class Stage1BlockedError extends Error {
   readonly problems: readonly string[];
 
-  constructor(problems: readonly string[]) {
-    super(
-      `etap 1 nie może wykonać płatnego wywołania:\n${problems.map((p) => `  - ${p}`).join("\n")}`
-    );
+  constructor(
+    problems: readonly string[],
+    headline = "etap 1 nie może wykonać płatnego wywołania"
+  ) {
+    super(`${headline}:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
     this.name = "Stage1BlockedError";
     this.problems = problems;
   }
@@ -136,6 +153,10 @@ export async function generateScreenplay(input: GenerateInput): Promise<Result<S
 
   if (!stage0.ok) {
     return stage0;
+  }
+
+  if (input.verbatim === true) {
+    return await adopt(input, paths.data, stage0.data);
   }
 
   const prompt = buildPrompt({
@@ -302,4 +323,195 @@ async function write(path: string, text: string): Promise<Result<true>> {
   const done = await applyWrites([{ kind: "text", text, to: path }], "apply");
 
   return done.ok ? ok(true) : done;
+}
+
+/** What stands in the way of `--verbatim`, and what it would replace. */
+interface Adoption {
+  readonly problems: readonly string[];
+  readonly verdict: ScreenplayVerdict | null;
+}
+
+/**
+ * `--verbatim`: a screenplay stage 0 already holds, published as it is.
+ *
+ * The gate is generation's, minus the model and the key because nothing is
+ * bought, plus the two conditions that make "as it is" honest: the episode
+ * says its source is a screenplay, and that source passes the verdict a paid
+ * answer would have to. It reads `source.md` alone, stage 0's own copy, so
+ * nothing from outside the workspace enters here and stage 0 keeps that
+ * monopoly. The record says `manual`, because a person wrote these bytes.
+ */
+async function adopt(
+  input: GenerateInput,
+  paths: EpisodePaths,
+  stage0: Stage0Inputs
+): Promise<Result<ScreenplayReport>> {
+  const report = {
+    approved: false,
+    correction: null,
+    minimumScenes: minimumScenes(stage0.settings.durationSeconds),
+    paidCalls: 0,
+    prompt: null,
+  };
+
+  if (input.mode === "dry-run") {
+    const { problems, verdict } = await adoption(input, paths, stage0);
+
+    return ok({
+      ...report,
+      approved: stage0.approved,
+      created: [],
+      nextStep:
+        problems.length === 0
+          ? `aimator screenplay generate ${input.projectId} ${input.episodeId} --verbatim${input.regenerate ? " --regenerate" : ""}`
+          : "usuń powyższe przeszkody przed przyjęciem scenariusza",
+      problems,
+      ready: problems.length === 0,
+      runId: null,
+      verdict,
+    });
+  }
+
+  const lock = await writeNew(
+    paths.screenplayLock,
+    serialize({ pid: process.pid, startedAt: nowIso() })
+  );
+
+  if (!lock.ok) {
+    return err(
+      new Stage1BlockedError(
+        [
+          `inna próba trzyma blokadę ${toWorkspacePath(input.workspace.root, paths.screenplayLock)}`,
+        ],
+        VERBATIM_BLOCKED
+      )
+    );
+  }
+
+  try {
+    const { problems, verdict } = await adoption(input, paths, stage0);
+
+    if (problems.length > 0 || verdict === null) {
+      return err(new Stage1BlockedError(problems, VERBATIM_BLOCKED));
+    }
+
+    const published = await publishVerbatim(input, paths);
+
+    return published.ok
+      ? ok({
+          ...report,
+          created: published.data.created,
+          nextStep: `oceń scenariusz, a potem: aimator approve ${input.projectId} ${input.episodeId} --stage screenplay`,
+          problems: [],
+          ready: true,
+          runId: published.data.runId,
+          verdict,
+        })
+      : published;
+  } finally {
+    await removeFile(paths.screenplayLock);
+  }
+}
+
+const VERBATIM_BLOCKED = "etap 1 nie może przyjąć source.md jako scenariusza";
+
+async function adoption(
+  input: GenerateInput,
+  paths: EpisodePaths,
+  stage0: Stage0Inputs
+): Promise<Adoption> {
+  const problems = stage0.approved
+    ? []
+    : [
+        ...stage0.problems,
+        `etap 0 musi mieć review.status = "approved" zanim etap 1 przyjmie scenariusz: aimator approve ${input.projectId}`,
+      ];
+  const nature = stage0.settings.sourceNature;
+  const verdict =
+    nature === "screenplay" ? validateScreenplay(stage0.source, stage0.settings) : null;
+
+  if (nature !== "screenplay") {
+    problems.push(
+      `--verbatim przyjmuje tylko gotowy scenariusz, a odcinek ma sourceNature "${nature}"; zwykłe screenplay generate kupi adaptację`
+    );
+  } else if (verdict !== null && !verdict.ok) {
+    problems.push(
+      `source.md: ${verdict.error.message}`,
+      "source.md nie przechodzi walidacji scenariusza; popraw źródło w etapie 0 albo zwykłe screenplay generate kupi adaptację"
+    );
+  }
+
+  const file = await readJson(paths.screenplayStage, stageFileSchema);
+  const record = file.ok ? file.data.artifacts[ARTIFACT] : undefined;
+
+  if (record !== undefined && !input.regenerate) {
+    problems.push(
+      `scenariusz dla tego odcinka już ma próbę ${record.runId} (${record.status}); zastępuje ją wyłącznie --verbatim --regenerate`
+    );
+  }
+
+  return { problems, verdict: verdict?.ok === true ? verdict.data : null };
+}
+
+/**
+ * `source.md` copied to `screenplay.md`, and a record whose only input is it.
+ *
+ * A screenplay this replaces is kept in its own `runs/<runId>/previous/`, the
+ * place a paid regeneration keeps one, because a regeneration is what this is.
+ */
+async function publishVerbatim(
+  input: GenerateInput,
+  paths: EpisodePaths
+): Promise<Result<{ readonly created: readonly string[]; readonly runId: string }>> {
+  const source = await readDigest(paths.source);
+
+  if (!source.ok) {
+    return source;
+  }
+
+  const runId = newRunId();
+  const archive = runPaths(paths, runId);
+  const previous = input.regenerate ? await replaced(paths) : [];
+  const kept: { text: string; to: string }[] = [];
+
+  for (const file of previous) {
+    const to = previousFile(archive, file.name);
+
+    if (!to.ok) {
+      return to;
+    }
+
+    kept.push({ text: file.text, to: to.data });
+  }
+
+  const relative = (path: string): string => toWorkspacePath(input.workspace.root, path);
+  const record = newRecord({
+    inputs: [{ path: relative(paths.source), sha256: source.data.sha256 }],
+    outputs: [{ path: relative(paths.screenplay), sha256: source.data.sha256 }],
+    producer: manualProducer(),
+    runId,
+  });
+  const written = await applyWrites(
+    [
+      ...kept.map((file) => ({ kind: "text" as const, ...file })),
+      { bytes: source.data.bytes, kind: "bytes", to: paths.screenplay },
+      {
+        kind: "text",
+        text: serialize({ ...emptyStage(ARTIFACT), artifacts: { [ARTIFACT]: record } }),
+        to: paths.screenplayStage,
+      },
+    ],
+    "apply"
+  );
+
+  return written.ok
+    ? ok({
+        created: [
+          relative(paths.screenplay),
+          relative(paths.screenplayStage),
+          ...(kept.length > 0 ? [relative(archive.root)] : []),
+        ],
+        runId,
+      })
+    : written;
 }

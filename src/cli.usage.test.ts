@@ -613,6 +613,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "fixture",
     "--dry-run",
   ],
+  "  screenplay generate <id> <episode-id> --verbatim [--regenerate] [--dry-run] [--json]": [
+    "screenplay",
+    "generate",
+    ...ON,
+    "--verbatim",
+    "--regenerate",
+    "--dry-run",
+  ],
   "  screenplay generate <id> <episode-id> [--model <id>] [--max-output-tokens <n>]": [
     "screenplay",
     "generate",
