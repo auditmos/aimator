@@ -333,9 +333,10 @@ Wspólne:
     samymi zakresami co approve (bez etapu 0). Bramki traktują odrzucony artefakt
     jak niezatwierdzony; approve może go potem przyjąć. --fail tylko na klatkach
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
-    artefaktu bez --instruction poprawia go według tej uwagi. W dialogue
-    i versions --artifact jest wymagane, jak w approve; versions odrzuca tylko
-    klip wersji (C01), nie twarze ani kroki pośrednie.
+    artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
+    i sound-design bez --track, dialogue i versions --artifact jest wymagane,
+    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze ani
+    kroki pośrednie.
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay

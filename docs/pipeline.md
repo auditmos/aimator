@@ -194,9 +194,10 @@ Obowiązują we wszystkich etapach.
 - **„Nie" też jest oceną i ma powód.** `aimator reject` przyjmuje te same zakresy co
   `approve` (odcinek, postać albo projekt, `--stage`, `--track`, `--artifact`), poza etapem
   0, którego rekordy są decyzjami samego człowieka. Gdzie jeden plik etapu trzyma
-  artefakty różnych rodzajów (etap 11: skrypt, przekład i kwestie; etap 12: klip wersji
-  obok twarzy i kroków), `--artifact` jest wymagane jak w `approve`, a etap 12 odrzuca
-  wyłącznie klip wersji. Wymaga `--note`, bo odrzucenie bez powodu
+  artefakty różnych rodzajów (etapy 9 i 10 na poziomie odcinka: skrypt albo arkusz cue
+  i nagrania; etap 11: skrypt, przekład i kwestie; etap 12: klip wersji obok twarzy
+  i kroków), `--artifact` jest wymagane jak w `approve`, a etap 12 odrzuca wyłącznie klip
+  wersji. Wymaga `--note`, bo odrzucenie bez powodu
   nie ma czym zasilić poprawki, i zapisuje w rekordzie `review.status = "rejected"`,
   `review.note`, `reviewer` i `reviewedAt`. Na klatkach z checklistą QC (klatka otwarcia,
   `entry:Cnn`) `--fail` dopisuje niezaliczone kryteria do `review.failed`; gdzie indziej

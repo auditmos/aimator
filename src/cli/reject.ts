@@ -58,9 +58,10 @@ export const USAGE = `  reject <id> <episode-id> --stage <etap> [--track <tor>] 
     samymi zakresami co approve (bez etapu 0). Bramki traktują odrzucony artefakt
     jak niezatwierdzony; approve może go potem przyjąć. --fail tylko na klatkach
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
-    artefaktu bez --instruction poprawia go według tej uwagi. W dialogue
-    i versions --artifact jest wymagane, jak w approve; versions odrzuca tylko
-    klip wersji (C01), nie twarze ani kroki pośrednie.`;
+    artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
+    i sound-design bez --track, dialogue i versions --artifact jest wymagane,
+    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze ani
+    kroki pośrednie.`;
 
 /** A stage that has produced nothing here yet: there is no result to say no to. */
 class NothingToRejectError extends Error {
@@ -323,6 +324,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
     episodeStage({
       check: checkSoundDesign,
       file: (paths) => paths.soundDesignStage,
+      named: { allowed: "cues albo M01[,E02]", takes: () => true },
       regenerate: (on, keys) =>
         `aimator sound-design generate ${on.projectId} ${on.episodeId} --regenerate ${artifactFlag(keys)}`,
     }),
@@ -337,6 +339,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
     episodeStage({
       check: checkNarration,
       file: (paths) => paths.soundtrackStage,
+      named: { allowed: "script albo N01[,N02]", takes: () => true },
       regenerate: (on, keys) =>
         `aimator narration generate ${on.projectId} ${on.episodeId} --regenerate ${artifactFlag(keys)}`,
     }),
@@ -436,8 +439,8 @@ function failedFor(
  * no way to say what is wrong with it. What it does refuse is a no about
  * nothing: an artifact the stage file does not hold, or an attempt that never
  * finished. With no `--artifact` it means every artifact in the file, which is
- * exactly one wherever `approve` does not ask for the flag either. Stages 11
- * and 12 ask for it, as their yes does.
+ * exactly one wherever `approve` does not ask for the flag either; where it
+ * does, so does this.
  */
 export async function runReject(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {

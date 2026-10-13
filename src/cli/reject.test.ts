@@ -7,12 +7,16 @@ import { resolveWorkspace, type Workspace } from "../lib/workspace.js";
 import {
   API_KEY,
   EPISODE,
+  makeCut,
   makeDialogue,
+  makeNarration,
+  makeSoundDesign,
   makeTrack,
   makeUpstream,
   makeVersions,
   PROJECT,
   recorder,
+  VOICE,
 } from "../test/fixture.js";
 import { run } from "./index.js";
 
@@ -653,6 +657,89 @@ describe("reject --stage dialogue and --stage versions", () => {
       note: "usta spóźnione",
       status: "rejected",
     });
+  });
+});
+
+/**
+ * Stages 9 and 10 at the episode level, where one file holds the script or
+ * the cue sheet beside every recording, and `approve` there asks for
+ * `--artifact` (#49). Assumptions: a no without it is refused before anything
+ * is read, and leaves every record as it was; the track's mix is one artifact,
+ * so a no about it still needs no flag, as its yes does not.
+ */
+describe("reject --stage soundtrack and --stage sound-design", () => {
+  let sounded = "";
+
+  beforeAll(async () => {
+    sounded = await mkdtemp(join(tmpdir(), "aimator-reject-sounded-"));
+    const sources = await mkdtemp(join(tmpdir(), "aimator-reject-sounded-src-"));
+    const resolved = resolveWorkspace(sounded);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    await makeUpstream({
+      answer: chainAnswer(),
+      approvePackage: true,
+      narration: true,
+      root: sounded,
+      scratch: sources,
+      voiceId: VOICE,
+      workspace: resolved.data,
+    });
+    await makeCut({ root: sounded, track: TRACK, workspace: resolved.data });
+    await makeNarration({ root: sounded, tracks: [TRACK], workspace: resolved.data });
+    await makeSoundDesign({ tracks: [TRACK], workspace: resolved.data });
+    await rm(sources, { force: true, recursive: true });
+  }, 240_000);
+
+  afterAll(async () => {
+    await rm(sounded, { force: true, recursive: true });
+  });
+
+  function rejectIn(stage: string, ...flags: readonly string[]) {
+    return run([
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      stage,
+      ...flags,
+      "--note",
+      "za głośno",
+      "--workspace",
+      sounded,
+    ]);
+  }
+
+  async function statuses(...path: readonly string[]): Promise<readonly string[]> {
+    const file = join(sounded, "projects", PROJECT, "episodes", EPISODE, ...path);
+    const { artifacts } = JSON.parse(await readFile(file, "utf8")) as {
+      artifacts: Record<string, { review: { status: string } }>;
+    };
+
+    return Object.values(artifacts).map((one) => one.review.status);
+  }
+
+  it.each([
+    ["soundtrack", "soundtrack.stage.json", "--artifact jest wymagane: script albo N01[,N02]"],
+    ["sound-design", "sound-design.stage.json", "--artifact jest wymagane: cues albo M01[,E02]"],
+  ] as const)(
+    "should refuse a no about every artifact of --stage %s at once",
+    async (stage, file, refusal) => {
+      const result = await rejectIn(stage);
+
+      expect(result.ok ? result.data : result.error.message).toContain(refusal);
+      expect(await statuses(file)).not.toContain("rejected");
+    }
+  );
+
+  it("should still reject a track's narrated cut without --artifact", async () => {
+    const result = await rejectIn("soundtrack", "--track", TRACK);
+
+    expect(result.ok ? null : result.error.message).toBeNull();
+    expect(await statuses(TRACK, "soundtrack.stage.json")).toEqual(["rejected"]);
   });
 });
 
