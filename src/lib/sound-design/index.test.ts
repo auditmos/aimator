@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -1139,5 +1139,76 @@ describe("what a preview may call accepted", () => {
 
     expect(status.ok ? status.data.approved : null).toBe(false);
     expect(preview.ok ? preview.data.nextStep : "").not.toContain("przyjęty");
+  });
+});
+
+/**
+ * A cue sheet corrected by hand, held to the same wiring verdict.
+ *
+ * The verdict never reads a prompt, so rewording a bed's description is a
+ * correction `approve` accepts and records; a correction that leaves a hole in
+ * the bed under the film is refused by the validator, exactly as a generated
+ * sheet with that hole would be. Stems bought from the old sheet recorded its
+ * digest and lose their approval through `inputsChanged`.
+ */
+describe("a cue sheet corrected by hand", () => {
+  const PATH = `projects/${PROJECT}/episodes/${EPISODE}/sound-design.md`;
+  const scope = () => ({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+  function file(): string {
+    return join(root, "projects", PROJECT, "episodes", EPISODE, "sound-design.md");
+  }
+
+  async function edit(from: string, to: string): Promise<void> {
+    await writeFile(file(), (await readFile(file(), "utf8")).replace(from, to), "utf8");
+  }
+
+  it("should accept a correction the wiring verdict still passes, and record it", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await accept(["cues"]);
+    await edit("A warm, unhurried acoustic theme", "A slow, quiet piano theme");
+
+    const checked = await checkSoundDesign(scope());
+
+    expect(checked.ok ? checked.data.amended : null).toEqual([PATH]);
+    expect(checked.ok ? checked.data.sheet.approved : null).toBe(false);
+
+    const approved = await accept(["cues"]);
+    const record = JSON.parse(
+      await readFile(
+        join(root, "projects", PROJECT, "episodes", EPISODE, "sound-design.stage.json"),
+        "utf8"
+      )
+    ).artifacts.cues;
+
+    expect(approved.ok ? approved.data.sheet.approved : approved.error.message).toBe(true);
+    expect(record.amendments[0]).toMatchObject({ path: PATH, reviewer: "test" });
+  });
+
+  it("should refuse a correction that leaves the film without a bed", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await edit("| U01,U02,U03,U04 | 0-30s", "| U01,U02,U03,U04 | 0-25s");
+
+    const refused = await accept(["cues"]);
+
+    expect(refused.ok).toBe(false);
+    expect(refused.ok ? "" : refused.error.message).toContain("nie przechodzi walidacji");
+  });
+
+  it("should withdraw the approval of a stem bought from the old sheet", async () => {
+    const calls = transport();
+
+    await boughtStems(calls);
+    await edit("A warm, unhurried acoustic theme", "A slow, quiet piano theme");
+
+    const checked = await checkSoundDesign(scope());
+    const m01 = checked.ok ? checked.data.cues.find((one) => one.id === "M01") : undefined;
+
+    expect(m01?.approved).toBe(false);
+    expect(m01?.inputsChanged).toContain(PATH);
   });
 });

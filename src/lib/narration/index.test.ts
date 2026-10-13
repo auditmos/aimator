@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -967,5 +967,93 @@ describe("the next step a mix preview names", () => {
     const preview = await mix({ mode: "dry-run" });
 
     expect(preview.ok ? preview.data.nextStep : "").toContain("przyjęty");
+  });
+});
+
+/**
+ * A narration script corrected by hand: a lapsed consent, with the lift kept.
+ *
+ * "Lifted, not invented" survives a correction: a corrected script is validated
+ * as it stands, so a sentence moved to another second still passes and is
+ * accepted by `approve`, while a sentence nobody's shot says is refused by the
+ * validator. Every line bought from the old script recorded its digest, so
+ * each loses its approval through `inputsChanged` without code of its own.
+ */
+describe("a narration script corrected by hand", () => {
+  const PATH = `projects/${PROJECT}/episodes/${EPISODE}/narration.md`;
+  const scope = () => ({ episodeId: EPISODE, projectId: PROJECT, workspace });
+
+  function file(): string {
+    return join(root, "projects", PROJECT, "episodes", EPISODE, "narration.md");
+  }
+
+  async function edit(from: string, to: string): Promise<void> {
+    await writeFile(file(), (await readFile(file(), "utf8")).replace(from, to), "utf8");
+  }
+
+  it("should accept a correction that is still lifted, and record it", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await approveScript();
+    await edit("### N01 | U01 | 2s", "### N01 | U01 | 3s");
+
+    const checked = await checkNarration(scope());
+
+    expect(checked.ok ? checked.data.amended : null).toEqual([PATH]);
+    expect(checked.ok ? checked.data.script.approved : null).toBe(false);
+    expect(checked.ok ? checked.data.problems.join("\n") : "").toContain(
+      `${PATH}: poprawiony ręcznie po generacji`
+    );
+
+    await approveScript();
+
+    const record = JSON.parse(
+      await readFile(
+        join(root, "projects", PROJECT, "episodes", EPISODE, "soundtrack.stage.json"),
+        "utf8"
+      )
+    ).artifacts.script;
+    const after = await checkNarration(scope());
+
+    expect(record.amendments).toHaveLength(1);
+    expect(record.amendments[0]).toMatchObject({ path: PATH, reviewer: "test" });
+    expect(after.ok ? after.data.script.approved : null).toBe(true);
+  });
+
+  it("should refuse a correction that invents a sentence", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await edit(NARRATION.U01, "Ewa wymyśliła smoka na dachu");
+
+    const refused = await approveNarration({
+      artifacts: ["script"],
+      episodeId: EPISODE,
+      mode: "apply",
+      note: null,
+      projectId: PROJECT,
+      reviewer: "test",
+      workspace,
+    });
+
+    expect(refused.ok).toBe(false);
+    expect(refused.ok ? "" : refused.error.message).toContain("nie przechodzi walidacji");
+  });
+
+  it("should withdraw the approval of a line bought from the old script", async () => {
+    const calls = transport();
+
+    await generate(calls);
+    await approveScript();
+    await generate(calls);
+    await approveLines();
+    await edit("### N01 | U01 | 2s", "### N01 | U01 | 3s");
+
+    const checked = await checkNarration(scope());
+    const n01 = checked.ok ? checked.data.lines.find((one) => one.id === "N01") : undefined;
+
+    expect(n01?.approved).toBe(false);
+    expect(n01?.inputsChanged).toContain(PATH);
   });
 });

@@ -253,6 +253,7 @@ exports[`every command >   check <id> <episode-id> --stage prompt-package [--jso
 {
   "command": "check",
   "stage": "prompt-package",
+  "amended": [],
   "approved": true,
   "inputsChanged": [],
   "problems": [],

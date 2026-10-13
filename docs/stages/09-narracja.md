@@ -62,6 +62,17 @@ co do słowa w ujęciu, które ta kwestia nazywa.**
 Zdanie, którego lista ujęć nie zawiera, nie przechodzi, choćby czytało się lepiej. Jeśli
 film ma powiedzieć coś nowego, poprawka należy do etapu 1.
 
+## Poprawka ręczna
+
+`narration.md` można poprawić wprost w pliku, na przykład przesunąć kwestię o sekundę albo
+usunąć zdanie. Poprawka jest wygaśnięciem zgody, nie błędem. `check` mówi „poprawiony ręcznie
+po generacji”, a `--json` wymienia plik w `amended`. Reguła „podniesione, nie wymyślone”
+obowiązuje dalej: poprawione zdanie musi występować dosłownie w ujęciu, które nazywa, inaczej
+walidator odmawia. `approve --stage soundtrack --artifact script` przyjmuje poprawkę, przepina
+hash i dopisuje wpis w `amendments`, jak przy [scenariuszu](01-scenariusz.md#poprawka-ręczna).
+Każda kwestia `Nnn` zapisała hash skryptu, z którego ją kupiono, więc kwestie kupione ze
+starego skryptu tracą zgodę.
+
 ## Głos to obsada, sposób czytania to reżyseria
 
 `narratorVoiceId` mieszka w `project.json` obok postaci, bo lektor wraca między odcinkami;

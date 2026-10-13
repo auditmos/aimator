@@ -142,9 +142,10 @@ w jedynym miejscu, które potrafi tę sytuację naprawić, i projekt zostawałby
 na zawsze. Każdy etap zapisuje hashe swoich własnych wejść w chwili, gdy je konsumuje.
 
 Tak samo czyta się **wynik etapu, który wolno poprawić ręcznie**. Etap sam deklaruje, które
-to wyjścia: dziś `screenplay.md` (etap 1) i `shot-list.md` (etap 3). Każde inne wyjście, a
-więc każdy obraz, klip i nagranie, przy niezgodnym hashu dalej daje błąd „wynik został
-zmieniony poza narzędziem”. Poprawiony plik jest walidowany **tak, jak leży**. Jeśli
+to wyjścia: `screenplay.md` (etap 1), `shot-list.md` (etap 3), pliki `prompts/**` (etap 4, ale
+nie `prompt-package.json`, który jest okablowaniem), `narration.md` (etap 9) i
+`sound-design.md` (etap 10). Każde inne wyjście, a więc każdy obraz, klip i nagranie, przy
+niezgodnym hashu dalej daje błąd „wynik został zmieniony poza narzędziem”. Poprawiony plik jest walidowany **tak, jak leży**. Jeśli
 przechodzi werdykt swojego etapu, `check` zgłasza wygaśnięcie zgody („poprawiony ręcznie po
 generacji, tej wersji nikt jeszcze nie przyjął”), a `--json` wymienia go w `amended`. Jeśli
 nie przechodzi, zostaje błąd walidatora i `approve` odmawia. `approve` przyjmuje bieżące
@@ -154,8 +155,12 @@ bajty: przepina `sha256` w `outputs` i dopisuje do `amendments` wpis
 mówi, że człowiek ją potem zmienił, i razem odpowiadają na pytanie, co trzeba uruchomić,
 żeby dostać te bajty. Kaskada nie ma własnego mechanizmu: etap, który zapisał hash
 poprawionego pliku jako wejście, widzi poprawkę jako `inputsChanged` i traci zgodę jak przy
-każdej zmianie wejścia. `--regenerate` traktuje wersję poprawioną jako poprzednią: to ona
-trafia do `previous/`, a z `--instruction` to ją model poprawia.
+każdej zmianie wejścia. Dlatego każdy wynik kupiony z dokumentu zapisuje jego hash jako
+wejście: referencja swój plik promptu, kwestia skrypt, a stem arkusz. `--regenerate` traktuje
+wersję poprawioną jako poprzednią: to ona trafia do `previous/`, a z `--instruction` to ją
+model poprawia. `--republish` etapu 4 odmawia, gdy którykolwiek plik pakietu ma wpis w
+`amendments` albo poprawkę, której nikt jeszcze nie przyjął, bo opublikowanie zapisanej
+odpowiedzi nadpisałoby pracę człowieka.
 
 ## Niezmienniki
 

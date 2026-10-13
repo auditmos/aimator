@@ -32,6 +32,7 @@ import {
 import { readStage4Inputs, type Stage4Inputs } from "./plan.js";
 import { PACKAGE_FORMAT, PROMPT_VERSION } from "./prompt.js";
 import { type PromptFile, readPackageAnswer, renderPackage } from "./render.js";
+import { handCorrections } from "./review.js";
 import { type PromptPackage, validatePromptPackage } from "./validate.js";
 
 /**
@@ -131,7 +132,22 @@ export async function generatePromptPackage(
     return stage4;
   }
 
-  const problems = blockers(input, stage4.data);
+  // A republication writes the archived answer over every prompt file, so a
+  // file a person corrected by hand would be lost to it, accepted or not.
+  const corrected = input.republish ? await handCorrections(input) : ok([]);
+
+  if (!corrected.ok) {
+    return corrected;
+  }
+
+  const problems = [
+    ...blockers(input, stage4.data),
+    ...(corrected.data.length === 0
+      ? []
+      : [
+          `--republish opublikowałby zapisaną odpowiedź na pliki poprawione ręcznie i nadpisał tę pracę: ${corrected.data.join(", ")}; nową wersję kupuje --regenerate`,
+        ]),
+  ];
 
   if (input.mode === "dry-run") {
     const { prompt } = stage4.data;

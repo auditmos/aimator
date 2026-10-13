@@ -9,8 +9,10 @@ import {
   type StageFile,
   serialize,
   stageFileSchema,
+  toWorkspacePath,
   verifyOutputs,
   type WriteMode,
+  withAmendments,
   withInputs,
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
@@ -38,6 +40,12 @@ import { type PromptPackage, validatePromptPackage } from "./validate.js";
 const ARTIFACT = "prompt-package";
 
 export interface PromptPackageStatus {
+  /**
+   * Prompt files a person corrected by hand that nobody has accepted yet. A
+   * lapsed consent like `inputsChanged`, not an error: the wiring verdict never
+   * reads a prompt, and `approve` is what accepts the correction.
+   */
+  readonly amended: readonly string[];
   readonly approved: boolean;
   /** Inputs whose bytes no longer match what this run consumed. */
   readonly inputsChanged: readonly string[];
@@ -65,6 +73,8 @@ class PackageStateError extends Error {
 }
 
 interface Inspection {
+  /** Hand-corrected prompts, with the digest each has now, what an approval accepts. */
+  readonly amended: readonly RecordedFile[];
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
   /** The inputs as they stand now, what an approval re-records. */
@@ -97,11 +107,13 @@ async function inspect(input: Stage4Scope): Promise<Result<Inspection>> {
 
   if (!stage.ok) {
     return ok({
+      amended: [],
       blocking: [],
       inputs: stage4.data.inputs,
       stage: null,
       stagePath: paths.episode.promptPackageStage,
       status: {
+        amended: [],
         approved: false,
         inputsChanged: [],
         problems: [
@@ -126,11 +138,13 @@ async function inspect(input: Stage4Scope): Promise<Result<Inspection>> {
     const unfinished = `odcinek "${input.episodeId}": próba ${record.runId} zapisała status "submitted" i nigdy nie dobiegła końca, mogła zostać rozliczona; nową próbę zaczyna --regenerate`;
 
     return ok({
+      amended: [],
       blocking: [unfinished],
       inputs: stage4.data.inputs,
       stage: stage.data,
       stagePath: paths.episode.promptPackageStage,
       status: {
+        amended: [],
         approved: false,
         inputsChanged: changedInputs(driftableInputs(record), stage4.data.inputs),
         problems: [unfinished],
@@ -140,7 +154,18 @@ async function inspect(input: Stage4Scope): Promise<Result<Inspection>> {
     });
   }
 
-  await verifyOutputs(input.workspace, stage.data, `odcinek "${input.episodeId}"`, blocking);
+  // A prompt file is a document a person may correct by hand before any image
+  // is bought from it; the wiring verdict never reads one, so a corrected
+  // prompt still validates. The manifest is wiring, not a prompt, and stays
+  // guarded as every other output is.
+  const prompts = `${toWorkspacePath(input.workspace.root, paths.episode.prompts)}/`;
+  const amended = await verifyOutputs(
+    input.workspace,
+    stage.data,
+    `odcinek "${input.episodeId}"`,
+    blocking,
+    (path) => path.startsWith(prompts)
+  );
 
   const verdict = await judge(stage4.data, blocking);
   // Drift is reported beside the blocking problems and revokes the approval
@@ -151,14 +176,20 @@ async function inspect(input: Stage4Scope): Promise<Result<Inspection>> {
     (path) =>
       `${path}: zmienił się od czasu ułożenia pakietu, tych wejść nikt jeszcze nie przyjął; przeczytaj pakiet jeszcze raz i zatwierdź go ponownie: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`
   );
-  const problems = [...blocking, ...lapsed];
+  const corrected = amended.map(
+    (one) =>
+      `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage prompt-package`
+  );
+  const problems = [...blocking, ...lapsed, ...corrected];
 
   return ok({
+    amended,
     blocking,
     inputs: stage4.data.inputs,
     stage: stage.data,
     stagePath: paths.episode.promptPackageStage,
     status: {
+      amended: amended.map((one) => one.path),
       // Approval is bound to bytes: a recorded "approved" that no longer
       // verifies is not an approval; it is a stale claim.
       approved: isApproved(stage.data) && problems.length === 0,
@@ -233,7 +264,7 @@ export async function approvePromptPackage(
     return inspection;
   }
 
-  const { blocking, inputs, stage, stagePath, status } = inspection.data;
+  const { amended, blocking, inputs, stage, stagePath, status } = inspection.data;
 
   if (stage === null || status.status !== "completed") {
     return err(
@@ -250,12 +281,36 @@ export async function approvePromptPackage(
     );
   }
 
-  const rebound = withInputs(stage, ARTIFACT, inputs);
+  // A hand-corrected prompt is accepted here, the one place able to: its
+  // digest is rebound and the record says who changed it from what.
+  const rebound = withAmendments(withInputs(stage, ARTIFACT, inputs), amended, input.reviewer);
   const approved = approveAll(rebound, { note: input.note, reviewer: input.reviewer });
   const written = await applyWrites(
     [{ kind: "text", text: serialize(approved), to: stagePath }],
     input.mode
   );
 
-  return written.ok ? ok({ ...status, approved: true, inputsChanged: [], problems: [] }) : written;
+  return written.ok
+    ? ok({ ...status, amended: [], approved: true, inputsChanged: [], problems: [] })
+    : written;
+}
+
+/**
+ * Every prompt file a person corrected by hand, accepted or not.
+ *
+ * What a republication of the archived answer would overwrite: an accepted
+ * correction is in the record's `amendments`, one nobody accepted yet is only
+ * on disk, and either one is a person's work the saved answer knows nothing of.
+ */
+export async function handCorrections(input: Stage4Scope): Promise<Result<readonly string[]>> {
+  const inspection = await inspect(input);
+
+  if (!inspection.ok) {
+    return inspection;
+  }
+
+  const record = inspection.data.stage?.artifacts[ARTIFACT];
+  const accepted = record?.amendments.map((one) => one.path) ?? [];
+
+  return ok([...new Set([...accepted, ...inspection.data.status.amended])]);
 }

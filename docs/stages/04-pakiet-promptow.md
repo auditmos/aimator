@@ -32,6 +32,22 @@ planować od nowa. Poprzednia wersja to wszystkie pliki, które pakiet opublikow
 odpowiada jednym obiektem JSON, którego wymaga zadanie. Szczegóły na stronie
 [etapu 1](01-scenariusz.md#poprawka-z-uwagą); to nadal nowa płatna próba.
 
+## Poprawka ręczna
+
+Prompt kadru, referencji albo klipu można poprawić wprost w pliku pod `prompts/`, zanim
+kupi się z niego obraz. To tańsze niż każda regeneracja. Werdykt okablowania nie czyta
+promptów, więc poprawka przechodzi walidację. `check` zgłasza ją jako wygaśnięcie zgody
+(„poprawiony ręcznie po generacji”), a `--json` wymienia plik w `amended`.
+`approve --stage prompt-package` przepina hash i dopisuje wpis w `amendments`, tak samo jak
+przy [scenariuszu](01-scenariusz.md#poprawka-ręczna). `prompt-package show` i `--dry-run`
+etapów 5–7 pokazują treść poprawioną. `prompt-package.json` nie jest promptem, tylko
+okablowaniem: jego zmiana dalej daje błąd „zmieniony poza narzędziem”.
+
+Obraz narysowany ze starej wersji pliku traci zgodę, bo zapisał jego hash jako wejście.
+**`--republish` odmawia**, gdy którykolwiek plik pakietu ma wpis w `amendments` albo
+poprawkę, której nikt jeszcze nie przyjął. Opublikowanie zapisanej odpowiedzi nadpisałoby
+pracę człowieka. `--regenerate` działa dalej, a z `--instruction` poprawia wersję poprawioną.
+
 ## Etap 4 jako obiekt
 
 `--json` wypisuje **obiekt, który zwraca moduł etapu**, plus pola `command` i `stage`:

@@ -652,3 +652,49 @@ describe("checkReferences after a correction", () => {
     );
   });
 });
+
+/**
+ * A prompt file corrected by hand after a reference was drawn from it.
+ *
+ * Nothing in stage 5 has to know a correction happened: the reference recorded
+ * the prompt file's digest as an input, so a corrected `R02.md` lapses the
+ * reference's approval exactly as any changed input does, accepted package or
+ * not. Redrawing it is what puts the corrected prompt on the wire.
+ */
+describe("checkReferences after its prompt is corrected by hand", () => {
+  it("should withdraw the approval of a reference drawn from the previous prompt", async () => {
+    await upstream();
+    await approvePackage();
+    await generate({ artifacts: ["R02"] });
+    await accept(["R02"]);
+    const prompt = join(
+      root,
+      "projects",
+      PROJECT,
+      "episodes",
+      EPISODE,
+      "prompts",
+      "references",
+      "R02.md"
+    );
+    await writeFile(
+      prompt,
+      (await readFile(prompt, "utf8")).replace("nieugnieciona", "z oboma uszami prosto"),
+      "utf8"
+    );
+    await approvePackage();
+
+    const status = await checkReferences({
+      episodeId: EPISODE,
+      projectId: PROJECT,
+      track: "gpt-image",
+      workspace,
+    });
+    const r02 = status.ok ? status.data.artifacts.find((one) => one.id === "R02") : undefined;
+
+    expect(r02?.approved).toBe(false);
+    expect(r02?.inputsChanged).toContain(
+      `projects/${PROJECT}/episodes/${EPISODE}/prompts/references/R02.md`
+    );
+  });
+});

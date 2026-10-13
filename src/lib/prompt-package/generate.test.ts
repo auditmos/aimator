@@ -807,3 +807,107 @@ describe("checkPromptPackage and approvePromptPackage", () => {
     expect(approved.ok ? null : approved.error.message).toContain("nie ma czego zatwierdzić");
   });
 });
+
+/**
+ * A prompt file a person corrected by hand, before any image is bought from it.
+ *
+ * Cheaper than any regeneration, and read the way stages 1 and 3 read their
+ * own: the wiring verdict never reads a prompt, so a corrected `R02.md` still
+ * validates, `check` reports a lapsed consent and `approve` accepts it, with
+ * the record saying who changed it from what. The manifest is not a prompt and
+ * stays guarded as before. A republication would overwrite the correction with
+ * the archived answer, so it is refused, whether the correction was accepted
+ * or not; a regeneration is still the way to a new package.
+ */
+describe("a prompt package corrected by hand", () => {
+  const scope = () => ({ episodeId: EPISODE, projectId: PROJECT, workspace });
+  const PATH = `projects/${PROJECT}/episodes/${EPISODE}/prompts/references/R02.md`;
+  const CORRECTED = "Pluszowa alpaka, oba uszy proste, siedzi na kolanach taty.";
+
+  function file(): string {
+    return join(episodeDir(), "prompts", "references", "R02.md");
+  }
+
+  async function correct(): Promise<string> {
+    const text = (await readFile(file(), "utf8")).replace(
+      "Pluszowa alpaka, ucho ugięte kontaktem z policzkiem.",
+      CORRECTED
+    );
+    await writeFile(file(), text, "utf8");
+
+    return text;
+  }
+
+  function approve() {
+    return approvePromptPackage({ ...scope(), mode: "apply", note: null, reviewer: "test" });
+  }
+
+  it("should report a corrected prompt as a lapsed consent, then accept and record it", async () => {
+    await makeUpstream();
+    await generate();
+    await approve();
+    const generated = await readFile(file());
+    const text = await correct();
+
+    const checked = await checkPromptPackage(scope());
+    const problems = checked.ok ? checked.data.problems.join("\n") : "";
+
+    expect(checked.ok ? checked.data.amended : null).toEqual([PATH]);
+    expect(checked.ok ? checked.data.approved : null).toBe(false);
+    expect(problems).toContain(`${PATH}: poprawiony ręcznie po generacji`);
+    expect(problems).not.toContain("poza narzędziem");
+
+    const approved = await approve();
+    const record = JSON.parse(
+      await readFile(join(episodeDir(), "prompt-package.stage.json"), "utf8")
+    ).artifacts["prompt-package"];
+
+    expect(approved.ok ? approved.data.approved : approved.error.message).toBe(true);
+    expect(record.outputs).toContainEqual({ path: PATH, sha256: sha256Of(Buffer.from(text)) });
+    expect(record.amendments).toEqual([
+      {
+        at: expect.any(String),
+        from: sha256Of(generated),
+        path: PATH,
+        reviewer: "test",
+        to: sha256Of(Buffer.from(text)),
+      },
+    ]);
+  });
+
+  it("should keep guarding the manifest, which is not a prompt", async () => {
+    await makeUpstream();
+    await generate();
+    const manifest = join(episodeDir(), "prompt-package.json");
+    await writeFile(manifest, `${await readFile(manifest, "utf8")}\n`, "utf8");
+
+    const checked = await checkPromptPackage(scope());
+
+    expect(checked.ok ? checked.data.amended : null).toEqual([]);
+    expect(checked.ok ? checked.data.problems.join("\n") : "").toContain("poza narzędziem");
+  });
+
+  it.each([
+    ["not yet accepted", false],
+    ["accepted", true],
+  ])(
+    "should refuse to republish over a correction %s, and overwrite nothing",
+    async (_, accepted) => {
+      await makeUpstream();
+      await generate();
+      const text = await correct();
+
+      if (accepted) {
+        await approve();
+      }
+
+      calls = 0;
+      const again = await generate({ republish: true });
+
+      expect(calls).toBe(0);
+      expect(again.ok ? null : again.error.message).toContain("--republish");
+      expect(again.ok ? null : again.error.message).toContain(PATH);
+      expect(await readFile(file(), "utf8")).toBe(text);
+    }
+  );
+});

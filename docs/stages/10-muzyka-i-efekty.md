@@ -96,6 +96,17 @@ Drugi wiersz niesie ciężar, który piętro wyżej niesie podnoszenie: wiernoś
 ale dowodzi, że model przeszedł **cały plan**: ujęcie pominięte i ujęcie wymyślone
 wychodzą tak samo.
 
+## Poprawka ręczna
+
+`sound-design.md` można poprawić wprost w pliku, na przykład przeredagować opis podkładu.
+Poprawka jest wygaśnięciem zgody, nie błędem. `check` mówi „poprawiony ręcznie po
+generacji”, a `--json` wymienia plik w `amended`. Werdykt okablowania obowiązuje dalej:
+poprawka, po której podkład nie kafelkuje filmu albo cue nazywa nie te ujęcia, dostaje
+odmowę walidatora. `approve --stage sound-design --artifact cues` przyjmuje poprawkę,
+przepina hash i dopisuje wpis w `amendments`, jak przy
+[scenariuszu](01-scenariusz.md#poprawka-ręczna). Każdy stem zapisuje hash arkusza, z którego
+go kupiono, więc stemy kupione ze starego arkusza tracą zgodę.
+
 ## Rachunek jest w sekundach
 
 Cennik dostawcy wygląda na sprzeczny: tabela podaje cenę za minutę, a FAQ mówi „per

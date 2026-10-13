@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -245,5 +245,102 @@ describe("prompt-package show --json", () => {
     const composed = plan.artifacts.find((one) => one.name === "opening-frame");
 
     expect(composed?.text).toContain("Image 1 =");
+  });
+});
+
+/**
+ * A prompt corrected by hand is the prompt a later stage sends.
+ *
+ * Its own workspace, because the correction and its approval rewrite stage 4's
+ * record, which the shared one above must not see. What it proves is the seam
+ * a person cares about: once the corrected package is accepted, the free
+ * preview of a send prints the corrected words, not the ones the model wrote.
+ */
+describe("prompt-package show after a hand correction", () => {
+  const CORRECTED = "Pluszowa alpaka, oba uszy proste, na kolanach taty.";
+  let own = "";
+  let source = "";
+
+  beforeAll(async () => {
+    own = await mkdtemp(join(tmpdir(), "aimator-cli-amend-"));
+    source = await mkdtemp(join(tmpdir(), "aimator-cli-amend-src-"));
+    const resolved = resolveWorkspace(own);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    const withAlpaca = JSON.parse(answer()) as {
+      clips: { referenceIds: string[] }[];
+      references: unknown[];
+    };
+
+    // A reference no clip uses is refused by the wiring verdict, so C01 carries it.
+    withAlpaca.clips[0]?.referenceIds.push("R02");
+    withAlpaca.references.push({
+      dependsOn: ["hero:ewa"],
+      id: "R02",
+      kind: "prop",
+      prompt: "Pluszowa alpaka, ucho ugięte.",
+      subject: "Alpaca toy",
+    });
+    await makeUpstream({
+      answer: JSON.stringify(withAlpaca),
+      approvePackage: true,
+      root: own,
+      scratch: source,
+      workspace: resolved.data,
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await rm(own, { force: true, recursive: true });
+    await rm(source, { force: true, recursive: true });
+  });
+
+  it("should print the corrected prompt once the correction is accepted", async () => {
+    const file = join(
+      own,
+      "projects",
+      PROJECT,
+      "episodes",
+      EPISODE,
+      "prompts",
+      "references",
+      "R02.md"
+    );
+    await writeFile(
+      file,
+      (await readFile(file, "utf8")).replace("Pluszowa alpaka, ucho ugięte.", CORRECTED),
+      "utf8"
+    );
+    const approved = await run([
+      "approve",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "prompt-package",
+      "--workspace",
+      own,
+    ]);
+    const shown = await run([
+      "prompt-package",
+      "show",
+      PROJECT,
+      EPISODE,
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "R02",
+      "--json",
+      "--workspace",
+      own,
+    ]);
+    const plan = JSON.parse(shown.ok ? shown.data : "{}") as {
+      artifacts?: readonly { readonly name: string; readonly text: string | null }[];
+    };
+
+    expect(approved.ok ? null : approved.error.message).toBe(null);
+    expect(plan.artifacts?.find((one) => one.name === "R02")?.text).toContain(CORRECTED);
   });
 });

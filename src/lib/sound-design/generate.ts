@@ -513,6 +513,22 @@ async function buy(
   const done: CueOutcome[] = [];
   let runId: string | null = null;
   let { stage } = stage10;
+  // The sheet is what a stem is bought from, so it is recorded beside the plan,
+  // exactly as stage 9 records its script: a sheet corrected or regenerated
+  // afterwards lapses the stems it authorised, and nothing above them.
+  const written = await readDigest(stage10.paths.episode.soundDesign);
+
+  if (!written.ok) {
+    return written;
+  }
+
+  const inputs: readonly RecordedFile[] = [
+    ...stage10.inputs,
+    {
+      path: toWorkspacePath(input.workspace.root, stage10.paths.episode.soundDesign),
+      sha256: written.data.sha256,
+    },
+  ];
 
   for (const cue of cuesOf(sheet)) {
     const outcome = planned.find((one) => one.id === cue.id);
@@ -539,7 +555,7 @@ async function buy(
       },
       {
         blocked: (problems) => new Stage10BlockedError(problems),
-        inputs: stage10.inputs,
+        inputs,
         instrumental: stage10.instrumental,
         key: cue.id,
         kind: cue.kind,

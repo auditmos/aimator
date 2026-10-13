@@ -6,6 +6,7 @@ import {
   type StageFile,
   serialize,
   type WriteMode,
+  withAmendments,
   withInputs,
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
@@ -61,6 +62,12 @@ export interface LineState {
 }
 
 export interface NarrationStatus {
+  /**
+   * The script, when a person corrected it by hand and nobody has accepted the
+   * correction yet. A lapsed consent, not an error: the corrected script is
+   * still held to "lifted, not invented", and `approve` is what accepts it.
+   */
+  readonly amended: readonly string[];
   /** True once the script and every line carry a still-valid approval. */
   readonly approved: boolean;
   readonly lines: readonly LineState[];
@@ -130,6 +137,8 @@ async function changedInputs(
 }
 
 interface Inspection {
+  /** A hand-corrected script, with the digest it has now, what an approval accepts. */
+  readonly amended: readonly RecordedFile[];
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
   readonly inputs: readonly RecordedFile[];
@@ -158,10 +167,12 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
 
   if (record === undefined || !text.ok || plan.data.verdict === null) {
     return ok({
+      amended: [],
       blocking: [],
       inputs: stage9.data.inputs,
       stage9: stage9.data,
       status: {
+        amended: [],
         approved: false,
         lines: [],
         nextStep: `aimator narration generate ${input.projectId} ${input.episodeId}`,
@@ -180,9 +191,16 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
 
   const [output] = record.outputs;
 
-  if (output === undefined || output.sha256 !== text.data.sha256) {
+  if (output === undefined) {
     blocking.push("narration.md: nie zgadza się z zapisanym hashem, plik zmieniono poza próbą");
   }
+
+  // The script is a document a person may correct by hand: changed bytes are a
+  // lapsed consent, validated below as they stand, and accepted by `approve`.
+  const amended: readonly RecordedFile[] =
+    output !== undefined && output.sha256 !== text.data.sha256
+      ? [{ path: output.path, sha256: text.data.sha256 }]
+      : [];
 
   // Re-validated against the plan as it stands, exactly as a shot list is
   // re-validated against the screenplay: a shot list whose narration changed
@@ -198,7 +216,10 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
 
   const scriptChanged = await changedInputs(input, record.inputs);
   const scriptApproved =
-    record.review.status === "approved" && blocking.length === 0 && scriptChanged.length === 0;
+    record.review.status === "approved" &&
+    blocking.length === 0 &&
+    scriptChanged.length === 0 &&
+    amended.length === 0;
   // The script's own record is deliberately not bound to the reading: how a
   // line is spoken changes nothing about which sentences the model lifted.
   const direction = await readDirection(input);
@@ -213,10 +234,12 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
   const approved = scriptApproved && lines.states.every((one) => one.approved);
 
   return ok({
+    amended,
     blocking,
     inputs: stage9.data.inputs,
     stage9: stage9.data,
     status: {
+      amended: amended.map((one) => one.path),
       approved,
       lines: lines.states,
       nextStep: nextStep(input, scriptApproved, lines.states),
@@ -227,6 +250,10 @@ async function inspect(input: Stage9Scope): Promise<Result<Inspection>> {
         ...scriptChanged.map(
           (path) =>
             `${path}: zmienił się od czasu spisania skryptu, przeczytaj skrypt jeszcze raz i zatwierdź ponownie`
+        ),
+        ...amended.map(
+          (one) =>
+            `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${SCRIPT}`
         ),
         ...lines.problems,
       ],
@@ -417,7 +444,7 @@ export async function approveNarration(input: ApproveScope): Promise<Result<Narr
     return inspection;
   }
 
-  const { blocking, inputs, stage9, status } = inspection.data;
+  const { amended, blocking, inputs, stage9, status } = inspection.data;
   const known = new Set([SCRIPT, ...status.lines.map((one) => one.id)]);
   const unknown = input.artifacts.filter((id) => !known.has(id));
 
@@ -447,7 +474,12 @@ export async function approveNarration(input: ApproveScope): Promise<Result<Narr
     );
   }
 
-  let file = stage9.stage;
+  // A hand-corrected script that validated is accepted with the script, the
+  // one decision able to: its digest is rebound and the record says who
+  // changed it from what.
+  let file = input.artifacts.includes(SCRIPT)
+    ? withAmendments(stage9.stage, amended, input.reviewer)
+    : stage9.stage;
 
   for (const id of input.artifacts) {
     file = withInputs(file, id, id === SCRIPT ? inputs : (file.artifacts[id]?.inputs ?? []));

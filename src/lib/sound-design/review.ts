@@ -6,6 +6,7 @@ import {
   type StageFile,
   serialize,
   type WriteMode,
+  withAmendments,
   withInputs,
 } from "../artifact/index.js";
 import { validateAudio } from "../audio-model/index.js";
@@ -61,6 +62,12 @@ export interface CueState {
 }
 
 export interface SoundDesignStatus {
+  /**
+   * The cue sheet, when a person corrected it by hand and nobody has accepted
+   * the correction yet. A lapsed consent, not an error: the corrected sheet is
+   * still held to the wiring verdict, and `approve` is what accepts it.
+   */
+  readonly amended: readonly string[];
   /** True once the sheet and every stem carry a still-valid approval. */
   readonly approved: boolean;
   readonly cues: readonly CueState[];
@@ -132,6 +139,8 @@ async function changedInputs(
 }
 
 interface Inspection {
+  /** A hand-corrected sheet, with the digest it has now, what an approval accepts. */
+  readonly amended: readonly RecordedFile[];
   /** Problems an approval may not write over. Input drift is not among them. */
   readonly blocking: readonly string[];
   readonly inputs: readonly RecordedFile[];
@@ -158,10 +167,12 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
 
   if (record === undefined || !text.ok || plan.data.verdict === null) {
     return ok({
+      amended: [],
       blocking: [],
       inputs: stage10.data.inputs,
       stage10: stage10.data,
       status: {
+        amended: [],
         approved: false,
         cues: [],
         nextStep: `aimator sound-design generate ${input.projectId} ${input.episodeId}`,
@@ -180,9 +191,17 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
 
   const [output] = record.outputs;
 
-  if (output === undefined || output.sha256 !== text.data.sha256) {
+  if (output === undefined) {
     blocking.push("sound-design.md: nie zgadza się z zapisanym hashem, plik zmieniono poza próbą");
   }
+
+  // The sheet is a document a person may correct by hand: changed bytes are a
+  // lapsed consent, held below to the same wiring verdict, and accepted by
+  // `approve`.
+  const amended: readonly RecordedFile[] =
+    output !== undefined && output.sha256 !== text.data.sha256
+      ? [{ path: output.path, sha256: text.data.sha256 }]
+      : [];
 
   // Re-validated against the plan as it stands, exactly as a shot list is
   // re-validated against the screenplay: a plan whose shots changed stops this
@@ -198,7 +217,10 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
 
   const sheetChanged = await changedInputs(input, record.inputs);
   const sheetApproved =
-    record.review.status === "approved" && blocking.length === 0 && sheetChanged.length === 0;
+    record.review.status === "approved" &&
+    blocking.length === 0 &&
+    sheetChanged.length === 0 &&
+    amended.length === 0;
   const cues = verdict.ok
     ? await readCueStates(input, stage10.data, [
         ...verdict.data.music.map((cue) => ({ id: cue.id, seconds: cue.seconds })),
@@ -208,10 +230,12 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
   const approved = sheetApproved && cues.states.every((one) => one.approved);
 
   return ok({
+    amended,
     blocking,
     inputs: stage10.data.inputs,
     stage10: stage10.data,
     status: {
+      amended: amended.map((one) => one.path),
       approved,
       cues: cues.states,
       nextStep: nextStep(input, sheetApproved, cues.states),
@@ -222,6 +246,10 @@ async function inspect(input: Stage10Scope): Promise<Result<Inspection>> {
         ...sheetChanged.map(
           (path) =>
             `${path}: zmienił się od czasu spisania arkusza, przeczytaj arkusz jeszcze raz i zatwierdź ponownie`
+        ),
+        ...amended.map(
+          (one) =>
+            `${one.path}: poprawiony ręcznie po generacji, tej wersji nikt jeszcze nie przyjął; przeczytaj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --artifact ${CUES}`
         ),
         ...cues.problems,
       ],
@@ -389,7 +417,7 @@ export async function approveSoundDesign(input: ApproveScope): Promise<Result<So
     return inspection;
   }
 
-  const { blocking, inputs, stage10, status } = inspection.data;
+  const { amended, blocking, inputs, stage10, status } = inspection.data;
   const known = new Set([CUES, ...status.cues.map((one) => one.id)]);
   const unknown = input.artifacts.filter((id) => !known.has(id));
 
@@ -419,7 +447,12 @@ export async function approveSoundDesign(input: ApproveScope): Promise<Result<So
     );
   }
 
-  let file = stage10.stage;
+  // A hand-corrected sheet that validated is accepted with the sheet, the one
+  // decision able to: its digest is rebound and the record says who changed it
+  // from what.
+  let file = input.artifacts.includes(CUES)
+    ? withAmendments(stage10.stage, amended, input.reviewer)
+    : stage10.stage;
 
   for (const id of input.artifacts) {
     file = withInputs(file, id, id === CUES ? inputs : (file.artifacts[id]?.inputs ?? []));
