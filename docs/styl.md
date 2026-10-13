@@ -90,8 +90,9 @@ cute cozy cartoon style, high quality
 2D animation, flat vector, thick brown outline, two-tone cel shading, warm pastel palette, visible paper grain
 ```
 
-W `project.md` opis stylu wpisuje się w wiersz „Styl wizualny": najpierw linia stylu,
-dosłownie, potem paleta, reguła kreski i lista „zawsze / nigdy".
+W `project.md` opis stylu stoi w bloku [Style Bible](stages/00-przygotowanie.md#style-bible),
+w czterech polach: linia stylu, dosłownie, potem paleta, reguła kreski i lista „zawsze /
+nigdy".
 
 ## Trudność utrzymania
 

@@ -21,6 +21,9 @@ let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
 
+/** A rules row, `- Palette: …`, and its label. */
+const ROW_LABEL = /^- ([^:\n]+):/;
+
 const FULL_SETTINGS = {
   audio: "music-and-effects" as const,
   durationSeconds: 60,
@@ -105,6 +108,45 @@ function fillRules(): Promise<void> {
   );
 }
 
+/**
+ * Answers the scaffold the way a person does: the quote goes and every marker
+ * gets an answer, except on the row `undecided` names. `answers` gives a row
+ * its own answer, by label.
+ */
+async function answerRules(
+  options: { answers?: Record<string, string>; undecided?: string } = {}
+): Promise<void> {
+  const path = join(root, "projects/demo/project.md");
+  const lines = (await readFile(path, "utf8")).split("\n").filter((line) => !line.startsWith(">"));
+  const answered = lines.map((line) => {
+    const label = ROW_LABEL.exec(line)?.[1] ?? "";
+
+    return label === options.undecided
+      ? line
+      : line.replace("TODO(etap-0)", options.answers?.[label] ?? "ustalone");
+  });
+
+  await writeFile(path, answered.join("\n"), "utf8");
+}
+
+/** From `heading` up to the next level-2 heading, or the end. */
+function section(text: string, heading: string): string {
+  const start = text.indexOf(`\n${heading}\n`);
+
+  if (start < 0) {
+    return "";
+  }
+
+  const end = text.indexOf("\n## ", start + heading.length + 1);
+
+  return text.slice(start, end < 0 ? undefined : end);
+}
+
+/** The labels of a section's rows: `- Palette: …` is `Palette`. */
+function fields(text: string): string[] {
+  return [...text.matchAll(/^- ([^:\n]+):/gm)].map((match) => match[1] ?? "");
+}
+
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "aimator-ws-"));
   scratch = await mkdtemp(join(tmpdir(), "aimator-src-"));
@@ -169,6 +211,22 @@ describe("initProject", () => {
     const rules = await readFile(join(root, "projects/demo/project.md"), "utf8");
     expect(rules).toContain("TODO(etap-0)");
     expect(rules).toContain("# Demo, zasady wspólne");
+  });
+
+  /**
+   * The drawing as a whole, in English because it is an instruction to the
+   * image model. Exactly these four: figure proportions and how the cast
+   * relates already have rows of their own, and a fifth field holding either
+   * would be a second place for one truth.
+   */
+  it("should scaffold a Style Bible of four fields, each still undecided", async () => {
+    await makeProject();
+    const rules = await readFile(join(root, "projects/demo/project.md"), "utf8");
+    const bible = section(rules, "## Style Bible");
+
+    expect(fields(bible)).toEqual(["Style line", "Palette", "Linework rule", "Always / never"]);
+    expect(bible.match(/^- [^:]+: TODO\(etap-0\)/gm)).toHaveLength(4);
+    expect(rules).not.toContain("Styl wizualny");
   });
 
   it("should record the project file digest in the stage record", async () => {
@@ -512,6 +570,27 @@ describe("checkStage0", () => {
     await makeProject();
     const result = await checkStage0({ projectId: "demo", workspace });
     expect(result.ok ? null : result.error.message).toContain("TODO(etap-0)");
+  });
+
+  it.each(["Style line", "Palette", "Linework rule", "Always / never"])(
+    "should block while the Style Bible's %s is undecided",
+    async (field) => {
+      await makeProject();
+      await answerRules({ undecided: field });
+      const result = await checkStage0({ projectId: "demo", workspace });
+      expect(result.ok ? null : result.error.message).toContain("pozostało 1 znaczników");
+    }
+  );
+
+  // Parity with the props row: an explicit "none" is an answer, not a gap.
+  it("should accept an explicit none as the always / never list", async () => {
+    await makeProject();
+    await answerRules({ answers: { "Always / never": "none" } });
+    const result = await checkStage0({ projectId: "demo", workspace });
+    expect(result.ok ? result.data.problems.join("\n") : result.error.message).not.toContain(
+      "TODO(etap-0)"
+    );
+    expect(result.ok).toBe(true);
   });
 
   it("should block while the aspect ratio is undecided", async () => {

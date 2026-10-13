@@ -59,8 +59,8 @@ For a new project establish:
 
 1. the premise, and what a single episode tells relative to the others;
 2. the shared world, period, tone and audience;
-3. the protagonist's role and recurring appearance, any recurring cast, and the visual
-   style. Ask where the character's look comes from — **photographs of a real person**, or
+3. the protagonist's role and recurring appearance, any recurring cast, and the Style
+   Bible (below). Ask where the character's look comes from — **photographs of a real person**, or
    **the description in `project.md`**. There is no third answer and no default, and the
    readiness gate blocks until one is recorded. Record real paths and the **actual**
    review status: never claim an approval or an inspection that did not happen;
@@ -71,7 +71,7 @@ For a new project establish:
    the protagonist's proportions — head-to-body ratio and how deformed the figure is, asked
    separately from the aspect ratio because in Polish both are "proporcje" — their face and
    body, the recurring wardrobe, every recurring character, each recurring prop, the
-   recurring setting, and the visual style.
+   recurring setting, and the four Style Bible fields.
 
    Once there is more than one character, also record how they relate: how they scale
    against each other, whether their heads are the same size, and what is drawn identically
@@ -95,6 +95,31 @@ For a new project establish:
    stage will otherwise invent it differently on every run;
 4. the aspect ratio, and any binding opening-composition or continuity requirement;
 5. any other binding creative constraint.
+
+### The Style Bible
+
+`project.md` carries one English block, **Style Bible**, with four fields: the style line,
+the palette, the linework rule and the always / never list. English is rule 9, not taste:
+every image call receives the block verbatim as an instruction to the model. `aimator check`
+blocks while any of its four markers is unfilled.
+
+When the conversation reaches the look of the series, read `docs/styl.md` and work from it
+rather than from memory: it holds the Style Stack, the nine questions of the style
+fingerprint, how to write a style line, a catalogue of lines to offer as proposals, and what
+each style family costs in regenerations. Ask its questions; do not recite the method. Name
+every concept with the word `docs/slownik.md` gives it, in the conversation as well as in
+the file, because a synonym in the conversation becomes a synonym in the prompt.
+
+**Never record a studio, film or artist name; record its decomposition.** A name is not a
+decision, and it reaches the image provider verbatim, which may refuse it and stop the
+stage. When the user answers with a name, ask which film and which features they mean, and
+offer the matching line from the "instead → use" table in `docs/styl.md` as a proposal.
+
+The block describes the drawing as a whole. Whatever stops being true when the cast is
+swapped, such as figure proportions or how the characters scale against each other, belongs
+to the character rows and never to the Style Bible. In the always / never field, `none` is
+an answer only when the user said there are no hard rules; it is never a way to skip the
+question.
 
 For each episode establish:
 

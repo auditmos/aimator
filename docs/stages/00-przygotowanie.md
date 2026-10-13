@@ -185,6 +185,43 @@ opis jej wyglądu w `project.md`, i wtedy to on musi być konkretny, bo nic dale
 uzupełni. `character add` samo w sobie jest deklaracją i przestawia podstawę na
 `photographs`.
 
+## Style Bible
+
+`project.md` ma jeden blok po angielsku, **Style Bible**: cztery pola, które opisują
+rysunek całej serii. Każde startuje ze znacznikiem `TODO(etap-0)`, więc blokuje bramkę jak
+każdy inny wiersz zasad.
+
+| Pole | Co zawiera |
+|---|---|
+| `Style line` | linia stylu: 5–7 fraz w kolejności Style Stacku, wklejana dosłownie do każdego promptu obrazu |
+| `Palette` | paleta: 5–8 barw, każda z wartością hex |
+| `Linework rule` | reguła kreski: grubość konturu zewnętrznego i wewnętrznego, zwężenie, kolor |
+| `Always / never` | lista „zawsze / nigdy": twarde nakazy i zakazy rysunku albo jawne `none` |
+
+Angielski wynika z [reguły 9](../../AGENTS.md#pipeline-rules), nie z wygody. `project.md`
+trafia w całości do każdego płatnego obrazu i klipu, a ten blok jest w nim instrukcją dla
+modelu, nie materiałem. Reszta pliku zostaje po polsku, więc prompt jest dwujęzyczny
+z założenia. Jawne `none` w ostatnim polu jest odpowiedzią, tak samo jak „brak" przy
+rekwizytach: mówi, że zakazów nie ma, a nie, że nikt o nie nie zapytał.
+
+Linia stylu ma 5–7 fraz, a nie „opisz styl", bo `project.md` jedzie w każdym wywołaniu
+obrazu, a rozdmuchana linia uśrednia się w sposób, którego nie da się przewidzieć. To ten
+sam dryf stylu, przed którym blok ma chronić.
+
+**Style Bible opisuje rysunek jako całość**: medium, kreskę, cieniowanie, paletę, teksturę
+i światło. Wiersze „Proporcje i stylizacja postaci" oraz „Relacje i wspólne zasady
+rysowania postaci" opisują konkretne postacie i to, jak mają się do siebie. Rozstrzyga
+jedno pytanie: *czy ten fakt przestaje być prawdziwy, gdy wymienisz obsadę?* Jeśli tak,
+należy do postaci, nie do Style Bible. Dzięki temu żadna prawda nie stoi w dwóch miejscach,
+które rozjechałyby się przy pierwszej ręcznej poprawce.
+
+Jak zamienić „ciepły, bajkowy" w te cztery pola, z gotowymi liniami i ceną każdej rodziny
+stylów, pokazuje [docs/styl.md](../styl.md). Słowa ustala [słownik](../slownik.md).
+
+Szkielet `project.md` powstaje wyłącznie przy `project init`, więc istniejący plik nigdy
+nie dostaje tego bloku sam i jego zgoda nie wygasa. Dopisanie bloku ręcznie to zwykła
+edycja zasad, która wygasza zgodę etapu 0 jak każda inna.
+
 ## Sześć decyzji odcinka
 
 Pięć z nich blokuje bramkę tego etapu. Szósta, `--max-clip`, jest wymagana dopiero przez

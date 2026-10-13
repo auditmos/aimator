@@ -20,6 +20,7 @@ Jak te pojęcia składają się w opis rysunku, pokazuje [docs/styl.md](styl.md)
 
 | Po polsku | In English | Co znaczy |
 |---|---|---|
+| **Style Bible** | Style Bible | Blok po angielsku w `project.md`, cztery pola: linia stylu, paleta, reguła kreski i lista „zawsze / nigdy". Opisuje rysunek jako całość; co przestaje być prawdą po wymianie obsady, należy do wierszy o postaciach. |
 | **linia stylu** | style line | Kilka fraz po angielsku, które opisują rysunek całej serii i trafiają **dosłownie** do każdego promptu obrazu. Jedna na projekt. |
 | **token** | token | Jedna fraza linii stylu, od przecinka do przecinka: `flat vector`, `thick black outline`. **Nie** jednostka tokenizera: „5–7 tokenów" to pięć do siedmiu fraz. |
 | **Style Stack** | Style Stack | Osiem warstw opisu rysunku, zawsze w tej kolejności: format, medium, kreska, cieniowanie, paleta, tekstura, światło i nastrój, kompozycja. |

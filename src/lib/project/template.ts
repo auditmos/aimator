@@ -4,6 +4,12 @@
  * in?" is a file read instead of a judgement call. Ported from the source
  * project's series template, which had the same sections but no marker, there
  * the check was "is the file nonempty", and placeholders slipped through.
+ *
+ * The Style Bible is the one English block in a Polish document, by rule 9:
+ * every image call receives it verbatim as an instruction, not as material.
+ * Its four fields are the drawing as a whole, named as in `docs/slownik.md`;
+ * figure proportions and how the cast relates already have rows above, and a
+ * field repeating either would be a second place for one truth.
  */
 
 export const PLACEHOLDER = "TODO(etap-0)";
@@ -14,6 +20,9 @@ export function renderRules(title: string): string {
 > Uzupełnij każdy ${PLACEHOLDER} zatwierdzonymi ustaleniami, a następnie usuń ten cytat.
 > Nie kopiuj ustawień ani fabuły innego projektu jako domyślnych.
 > Póki został choć jeden ${PLACEHOLDER}, \`aimator check\` nie przepuści etapu 0.
+> Style Bible pisz po angielsku, bo trafia do każdego obrazu jako instrukcja dla modelu.
+> Opisuje rysunek jako całość: co przestaje być prawdą po wymianie obsady, należy do wierszy
+> o postaciach. Metodę i gotowe linie stylu podaje \`docs/styl.md\` w repozytorium aimator.
 
 ## Zatwierdzone założenia
 
@@ -38,9 +47,16 @@ export function renderRules(title: string): string {
   rysuje każdą osobno.
 - Powracające rekwizyty: ${PLACEHOLDER} albo jawne „brak". Każdy wymieniony opisz: kształt,
   wielkość względem postaci, materiał, barwa, zużycie. Sama nazwa to nie opis.
-- Styl wizualny: ${PLACEHOLDER} zatwierdzony kierunek.
 - Materiały postaci: podstawa i zdjęcia wynikają z \`project.json\` (\`characterBasis\`,
   \`characterSources\`); nie wpisuj tu akceptacji, która nie nastąpiła.
+
+## Style Bible
+
+- Style line: ${PLACEHOLDER} 5–7 comma-separated phrases in Style Stack order, repeated
+  verbatim in every image prompt.
+- Palette: ${PLACEHOLDER} 5–8 colours, each with a hex value.
+- Linework rule: ${PLACEHOLDER} outer and inner line weight, taper, colour.
+- Always / never: ${PLACEHOLDER} hard rules for the whole drawing, or an explicit "none".
 
 ## Obraz i ciągłość
 
