@@ -9,6 +9,16 @@ import {
   generateCharacter,
   isCharacterArtifact,
 } from "../../lib/character/index.js";
+import {
+  approveVoice,
+  checkVoice,
+  generateSample,
+  type SampleReport,
+  setVoice,
+  type VoiceDecision,
+  type VoiceStatus,
+} from "../../lib/character-voice/index.js";
+import { env } from "../../lib/env.js";
 import { addCharacter, addCharacterSources, setCharacterBasis } from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
@@ -43,7 +53,19 @@ import {
  */
 export const CAST_USAGE = `  character new <id> <character-id> --name <nazwa> [--json]
   character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
-  character describe <id> <character-id> [--json]`;
+  character describe <id> <character-id> [--json]
+  character voice <id> <character-id> --language <kod> --voice-id <id głosu> [--json]
+    Obsadza głos postaci w jednym języku: id głosu dostawcy, dosłownie, w
+    characters/<postać>/voices/<język>/voice.json. Darmowe. Głos nie mieszka w
+    project.json, więc jego zmiana cofa wyłącznie zgodę na próbkę tego języka;
+    obrazy, klipy, inne języki i inne postacie zostają nietknięte.
+  character sample <id> <character-id> --language <kod> --text <zdanie>
+                   [--model <id>] [--dry-run] [--json] [--regenerate]
+    Kupuje próbkę głosu: jedno płatne wywołanie czytające podane zdanie, które
+    nie ma wartości domyślnej. ElevenLabs rozlicza znaki, więc podgląd podaje
+    wywołania i znaki osobno. Model: --model albo AIMATOR_DIALOGUE_VOICE_MODEL.
+    Nie czeka na zgodę na etap 0: próbka służy do wybrania głosu. Przyjmuje ją
+    approve --stage voice --language <kod>.`;
 
 /** Stage 2: the card, the eight views and the hero, per track. */
 export const USAGE = `Etap 2. Postać (płatny; niezależny od etapu 1, może biec równolegle):
@@ -53,6 +75,9 @@ export const USAGE = `Etap 2. Postać (płatny; niezależny od etapu 1, może bi
 
 /** Which stage this file answers for, in the word `--stage` takes. */
 const STAGE = "character";
+
+/** The voices this file also answers for: casting, beside stage 0. */
+const VOICE_STAGE = "voice";
 
 /** Project id, character id and the workspace, what every cast command needs. */
 function castScope(
@@ -156,6 +181,204 @@ async function runCharacterDescribe(parsed: Parsed): Promise<Result<string>> {
     : result;
 }
 
+/**
+ * Casts a character's voice in one language. Free: it writes `voice.json` and
+ * nothing else, so a person can change their mind before buying a sample.
+ */
+async function runCharacterVoice(parsed: Parsed): Promise<Result<string>> {
+  const scope = castScope(parsed);
+  const language = requireFlag(parsed, "language");
+  const voiceId = requireFlag(parsed, "voice-id");
+
+  if (!scope.ok) {
+    return scope;
+  }
+  if (!language.ok) {
+    return language;
+  }
+  if (!voiceId.ok) {
+    return voiceId;
+  }
+
+  const mode = modeOf(parsed);
+  const result = await setVoice({
+    ...scope.data,
+    language: language.data,
+    mode,
+    voiceId: voiceId.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed) === "json"
+      ? asJson("voice", VOICE_STAGE, result.data)
+      : renderVoiceDecision(result.data, mode)
+  );
+}
+
+/**
+ * Buys one sample of a cast voice. `--text` is required: a sentence nobody
+ * chose would be the tool deciding what a character says.
+ */
+async function runCharacterSample(parsed: Parsed): Promise<Result<string>> {
+  const scope = castScope(parsed);
+  const language = requireFlag(parsed, "language");
+  const text = requireFlag(parsed, "text");
+
+  if (!scope.ok) {
+    return scope;
+  }
+  if (!language.ok) {
+    return language;
+  }
+  if (!text.ok) {
+    return text;
+  }
+
+  const { model } = parsed.values;
+  const mode = modeOf(parsed);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await generateSample({
+    ...scope.data,
+    apiKey: mode === "dry-run" ? null : (env.ELEVENLABS_API_KEY ?? null),
+    fetch,
+    language: language.data,
+    mode,
+    model: typeof model === "string" ? model : (env.AIMATOR_DIALOGUE_VOICE_MODEL ?? null),
+    regenerate: parsed.values.regenerate === true,
+    text: text.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed) === "json"
+      ? asJson("sample", VOICE_STAGE, result.data)
+      : renderSample(result.data, mode)
+  );
+}
+
+/**
+ * Calls and characters on one line, before the outcome: the provider bills
+ * the sentence, so the count of calls alone would understate what is spent.
+ */
+function renderSample(report: SampleReport, mode: "apply" | "dry-run"): string {
+  const headline = `Próbka głosu postaci "${report.characterId}" (${report.language}): ${report.voiceId ?? "głos nieobsadzony"}`;
+
+  return [
+    mode === "dry-run"
+      ? `Próba na sucho: nic nie zapisano, nic nie wysłano. ${headline}`
+      : headline,
+    `  ${mode === "dry-run" ? "do kupienia" : "kupiono"}: ${report.paidCalls} wywołań, ${report.characters} znaków`,
+    `  sample: ${report.state}, ${report.note}`,
+    ...report.created.map((path) => `  + ${path}`),
+    ...report.problems.map((problem) => `  ! ${problem}`),
+    ...(report.created.length > 0
+      ? ["  ! nagranie przeszło walidację; to nie to samo co przyjęcie go przez człowieka"]
+      : []),
+    `Dalej: ${report.nextStep}`,
+  ].join("\n");
+}
+
+/** The language a voice question is about, required: there is no default one. */
+function voiceScopeOf(
+  parsed: Parsed
+): Result<{ readonly characterId: string; readonly language: string }> {
+  const characterId = requirePositional(parsed, 1, "character-id");
+  const language = requireFlag(parsed, "language");
+
+  if (!characterId.ok) {
+    return characterId;
+  }
+
+  return language.ok ? ok({ characterId: characterId.data, language: language.data }) : language;
+}
+
+function renderVoiceStatus(headline: string, status: VoiceStatus): string {
+  const { sample } = status;
+  const state = sample.approved ? "zatwierdzona" : sample.state;
+
+  return [
+    headline,
+    `  głos: ${status.voiceId ?? "nieobsadzony"}`,
+    `  sample: ${state}, ${sample.note}`,
+    ...status.problems.map((problem) => `  ! ${problem}`),
+    `Dalej: ${status.nextStep}`,
+  ].join("\n");
+}
+
+/** `check --stage voice`: one character's voice in one language. Writes nothing. */
+export async function checkVoiceStage(
+  parsed: Parsed,
+  projectId: string,
+  workspace: Workspace,
+  answer: Answer
+): Promise<Result<string>> {
+  const scope = voiceScopeOf(parsed);
+
+  if (!scope.ok) {
+    return scope;
+  }
+
+  const result = await checkVoice({ ...scope.data, projectId, workspace });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answer === "json"
+      ? asJson("check", VOICE_STAGE, result.data)
+      : renderVoiceStatus(
+          `Głos postaci "${scope.data.characterId}" (${scope.data.language})${result.data.approved ? ", zatwierdzony" : ""}`,
+          result.data
+        )
+  );
+}
+
+/** `approve --stage voice`: the sample heard and the voice accepted, bound to its bytes. */
+export async function approveVoiceStage(
+  parsed: Parsed,
+  approval: Approval
+): Promise<Result<string>> {
+  const scope = voiceScopeOf(parsed);
+
+  if (!scope.ok) {
+    return scope;
+  }
+
+  const result = await approveVoice({ ...approval, ...scope.data });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    approval.answer === "json"
+      ? asJson("approve", VOICE_STAGE, result.data)
+      : renderVoiceStatus(
+          `Głos postaci "${scope.data.characterId}" (${scope.data.language}), zatwierdzono próbkę`,
+          result.data
+        )
+  );
+}
+
+function renderVoiceDecision(decision: VoiceDecision, mode: "apply" | "dry-run"): string {
+  const headline = `Głos postaci "${decision.characterId}" (${decision.language}): ${decision.voiceId}`;
+
+  return [
+    mode === "dry-run" ? `Próba na sucho: nic nie zapisano. ${headline}` : headline,
+    ...decision.written.map((path) => `  + ${path}`),
+    ...decision.problems.map((problem) => `  ! ${problem}`),
+    `Dalej: ${decision.nextStep}`,
+  ].join("\n");
+}
+
 const CHARACTER_OPTIONS = {
   add: { json: { type: "boolean" }, source: { multiple: true, type: "string" } },
   describe: { json: { type: "boolean" } },
@@ -168,12 +391,28 @@ const CHARACTER_OPTIONS = {
     track: { type: "string" },
   },
   new: { json: { type: "boolean" }, name: { type: "string" } },
+  sample: {
+    json: { type: "boolean" },
+    language: { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+    text: { type: "string" },
+  },
+  voice: {
+    json: { type: "boolean" },
+    language: { type: "string" },
+    "voice-id": { type: "string" },
+  },
 } as const satisfies Record<string, ParseArgsConfig["options"]>;
+
+function isAction(action: string | undefined): action is keyof typeof CHARACTER_OPTIONS {
+  return action !== undefined && Object.hasOwn(CHARACTER_OPTIONS, action);
+}
 
 export async function runCharacter(argv: readonly string[]): Promise<Result<string>> {
   const [action] = argv;
 
-  if (action !== "add" && action !== "describe" && action !== "new" && action !== "generate") {
+  if (!isAction(action)) {
     return err(new UsageError(`nieznane polecenie: character ${action ?? ""}`.trim()));
   }
 
@@ -185,6 +424,14 @@ export async function runCharacter(argv: readonly string[]): Promise<Result<stri
 
   if (action === "new") {
     return await runCharacterNew(parsed.data);
+  }
+
+  if (action === "voice") {
+    return await runCharacterVoice(parsed.data);
+  }
+
+  if (action === "sample") {
+    return await runCharacterSample(parsed.data);
   }
 
   if (action === "generate") {

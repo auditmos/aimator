@@ -23,6 +23,18 @@ Etap 0. Przygotowanie projektu i odcinka:
   character new <id> <character-id> --name <nazwa> [--json]
   character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
   character describe <id> <character-id> [--json]
+  character voice <id> <character-id> --language <kod> --voice-id <id głosu> [--json]
+    Obsadza głos postaci w jednym języku: id głosu dostawcy, dosłownie, w
+    characters/<postać>/voices/<język>/voice.json. Darmowe. Głos nie mieszka w
+    project.json, więc jego zmiana cofa wyłącznie zgodę na próbkę tego języka;
+    obrazy, klipy, inne języki i inne postacie zostają nietknięte.
+  character sample <id> <character-id> --language <kod> --text <zdanie>
+                   [--model <id>] [--dry-run] [--json] [--regenerate]
+    Kupuje próbkę głosu: jedno płatne wywołanie czytające podane zdanie, które
+    nie ma wartości domyślnej. ElevenLabs rozlicza znaki, więc podgląd podaje
+    wywołania i znaki osobno. Model: --model albo AIMATOR_DIALOGUE_VOICE_MODEL.
+    Nie czeka na zgodę na etap 0: próbka służy do wybrania głosu. Przyjmuje ją
+    approve --stage voice --language <kod>.
   episode add <id> --source <NN-tytul.md|katalog> [--duration <s>] [--audio <tryb>]
                    [--language <kod>] [--subtitles <kod|none>] [--nature <rodzaj>]
                    [--max-clip <s>] [--json]
@@ -220,6 +232,7 @@ Wspólne:
   check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor> [--json]
   check <id> --stage style --track <tor> [--json]
+  check <id> <character-id> --stage voice --language <kod> [--json]
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
@@ -231,6 +244,7 @@ Wspólne:
   approve <id> <character-id> --stage character --track <tor> [--json]
                --artifact <klucz>[,<klucz>...]
   approve <id> --stage style --track <tor> --artifact S01[,S02] [--json]
+  approve <id> <character-id> --stage voice --language <kod> [--json]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
                [--json]
   approve <id> <episode-id> --stage opening-frame --track <tor> --checks <kryteria>|all

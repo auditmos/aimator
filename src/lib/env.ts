@@ -19,6 +19,20 @@ export const env = createEnv({
   runtimeEnv: process.env,
   server: {
     /**
+     * The speech model a character's lines are read with, and the sample bought
+     * to hear a cast voice. **One variable for both**: a sample exists to
+     * sound like the lines will, and a different model would make it a sample
+     * of something else. Its own variable rather than the narrator's
+     * `AIMATOR_VOICE_MODEL`, because those are two call sites, and choosing how
+     * the narrator is read must not quietly choose how a character is.
+     *
+     * The model, never the voice: which voice a character speaks in is
+     * casting, stored per character and per language in `voice.json`. The key
+     * is `ELEVENLABS_API_KEY`, the narrator's, because the key follows the
+     * provider and the variable follows the call site.
+     */
+    AIMATOR_DIALOGUE_VOICE_MODEL: z.string().min(1).optional(),
+    /**
      * Stage 10's two audio call sites: `AIMATOR_MUSIC_MODEL` composes a bed and
      * this one renders a sound effect. **One variable each for both tracks**,
      * like the video model and the voice model and for the same reason,

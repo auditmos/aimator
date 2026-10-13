@@ -28,6 +28,8 @@ $AIMATOR_WORKSPACE/
     ├── prepare.stage.json
     ├── characters/<character-id>/
     │   ├── sources/                  zdjęcia użytkownika (etap 0)
+    │   ├── voices/<język>/           voice.json (obsada głosu), sample.wav, voice.stage.json,
+    │   │                             voice.lock, runs/; jeden katalog na język
     │   ├── gpt-image/                card.png, views/, hero.png,
     │   │                             character.stage.json, character.lock, runs/
     │   └── seedream/                 to samo, niezależnie
@@ -319,10 +321,10 @@ wiersz etapu 9, a potem 10, istniał zanim powstał. Wiersz istnieje po to, żeb
 wpięła się w ustalony układ zamiast wymyślać własny: kupowana wspólnie dla obu torów jak
 narracja, i lądująca w miksie etapu 10 jako kolejny stem, a nie jako drugi miks.
 
-Czego ten wiersz nie rozstrzyga: **skąd bierze się głos każdej postaci.** `project.json`
-trzyma dziś `narratorVoiceId` i nic więcej, a obsadzenie dziesięciu postaci to dziesięć
-decyzji, których nikt jeszcze nie podjął. Reguła 7 obowiązuje: brak odpowiedzi nie udaje
-odpowiedzi, więc dialogi są **nieobecne**, a ich brak jest raportowany przy każdym `check`
+Głos każdej postaci rozstrzyga już obsada głosów obok etapu 0
+([Głosy postaci](#głosy-postaci)): osobny `voice.json` na postać i język, z próbką i własną
+zgodą. Kwestii nie kupuje jeszcze nic, więc reguła 7 nadal obowiązuje: brak odpowiedzi nie
+udaje odpowiedzi, dialogi są **nieobecne**, a ich brak jest raportowany przy każdym `check`
 i przy każdej generacji etapu 10, ale wyłącznie w dwóch trybach, które go deklarują.
 
 Etap 2 nie zależy od etapu 1 i może biec równolegle: postać opisuje projekt, nie odcinek.
@@ -514,6 +516,39 @@ wprost, że odcinka jeszcze nie ma i że czeka na niego etap 1, ale nie blokuje.
 <project-id>`, które powtarza całą weryfikację, dopisuje hash `project.md` i ustawia
 `review.status` na `approved` we wszystkich plikach etapu (projektu i każdego odcinka),
 razem z tym, kto i kiedy to zrobił. Dopiero wtedy `check` odsyła do etapu 1.
+
+### Głosy postaci
+
+Głos postaci jest obsadą, jak głos narratora, ale **nie** jest polem `project.json`. Ten plik
+jest zapisanym wejściem niemal każdego artefaktu, więc zmiana głosu w nim cofnęłaby zgody na
+obrazy i klipy, których głos nigdy nie dotknął. Każda postać ma głos **osobno w każdym
+języku**, w pliku `characters/<id>/voices/<język>/voice.json` (`{ "voiceId": "…" }`, id
+dostawcy dosłownie). Język jest poziomem katalogu z tego samego powodu co tor: dwa języki to
+dwie decyzje, a plik na decyzję sprawia, że zmiana jednej zostawia zgody drugiej.
+
+- `character voice <project-id> <id> --language <kod> --voice-id <id>` zapisuje wybór.
+  Jest darmowe, nie wymaga zgody na etap 0, nie cofa jej i odmawia postaci spoza obsady.
+  Kod języka ma kształt `--language` odcinka (`pl`, `en`, `pt-BR`).
+- `character sample <project-id> <id> --language <kod> --text "<zdanie>"` kupuje próbkę:
+  **jedno** wywołanie mowy, rozliczane w znakach, więc podgląd podaje wywołania i znaki
+  osobno, jak etap 9. `--text` nie ma wartości domyślnej (reguła 7). Model to `--model`
+  albo `AIMATOR_DIALOGUE_VOICE_MODEL`, klucz `ELEVENLABS_API_KEY`, sposób czytania to wartości
+  domyślne dostawcy wysyłane jawnie. Nie czeka na zgodę na etap 0, bo nie czyta niczego,
+  co ten etap przyjmuje: głos i zdanie wpisane w poleceniu.
+- Plik etapu to `voices/<język>/voice.stage.json` (etap `voice`), z jednym rekordem pod
+  kluczem `sample`. Jego **jedynym wejściem** jest `voice.json`; wynik to `sample.wav`,
+  archiwum próby to `voices/<język>/runs/<runId>/`, a lifecycle płatnego wywołania jest
+  wspólny z etapem 9 (`submitted` przed wysyłką, wznowienie bez drugiej opłaty, nic się samo
+  nie ponawia, drugą próbkę kupuje wyłącznie `--regenerate`).
+- `aimator approve <project-id> <id> --stage voice --language <kod>` wiąże zgodę z sha256
+  próbki; `aimator check … --stage voice --language <kod>` sprawdza to samo i nic nie
+  zapisuje. Zmiana `voice.json` po zgodzie ją cofa, a `approve` **odmawia** przyjęcia próbki
+  czytanej poprzednim głosem: to nie jest ten sam obraz obejrzany jeszcze raz, tylko nagranie
+  kogoś innego, więc lekarstwem jest nowa próbka.
+
+`project show` wypisuje głosy obok obsady (`voices`, po jednym wpisie na postać i język,
+ze stanem próbki), bo nie pochodzą z `project.json`. Żaden etap nie bramkuje jeszcze na
+głosie postaci; pierwszym, który to zrobi, będą kwestie etapu 11.
 
 ## Etap 1: szczegóły
 

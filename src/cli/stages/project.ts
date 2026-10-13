@@ -1,3 +1,4 @@
+import { type CastVoice, voicesOf } from "../../lib/character-voice/index.js";
 import {
   approveStage0,
   type CastEntry,
@@ -217,7 +218,20 @@ function basisOf(entry: CastEntry): string {
   return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
 }
 
-function renderProject(overview: ProjectOverview): string {
+/** Where a sample stands, in the words a person decides what to buy in. */
+function sampleOf(voice: CastVoice): string {
+  if (voice.approved) {
+    return "zatwierdzona";
+  }
+
+  if (voice.sample === "completed") {
+    return "czeka na ocenę";
+  }
+
+  return voice.sample === "submitted" ? "nieukończona" : "brak";
+}
+
+function renderProject(overview: ProjectOverview, voices: readonly CastVoice[]): string {
   const idWidth = Math.max(0, ...overview.cast.map((entry) => entry.id.length));
   const nameWidth = Math.max(0, ...overview.cast.map((entry) => entry.name.length));
   const lines = [
@@ -232,10 +246,15 @@ function renderProject(overview: ProjectOverview): string {
   } else {
     lines.push("  Obsada:");
     lines.push(
-      ...overview.cast.map(
-        (entry) =>
-          `    ${entry.id.padEnd(idWidth)}  ${entry.name.padEnd(nameWidth)}  ${basisOf(entry)}`
-      )
+      ...overview.cast.flatMap((entry) => [
+        `    ${entry.id.padEnd(idWidth)}  ${entry.name.padEnd(nameWidth)}  ${basisOf(entry)}`,
+        ...voices
+          .filter((voice) => voice.characterId === entry.id)
+          .map(
+            (voice) =>
+              `      głos ${voice.language}: ${voice.voiceId ?? "nieobsadzony"}, próbka: ${sampleOf(voice)}`
+          ),
+      ])
     );
   }
 
@@ -268,16 +287,25 @@ async function runProjectShow(argv: readonly string[]): Promise<Result<string>> 
     return workspace;
   }
 
-  const result = await showProject({ projectId: projectId.data, workspace: workspace.data });
+  const scope = { projectId: projectId.data, workspace: workspace.data };
+  const result = await showProject(scope);
 
   if (!result.ok) {
     return result;
   }
 
+  // The voices are not in `project.json`, so they come from their own module
+  // and sit beside the project's object rather than inside it.
+  const voices = await voicesOf(scope);
+
+  if (!voices.ok) {
+    return voices;
+  }
+
   return ok(
     answerFlag(parsed.data) === "json"
-      ? JSON.stringify({ command: "project show", ...result.data }, null, 2)
-      : renderProject(result.data)
+      ? JSON.stringify({ command: "project show", ...result.data, voices: voices.data }, null, 2)
+      : renderProject(result.data, voices.data)
   );
 }
 

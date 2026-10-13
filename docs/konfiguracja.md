@@ -36,6 +36,7 @@ AIMATOR_VIDEO_MODEL=…                 # etap 7, JEDEN dla obu torów: dreamina
 AIMATOR_FFMPEG=ffmpeg                 # etapy 7 (Kling), 8-10; program, nie model; tylko gdy nie jest w PATH
 AIMATOR_NARRATION_MODEL=…             # etap 9, tekstowy; podnosi skrypt
 AIMATOR_VOICE_MODEL=…                 # etap 9, mowa; JEDEN dla obu torów
+AIMATOR_DIALOGUE_VOICE_MODEL=…        # głosy postaci: próbka i kwestie; inny niż narratora
 AIMATOR_SOUND_MODEL=…                 # etap 10, tekstowy; pisze arkusz cue
 AIMATOR_MUSIC_MODEL=…                 # etap 10, podkład; JEDEN dla obu torów
 AIMATOR_EFFECTS_MODEL=…               # etap 10, efekty; JEDEN dla obu torów
@@ -43,7 +44,7 @@ AIMATOR_EFFECTS_MODEL=…               # etap 10, efekty; JEDEN dla obu torów
 OPENAI_API_KEY=…
 BYTEPLUS_MODELARK=…                   # także klucz wideo Seedance, na obu torach
 KLING_API_KEY=…                       # klucz wideo, gdy AIMATOR_VIDEO_MODEL=kling-3.0
-ELEVENLABS_API_KEY=…                  # mowa, muzyka i efekty; trzy miejsca wywołania, jeden klucz
+ELEVENLABS_API_KEY=…                  # mowa narratora i postaci, muzyka i efekty; jeden klucz
 ```
 
 **Model wideo wybiera dostawcę.** Identyfikator przechodzi przez zamkniętą tabelę:
@@ -60,7 +61,7 @@ Wspólna zmienna znaczyłaby, że wybór modelu do scenariusza po cichu wybrał 
 listy ujęć, a tego nikt nie zdecydował.
 
 **Zmienna idzie za miejscem wywołania, klucz za dostawcą.** Stąd jeden
-`ELEVENLABS_API_KEY` na trzy zmienne, i `BYTEPLUS_MODELARK` także na torze `gpt-image`,
+`ELEVENLABS_API_KEY` na cztery zmienne, i `BYTEPLUS_MODELARK` także na torze `gpt-image`,
 kiedy renderuje klip.
 
 **Model obrazu jest per tor, model wideo nie.** Oba tory są *rysowane* obok siebie, więc
@@ -74,6 +75,11 @@ osią jest miejsce wywołania, nie tor.
 postacie, więc siedzi w `project.json` jako `narratorVoiceId`, ustawiany przez
 `project voice`. W zmiennej drugi odcinek puszczony z innej powłoki dostałby innego
 lektora, a na dysku nie byłoby pliku mówiącego, że ktokolwiek tak zdecydował.
+
+**Głosów postaci.** Z tego samego powodu to też obsada, ale nie w `project.json`, tylko
+osobno dla każdej postaci i języka w `characters/<postać>/voices/<język>/voice.json`,
+ustawianym przez `character voice`. Zmiana takiego pliku cofa wyłącznie zgodę na próbkę
+tego języka, a zmiana `project.json` cofnęłaby zgody na obrazy i klipy.
 
 **Sposobu czytania i poziomów miksu.** `narration.json` i `mix.json` leżą w katalogu
 projektu, bo to suwaki, które ktoś kręci po odsłuchu, a zmienna środowiskowa nie

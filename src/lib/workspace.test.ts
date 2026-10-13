@@ -7,6 +7,7 @@ import {
   characterSource,
   characterTrackPaths,
   characterViewImage,
+  characterVoicePaths,
   clipFrame,
   clipVideo,
   episodeIdFromSource,
@@ -143,16 +144,50 @@ describe("projectPaths", () => {
 describe("characterPaths", () => {
   const project = projectPaths({ root: "/srv/aimator" }, "demo");
 
-  it("should give each cast member its own directory and sources", () => {
+  it("should give each cast member its own directory, sources and voices", () => {
     const result = project.ok ? characterPaths(project.data, "ewa") : null;
     expect(result?.ok ? result.data : null).toEqual({
       root: "/srv/aimator/projects/demo/characters/ewa",
       sources: "/srv/aimator/projects/demo/characters/ewa/sources",
+      voices: "/srv/aimator/projects/demo/characters/ewa/voices",
     });
   });
 
   it("should reject a character id that could escape the project", () => {
     expect(project.ok ? characterPaths(project.data, "../..").ok : null).toBe(false);
+  });
+});
+
+/**
+ * One language of a character's voice. The language is a directory level, so
+ * the code is checked here as an id, never trusted into a path.
+ */
+describe("characterVoicePaths", () => {
+  const project = projectPaths({ root: "/srv/aimator" }, "demo");
+  const character = project.ok ? characterPaths(project.data, "ewa") : null;
+  const voice = (language: string): ReturnType<typeof characterVoicePaths> | null =>
+    character?.ok ? characterVoicePaths(character.data, language) : null;
+
+  it("should keep the decision, the sample and its record in one directory per language", () => {
+    const root = "/srv/aimator/projects/demo/characters/ewa/voices/pl";
+    const result = voice("pl");
+
+    expect(result?.ok ? result.data : null).toEqual({
+      file: `${root}/voice.json`,
+      lock: `${root}/voice.lock`,
+      root,
+      runs: `${root}/runs`,
+      sample: `${root}/sample.wav`,
+      stage: `${root}/voice.stage.json`,
+    });
+  });
+
+  it("should take a regional code, the way an episode's --language does", () => {
+    expect(voice("pt-BR")?.ok).toBe(true);
+  });
+
+  it.each(["", "../en", "EN", "polski", "pl/en"])("should refuse %j as a language", (code) => {
+    expect(voice(code)?.ok).toBe(false);
   });
 });
 

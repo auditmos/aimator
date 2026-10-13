@@ -12,7 +12,7 @@ import {
   workspaceOf,
 } from "./common.js";
 import { approveAssemblyStage } from "./stages/assembly.js";
-import { approveCharacterStage } from "./stages/character.js";
+import { approveCharacterStage, approveVoiceStage } from "./stages/character.js";
 import { approveClipsStage } from "./stages/clips.js";
 import { approveSoundtrackStage } from "./stages/narration.js";
 import { approveOpeningFrameStage } from "./stages/opening-frame.js";
@@ -30,6 +30,7 @@ export const USAGE = `  approve <id> [<episode-id>] [--stage prepare|screenplay|
   approve <id> <character-id> --stage character --track <tor> [--json]
                --artifact <klucz>[,<klucz>...]
   approve <id> --stage style --track <tor> --artifact S01[,S02] [--json]
+  approve <id> <character-id> --stage voice --language <kod> [--json]
   approve <id> <episode-id> --stage references --track <tor> --artifact R01[,R02]
                [--json]
   approve <id> <episode-id> --stage opening-frame --track <tor> --checks <kryteria>|all
@@ -81,6 +82,7 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
     artifact: { type: "string" },
     checks: { type: "string" },
     json: { type: "boolean" },
+    language: { type: "string" },
     note: { type: "string" },
     reviewer: { type: "string" },
     stage: { type: "string" },
@@ -135,6 +137,10 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
     return await approveStyleStage(parsed.data, approval);
   }
 
+  if (stage === "voice") {
+    return await approveVoiceStage(parsed.data, approval);
+  }
+
   if (stage === "references") {
     return await approveReferencesStage(parsed.data, approval);
   }
@@ -173,7 +179,7 @@ export async function runApprove(argv: readonly string[]): Promise<Result<string
 
   return err(
     new UsageError(
-      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design`
+      `--stage "${String(stage)}", dozwolone: prepare, screenplay, character, style, shot-list, prompt-package, references, opening-frame, clips, assembly, soundtrack, sound-design, voice`
     )
   );
 }

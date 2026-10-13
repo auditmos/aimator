@@ -52,6 +52,35 @@ w `project.json` obok postaci, a nie w zmiennej środowiskowej, która dałaby d
 odcinkowi innego lektora bez śladu na dysku. Bramkuje wyłącznie
 [etap 9](09-narracja.md); film bez narracji nigdy nie musi tej decyzji podejmować.
 
+Postać, która mówi, dostaje głos **osobno w każdym języku**, w jakim ma mówić. Wybór jest
+darmowy, a próbka płatna, więc najpierw podgląd:
+
+```bash
+pnpm dev character voice dzielna-ewa ewa --language pl --voice-id <id głosu>
+pnpm dev character sample dzielna-ewa ewa --language pl --text "Nie boję się burzy." --dry-run
+pnpm dev character sample dzielna-ewa ewa --language pl --text "Nie boję się burzy."
+pnpm dev approve dzielna-ewa ewa --stage voice --language pl
+pnpm dev check dzielna-ewa ewa --stage voice --language pl
+```
+
+Głos postaci też jest obsadą, ale **nie** mieszka w `project.json`. Ten plik jest
+zapisanym wejściem niemal każdego obrazu i klipu, więc zmiana głosu w nim cofnęłaby zgody
+na rzeczy, których głos nigdy nie dotknął. Każdy język każdej postaci ma własny
+`voice.json`, a jedynym, co go zapisuje jako wejście, jest próbka tego języka. Dlatego
+`character voice` z innym `--voice-id` cofa zgodę na próbkę tego języka i mówi o tym od
+razu, a próbka w innym języku, obrazy, klipy i zgoda na etap 0 zostają nietknięte.
+
+- `--text` jest wymagane. Zdanie, którego nikt nie wybrał, byłoby decyzją narzędzia
+  o tym, co mówi postać.
+- Model to `--model` albo `AIMATOR_DIALOGUE_VOICE_MODEL`, ten sam, którym będą czytane
+  kwestie, bo próbka ma brzmieć jak one. Klucz to `ELEVENLABS_API_KEY`, ten sam co
+  narratora. Sposób czytania to wartości domyślne dostawcy, wysyłane jawnie.
+- ElevenLabs rozlicza znaki, nie wywołania, więc podgląd i wynik podają jedno i drugie.
+- Próbka nie czeka na zgodę na etap 0, bo czyta wyłącznie głos i wpisane zdanie, a
+  posłuchanie głosu jest właśnie tym, jak się go wybiera.
+- Drugą próbkę kupuje wyłącznie `--regenerate`. Zgoda dotyczy głosu, który wybrano teraz,
+  więc próbki czytanej poprzednim głosem `approve` nie przyjmie.
+
 Obrazy stylu też można rozstrzygnąć później, ale nie da się ich pominąć, bo czekają na nie
 etapy 5, 6 i 7:
 
@@ -81,6 +110,7 @@ Projekt "dzielna-ewa": Dzielna Ewa
   Obrazy stylu: wnoszone (2)
   Obsada:
     ewa   Ewa   ze zdjęć (1)
+      głos pl: pNInz6obpgDQGcFmaJgB, próbka: zatwierdzona
     tata  Tata  z opisu w project.md
 ```
 
@@ -88,8 +118,11 @@ To **opis, nie werdykt**: czy obsada, proporcje i zasady wystarczają, odpowiada
 Pole, którego nikt nie rozstrzygnął, pokazuje się jako nierozstrzygnięte, a nie znika.
 Pod `--json` wypisuje ten sam opis jako obiekt (`command`, `projectId`, `title`,
 `aspectRatio`, `narratorVoiceId`, `style` z `basis`, `images` i `sources`, `cast` z `id`,
-`name`, `basis` i `sources`), bez pola `stage`, bo nie jest raportem etapu. Styl, którego
-nikt nie rozstrzygnął, ma `basis: null` i w tekście „nierozstrzygnięte”.
+`name`, `basis` i `sources`, `voices` z `characterId`, `language`, `voiceId`, `sample`
+i `approved`), bez pola `stage`, bo nie jest raportem etapu. Styl, którego nikt nie
+rozstrzygnął, ma `basis: null` i w tekście „nierozstrzygnięte”. Głosy stoją obok obsady,
+a nie w niej, bo nie pochodzą z `project.json`; `sample` to `absent`, `submitted` albo
+`completed`, a `approved` mówi, czy zgoda na próbkę nadal się zgadza.
 
 To samo o poziom niżej, dla jednego odcinka:
 
@@ -217,6 +250,11 @@ $AIMATOR_WORKSPACE/projects/dzielna-ewa/
 ├── prepare.stage.json  pochodzenie i ocena
 ├── style/sources/      obrazy stylu, skopiowane jako S01.png, S02.png… i zahashowane
 ├── characters/ewa/sources/   zdjęcia tej postaci, skopiowane i zahashowane
+├── characters/ewa/voices/pl/
+│   ├── voice.json        id głosu w tym języku, dosłownie
+│   ├── sample.wav        kupiona próbka
+│   ├── voice.stage.json  pochodzenie i ocena próbki
+│   └── runs/             archiwum prób
 └── episodes/01-burza/
     ├── source.md       kopia bajtowa Twojego opisu albo wpisany pomysł
     ├── episode.json    decyzje odcinka

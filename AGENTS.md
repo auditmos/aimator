@@ -110,7 +110,7 @@ src/
 │   └── stages/       # Internal: fragment, flags, dispatch, renderers, and their tests
 │       ├── project.ts        # Etap 0: the rules, and who narrates
 │       ├── episode.ts        # Etap 0: the five production settings
-│       ├── character.ts      # Etap 0's cast and etap 2's images: one command
+│       ├── character.ts      # Etap 0's cast and voices, etap 2's images: one command
 │       ├── style.ts          # Style frames generated per track, beside etap 2
 │       ├── screenplay.ts     # Etap 1
 │       ├── shot-list.ts      # Etap 3
@@ -214,6 +214,13 @@ src/
     │   ├── generate.ts   # Internal: the command: targets, lock, preview, series
     │   ├── review.ts     # Internal: per-image verification and approval
     │   └── index.test.ts # Gate/bill/approval, through the entry
+    ├── character-voice/ # Folder form: a character's voice per language, beside stage 0
+    │   ├── index.ts      # Public: setVoice, generateSample, checkVoice, approveVoice,
+    │   │                 #         voicesOf
+    │   ├── plan.ts       # Internal: voice.json, the roster check, the decision
+    │   ├── generate.ts   # Internal: the sample: bill in calls and characters, lock
+    │   ├── review.ts     # Internal: verification, approval bound to sample and voice
+    │   └── index.test.ts # Purchase/approval/lapse, through the entry
     ├── shot-list/    # Folder form: index.ts is the only entry (stage 3)
     │   ├── index.ts      # Public: generateShotList, checkShotList,
     │   │                 #         approveShotList, validateShotList, buildPrompt
@@ -1000,6 +1007,12 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
   `narratorVoiceId`, and it gates stage 9 alone. In a variable, the second episode would get
   a different narrator from a different shell with nothing on disk saying anybody decided
   that, which is the silent default the cast was invented to remove.
+- `AIMATOR_DIALOGUE_VOICE_MODEL` reads a character's lines and the sample bought to hear a
+  cast voice: one variable for both, because a sample exists to sound like the lines will,
+  and not the narrator's, because two call sites. A character's voice is casting too, but
+  it is **not** in `project.json`: it lives per character per language in
+  `characters/<c>/voices/<language>/voice.json`, recorded by that language's sample alone,
+  so changing it lapses that sample and nothing that `project.json` is an input of.
 - `AIMATOR_FFMPEG` is the only variable here that names a **program** rather than a model or
   a key, and the only one whose absence has a sensible answer. Every other one refuses a
   default because a model nobody chose is not a decision; "the ffmpeg on this machine" is

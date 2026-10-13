@@ -10,7 +10,7 @@ import {
   workspaceOf,
 } from "./common.js";
 import { checkAssemblyStage } from "./stages/assembly.js";
-import { checkCharacterStage } from "./stages/character.js";
+import { checkCharacterStage, checkVoiceStage } from "./stages/character.js";
 import { checkClipsStage } from "./stages/clips.js";
 import { checkSoundtrackStage } from "./stages/narration.js";
 import { checkOpeningFrameStage } from "./stages/opening-frame.js";
@@ -30,6 +30,7 @@ export const USAGE = `  check <id> [<episode-id>]
   check <id> <episode-id> --stage prompt-package [--json]
   check <id> <character-id> --stage character --track <tor> [--json]
   check <id> --stage style --track <tor> [--json]
+  check <id> <character-id> --stage voice --language <kod> [--json]
   check <id> <episode-id> --stage references --track <tor> [--json]
   check <id> <episode-id> --stage opening-frame --track <tor> [--json]
   check <id> <episode-id> --stage clips --track <tor> [--json]
@@ -78,6 +79,7 @@ const WIDE: Readonly<
   "sound-design": checkSoundDesignStage,
   soundtrack: checkSoundtrackStage,
   style: checkStyleStage,
+  voice: checkVoiceStage,
 };
 
 /**
@@ -115,6 +117,7 @@ async function checkTextSide(stage0: string, scope: EpisodeScope): Promise<Resul
 export async function runCheck(argv: readonly string[]): Promise<Result<string>> {
   const parsed = parse(argv, {
     json: { type: "boolean" },
+    language: { type: "string" },
     stage: { type: "string" },
     track: { type: "string" },
   });

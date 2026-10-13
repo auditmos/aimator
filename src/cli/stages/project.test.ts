@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { voicesOf } from "../../lib/character-voice/index.js";
 import { checkStage0, showEpisode, showProject } from "../../lib/project/index.js";
 import { resolveWorkspace, type Workspace } from "../../lib/workspace.js";
 import { png } from "../../test/fixture.js";
@@ -49,6 +50,8 @@ const EPISODE = "01-burza";
 /** How `project show` lays out one cast row: id, name, basis, in columns. */
 const EWA_FROM_PHOTOS = /ewa\s+Ewa\s+ze zdjęć \(1\)/;
 const TATA_FROM_DESCRIPTION = /tata\s+Tata\s+z opisu w project\.md/;
+/** How `project show` states one voice: the language, the id, the sample. */
+const TATA_VOICE_PL = /głos pl:\s+voice-tata, próbka: brak/;
 /** How `project show` states the style frames: the basis, then how many. */
 const STYLE_SUPPLIED_1 = /Obrazy stylu:\s+wnoszone \(1\)/;
 const STYLE_UNDECIDED = /Obrazy stylu:\s+nierozstrzygnięte/;
@@ -289,7 +292,45 @@ describe("project show", () => {
       throw shown.error;
     }
 
-    expect(printed).toEqual({ command: "project show", ...shown.data });
+    const voices = await voicesOf({ projectId: PROJECT, workspace });
+
+    if (!voices.ok) {
+      throw voices.error;
+    }
+
+    expect(printed).toEqual({ command: "project show", ...shown.data, voices: voices.data });
+  });
+
+  /**
+   * The voices sit beside the cast rather than inside `project.json`, so they
+   * come from their own module, one entry per character and language, each
+   * with the state of the sample bought to hear it.
+   */
+  it("should list each character's voice per language, with its sample's state", async () => {
+    await cli(
+      "character",
+      "voice",
+      PROJECT,
+      "tata",
+      "--language",
+      "pl",
+      "--voice-id",
+      "voice-tata"
+    );
+
+    const printed = (await object("project", "show", PROJECT, "--json")) as { voices: unknown };
+    const text = await cli("project", "show", PROJECT);
+
+    expect(printed.voices).toEqual([
+      {
+        approved: false,
+        characterId: "tata",
+        language: "pl",
+        sample: "absent",
+        voiceId: "voice-tata",
+      },
+    ]);
+    expect(text).toMatch(TATA_VOICE_PL);
   });
 
   it("should name the cast, where each one is drawn from, and who narrates", async () => {

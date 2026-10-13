@@ -5,6 +5,12 @@ exports[`every command >   approve <id> <character-id> --stage character --track
 wskaż, co zatwierdzasz: --artifact card|front|slight-left|slight-right|three-quarter-left|three-quarter-right|profile-left|profile-right|rear|hero"
 `;
 
+exports[`every command >   approve <id> <character-id> --stage voice --language <kod> [--json] 1`] = `
+"VoiceStateError
+nie akceptuje się tego, co nie przechodzi walidacji
+  - sample: nie ma czego zatwierdzić (absent)"
+`;
+
 exports[`every command >   approve <id> <episode-id> --stage assembly --track <tor> [--json] 1`] = `
 "ok
 Odcinek "01-burza", tor gpt-image, całość przyjęta
@@ -213,6 +219,23 @@ Próba na sucho: nic nie zapisano. Postać "Babcia" dopisana do obsady
 Dalej: zdecyduj, skąd bierze się wygląd: aimator character add ewa babcia --source <plik> albo aimator character describe ewa babcia"
 `;
 
+exports[`every command >   character sample <id> <character-id> --language <kod> --text <zdanie> 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Próbka głosu postaci "ewa" (pl): głos nieobsadzony
+  do kupienia: 0 wywołań, 0 znaków
+  sample: blocked, zablokowana przez przeszkody poniżej
+  ! postać "ewa" nie ma głosu w języku pl, wybierz go przez: aimator character voice ewa ewa --language pl --voice-id <id głosu>
+  ! ELEVENLABS_API_KEY nie był czytany, próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga
+Dalej: usuń przeszkody przed płatnym wywołaniem"
+`;
+
+exports[`every command >   character voice <id> <character-id> --language <kod> --voice-id <id głosu> [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Głos postaci "ewa" (pl): pNInz6obpgDQGcFmaJgB
+  + projects/ewa/characters/ewa/voices/pl/voice.json
+Dalej: posłuchaj głosu, zaczynając od podglądu: aimator character sample ewa ewa --language pl --text "<zdanie>" --dry-run"
+`;
+
 exports[`every command >   check <id> <character-id> --stage character --track <tor> [--json] 1`] = `
 "ok
 Postać "Ewa" (ewa), tor gpt-image, etap 2
@@ -227,6 +250,15 @@ Postać "Ewa" (ewa), tor gpt-image, etap 2
   rear: absent, widoki czekają na zatwierdzenie karty, oceń card.png i zatwierdź ją
   hero: zatwierdzony, 1536x2304
 Dalej: aimator character generate ewa ewa --track gpt-image"
+`;
+
+exports[`every command >   check <id> <character-id> --stage voice --language <kod> [--json] 1`] = `
+"ok
+Głos postaci "ewa" (pl)
+  głos: nieobsadzony
+  sample: absent, jeszcze nie kupiona
+  ! postać "ewa" nie ma głosu w języku pl: aimator character voice ewa ewa --language pl --voice-id <id głosu>
+Dalej: aimator character voice ewa ewa --language pl --voice-id <id głosu>"
 `;
 
 exports[`every command >   check <id> <episode-id> --stage assembly --track <tor> [--json] 1`] = `

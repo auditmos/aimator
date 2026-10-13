@@ -16,6 +16,8 @@ const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const ARTIFACT_ID = /^[A-Z]\d{2,}$/;
 /** `S01`: one style frame of a project, and its own file name. */
 const STYLE_ID = /^S\d{2,}$/;
+/** `pl`, `en`, `pt-BR`: a language code, the one an episode's `--language` takes. */
+const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 /** One path segment that cannot escape the directory it is joined onto. */
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /**
@@ -94,6 +96,27 @@ export interface CharacterPaths {
   readonly root: string;
   /** Photographs of this one character; absent when the basis is a description. */
   readonly sources: string;
+  /** This character's voices, one directory per language it speaks. */
+  readonly voices: string;
+}
+
+/**
+ * One character's voice in one language: the decision, the sample bought to
+ * hear it, and the sample's own stage file and archive.
+ *
+ * The language is a directory level for the reason a track is one: a voice in
+ * English and a voice in Polish are two decisions, and a file per decision is
+ * what lets changing one leave the other's approvals standing.
+ */
+export interface CharacterVoicePaths {
+  /** `voice.json`, the voice id somebody chose, verbatim. */
+  readonly file: string;
+  /** A file, not a directory, for the reason `CharacterTrackPaths.lock` gives. */
+  readonly lock: string;
+  readonly root: string;
+  readonly runs: string;
+  readonly sample: string;
+  readonly stage: string;
 }
 
 /** The style frames one track generates, beside its own stage file and archive. */
@@ -625,7 +648,36 @@ export function characterPaths(project: ProjectPaths, characterId: string): Resu
 
   const root = join(project.characters, characterId);
 
-  return ok({ root, sources: join(root, "sources") });
+  return ok({ root, sources: join(root, "sources"), voices: join(root, "voices") });
+}
+
+/**
+ * One language of a character's voice. The code is a directory name, so it is
+ * checked here rather than trusted into a path.
+ */
+export function characterVoicePaths(
+  character: CharacterPaths,
+  language: string
+): Result<CharacterVoicePaths> {
+  if (!LANGUAGE_CODE.test(language)) {
+    return err(
+      new IdentifierError(
+        language,
+        `invalid language "${language}": expected a code like pl, en or pt-BR`
+      )
+    );
+  }
+
+  const root = join(character.voices, language);
+
+  return ok({
+    file: join(root, "voice.json"),
+    lock: join(root, "voice.lock"),
+    root,
+    runs: join(root, "runs"),
+    sample: join(root, "sample.wav"),
+    stage: join(root, "voice.stage.json"),
+  });
 }
 
 /**

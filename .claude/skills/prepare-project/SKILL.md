@@ -1,6 +1,6 @@
 ---
 name: prepare-project
-description: Run stage 0 of the animation pipeline — establish a project's shared creative rules, its cast including the narrator's voice when an episode narrates, and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
+description: Run stage 0 of the animation pipeline — establish a project's shared creative rules, its cast including the voices of the narrator and of every character who speaks, and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
 ---
 
 # Stage 0 — prepare a project and an episode
@@ -14,7 +14,7 @@ stay in English. Never hand-write a JSON file: the CLI computes their digests an
 
 ```sh
 aimator list --json                                     # projects and their episodes
-aimator project show <project-id> --json                # cast, narrator, style images
+aimator project show <project-id> --json                # cast, voices, narrator, style images
 aimator episode show <project-id> <episode-id> --json   # source and its six decisions
 aimator check <project-id> --stage prepare --json       # the verdict on stage 0 alone
 ```
@@ -73,11 +73,11 @@ apart from `--language`, and in a speechless film `none` also rules out title ca
 Once the Style Bible is settled, ask about style images, a project decision that stages 5 to 7
 wait for; read [what each answer means](../../../docs/stages/00-przygotowanie.md#obrazy-stylu) first.
 
-<important if="an episode's audio is narration or dialogue-and-narration">
-**Who reads the series is casting**, recorded once per project as `narratorVoiceId`. Ask for
-the provider's voice id and record it verbatim; never invent one or pick a default. How the
-narrator reads is stage 9's direction, not yours. `aimator check` passes without a voice, so
-if it is missing, say so in your report, or the user meets it several paid stages later.
+<important if="an episode's audio includes narration or dialogue">
+**A voice is casting**: record the provider's id verbatim; never invent one. Narration needs the
+narrator (`project voice`); each character who speaks, a voice in the film's language
+(`character voice`). Never buy a sample, it is paid: name `character sample … --dry-run` next.
+`check` passes without voices, so report each missing one. How a voice reads is not yours.
 </important>
 
 ## 3. Save
@@ -92,6 +92,7 @@ aimator episode add <project-id> --source <NN-tytul.md>
 aimator episode set <project-id> <episode-id> --duration 60 --audio music-and-effects \
   --language pl --subtitles pl --nature law-or-idea --max-clip 6
 aimator project voice <project-id> --voice-id <id głosu>   # only when an episode narrates
+aimator character voice <project-id> <character-id> --language pl --voice-id <id głosu>
 ```
 
 `--dry-run` shows what any of them would write. `episode set` changes only the flags it is
@@ -116,5 +117,4 @@ read the rules and said yes**, never on your own initiative or to make a report 
 It binds the yes to the bytes, so a later edit to `project.md` revokes it: tell the user the
 rules they approved changed and must be read again, and never re-approve to clear the lapse.
 
-Report what was created, what was reused, what is still open, and the exact next command.
-Stage 0 ends there.
+Report what was created or reused, what is open, and the exact next command. Stage 0 ends there.
