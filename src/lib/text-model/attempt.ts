@@ -522,7 +522,7 @@ async function resume<T>(
   if (record.status === "completed") {
     return err(
       stage.blocked([
-        `${stage.what} dla tego odcinka już istnieje (${toWorkspacePath(call.workspace.root, stage.result)})`,
+        `${stage.what} już istnieje (${toWorkspacePath(call.workspace.root, stage.result)})`,
         "zachowano poprzedni wynik; nową płatną próbę zaczyna wyłącznie --regenerate",
       ])
     );

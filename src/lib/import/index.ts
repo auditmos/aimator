@@ -1,5 +1,3 @@
-import { dirname, relative, sep } from "node:path";
-import { z } from "zod";
 import {
   applyWrites,
   emptyStage,
@@ -13,7 +11,6 @@ import {
   type StageFile,
   serialize,
   sha256Of,
-  sha256Schema,
   stageFileSchema,
   toWorkspacePath,
   type WriteMode,
@@ -29,6 +26,17 @@ import {
   workspacePath,
 } from "../workspace.js";
 import { convertDocx, type DocxConversion } from "./docx.js";
+import {
+  ImportError,
+  type ImportFile,
+  type ImportSection,
+  linkFrom,
+  type MaterialSection,
+  readImport,
+  sectionsOf,
+} from "./material.js";
+
+export { groupImport } from "./group.js";
 
 /**
  * An import: a document somebody brought, converted and waiting beside the
@@ -36,36 +44,12 @@ import { convertDocx, type DocxConversion } from "./docx.js";
  * deterministic and free, the material stays in the words it was written in,
  * and what becomes of it is stage 0's, which `/prepare-project` runs.
  *
- * The sections are **derived, never stored**: they are the headings of
- * `material.md`, read on every call, so a person who fixes the Markdown by hand
- * fixes the sections with it, and there is no second file to drift.
+ * Grouping is its one paid step, and even there the model decides only where
+ * each section goes: every file under `grouped/` is the material, copied.
  */
 
 /** The engine that wrote the bytes, and the version that decides whether it would again. */
 const CONVERTER = "docx-markdown 1";
-/**
- * Both patterns read a file a person may have edited, so neither may
- * backtrack: no lazy group before a run that can match the same characters,
- * and no class that runs across the next `[` or `(`. The title is trimmed in
- * code rather than by a trailing `[ \t]*$`.
- */
-const HEADING = /^(#{1,6})[ \t]+(.*)$/;
-const IMAGE_LINK = /!\[[^[\]]*\]\(([^()\s]+)\)/g;
-
-const importFileSchema = z.strictObject({
-  id: z.string().min(1),
-  /** Each image in the order the document first showed it, and where it lives now. */
-  images: z.array(
-    z.strictObject({ id: z.string().min(1), part: z.string().min(1), path: z.string().min(1) })
-  ),
-  /** What the conversion left out on purpose, said again by every `show`. */
-  omitted: z.array(z.string()),
-  originPath: z.string().min(1),
-  schemaVersion: z.literal(1),
-  source: z.strictObject({ path: z.string().min(1), sha256: sha256Schema }),
-});
-
-type ImportFile = z.infer<typeof importFileSchema>;
 
 interface ImportInput {
   readonly importId: string;
@@ -75,19 +59,6 @@ interface ImportInput {
 interface AddImportInput extends ImportInput {
   readonly mode: WriteMode;
   readonly sourcePath: string;
-}
-
-/** One piece of the material between two headings, `T01` in document order. */
-interface ImportSection {
-  /** How much text it holds, so an empty heading can be told from a chapter. */
-  readonly characters: number;
-  readonly id: string;
-  /** Which images it shows, `I01`, in the order it shows them. */
-  readonly images: readonly string[];
-  /** 1 to 6 for a heading, 0 for what stands before the first one. */
-  readonly level: number;
-  /** Null for what stands before the first heading. */
-  readonly title: string | null;
 }
 
 interface ImportImage {
@@ -113,16 +84,6 @@ export interface ImportReport {
   readonly notices: readonly string[];
   readonly originPath: string;
   readonly sections: readonly ImportSection[];
-}
-
-class ImportError extends Error {
-  readonly reason: "already-exists" | "empty-source" | "missing-import";
-
-  constructor(reason: ImportError["reason"], message: string) {
-    super(message);
-    this.name = "ImportError";
-    this.reason = reason;
-  }
 }
 
 /**
@@ -159,7 +120,7 @@ export async function addImport(input: AddImportInput): Promise<Result<ImportRep
   const conversion = convertDocx(source.data.bytes, (id, extension) => {
     const file = importImage(paths.data, id, extension);
 
-    return file.ok ? linkFrom(paths.data, file.data) : "";
+    return file.ok ? linkFrom(paths.data.material, file.data) : "";
   });
 
   if (!conversion.ok) {
@@ -174,14 +135,24 @@ export async function addImport(input: AddImportInput): Promise<Result<ImportRep
 
   const written = await applyWrites(planned.data.ops, input.mode);
 
-  return written.ok
-    ? ok(
-        reportOf(input, paths.data, planned.data.file, conversion.data.markdown, {
-          created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
-          notices: [],
-        })
-      )
-    : written;
+  if (!written.ok) {
+    return written;
+  }
+
+  const { file } = planned.data;
+
+  return ok(
+    reportOf(
+      input,
+      paths.data,
+      file,
+      sectionsOf(input.workspace, paths.data, file, conversion.data.markdown),
+      {
+        created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+        notices: [],
+      }
+    )
+  );
 }
 
 /** The import as it is on disk now, sections read off the current `material.md`. */
@@ -192,36 +163,23 @@ export async function showImport(input: ImportInput): Promise<Result<ImportRepor
     return paths;
   }
 
-  if (!(await exists(paths.data.file))) {
-    return err(
-      new ImportError(
-        "missing-import",
-        `import "${input.importId}" nie istnieje: aimator import add ${input.importId} --source <plik.docx>`
-      )
-    );
+  const stored = await readImport(input.workspace, paths.data, input.importId);
+
+  if (!stored.ok) {
+    return stored;
   }
 
-  const file = await readJson(paths.data.file, importFileSchema);
   const stage = await readJson(paths.data.stage, stageFileSchema);
-  const material = await readDigest(paths.data.material);
-
-  if (!file.ok) {
-    return file;
-  }
 
   if (!stage.ok) {
     return stage;
   }
 
-  if (!material.ok) {
-    return material;
-  }
-
   return ok(
-    reportOf(input, paths.data, file.data, material.data.bytes.toString("utf8"), {
+    reportOf(input, paths.data, stored.data.file, stored.data.sections, {
       created: [],
-      notices: await drift(input.workspace, paths.data, file.data, {
-        material: material.data.sha256,
+      notices: await drift(input.workspace, paths.data, stored.data.file, {
+        material: stored.data.material.sha256,
         stage: stage.data,
       }),
     })
@@ -303,10 +261,9 @@ function reportOf(
   input: ImportInput,
   paths: ImportPaths,
   file: ImportFile,
-  markdown: string,
+  sections: readonly MaterialSection[],
   extra: { readonly created: readonly string[]; readonly notices: readonly string[] }
 ): ImportReport {
-  const sections = sectionsOf(markdown, (link) => imageAt(input.workspace, paths, file, link));
   const material = toWorkspacePath(input.workspace.root, paths.material);
 
   return {
@@ -320,69 +277,8 @@ function reportOf(
     nextStep: `przeczytaj ${material} i popraw, co konwersja oddała źle; projekt z tego materiału zakłada skill /prepare-project`,
     notices: [...file.omitted, ...extra.notices],
     originPath: file.originPath,
-    sections,
+    sections: sections.map(({ text, ...section }) => section),
   };
-}
-
-/** Which image a Markdown link in `material.md` points at, if it is one of this import's. */
-function imageAt(
-  workspace: Workspace,
-  paths: ImportPaths,
-  file: ImportFile,
-  link: string
-): string | null {
-  return (
-    file.images.find((image) => linkFrom(paths, workspacePath(workspace, image.path)) === link)
-      ?.id ?? null
-  );
-}
-
-/** A link as `material.md` writes it: relative to its own directory, with `/`. */
-function linkFrom(paths: ImportPaths, file: string): string {
-  return relative(dirname(paths.material), file).split(sep).join("/");
-}
-
-/**
- * The material cut at every heading. What stands before the first one is a
- * section of its own, with no title, so the opening lines of a document are
- * never folded silently into its first chapter.
- */
-function sectionsOf(markdown: string, imageOf: (link: string) => string | null): ImportSection[] {
-  const sections: { level: number; lines: string[]; title: string | null }[] = [];
-
-  for (const line of markdown.split("\n")) {
-    const heading = HEADING.exec(line);
-    const current = sections.at(-1);
-
-    if (heading !== null) {
-      sections.push({
-        level: heading[1]?.length ?? 1,
-        lines: [line],
-        title: (heading[2] ?? "").trim(),
-      });
-    } else if (current === undefined) {
-      sections.push({ level: 0, lines: [line], title: null });
-    } else {
-      current.lines.push(line);
-    }
-  }
-
-  return sections
-    .filter((section) => section.title !== null || section.lines.join("").trim() !== "")
-    .map((section, index) => {
-      const body = (section.title === null ? section.lines : section.lines.slice(1)).join("\n");
-      const images = [...section.lines.join("\n").matchAll(IMAGE_LINK)]
-        .map((match) => imageOf(match[1] ?? ""))
-        .filter((id) => id !== null);
-
-      return {
-        characters: body.trim().length,
-        id: `T${String(index + 1).padStart(2, "0")}`,
-        images,
-        level: section.level,
-        title: section.title,
-      };
-    });
 }
 
 /** What changed since the import was written: a hand edit, or a file gone missing. */

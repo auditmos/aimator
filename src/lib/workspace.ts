@@ -721,6 +721,38 @@ export function importImage(paths: ImportPaths, id: string, extension: string): 
     : err(new IdentifierError(extension, `invalid image extension "${extension}"`));
 }
 
+/** What a grouping sorts a section into; a character and an episode carry an id. */
+export type ImportDestination =
+  | { readonly kind: "other" | "series" | "style" }
+  | { readonly id: string; readonly kind: "character" | "episode" };
+
+/**
+ * The file one destination of a grouping is written to: `grouped/series.md`,
+ * `grouped/characters/miko.md`, `grouped/episodes/01-pola.md`. An id the
+ * model proposed becomes a file name, so it is checked here, by the rule a
+ * character or an episode id obeys once it is one.
+ */
+export function groupedFile(paths: ImportPaths, destination: ImportDestination): Result<string> {
+  if (destination.kind !== "character" && destination.kind !== "episode") {
+    return ok(join(paths.grouped, `${destination.kind}.md`));
+  }
+
+  return PROJECT_ID.test(destination.id)
+    ? ok(
+        join(
+          paths.grouped,
+          destination.kind === "character" ? "characters" : "episodes",
+          `${destination.id}.md`
+        )
+      )
+    : err(
+        new IdentifierError(
+          destination.id,
+          `invalid ${destination.kind} id "${destination.id}": must start with an ASCII letter or digit and contain only letters, digits, - and _`
+        )
+      );
+}
+
 /**
  * One style frame brought in at stage 0. The id is the file name, so it is
  * checked here rather than trusted into a path, as a reference id is.
