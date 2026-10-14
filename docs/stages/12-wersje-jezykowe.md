@@ -161,14 +161,19 @@ ze zgodą na każdy klip wersji i na oba filmy.
 po kodzie języka (`en`, `pl`), nie `faces:C01` (to, co znalazł dostawca), krok `C01:ewa`
 ani obraz `episode`, którego nikt nie ogląda. Filmu, który jeszcze nie powstał, nie da się
 odrzucić, tak jak klipu bez wersji. Jedno „nie” może wskazać klipy i filmy naraz, a
-„Dalej:” podaje wtedy osobne polecenie dla klipów i dla każdego filmu.
+„Dalej:” podaje wtedy osobne polecenie dla klipów i dla każdego filmu. Przy filmie w języku
+ust `--fail` zapisuje w `review.failed`, których kryteriów jego checklisty film nie
+spełnił (`--fail timing,lip-sync`), i tylko z tej listy: `--fail anatomy` na filmie oraz
+każde `--fail` na klipie wersji albo na filmie w języku filmu to odmowa.
 
 Odrzucony klip kupuje się od nowa przez `versions lip-sync … --artifact C01 --regenerate`;
 jeśli uwaga dotyczy tego, kto jest kim, najpierw poprawia się przypisanie przez
 `versions bind`. Odrzucony film składa się od nowa przez
 `versions final … --language <kod> --regenerate`. Do tego czasu `check` pokazuje uwagę
-przy filmie (`film en: completed, próba …, odrzucony: <uwaga>`), „Dalej:” wskazuje to
-polecenie, a `versions final` bez `--regenerate` zostawia film bez zmian i mówi to samo.
+przy klipie (`…, próba …, odrzucona: <uwaga>`) albo filmie (`film en: completed, próba …,
+odrzucony: <uwaga>`), „Dalej:” wskazuje to polecenie, klipy przed filmami, bo z nich
+składa się obraz, a `versions lip-sync` i `versions final` bez `--regenerate` zostawiają
+je bez zmian i mówią to samo.
 Nowy film nie ma ani zgody, ani odmowy. **Film powstaje wyłącznie z części, które już mają
 zgodę, i niczego nie kupuje, więc złożony z tych samych części wyjdzie taki sam.** Najpierw
 poprawia się część, o której mówi uwaga: poziomy przez `sound-design levels`, kwestię albo

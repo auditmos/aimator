@@ -345,8 +345,9 @@ Wspólne:
   reject <id> --stage style --track <tor> --artifact S01[,S02] --note <uwaga> [--json]
     Zapisuje "nie" z powodem: review.status "rejected", uwagę, kto i kiedy, z tymi
     samymi zakresami co approve (bez etapu 0). Bramki traktują odrzucony artefakt
-    jak niezatwierdzony; approve może go potem przyjąć. --fail tylko na klatkach
-    z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
+    jak niezatwierdzony; approve może go potem przyjąć. --fail tylko tam, gdzie
+    zgoda idzie z checklistą QC, i tylko z jej kryteriów: klatki (opening-frame,
+    entry:Cnn) i film w języku ust (versions). --regenerate odrzuconego
     artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
     i sound-design bez --track, dialogue i versions --artifact jest wymagane,
     jak w approve; versions odrzuca klip wersji (C01) i gotowy film (en), nie

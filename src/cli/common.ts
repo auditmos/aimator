@@ -1,7 +1,7 @@
 import { userInfo } from "node:os";
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import type { Correction } from "../lib/artifact/index.js";
-import { type Check, type Checklist, FRAME_CHECKS } from "../lib/checklist.js";
+import { CHECKS, type Check, type Checklist } from "../lib/checklist.js";
 import { env } from "../lib/env.js";
 import type { Stage0Report } from "../lib/project/index.js";
 import { err, ok, type Result } from "../lib/result.js";
@@ -358,13 +358,14 @@ export function checksOf(parsed: Parsed, vocabulary: readonly Check[]): Result<C
 
 /**
  * `--fail`: the QC criteria a rejection names as failed, or `null` when absent.
- * A list only: "everything failed" is a note, not a criterion. Only a frame is
- * rejected against a checklist, so it is a frame's vocabulary.
+ * A list only: "everything failed" is a note, not a criterion. A frame and a
+ * film are rejected against different checklists, and which one an artifact
+ * has is the stage's to say, so here it is every criterion either knows.
  */
 export function failedOf(parsed: Parsed): Result<readonly Check[] | null> {
   const flag = parsed.values.fail;
 
-  return typeof flag === "string" ? criteriaOf("fail", flag, "", FRAME_CHECKS) : ok(null);
+  return typeof flag === "string" ? criteriaOf("fail", flag, "", CHECKS) : ok(null);
 }
 
 /** A comma list from one checklist's vocabulary, in vocabulary order; anything else is refused. */

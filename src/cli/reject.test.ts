@@ -770,7 +770,7 @@ describe("reject --stage versions, a finished film", () => {
     ]);
   }
 
-  async function filmRecord(key: string): Promise<{ readonly review: object }> {
+  async function filmRecord(key: string): Promise<{ readonly review: { failed?: string[] } }> {
     const path = join(
       filmed,
       "projects",
@@ -849,6 +849,75 @@ describe("reject --stage versions, a finished film", () => {
     expect(result.ok ? result.data : result.error.message).toContain(
       `Dalej: popraw z tą uwagą: aimator versions lip-sync ${scope} --regenerate --artifact C01; aimator versions final ${scope} --language pl --regenerate`
     );
+  });
+
+  /**
+   * The film whose mouths moved is accepted against the film's checklist, so a
+   * no about it may name what it missed, from that list, in its order.
+   */
+  it("should record the film criteria a film in the language of the mouths missed", async () => {
+    const result = await rejectFilm("--artifact", "en", "--fail", "lip-sync,timing");
+
+    expect(result.ok ? result.data : result.error.message).toContain(
+      "niezaliczone: timing, lip-sync"
+    );
+    expect((await filmRecord("en")).review.failed).toEqual(["timing", "lip-sync"]);
+  });
+
+  it.each([
+    ["on the film in the film's own language, which has no checklist", "pl", "lip-sync", "pl"],
+    ["of a frame on a film", "en", "anatomy", "anatomy"],
+  ])("should refuse --fail %s", async (_case, film, fail, named) => {
+    const result = await rejectFilm("--artifact", film, "--fail", fail);
+
+    expect(result.ok ? null : result.error.message).toContain(named);
+  });
+
+  /**
+   * A clip's version is told the way a film is: the no beside it, and a new
+   * lip-sync as what is next, ahead of the films, which are laid from it.
+   */
+  it("should leave the stage pointing at the rejected clip, lip-synced again", async () => {
+    const result = await rejectFilm("--artifact", "C01", "--json");
+    const status = JSON.parse(result.ok ? result.data : "{}") as {
+      clips: { approved: boolean; id: string; note: string }[];
+      nextStep: string;
+    };
+
+    expect(status.clips.find((one) => one.id === "C01")).toMatchObject({
+      approved: false,
+      note: expect.stringContaining("odrzucona: muzyka zagłusza Ewę"),
+    });
+    expect(status.nextStep).toBe(
+      `aimator versions lip-sync ${PROJECT} ${EPISODE} --track ${TRACK} --artifact C01 --regenerate`
+    );
+  });
+
+  /** As a rejected film is left alone without --regenerate, so is a clip, and the answer says how. */
+  it("should leave a rejected clip alone without --regenerate, and say how to buy a new one", async () => {
+    const result = await run([
+      "versions",
+      "lip-sync",
+      PROJECT,
+      EPISODE,
+      "--track",
+      TRACK,
+      "--artifact",
+      "C01",
+      "--dry-run",
+      "--json",
+      "--workspace",
+      filmed,
+    ]);
+    const report = JSON.parse(result.ok ? result.data : "{}") as {
+      nextStep: string;
+      paidLipSyncs: number;
+    };
+
+    expect(report).toMatchObject({
+      nextStep: `aimator versions lip-sync ${PROJECT} ${EPISODE} --track ${TRACK} --artifact C01 --regenerate`,
+      paidLipSyncs: 0,
+    });
   });
 });
 

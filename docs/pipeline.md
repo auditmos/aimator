@@ -203,9 +203,10 @@ Obowiązują we wszystkich etapach.
   w `approve`, a etap 12 odrzuca klip wersji i film, nigdy twarze, krok ani obraz.
   Wymaga `--note`, bo odrzucenie bez powodu nie ma czym zasilić poprawki, i zapisuje
   w rekordzie `review.status = "rejected"`,
-  `review.note`, `reviewer` i `reviewedAt`. Na klatkach z checklistą QC (klatka otwarcia,
-  `entry:Cnn`) `--fail` dopisuje niezaliczone kryteria do `review.failed`; gdzie indziej
-  `--fail` to odmowa. Nie sprawdza bajtów, bo „nie" nie potrzebuje dowodu, że wynik jest
+  `review.note`, `reviewer` i `reviewedAt`. Na artefaktach przyjmowanych z checklistą QC
+  (klatka otwarcia, `entry:Cnn`, film w języku ust) `--fail` dopisuje niezaliczone kryteria
+  do `review.failed`, wyłącznie z checklisty tego artefaktu; gdzie indziej `--fail` to
+  odmowa. Nie sprawdza bajtów, bo „nie" nie potrzebuje dowodu, że wynik jest
   cały, ale odmawia artefaktu, którego plik etapu nie ma, i próby, która nie dobiegła końca.
   Każda bramka traktuje odrzucony artefakt jak niezatwierdzony, a `approve` może go potem
   przyjąć jak każdy oczekujący. `--regenerate` odrzuconego artefaktu bez `--instruction`

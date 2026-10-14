@@ -142,7 +142,7 @@ interface ClipInspection {
   /** What an approval of this clip may not write over. */
   readonly blocking: readonly string[];
   readonly problems: readonly string[];
-  /** The command that moves this clip on, while it is not yet a version. */
+  /** The command that moves this clip on, while it is not yet a version or a person said no to it. */
   readonly remedy: string | null;
   readonly state: ClipVersion;
 }
@@ -390,17 +390,19 @@ async function inspectClip(
       `${target.id}: ${path} zmienił się od lip-syncu, usta ruszają się do czegoś innego niż teraz; nowy kupuje: ${lipSyncCommand(input, target.id)} --regenerate`
   );
   const blocking = [...bytes, ...drift];
+  const rejected = record.review.status === "rejected";
 
   return ok({
     blockers: [],
     blocking,
     problems: blocking,
-    remedy: null,
+    // A no is answered by a new lip-sync, as a film's is by laying it again.
+    remedy: rejected ? `${lipSyncCommand(input, target.id)} --regenerate` : null,
     state: {
       ...base,
       approved: record.review.status === "approved" && blocking.length === 0,
       inputsChanged,
-      note: `${target.speakers.join(", ")}, próba ${record.runId}`,
+      note: `${target.speakers.join(", ")}, próba ${record.runId}${rejected ? `, odrzucona: ${record.review.note ?? ""}` : ""}`,
       state: "completed",
     },
   });

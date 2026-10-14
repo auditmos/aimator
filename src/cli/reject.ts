@@ -7,7 +7,7 @@ import {
 } from "../lib/artifact/index.js";
 import { checkAssembly } from "../lib/assembly/index.js";
 import { checkCharacter } from "../lib/character/index.js";
-import type { Check } from "../lib/checklist.js";
+import { type Check, FRAME_CHECKS } from "../lib/checklist.js";
 import { checkClips } from "../lib/clips/index.js";
 import { checkDialogue } from "../lib/dialogue/index.js";
 import { checkMix, checkNarration } from "../lib/narration/index.js";
@@ -56,8 +56,9 @@ export const USAGE = `  reject <id> <episode-id> --stage <etap> [--track <tor>] 
   reject <id> --stage style --track <tor> --artifact S01[,S02] --note <uwaga> [--json]
     Zapisuje "nie" z powodem: review.status "rejected", uwagę, kto i kiedy, z tymi
     samymi zakresami co approve (bez etapu 0). Bramki traktują odrzucony artefakt
-    jak niezatwierdzony; approve może go potem przyjąć. --fail tylko na klatkach
-    z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
+    jak niezatwierdzony; approve może go potem przyjąć. --fail tylko tam, gdzie
+    zgoda idzie z checklistą QC, i tylko z jej kryteriów: klatki (opening-frame,
+    entry:Cnn) i film w języku ust (versions). --regenerate odrzuconego
     artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
     i sound-design bez --track, dialogue i versions --artifact jest wymagane,
     jak w approve; versions odrzuca klip wersji (C01) i gotowy film (en), nie
@@ -82,8 +83,8 @@ interface Named {
 interface Located {
   /** The stage's own object after the write, what `--json` prints. */
   readonly check: () => Promise<Result<object>>;
-  /** Whether a key is a frame judged against the QC checklist, the only ones `--fail` fits. */
-  readonly checklisted: (key: string) => boolean;
+  /** The QC checklist a key's yes is given against, the only criteria `--fail` fits; empty where none. */
+  readonly checklist: (key: string) => Promise<readonly Check[]>;
   /** The stage file the rejection is written into. */
   readonly file: string;
   /** Set where one file holds artifacts of several kinds, so "every one" is nobody's decision. */
@@ -102,7 +103,7 @@ interface Scope {
 
 type Locate = (scope: Scope) => Result<Located>;
 
-const NO_CHECKLIST = (): boolean => false;
+const NO_CHECKLIST = async (): Promise<readonly Check[]> => [];
 
 function projectOf(scope: Scope): Result<ProjectPaths> {
   return projectPaths(scope.workspace, scope.projectId);
@@ -151,7 +152,7 @@ function episodeStage(spec: {
 
     return ok({
       check: () => spec.check(on),
-      checklisted: NO_CHECKLIST,
+      checklist: NO_CHECKLIST,
       file: spec.file(episode.data.paths),
       ...(spec.named === undefined ? {} : { named: spec.named }),
       regenerate: (keys) => spec.regenerate(on, keys),
@@ -165,7 +166,7 @@ type TrackOn = EpisodeOn & { readonly track: ImageTrack };
 /** A stage whose file lives once per episode per track. */
 function trackStage(spec: {
   readonly check: (on: TrackOn) => Promise<Result<object>>;
-  readonly checklisted?: (key: string) => boolean;
+  readonly checklist?: (on: TrackOn, key: string) => Promise<readonly Check[]>;
   readonly file: (paths: EpisodeTrackPaths) => string;
   readonly named?: Named;
   readonly regenerate: (on: TrackOn, keys: readonly string[]) => string;
@@ -185,7 +186,7 @@ function trackStage(spec: {
 
     return ok({
       check: () => spec.check(on),
-      checklisted: spec.checklisted ?? NO_CHECKLIST,
+      checklist: (key) => (spec.checklist ?? NO_CHECKLIST)(on, key),
       file: spec.file(episodeTrackPaths(episode.data.paths, track.data)),
       ...(spec.named === undefined ? {} : { named: spec.named }),
       regenerate: (keys) => spec.regenerate(on, keys),
@@ -206,6 +207,21 @@ const CLIP_VERSION = /^C\d{2,}$/;
 
 /** A finished film of stage 12, keyed by its language: `en`, `pt-BR`. */
 const FILM = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * A film's checklist as the stage answers it: the film whose mouths moved has
+ * one and the other none, which `check` already derives, so it is read there
+ * rather than decided twice. A clip's version is accepted against none.
+ */
+async function filmChecklist(on: TrackOn, key: string): Promise<readonly Check[]> {
+  if (CLIP_VERSION.test(key)) {
+    return [];
+  }
+
+  const status = await checkVersions(on);
+
+  return status.ok ? (status.data.finals.find((film) => film.id === key)?.checks ?? []) : [];
+}
 
 /**
  * Stage 12's keys, each sent back to what makes it: a clip's version is a new
@@ -296,7 +312,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
 
     return ok({
       check: () => checkCharacter(on),
-      checklisted: NO_CHECKLIST,
+      checklist: NO_CHECKLIST,
       file: characterTrackPaths(paths.data, track.data).stage,
       regenerate: (keys) =>
         `aimator character generate ${on.projectId} ${on.characterId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
@@ -305,7 +321,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
   },
   clips: trackStage({
     check: checkClips,
-    checklisted: (key) => key.startsWith("entry:"),
+    checklist: async (_on, key) => (key.startsWith("entry:") ? FRAME_CHECKS : []),
     file: (paths) => paths.clipsStage,
     regenerate: (on, keys) =>
       `aimator clip generate ${on.projectId} ${on.episodeId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
@@ -318,7 +334,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
   }),
   "opening-frame": trackStage({
     check: checkOpeningFrame,
-    checklisted: () => true,
+    checklist: async () => FRAME_CHECKS,
     file: (paths) => paths.openingFrameStage,
     regenerate: (on) =>
       `aimator opening-frame generate ${on.projectId} ${on.episodeId} --track ${on.track} --regenerate`,
@@ -390,7 +406,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
 
     return ok({
       check: () => checkStyle(on),
-      checklisted: NO_CHECKLIST,
+      checklist: NO_CHECKLIST,
       file: styleTrackPaths(project.data, track.data).stage,
       regenerate: (keys) =>
         `aimator style generate ${on.projectId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
@@ -399,6 +415,7 @@ const STAGES: Readonly<Record<string, Locate>> = {
   },
   versions: trackStage({
     check: checkVersions,
+    checklist: filmChecklist,
     file: (paths) => paths.versionsStage,
     // What a person watches is all they reject here: a clip's version and a
     // finished film. `faces:C01` is what the provider found, `C01:ewa` a step
@@ -439,24 +456,38 @@ function namedFor(located: Located, keys: readonly string[], stage: string): Res
     : ok(null);
 }
 
-/** `--fail` only where a checklist was the yes it stands in for. */
-function failedFor(
+/** `--fail` only where a checklist was the yes it stands in for, and only from that checklist. */
+async function failedFor(
   located: Located,
   keys: readonly string[],
   failed: readonly Check[] | null
-): Result<Readonly<Record<string, readonly Check[]>>> {
+): Promise<Result<Readonly<Record<string, readonly Check[]>>>> {
   if (failed === null) {
     return ok({});
   }
 
-  const plain = keys.filter((key) => !located.checklisted(key));
+  const lists = await Promise.all(
+    keys.map(async (key) => ({ checks: await located.checklist(key), key }))
+  );
+  const plain = lists.filter((one) => one.checks.length === 0).map((one) => one.key);
+  const foreign = lists.flatMap(({ checks, key }) => {
+    const outside = failed.filter((check) => !checks.includes(check));
 
-  return plain.length > 0
-    ? err(
-        new UsageError(
-          `--fail dotyczy tylko klatek z checklistą QC (opening-frame, entry:Cnn), a ${plain.join(", ")} jej nie ma`
-        )
+    return checks.length > 0 && outside.length > 0
+      ? [`${outside.join(", ")} nie ma w checkliście ${key} (${checks.join(", ")})`]
+      : [];
+  });
+
+  if (plain.length > 0) {
+    return err(
+      new UsageError(
+        `--fail dotyczy tylko artefaktów z checklistą QC (opening-frame, entry:Cnn, film w języku ust), a ${plain.join(", ")} jej nie ma`
       )
+    );
+  }
+
+  return foreign.length > 0
+    ? err(new UsageError(`--fail spoza checklisty: ${foreign.join("; ")}`))
     : ok(Object.fromEntries(keys.map((key) => [key, failed])));
 }
 
@@ -585,7 +616,7 @@ async function writeRejection(input: {
   }
 
   const keys = input.named.length > 0 ? input.named : Object.keys(file.data.artifacts);
-  const failures = failedFor(located, keys, input.failed);
+  const failures = await failedFor(located, keys, input.failed);
 
   if (!failures.ok) {
     return failures;

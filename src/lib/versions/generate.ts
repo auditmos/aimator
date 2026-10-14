@@ -320,12 +320,24 @@ export async function generateLipSync(input: LipSyncInput): Promise<Result<LipSy
 
   const problems = clips.flatMap((clip) => clip.problems);
   const bill = billOf(clips);
+  const command = `aimator versions lip-sync ${input.projectId} ${input.episodeId} --track ${input.track}`;
+  // A version a person said no to stays as it is until asked for again, as a
+  // rejected film does, so the answer names the flag that buys a new one.
+  const rejected = input.regenerate
+    ? []
+    : clips.filter((clip) => stage12.data.stage.artifacts[clip.id]?.review.status === "rejected");
+  const again =
+    rejected.length > 0
+      ? `${command} --artifact ${rejected.map((clip) => clip.id).join(",")} --regenerate`
+      : null;
   const report = {
     clips: clips.map(outcomeOf),
     created: [],
     nextStep:
       problems[0] ??
-      `aimator versions lip-sync ${input.projectId} ${input.episodeId} --track ${input.track}${input.artifacts.length > 0 ? ` --artifact ${input.artifacts.join(",")}` : ""}`,
+      (bill.lipSyncs === 0 && again !== null
+        ? again
+        : `${command}${input.artifacts.length > 0 ? ` --artifact ${input.artifacts.join(",")}` : ""}`),
     notices: stage12.data.notices,
     paidFaces: bill.faces,
     paidLipSyncs: bill.lipSyncs,
@@ -351,7 +363,9 @@ export async function generateLipSync(input: LipSyncInput): Promise<Result<LipSy
       ? ok({
           ...report,
           ...bought.data,
-          nextStep: `obejrzyj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${clips.map((clip) => clip.id).join(",")}`,
+          nextStep:
+            again ??
+            `obejrzyj i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${clips.map((clip) => clip.id).join(",")}`,
           notices: [...report.notices, ...bought.data.notices],
         })
       : bought;
