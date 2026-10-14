@@ -25,9 +25,11 @@ import {
   textPrompt,
 } from "../text-model/index.js";
 import {
+  type EpisodePaths,
   promptFile,
   promptPaths,
   type RunPaths,
+  recordedUnder,
   type Workspace,
   workspacePath,
 } from "../workspace.js";
@@ -144,8 +146,21 @@ export async function generatePromptPackage(
     return corrected;
   }
 
+  // Read before the attempt starts: `submitted` lands on disk before the POST
+  // and empties the outputs, so after it there is no record of what this stage
+  // published last time, and both preserving and sweeping need exactly that.
+  const { previous, strays } = await previousOutputs(input.workspace, stage4.data.paths.episode);
+  const stagePath = toWorkspacePath(
+    input.workspace.root,
+    stage4.data.paths.episode.promptPackageStage
+  );
   const problems = [
     ...blockers(input, stage4.data),
+    ...(strays.length === 0
+      ? []
+      : [
+          `${stagePath} wymienia pliki, których etap 4 nie publikuje: ${strays.join(", ")}; ten rekord zmieniono poza aimatorem, a etap 4 niczego według niego nie usunie ani nie wyśle; popraw go albo usuń, a następna próba zacznie od zera`,
+        ]),
     ...(corrected.data.length === 0
       ? []
       : [
@@ -155,7 +170,6 @@ export async function generatePromptPackage(
 
   if (input.mode === "dry-run") {
     const { prompt } = stage4.data;
-    const previous = await previousOutputs(stage4.data.paths.episode.promptPackageStage);
     const sent =
       prompt === null
         ? { correction: null, problems: [], prompt: null }
@@ -193,10 +207,6 @@ export async function generatePromptPackage(
     return err(new Stage4BlockedError(stage4.data.gate));
   }
 
-  // Read before the attempt starts: `submitted` lands on disk before the POST
-  // and empties the outputs, so after it there is no record of what this stage
-  // published last time, and both preserving and sweeping need exactly that.
-  const previous = await previousOutputs(stage4.data.paths.episode.promptPackageStage);
   const attempt = await runTextStage(
     {
       apiKey: input.apiKey ?? "",
@@ -255,11 +265,25 @@ function stage(
   };
 }
 
-/** What the previous record says this stage published, as recorded paths. */
-async function previousOutputs(stagePath: string): Promise<readonly RecordedFile[]> {
-  const file = await readJson(stagePath, stageFileSchema);
+/**
+ * What the previous record says this stage published, which is what a
+ * regeneration removes, keeps and quotes. Only while every path in it is the
+ * manifest or a file under `prompts/`: a record is a file anybody can edit,
+ * and one that names something else is reported in `strays` and trusted for
+ * nothing.
+ */
+async function previousOutputs(
+  workspace: Workspace,
+  episode: EpisodePaths
+): Promise<{ readonly previous: readonly RecordedFile[]; readonly strays: readonly string[] }> {
+  const file = await readJson(episode.promptPackageStage, stageFileSchema);
+  const outputs = file.ok ? (file.data.artifacts[ARTIFACT]?.outputs ?? []) : [];
+  const manifest = toWorkspacePath(workspace.root, episode.promptPackage);
+  const strays = outputs
+    .filter(({ path }) => path !== manifest && !recordedUnder(workspace, episode.prompts, path))
+    .map(({ path }) => path);
 
-  return file.ok ? (file.data.artifacts[ARTIFACT]?.outputs ?? []) : [];
+  return { previous: strays.length === 0 ? outputs : [], strays };
 }
 
 /**

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -722,6 +723,29 @@ describe("generatePromptPackage", () => {
     await generate();
 
     expect(await readdir(episodeDir())).not.toContain("prompt-package.lock");
+  });
+
+  it("should remove nothing it did not publish, whatever its record was edited to say", async () => {
+    await makeUpstream();
+    await generate();
+    await writeFile(join(scratch, "outside.txt"), "nie ruszać");
+
+    const stagePath = join(episodeDir(), "prompt-package.stage.json");
+    const stage = JSON.parse(await readFile(stagePath, "utf8"));
+
+    stage.artifacts["prompt-package"].outputs.push(
+      { path: "../outside.txt", sha256: sha256Of(Buffer.from("nie ruszać")) },
+      { path: `projects/${PROJECT}/project.md`, sha256: sha256Of(Buffer.from("nie ruszać")) }
+    );
+    await writeFile(stagePath, JSON.stringify(stage));
+
+    const result = await generate({ regenerate: true });
+
+    expect(existsSync(join(scratch, "outside.txt"))).toBe(true);
+    expect(await readdir(join(root, "projects", PROJECT))).toContain("project.md");
+    expect(result.ok ? "" : result.error.message).toContain(
+      `wymienia pliki, których etap 4 nie publikuje: ../outside.txt, projects/${PROJECT}/project.md`
+    );
   });
 });
 
