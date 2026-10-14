@@ -4,6 +4,7 @@ import { ProjectCast } from "./cast";
 import { CharacterPanel } from "./character";
 import { ClipsPanel } from "./clips";
 import { DialoguePanel } from "./dialogue";
+import { ImportPanel, NewImport, useImports } from "./import";
 import {
   defaultCell,
   EpisodeOverview,
@@ -100,6 +101,8 @@ type Route =
   | { readonly kind: "home" }
   | { readonly kind: "new" }
   | { readonly kind: "open" }
+  | { readonly kind: "imports" }
+  | { readonly importId: string; readonly kind: "import" }
   | { readonly kind: "project"; readonly projectId: string }
   | { readonly kind: "cast"; readonly projectId: string }
   | { readonly kind: "new-episode"; readonly projectId: string }
@@ -122,6 +125,11 @@ type InProject = Extract<Route, { readonly projectId: string }>;
 const HOME = "#/";
 const NEW = "#/nowy";
 const OPEN = "#/wczytaj";
+const IMPORTS = "#/import";
+
+function importHref(importId: string): string {
+  return `${IMPORTS}/${encodeURIComponent(importId)}`;
+}
 
 function projectHref(projectId: string): string {
   return `#/projekt/${encodeURIComponent(projectId)}`;
@@ -176,6 +184,12 @@ function routeOf(hash: string): Route {
 
   if (first === "wczytaj") {
     return { kind: "open" };
+  }
+
+  if (first === "import") {
+    const importId = segment(second);
+
+    return importId === null ? { kind: "imports" } : { importId, kind: "import" };
   }
 
   const projectId = first === "projekt" ? segment(second) : null;
@@ -957,6 +971,77 @@ function ProjectScreens(props: {
   );
 }
 
+/**
+ * The imports in the workspace, and the form that adds one.
+ *
+ * One screen rather than two, unlike projects: a new import is a name and a
+ * path, and the list under the form is what says whether the name is taken.
+ * Re-read whenever the workspace moves, like the listing it rides on.
+ */
+function Imports(props: {
+  readonly listing: WorkspaceListing | null;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { listing, onRun, run, running } = props;
+  const answer = useImports(listing);
+  const created = useCallback((importId: string) => {
+    window.location.hash = importHref(importId);
+  }, []);
+  const imports = answer === null || "error" in answer ? null : answer.imports;
+
+  return (
+    <section aria-labelledby="imports-title">
+      <Back href={HOME} label="Start" />
+      <h1 id="imports-title">Import materiału</h1>
+      <NewImport onCreated={created} onRun={onRun} run={run} running={running} />
+      <h2 className="imports-list-title">Importy w katalogu roboczym</h2>
+      {answer === null ? <p className="empty">Czytam katalog roboczy…</p> : null}
+      {answer !== null && "error" in answer ? (
+        <p className="refusal" role="alert">
+          {answer.error.message}
+        </p>
+      ) : null}
+      {imports !== null && imports.length === 0 ? (
+        <p className="empty">Katalog roboczy nie ma jeszcze żadnego importu.</p>
+      ) : null}
+      {imports === null || imports.length === 0 ? null : (
+        <PickList items={imports.map((id) => ({ href: importHref(id), id }))} />
+      )}
+    </section>
+  );
+}
+
+/** One import, under the address that names it; what is on it is `import show`. */
+function ImportScreen(props: {
+  readonly importId: string;
+  readonly listing: WorkspaceListing | null;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+}): JSX.Element {
+  const { importId, listing, onRun, run, running } = props;
+
+  return (
+    <section aria-labelledby="import-title">
+      <Back href={IMPORTS} label="Importy" />
+      <h1 id="import-title">
+        <span className="title-context">import /</span> {importId}
+      </h1>
+      <Commands>
+        <ImportPanel
+          importId={importId}
+          onRun={onRun}
+          revision={listing}
+          run={run}
+          running={running}
+        />
+      </Commands>
+    </section>
+  );
+}
+
 export function App(): JSX.Element {
   const route = useRoute();
   const [listing, setListing] = useState<WorkspaceListing | null>(null);
@@ -1123,8 +1208,27 @@ export function App(): JSX.Element {
               label="Od czego zacząć"
               load={{ href: OPEN, label: "Wczytaj projekt" }}
               make={{ href: NEW, label: "Nowy projekt" }}
-            />
+            >
+              {/* Quieter than the two choices: a document is brought in once,
+                  before a project, and what it becomes is still a new one. */}
+              <p className="home-aside">
+                <a href={IMPORTS}>Importuj materiał z Worda</a>
+              </p>
+            </Choices>
           </section>
+        ) : null}
+        {route.kind === "imports" ? (
+          <Imports listing={listing} onRun={start} run={run} running={running} />
+        ) : null}
+        {route.kind === "import" ? (
+          <ImportScreen
+            importId={route.importId}
+            key={route.importId}
+            listing={listing}
+            onRun={start}
+            run={run}
+            running={running}
+          />
         ) : null}
         {route.kind === "new" ? (
           <>

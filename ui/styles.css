@@ -1706,3 +1706,73 @@ body:has(.dock) .block-decision:has(.action-primary) {
     animation: none;
   }
 }
+
+/* The import screen: the material as the CLI counts it, one row per section,
+   with the pictures that section shows small enough to tell apart, and the
+   grouping as files that open where they are listed. */
+.imports-list-title {
+  margin-top: 2.5rem;
+  font-size: 1.125rem;
+}
+.import-sections {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+}
+.import-sections li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+.import-id {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+.import-heading {
+  flex: 1 1 16rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-size {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+.import-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.import-thumbs .zoom {
+  width: auto;
+}
+.import-thumbs img {
+  display: block;
+  object-fit: cover;
+  background: var(--color-neutral-950);
+  border-radius: 0.25rem;
+}
+.grouped {
+  display: grid;
+  gap: 0.5rem;
+}
+.grouped-file {
+  padding: 0.5rem 0.75rem;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+}
+.grouped-file summary {
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.grouped-path {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}

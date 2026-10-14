@@ -820,3 +820,44 @@ export interface WorkspaceListing {
 export interface Refusal {
   readonly error: { readonly message: string; readonly name: string };
 }
+
+/** The imports in the workspace, as `import list --json` prints them. */
+export interface ImportListing {
+  readonly command: "import list";
+  readonly imports: readonly string[];
+  readonly workspace: string;
+}
+
+/** One section of the material, counted from the headings of `material.md` as it is now. */
+export interface ImportedSection {
+  readonly characters: number;
+  readonly id: string;
+  /** The pictures it shows, `I01`, in the order it shows them. */
+  readonly images: readonly string[];
+  /** 1 to 6 for a heading, 0 for what stands before the first one. */
+  readonly level: number;
+  readonly title: string | null;
+}
+
+/** What one import holds, as `import show --json` prints it: a description, not a verdict. */
+export interface ImportOverview {
+  readonly command: "import show";
+  /** The files `import group` wrote, each under what it holds: `series`, `character:miko`. */
+  readonly grouped: readonly { readonly destination: string; readonly path: string }[];
+  readonly images: readonly {
+    readonly id: string;
+    /** Its name inside the document, `word/media/image1.png`. */
+    readonly part: string;
+    /** Workspace-relative. */
+    readonly path: string;
+    readonly sections: readonly string[];
+  }[];
+  readonly importId: string;
+  /** `material.md`, workspace-relative. */
+  readonly material: string;
+  readonly nextStep: string;
+  /** What the conversion left out, what changed by hand, a grouping gone stale. */
+  readonly notices: readonly string[];
+  readonly originPath: string;
+  readonly sections: readonly ImportedSection[];
+}

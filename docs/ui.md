@@ -1,8 +1,8 @@
 # Lokalne UI nad CLI
 
 `pnpm ui` uruchamia serwer pod `http://127.0.0.1:4317`. Ekran otwiera się na dwóch
-wyborach, „Nowy projekt” i „Wczytaj projekt”, i dopiero wybrany projekt pokazuje swoje
-odcinki i drabinę etapów. To narzędzie dla jednej
+wyborach, „Nowy projekt” i „Wczytaj projekt”, z cichszym „Importuj materiał z Worda” pod
+nimi, i dopiero wybrany projekt pokazuje swoje odcinki i drabinę etapów. To narzędzie dla jednej
 osoby na jednym Macu, bez uwierzytelniania i bez dostępu zdalnego; nasłuch tylko na pętli
 zwrotnej jest tu całym modelem bezpieczeństwa, a nie ustawieniem, które kiedyś się poszerzy.
 
@@ -24,6 +24,25 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   drabina i panel etapu dotyczą projektu, więc czekają, aż jakiś jest. Gdzie stoi ekran,
   zapisuje adres, więc odświeżenie zostaje w miejscu, a przycisk „wstecz” przeglądarki
   cofa. Wordmark w nagłówku wraca na start.
+- **Import materiału** (`#/import`): odnośnik pod oboma wyborami, cichszy od nich, bo
+  dokument przynosi się raz, przed projektem, a to, czym się stanie, i tak zaczyna się od
+  nowego projektu. Formularz `import add` (identyfikator i ścieżka do `.docx` wklejona
+  z Findera, z powodu opisanego niżej przy etapie 0), a pod nim importy z `import list
+  --json`, czytane na nowo przy każdej zmianie w katalogu roboczym. Gdy CLI powie „tak”,
+  ekran przechodzi do importu; odmowa, na przykład zajęty identyfikator, zostaje w pasku
+  na dole słowo w słowo.
+- **Strona importu** (`#/import/<id>`): to, co mówi `import show --json`, i nic więcej.
+  Najpierw następny krok, zdanie CLI bez zmian. Potem materiał: dokument, z którego
+  pochodzi, sekcje `T01…` z nagłówkiem, liczbą znaków i miniaturami obrazów, które
+  pokazują, oraz uwagi (co konwersja pominęła, co zmieniono ręcznie, podział starszy od
+  materiału). Treść `material.md` jest zwinięta. Obrazy stoją w galerii, każdy z nazwą
+  części dokumentu i sekcjami, które go pokazują, i otwierają się na całe okno. Podział to
+  pliki spod `grouped/`, każdy pod swoim przydziałem (`series`, `character:miko`,
+  `episode:01-…`), czytany dopiero po rozwinięciu. Na końcu „Generowanie (płatne)”, czyli
+  `import group` w tych samych dwóch krokach co każdy płatny etap: „Generuj” to próba na
+  sucho z rachunkiem i całym promptem, „Kup” pojawia się dopiero po niej. Nic tu się nie
+  zatwierdza, bo podział to propozycja, którą czyta skill `/prepare-project`, więc ekran
+  kończy się tam, gdzie kończy się „Dalej” w CLI.
 - **Nowy projekt** (`#/nowy`): sam formularz `project init` (identyfikator, tytuł,
   proporcje). Proporcje wybiera się z listy najczęstszych (16:9, 9:16, 1:1, 4:5, 4:3,
   21:9), a lista otwiera się na „nierozstrzygnięte”, bo ta decyzja nie ma wartości
@@ -526,6 +545,12 @@ zatwierdza się patrząc, a zatwierdzanie obrazu w terminalu to zatwierdzanie na
 Kwestie etapu 9 wracają jako `audio/wav` z tego samego powodu o jeden zmysł dalej: nagranie
 ocenione po nazwie pliku to nagranie nieocenione.
 
+Import nie należy do żadnego projektu, więc ma własną trasę, `/api/import/<id>/<artefakt>`,
+a artefakt to `material`, obraz pod nazwą nadaną mu przez import (`I01.png`) albo plik
+podziału pod swoim przydziałem (`series`, `character:miko`, `episode:01-pola`), tym samym
+słowem, które `import show` podaje przy pliku. Ekran nie wyczytuje przydziału z nazwy
+pliku, a resolver odrzuca nazwę spoza tego układu tak samo, zanim powstanie ścieżka.
+
 Etap 9 jest też pierwszym, którego artefakty leżą na **dwóch poziomach**, i resolver to
 rozróżnia po identyfikatorze, a nie po tym, co wołający wpisał w zapytaniu: skrypt i kwestie
 są wspólne i nie przyjmują toru, `narrated` przyjmuje tylko z torem. Odwrotnie byłaby to
@@ -624,7 +649,11 @@ niekompletny etap 0 przychodzi jako odmowa CLI z jej nazwą, odmowa zostaje odmo
 z tym samym komunikatem, strumień zdarzeń wypycha
 drabinę po zmianie pliku, artefakt wraca jako bajty z właściwym typem, krotka spoza układu
 jako 404, a uruchomiona komenda oddaje identyfikator od razu i wynik zdarzeniem, także
-na strumieniu katalogu roboczego, gdy żaden odcinek nie jest otwarty. Słownik
+na strumieniu katalogu roboczego, gdy żaden odcinek nie jest otwarty. Import ma własny
+zestaw na osobnym katalogu roboczym: lista i import to to samo, co `import list --json`
+i `import show --json`, materiał, obraz i plik podziału wracają pod swoimi nazwami,
+a nazwa spoza układu jako odmowa z komunikatem, odróżniona od pliku, którego jeszcze nie
+ma. Słownik
 komend jest sprawdzany względem `--help`, a zakup osobno: że jest tą samą wysyłką bez próby
 na sucho i że bez ukończonej próby nie daje się zbudować. Ścieżka z formularza etapu 0 ma
 własny test przez `app.request()`: po uruchomieniu komendy `episode.json` zapisuje dokładnie

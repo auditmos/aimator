@@ -329,9 +329,9 @@ export const INTENTS = {
    * Before stage 0: a Word document copied in and converted, for free.
    *
    * By path, like every file this screen hands the CLI: the screen takes no
-   * upload, and the import records where the document came from. `--json`,
-   * because the panel lays the sections and pictures out rather than reading
-   * a sentence about them.
+   * upload, and the import records where the document came from. No `--json`,
+   * for `project init`'s reason: the screen moves into the import and lays it
+   * out from `import show`, so this answer is read whole, and only a refusal is.
    */
   addImport: (one: ImportRef & { readonly source: string }): readonly string[] => [
     "import",
@@ -339,7 +339,6 @@ export const INTENTS = {
     one.importId,
     "--source",
     one.source,
-    "--json",
   ],
   /**
    * Stage 8, accepted: the whole film of one track, and nothing to narrow.
