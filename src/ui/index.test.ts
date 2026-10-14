@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,8 @@ import { generateDialogue } from "../lib/dialogue/index.js";
 import { episodePaths, projectPaths, resolveWorkspace, type Workspace } from "../lib/workspace.js";
 import {
   API_KEY,
+  DOCX_IMAGE,
+  docx,
   EPISODE,
   makeCut,
   makeDialogue,
@@ -874,6 +876,102 @@ describe("the artifact resolver", () => {
     } finally {
       await writeFile(cut, original);
     }
+  });
+});
+
+/**
+ * An import, beside the projects: its report through the CLI, and its files
+ * by what they are. In a workspace of its own, because nothing here belongs
+ * to the shared episode.
+ */
+describe("the import resolver", () => {
+  let elsewhere = "";
+  let app = createUi({ workspace });
+
+  beforeAll(async () => {
+    elsewhere = await mkdtemp(join(tmpdir(), "aimator-ui-import-"));
+    const source = join(scratch, "treatment.docx");
+    const own = resolveWorkspace(elsewhere);
+
+    if (!own.ok) {
+      throw own.error;
+    }
+
+    await writeFile(
+      source,
+      docx(
+        '<w:p><w:pPr><w:pStyle w:val="Nagwek1"/></w:pPr><w:r><w:t>Miko</w:t></w:r></w:p><w:p><w:r><w:drawing><a:blip r:embed="rId10"/></w:drawing></w:r></w:p>'
+      )
+    );
+    await run(["import", "add", "miko", "--source", source, "--workspace", elsewhere]);
+    // Grouping is bought; what the resolver needs is only a file where the
+    // layout puts one, so one is written there.
+    await mkdir(join(elsewhere, "imports", "miko", "grouped", "characters"), { recursive: true });
+    await writeFile(
+      join(elsewhere, "imports", "miko", "grouped", "characters", "miko.md"),
+      "# Miko\n"
+    );
+    app = createUi({ workspace: own.data });
+  });
+
+  afterAll(async () => {
+    await rm(elsewhere, { force: true, recursive: true });
+  });
+
+  async function printed(...argv: readonly string[]): Promise<unknown> {
+    const result = await run([...argv, "--workspace", elsewhere, "--json"]);
+
+    if (!result.ok) {
+      throw result.error;
+    }
+
+    return JSON.parse(result.data);
+  }
+
+  it("should answer the list and one import with exactly what the CLI prints", async () => {
+    const listed = await app.request("/api/imports");
+    const shown = await app.request("/api/import/miko");
+
+    expect(await listed.json()).toEqual(await printed("import", "list"));
+    expect(await shown.json()).toEqual(await printed("import", "show", "miko"));
+  });
+
+  it("should serve the material, a picture and a grouped file by what they are", async () => {
+    const material = await app.request("/api/import/miko/material");
+    const picture = await app.request("/api/import/miko/I01.png");
+    const grouped = await app.request(`/api/import/miko/${encodeURIComponent("character:miko")}`);
+
+    expect(material.headers.get("content-type")).toContain("text/markdown");
+    expect(await material.text()).toBe(
+      await readFile(join(elsewhere, "imports", "miko", "material.md"), "utf8")
+    );
+    expect(picture.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await picture.arrayBuffer()).equals(DOCX_IMAGE)).toBe(true);
+    expect(await grouped.text()).toBe("# Miko\n");
+  });
+
+  it("should refuse every name the layout does not build, before any path exists", async () => {
+    const answers = await Promise.all(
+      [
+        "/api/import/miko/notes",
+        `/api/import/miko/${encodeURIComponent("../import.json")}`,
+        `/api/import/miko/${encodeURIComponent("character:../../import")}`,
+        `/api/import/miko/${encodeURIComponent("I01.exe")}`,
+        `/api/import/${encodeURIComponent("../x")}/material`,
+        // A destination the layout builds and nobody wrote: absent, not refused.
+        "/api/import/miko/style",
+      ].map(async (path) => {
+        const response = await app.request(path);
+        const { error } = (await response.json()) as { error: { message: string } };
+
+        return `${response.status} ${error.message}`;
+      })
+    );
+
+    expect(answers).toEqual([
+      ...Array.from({ length: 5 }, () => "404 nie ma takiego pliku w imporcie"),
+      "404 tego artefaktu jeszcze nie ma na dysku",
+    ]);
   });
 });
 

@@ -6,7 +6,7 @@ import { streamSSE } from "hono/streaming";
 import { run } from "../cli/index.js";
 import { parseRange } from "../lib/byte-range.js";
 import type { Workspace } from "../lib/workspace.js";
-import { type LocatedArtifact, locateArtifact } from "./artifact.js";
+import { type LocatedArtifact, locateArtifact, locateImportArtifact } from "./artifact.js";
 import { watchWorkspace } from "./watch.js";
 
 /**
@@ -280,6 +280,32 @@ export function createUi(options: UiOptions): Hono {
     async (c) =>
       await answer(["episode", "show", c.req.param("projectId"), c.req.param("episodeId")])
   );
+
+  // The imports, and what one holds, for the import screen: `import list` and
+  // `import show`, so the sections and the grouping on screen are the CLI's.
+  app.get("/api/imports", async () => await answer(["import", "list"]));
+  app.get(
+    "/api/import/:importId",
+    async (c) => await answer(["import", "show", c.req.param("importId")])
+  );
+
+  /**
+   * One file of an import, read-only: the material, a picture, or a grouped
+   * file, by what it is. An import sits beside the projects rather than in
+   * one, so it has a resolver of its own rather than a seventh axis on the
+   * artifact tuple that every project artifact would carry empty.
+   */
+  app.get("/api/import/:importId/:artifact", async (c) => {
+    const located = locateImportArtifact(
+      options.workspace,
+      c.req.param("importId"),
+      c.req.param("artifact")
+    );
+
+    return located === null
+      ? missing("nie ma takiego pliku w imporcie")
+      : await serve(located, c.req.header("range"));
+  });
 
   /**
    * An artifact, read-only, addressed by what it is rather than where it is.

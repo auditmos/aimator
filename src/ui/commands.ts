@@ -29,6 +29,11 @@ interface EpisodeRef extends ProjectRef {
   readonly episodeId: string;
 }
 
+/** A document brought in before any project: beside the projects, never inside one. */
+interface ImportRef {
+  readonly importId: string;
+}
+
 /** One member of the cast, which is a directory level and never a filename. */
 interface CastRef extends ProjectRef {
   readonly characterId: string;
@@ -226,7 +231,7 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Delivery, Failed, Judged, Levels, Send, Settings {
+interface Everything extends Delivery, Failed, ImportRef, Judged, Levels, Send, Settings {
   readonly artifact: string;
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
@@ -319,6 +324,22 @@ export const INTENTS = {
     "--episode",
     one.episodeId,
     ...settings(one),
+  ],
+  /**
+   * Before stage 0: a Word document copied in and converted, for free.
+   *
+   * By path, like every file this screen hands the CLI: the screen takes no
+   * upload, and the import records where the document came from. `--json`,
+   * because the panel lays the sections and pictures out rather than reading
+   * a sentence about them.
+   */
+  addImport: (one: ImportRef & { readonly source: string }): readonly string[] => [
+    "import",
+    "add",
+    one.importId,
+    "--source",
+    one.source,
+    "--json",
   ],
   /**
    * Stage 8, accepted: the whole film of one track, and nothing to narrow.
@@ -1011,6 +1032,26 @@ export const INTENTS = {
     one.track,
     ...flag("--artifact", one.artifact),
     ...(one.regenerate ? ["--regenerate"] : []),
+    "--dry-run",
+    "--json",
+  ],
+  /**
+   * An import's grouping, previewed: the sections as they would be sent, and
+   * a bill of one call. Bought through `buy`, like every other paid send.
+   */
+  previewGrouping: (
+    one: Attempt &
+      ImportRef & {
+        readonly maxOutputTokens: string;
+        readonly model: string;
+      }
+  ): readonly string[] => [
+    "import",
+    "group",
+    one.importId,
+    ...flag("--model", one.model),
+    ...flag("--max-output-tokens", one.maxOutputTokens),
+    ...attempt(one),
     "--dry-run",
     "--json",
   ],

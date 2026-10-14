@@ -11,8 +11,12 @@ import {
   episodePaths,
   episodeTrackPaths,
   faceImage,
+  groupedFile,
   type ImageTrack,
+  type ImportDestination,
   imageTracks,
+  importImage,
+  importPaths,
   narrationAudio,
   type ProjectPaths,
   projectPaths,
@@ -467,6 +471,56 @@ function underCast(project: ProjectPaths, request: ArtifactRequest): LocatedArti
   const type = PHOTO_TYPES[request.artifact.split(".").at(-1)?.toLowerCase() ?? ""];
 
   return path.ok && type !== undefined ? { contentType: type, path: path.data } : null;
+}
+
+/** The words a grouped file is named by on screen, read back into a destination. */
+function destinationOf(label: string): ImportDestination | null {
+  if (label === "other" || label === "series" || label === "style") {
+    return { kind: label };
+  }
+
+  const colon = label.indexOf(":");
+  const kind = label.slice(0, colon);
+
+  return kind === "character" || kind === "episode" ? { id: label.slice(colon + 1), kind } : null;
+}
+
+/**
+ * One file of an import, by what it is: `material`, a picture by the name the
+ * import gave it (`I01.png`), or a grouped file by its destination (`series`,
+ * `character:miko`, `episode:01-pola`). An import belongs to no project, so it
+ * has no place in the tuple above; the refusal is the same, though: a name
+ * the layout does not build is nothing, before any path exists.
+ */
+export function locateImportArtifact(
+  workspace: Workspace,
+  importId: string,
+  artifact: string
+): LocatedArtifact | null {
+  const paths = importPaths(workspace, importId);
+
+  if (!paths.ok) {
+    return null;
+  }
+
+  if (artifact === "material") {
+    return { contentType: MARKDOWN, path: paths.data.material };
+  }
+
+  const dot = artifact.lastIndexOf(".");
+
+  if (dot !== -1) {
+    const extension = artifact.slice(dot + 1);
+    const image = importImage(paths.data, artifact.slice(0, dot), extension);
+    const type = PHOTO_TYPES[extension];
+
+    return image.ok && type !== undefined ? { contentType: type, path: image.data } : null;
+  }
+
+  const destination = destinationOf(artifact);
+  const grouped = destination === null ? null : groupedFile(paths.data, destination);
+
+  return grouped?.ok === true ? { contentType: MARKDOWN, path: grouped.data } : null;
 }
 
 /** The file a tuple names, or nothing at all. There is no third answer. */
