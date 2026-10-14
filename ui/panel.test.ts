@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { asMedia } from "./clips";
 import { asDialogue } from "./dialogue";
 import { approvable, asImages } from "./panel";
-import type { DrawnReport, MediaReport, TextStatus } from "./types";
-import { asVersions } from "./versions";
+import type { DrawnReport, FinalFilm, MediaReport, TextStatus } from "./types";
+import { acceptableFilm, asFilm, asVersions } from "./versions";
 
 /**
  * How a panel reads its own stage's report, and the one thing it must not do.
@@ -289,5 +289,67 @@ describe("stage 12's reader", () => {
         "C01: tata, twarz 1, od 6000 ms do 9000 ms, en:D02, do kupienia",
       ].join("\n")
     );
+  });
+});
+
+/**
+ * Stage 12's two films, which buy nothing. What a panel reads off them is when
+ * "Zatwierdź" stands beside one, which has to be exactly when `approve` would
+ * take it, and what a dry run says the film would be laid from: each clip of
+ * the picture with where it came from, and each sound with where it lands.
+ */
+describe("stage 12's films", () => {
+  const LAID: FinalFilm = {
+    approved: false,
+    checks: ["animation", "timing", "acting", "lip-sync", "continuity"],
+    id: "en",
+    inputsChanged: [],
+    note: "próba 2026-10-13T19-00-00Z",
+    state: "completed",
+  };
+
+  it("should offer a yes on a film that is laid and not yet accepted", () => {
+    expect(acceptableFilm(LAID)).toBe(true);
+    expect(acceptableFilm({ ...LAID, checks: [], id: "pl" })).toBe(true);
+  });
+
+  /** A film whose inputs moved is refused by `approve`; its remedy is laying it again. */
+  it("should refuse one that is absent, accepted, or laid from inputs that have since changed", () => {
+    expect(acceptableFilm({ ...LAID, state: "absent" })).toBe(false);
+    expect(acceptableFilm({ ...LAID, approved: true })).toBe(false);
+    expect(
+      acceptableFilm({
+        ...LAID,
+        inputsChanged: ["projects/dzielna-ewa/episodes/01-burza/gpt-image/versions/clips/C01.mp4"],
+      })
+    ).toBe(false);
+  });
+
+  it("should read the picture and every sound of a planned film, nothing re-derived", () => {
+    const read = asFilm({
+      actualSeconds: 30,
+      engine: "ffmpeg 7.1",
+      language: "en",
+      nextStep: "",
+      notices: [],
+      picture: [
+        { id: "C01", source: "lip-sync" },
+        { id: "C02", source: "clips" },
+      ],
+      problems: [],
+      sounds: [
+        { atSeconds: 0, id: "M01", kind: "music", plannedSeconds: 0, seconds: 30 },
+        { atSeconds: 3.5, id: "en:D01", kind: "speech", plannedSeconds: 3, seconds: 2 },
+        { atSeconds: 21, id: "E01", kind: "effect", plannedSeconds: 21, seconds: 1 },
+      ],
+      state: "planned",
+    });
+
+    expect(read.picture).toEqual(["C01 · po lip-syncu", "C02 · przyjęty klip etapu 7"]);
+    expect(read.sounds).toEqual([
+      "M01 · muzyka · od 0s (plan 0s) · 30s",
+      "en:D01 · mowa · od 3.5s (plan 3s) · 2s",
+      "E01 · efekt · od 21s (plan 21s) · 1s",
+    ]);
   });
 });

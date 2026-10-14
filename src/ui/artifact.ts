@@ -20,6 +20,7 @@ import {
   type StillFormat,
   soundStem,
   versionClip,
+  versionFilm,
   type Workspace,
 } from "../lib/workspace.js";
 
@@ -361,8 +362,10 @@ function underDialogue(project: ProjectPaths, request: ArtifactRequest): Located
 }
 
 /**
- * Stage 12, per track: a clip's version under the clip's own id, `C01`, as
- * `--artifact` names it, and a face's picture as `face:C01:0.png`.
+ * Stage 12, per track: a clip's version under the clip's own id, `C01`, and a
+ * finished film under its language, `en`, both as `--artifact` names them,
+ * and a face's picture as `face:C01:0.png`. The picture both films share is
+ * not served: it carries no yes of its own, and nobody watches the silent cut.
  *
  * A face's format is the provider's choice, which is why stage 7's `end:Cnn`
  * is not served at all. Here the choice is already written down: `check`
@@ -394,9 +397,12 @@ function underVersions(project: ProjectPaths, request: ArtifactRequest): Located
       : null;
   }
 
+  // A clip's id and a language never read alike, so whichever the layout
+  // module takes is the one the key names.
   const version = versionClip(paths, request.artifact);
+  const film = version.ok ? version : versionFilm(paths, request.artifact);
 
-  return version.ok ? { contentType: MP4, path: version.data } : null;
+  return film.ok ? { contentType: MP4, path: film.data } : null;
 }
 
 /**

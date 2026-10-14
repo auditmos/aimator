@@ -311,21 +311,27 @@ export function InstructionField(props: {
 }
 
 /**
- * What each QC criterion asks a person to look at, in stage 6's page's words.
+ * What each QC criterion asks a person to look at, in the words of the stage
+ * pages: stage 6's for a frame, stage 12's for a film whose mouths moved.
  *
- * Which criteria a frame needs is the stage's answer (`checks` in its `check`
- * object), never this list's: here is only the gloss beside each name, and a
- * criterion it does not know is still shown, by its name alone.
+ * Which criteria a frame or a film needs is the stage's answer (`checks` in
+ * its `check` object), never this list's: here is only the gloss beside each
+ * name, and a criterion it does not know is still shown, by its name alone.
+ * `continuity` is in both lists, so its gloss names both.
  */
 const CRITERIA: Readonly<Record<string, string>> = {
+  acting: "gra postaci",
   anatomy: "anatomia postaci",
-  continuity: "ciągłość z listą ujęć",
+  animation: "animacja",
+  continuity: "ciągłość z listą ujęć, a w filmie między klipami",
+  "lip-sync": "usta na słowach",
   master: "zgodność z Character Master (hero.png na tym torze)",
   props: "rekwizyty i otoczenie",
   style: "zgodność ze stylem serii",
+  timing: "rozłożenie kwestii w czasie",
 };
 
-/** What the checklist above "Zatwierdź" asks, on both stages that have one. */
+/** What the checklist above "Zatwierdź" asks, on every stage that has one. */
 export const QC_LEGEND = "Checklista QC: zgoda bez pełnej listy nie jest zgodą";
 
 /**

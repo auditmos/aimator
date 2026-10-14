@@ -16,6 +16,7 @@ import {
   makeUpstream,
   makeVersions,
   makeVoices,
+  mp4,
   PROJECT,
   png,
   VOICE,
@@ -1085,10 +1086,32 @@ describe("the artifact resolver, stage 12", () => {
     expect(face?.bytes).toEqual(await readFile(join(versionsRoot(), "faces", "C02", "1.png")));
   });
 
+  /**
+   * A finished film under its language, `en`, as `--artifact` names it. The
+   * bytes are put where the layout says the film lies rather than laid by the
+   * stage, because what is under test is where a key leads, and laying one
+   * would need every stem of stage 10 to say nothing about that.
+   */
+  it("should serve a finished film under its language", async () => {
+    const film = mp4({ audio: true, height: 1080, seconds: 30, width: 1920 });
+
+    await writeFile(join(versionsRoot(), "en.mp4"), film);
+    const response = await ask("en");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("video/mp4");
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(film);
+    // A language with no film laid is no film at all.
+    expect((await ask("pl")).status).toBe(404);
+  });
+
   it("should answer 404 without a track, for a step, and for anything it does not name", async () => {
     const answers = await Promise.all(
       [
         ask("C02", ""),
+        // The picture both films share carries no yes of its own: nobody
+        // watches the silent cut, they watch the films laid over it.
+        ask("episode"),
         // A step is half a clip, and nothing a person is meant to watch.
         ask("C02:tata"),
         ask("face:C02:1"),
@@ -1100,7 +1123,7 @@ describe("the artifact resolver, stage 12", () => {
       ].map(async (response) => (await response).status)
     );
 
-    expect(answers).toEqual(Array.from({ length: 8 }, () => 404));
+    expect(answers).toEqual(Array.from({ length: 9 }, () => 404));
   });
 });
 

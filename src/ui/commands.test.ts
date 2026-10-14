@@ -190,7 +190,8 @@ describe("the command dictionary", () => {
    * intent that cannot be built from a scope. Stage 11's `translate` and stage
    * 12's `faces` and `lip-sync` are paid calls under other verbs, so they are
    * held to the same rule; stage 12's `bind` is not, because it writes down a
-   * person's decision and sends nothing.
+   * person's decision and sends nothing, and nor is its `final`, which lays a
+   * film on this machine exactly as stage 8 cuts one.
    */
   it("should build no purchase from a scope alone", () => {
     const spending = Object.entries(INTENTS).filter(([, build]) => {
@@ -1224,6 +1225,65 @@ describe("the stage-12 commands", () => {
       "--json",
     ]);
     expect(INTENTS.previewLipSync({ ...scope, artifacts: [] })).not.toContain("--artifact");
+  });
+
+  /**
+   * A finished film buys nothing, so like stage 8's cut it has no purchase to
+   * derive: the same command runs on the dry run that shows the plan and on
+   * the one that lays the film, and a new attempt is asked for, never implied.
+   */
+  it("should lay one language's film, shown first by a dry run that writes nothing", () => {
+    const film = { ...scope, dryRun: true, language: "en" };
+
+    expect(INTENTS.makeFilm(film)).toEqual([
+      "versions",
+      "final",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--language",
+      "en",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(INTENTS.makeFilm({ ...film, dryRun: false, regenerate: true })).toEqual([
+      "versions",
+      "final",
+      "dzielna-ewa",
+      "01-burza",
+      "--track",
+      "gpt-image",
+      "--language",
+      "en",
+      "--regenerate",
+      "--json",
+    ]);
+  });
+
+  /**
+   * A film is its own judgement, so it is accepted and refused by its own key,
+   * and the one whose mouths moved carries the checklist ticked; the other
+   * has none, and an empty list spells no flag.
+   */
+  it("should accept one film by its language, with the criteria ticked", () => {
+    const film = { ...scope, artifact: "en", checks: ["animation", "lip-sync"] };
+
+    expect(INTENTS.approveFilm(film)).toEqual([
+      "approve",
+      "dzielna-ewa",
+      "01-burza",
+      "--stage",
+      "versions",
+      "--track",
+      "gpt-image",
+      "--artifact",
+      "en",
+      "--checks",
+      "animation,lip-sync",
+    ]);
+    expect(INTENTS.approveFilm({ ...film, artifact: "pl", checks: [] })).not.toContain("--checks");
+    expect(INTENTS.rejectVersions({ ...scope, artifacts: ["pl"] })).toContain("pl");
   });
 
   it("should buy exactly the lip-sync it previewed", () => {

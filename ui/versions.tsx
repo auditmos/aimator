@@ -4,6 +4,7 @@ import {
   Action,
   artifactUrl,
   Block,
+  Checklist,
   Drift,
   Notices,
   PaidCall,
@@ -12,14 +13,18 @@ import {
   type Priced,
   Problems,
   pickable,
+  QC_LEGEND,
   Reject,
   Said,
   type Unit,
+  useChecklist,
 } from "./panel";
 import type {
   ClipFace,
   ClipVersion,
   FacesReport,
+  FinalFilm,
+  FinalReport,
   LipSyncReport,
   RunDone,
   StatusCell,
@@ -28,10 +33,10 @@ import type {
 
 /**
  * Stage 12: the cast's mouths moved to the language of the mouths, on one
- * track, clip by clip.
+ * track, clip by clip, and the track's two films laid from them.
  *
  * It is stage 7's panel with a person's decision between two purchases, and
- * three things are its own.
+ * four things are its own.
  *
  * **A face is bound by looking.** The face call finds faces and the provider
  * numbers them; which one is Ewa is never inferred, not even with one face on
@@ -48,6 +53,12 @@ import type {
  *
  * **Watched twice.** A version is judged against the clip it was made from,
  * so the accepted clip of stage 7 stands above its version.
+ *
+ * **Two films, bought from nobody.** One picture is cut once from the clips,
+ * and each language's lines are laid over it beside the same stems: stage 8's
+ * reading, one button and a free dry run that shows the plan, no bill. Each
+ * film is its own judgement, so its yes and no stand in its own card, and the
+ * one whose mouths moved is accepted against the film's checklist.
  */
 
 interface PanelProps {
@@ -429,15 +440,302 @@ function PurchaseFields(props: {
   );
 }
 
+/** What the state of a film means, in the word a person reads. */
+const FILM_STATE: Record<FinalFilm["state"], string> = {
+  absent: "jeszcze nie złożony",
+  completed: "gotowy, czeka na ocenę",
+};
+
+/**
+ * What `versions final` did, or would do. `skipped` is a film already laid,
+ * which only a new attempt lays again, a rejected one included.
+ */
+const PLAN_STATE: Record<FinalReport["state"], string> = {
+  blocked: "zablokowany",
+  planned: "do złożenia",
+  published: "złożony",
+  skipped: "już złożony, ponownie tylko jako nowa próba",
+};
+
+/** Where one clip of the picture came from. */
+const PICTURE_SOURCE: Record<FinalReport["picture"][number]["source"], string> = {
+  clips: "przyjęty klip etapu 7",
+  "lip-sync": "po lip-syncu",
+};
+
+/** What one sound of a film is. */
+const SOUND_KIND: Record<FinalReport["sounds"][number]["kind"], string> = {
+  effect: "efekt",
+  music: "muzyka",
+  speech: "mowa",
+};
+
+/**
+ * Whether a film's `approve` would take it, read off its own state.
+ *
+ * Laid, not yet accepted, and laid from what is on disk now: `approve`
+ * refuses a film whose inputs moved, because the remedy there is laying it
+ * again, so a yes offered beside one would only lead to a refusal.
+ */
+export function acceptableFilm(film: FinalFilm): boolean {
+  return film.state === "completed" && !film.approved && film.inputsChanged.length === 0;
+}
+
+/**
+ * What a film is laid from, as its report said: each clip of the picture with
+ * where it came from, and each sound with the second of the film it lands at
+ * beside the second the plan gave it. A translation, never a computation.
+ */
+export function asFilm(report: FinalReport): {
+  readonly picture: readonly string[];
+  readonly sounds: readonly string[];
+} {
+  return {
+    picture: report.picture.map((clip) => `${clip.id} · ${PICTURE_SOURCE[clip.source]}`),
+    sounds: report.sounds.map(
+      (sound) =>
+        `${sound.id} · ${SOUND_KIND[sound.kind]} · od ${sound.atSeconds}s (plan ${sound.plannedSeconds}s) · ${sound.seconds}s`
+    ),
+  };
+}
+
+/** What the free block is told: which film, whether to write it, a new attempt. */
+interface FilmForm {
+  readonly dryRun: boolean;
+  /** The film's language; empty follows `filmLanguageOf`. */
+  readonly language: string;
+  readonly regenerate: boolean;
+}
+
+const NO_FILM: FilmForm = { dryRun: true, language: "", regenerate: false };
+
+/** The film the block is about: the one chosen, or the first not yet laid. Only a default. */
+function filmLanguageOf(form: FilmForm, finals: readonly FinalFilm[]): string {
+  if (finals.some((film) => film.id === form.language)) {
+    return form.language;
+  }
+
+  return (finals.find((film) => film.state === "absent") ?? finals[0])?.id ?? "";
+}
+
+/**
+ * One finished film: the film itself, and its own yes and no.
+ *
+ * Each film is its own judgement, so its decision stands in its card rather
+ * than under a choice of several. The one whose mouths moved is accepted
+ * against the film's checklist, ticked afresh for every film laid; the other
+ * has none to tick.
+ */
+function FilmCard(props: {
+  readonly film: FinalFilm;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly run: RunDone | null;
+  readonly running: boolean;
+  readonly scope: {
+    readonly episodeId: string;
+    readonly projectId: string;
+    readonly track: string;
+  };
+  readonly urlOf: (stage: "clips" | "versions", artifact: string, revision: string) => string;
+}): JSX.Element {
+  const { film, onRun, run, running, scope, urlOf } = props;
+  const mouths = film.checks.length > 0;
+  const { complete, setTicked, ticked } = useChecklist(film.checks, film.note);
+  const approve = useMemo(
+    () => INTENTS.approveFilm({ ...scope, artifact: film.id, checks: ticked }),
+    [film.id, scope, ticked]
+  );
+  const rejection = useCallback(
+    (note: string) => INTENTS.rejectVersions({ ...scope, artifacts: [film.id], note }),
+    [film.id, scope]
+  );
+
+  return (
+    <li className={film.approved ? "link picture-approved" : "link"}>
+      <p className="picture-name">
+        FINAL {film.id.toUpperCase()} ·{" "}
+        {mouths
+          ? "język ust: kwestie, do których ruszono usta"
+          : "język filmu: dubbing, usta mówią drugim językiem"}
+      </p>
+
+      {/* Until the film is laid, the state line below is all there is to say. */}
+      {film.state === "completed" ? (
+        // biome-ignore lint/a11y/useMediaCaption: kwestie ma skrypt etapu 11, a napisy to decyzja odcinka
+        <video
+          className="link-film"
+          controls
+          preload="metadata"
+          src={urlOf("versions", film.id, film.note)}
+        />
+      ) : null}
+      <p className="picture-state">
+        {film.approved ? "zatwierdzony" : FILM_STATE[film.state]} · {film.note}
+      </p>
+      <Drift paths={film.inputsChanged} title="Wejścia zmieniły się po złożeniu filmu:" />
+
+      {acceptableFilm(film) ? (
+        <>
+          {mouths ? (
+            <Checklist
+              id={`film-${film.id}-checks`}
+              legend={QC_LEGEND}
+              onTick={setTicked}
+              required={film.checks}
+              ticked={ticked}
+            />
+          ) : null}
+          <Action
+            argv={approve}
+            disabled={running || !complete}
+            label="Zatwierdź"
+            onRun={onRun}
+            primary
+          />
+          <Reject
+            again="Złożenie filmu nie czyta powodu: zostaje on w ocenie i na drabinie, a nowy film składa „Złóż film” z „Ponownym złożeniem”. Jeśli powód leży w kwestii albo w klipie, popraw najpierw je."
+            argvOf={rejection}
+            criteria={[]}
+            id={`film-${film.id}-reject`}
+            onRun={onRun}
+            run={run}
+            running={running}
+          />
+        </>
+      ) : null}
+    </li>
+  );
+}
+
+/** What one film is laid from, as the last `versions final` reported it. */
+function FilmPlan(props: { readonly plan: FinalReport }): JSX.Element {
+  const { plan } = props;
+  const read = asFilm(plan);
+
+  return (
+    <>
+      <dl className="verdict">
+        <div>
+          <dt>Film</dt>
+          <dd>
+            {plan.language} · {PLAN_STATE[plan.state]}
+          </dd>
+        </div>
+        <div>
+          <dt>Silnik</dt>
+          <dd>{plan.engine ?? "nieustalony"}</dd>
+        </div>
+        <div>
+          <dt>Obraz</dt>
+          <dd>{plan.actualSeconds}s</dd>
+        </div>
+        <div>
+          <dt>Dalej</dt>
+          <dd>
+            <Said text={plan.nextStep} />
+          </dd>
+        </div>
+      </dl>
+      <p className="picture-state">Obraz, klipy w kolejności planu</p>
+      <ul className="cut">
+        {read.picture.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <p className="picture-state">Dźwięki: sekunda filmu, w nawiasie sekunda planu, długość</p>
+      <ul className="cut">
+        {read.sounds.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <Problems problems={plan.problems} />
+      <Notices notices={plan.notices} />
+    </>
+  );
+}
+
+/** What the free block is told: which film, a dry run or not, a new attempt. */
+function FilmFields(props: {
+  readonly finals: readonly FinalFilm[];
+  readonly form: FilmForm;
+  readonly language: string;
+  readonly onForm: (change: (form: FilmForm) => FilmForm) => void;
+}): JSX.Element {
+  const { finals, form, language, onForm } = props;
+  const pick = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const chosen = event.target.value;
+
+      onForm((current) => ({ ...current, language: chosen }));
+    },
+    [onForm]
+  );
+  const changeDryRun = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const dryRun = event.target.checked;
+
+      onForm((current) => ({ ...current, dryRun }));
+    },
+    [onForm]
+  );
+  const changeAgain = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const regenerate = event.target.checked;
+
+      onForm((current) => ({ ...current, regenerate }));
+    },
+    [onForm]
+  );
+
+  return (
+    <div className="send">
+      <div className="field">
+        <label htmlFor="versions-film-language">Film</label>
+        <select id="versions-film-language" onChange={pick} value={language}>
+          {finals.map((film) => (
+            <option key={film.id} value={film.id}>
+              {film.id}
+              {film.checks.length > 0 ? " (język ust)" : " (język filmu)"}
+              {film.state === "completed" ? ", już złożony" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      <label className="field-check" htmlFor="versions-film-dry-run">
+        <input
+          checked={form.dryRun}
+          id="versions-film-dry-run"
+          onChange={changeDryRun}
+          type="checkbox"
+        />
+        Próba na sucho: pokaż, z czego powstanie film, nie zapisuj niczego
+      </label>
+      <label className="field-check" htmlFor="versions-film-regenerate">
+        <input
+          checked={form.regenerate}
+          id="versions-film-regenerate"
+          onChange={changeAgain}
+          type="checkbox"
+        />
+        Ponowne złożenie gotowego filmu, zachowując poprzedni w archiwum próby
+      </label>
+    </div>
+  );
+}
+
 export function VersionsPanel(props: PanelProps): JSX.Element {
   const { cell, episodeId, onRun, projectId, run, running } = props;
   const status = cell.status as VersionsStatus | null;
   const track = cell.track ?? "";
   const clips = useMemo(() => status?.clips ?? [], [status]);
+  const finals = useMemo(() => status?.finals ?? [], [status]);
   const [chosen, setChosen] = useState<readonly string[]>([]);
   const [form, setForm] = useState<PurchaseForm>(NO_FORM);
+  const [filmForm, setFilmForm] = useState<FilmForm>(NO_FILM);
+  const [plan, setPlan] = useState<FinalReport | null>(null);
   const [sent, setSent] = useState<readonly string[] | null>(null);
   const [reveal, setReveal] = useState(0);
+  const language = filmLanguageOf(filmForm, finals);
   const purchase = form.choice ?? suggested(clips);
   const faceClip = faceClipOf(form, clips);
   // An accepted version stays ticked and locked unless a new lip-sync is what
@@ -460,6 +758,16 @@ export function VersionsPanel(props: PanelProps): JSX.Element {
         ? INTENTS.previewFaces({ ...scope, artifact: faceClip, regenerate: form.regenerate })
         : INTENTS.previewLipSync({ ...scope, artifacts: selected, regenerate: form.regenerate }),
     [faceClip, form.regenerate, purchase, scope, selected]
+  );
+  const lay = useMemo(
+    () =>
+      INTENTS.makeFilm({
+        ...scope,
+        dryRun: filmForm.dryRun,
+        language,
+        regenerate: filmForm.regenerate,
+      }),
+    [filmForm.dryRun, filmForm.regenerate, language, scope]
   );
   const startRun = useCallback(
     (argv: readonly string[]) => {
@@ -487,9 +795,30 @@ export function VersionsPanel(props: PanelProps): JSX.Element {
     [cell.state, episodeId, projectId, track]
   );
 
+  /**
+   * The film the last `versions final` answered with, dry or laid.
+   *
+   * Both report the same picture and the same sounds, so both are read; any
+   * other command leaves nothing here, because none of them carries a film.
+   */
+  useEffect(() => {
+    if (sent === null || !(sent[1] === "final" && run?.ok === true)) {
+      setPlan(null);
+
+      return;
+    }
+
+    try {
+      setPlan(JSON.parse(run.data) as FinalReport);
+    } catch {
+      setPlan(null);
+    }
+  }, [run, sent]);
+
   useEffect(() => {
     setChosen([]);
     setForm(NO_FORM);
+    setFilmForm(NO_FILM);
     setSent(null);
   }, [episodeId, track]);
 
@@ -576,6 +905,41 @@ export function VersionsPanel(props: PanelProps): JSX.Element {
               </>
             )}
           </Block>
+
+          <Block
+            hint={
+              <>
+                Dwa filmy tego toru, oba <strong>bez płacenia</strong>: jeden obraz, sklejony raz z
+                klipów po lip-syncu i przyjętych klipów etapu 7, a na nim kwestie jednego języka
+                przy tej samej muzyce i tych samych efektach etapu 10. Film w języku ust ocenia się
+                z checklistą QC, bo to w nim ruszono usta; film w języku filmu to klasyczny dubbing
+                i przyjmuje się go bez listy. Zmiana obrazu, któregoś klipu, kwestii, stemu albo{" "}
+                <code>mix.json</code> cofa zgodę na film, a lekarstwem jest złożenie go od nowa, nie
+                druga zgoda.
+              </>
+            }
+            title="Filmy wersji"
+          >
+            {finals.length === 0 ? (
+              <p className="picture-empty">
+                Filmy czekają, aż etap ruszy na tym torze; stan wyżej mówi dlaczego.
+              </p>
+            ) : (
+              <ul className="reel">
+                {finals.map((film) => (
+                  <FilmCard
+                    film={film}
+                    key={film.id}
+                    onRun={startRun}
+                    run={run}
+                    running={running}
+                    scope={scope}
+                    urlOf={urlOf}
+                  />
+                ))}
+              </ul>
+            )}
+          </Block>
         </>
       )}
 
@@ -622,6 +986,43 @@ export function VersionsPanel(props: PanelProps): JSX.Element {
           purchase={purchase}
         />
       </PaidCall>
+
+      {finals.length === 0 ? null : (
+        <Block
+          fold={finals.some((film) => film.state === "absent")}
+          hint={
+            <>
+              Złożenie filmu <strong>niczego nie kupuje</strong>, jak montaż etapu 8: nie ma tu
+              rachunku ani przycisku „Kup”, jest jeden przycisk. Potrzebny jest <code>ffmpeg</code>{" "}
+              na tej maszynie (PATH albo <code>AIMATOR_FFMPEG</code>). Obraz składa się raz i służy
+              obu filmom; ponownie składa się tylko wtedy, gdy zmienił się któryś jego klip. Próba
+              na sucho pokazuje klipy obrazu ze źródłem każdego i każdy dźwięk z sekundą filmu obok
+              sekundy planu, a dwie wypowiedzi naraz albo wypowiedź za końcem filmu są odmową, nigdy
+              przesunięciem.
+            </>
+          }
+          title="Złożenie filmu (bez płacenia)"
+        >
+          <FilmFields finals={finals} form={filmForm} language={language} onForm={setFilmForm} />
+
+          <Action
+            argv={lay}
+            disabled={running}
+            label={filmForm.dryRun ? "Pokaż plan filmu" : "Złóż film"}
+            onRun={startRun}
+            primary={!filmForm.dryRun}
+          />
+
+          {plan === null ? (
+            <p className="actions-note">
+              Plan pokazuje „Pokaż plan filmu”. To wywołanie jest darmowe i przy próbie na sucho nie
+              zapisuje niczego.
+            </p>
+          ) : (
+            <FilmPlan plan={plan} />
+          )}
+        </Block>
+      )}
     </section>
   );
 }

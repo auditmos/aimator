@@ -541,10 +541,53 @@ export interface ClipVersion {
   readonly state: "absent" | "completed" | "submitted";
 }
 
-/** Stage 12 on one track: the clips that need their mouths moved, and those that do not. */
+/**
+ * One of stage 12's two finished films on a track, keyed by its language.
+ *
+ * `checks` is what its yes is given against: the film whose mouths moved is
+ * accepted against the film's checklist, the one in the film's own language
+ * against none. `inputsChanged` is what moved since it was laid, which no yes
+ * settles: the film is laid again instead.
+ */
+export interface FinalFilm {
+  readonly approved: boolean;
+  readonly checks: readonly string[];
+  readonly id: string;
+  readonly inputsChanged: readonly string[];
+  readonly note: string;
+  readonly state: "absent" | "completed";
+}
+
+/**
+ * Stage 12's film, laid or planned: the picture's clips and where each came
+ * from, and every sound with where it lands. No bill, because it buys nothing.
+ */
+export interface FinalReport {
+  /** How long the picture runs: its clips as they came back. */
+  readonly actualSeconds: number;
+  /** The local engine, once it has answered. `null` when it could not be asked. */
+  readonly engine: string | null;
+  readonly language: string;
+  readonly nextStep: string;
+  readonly notices: readonly string[];
+  readonly picture: readonly { readonly id: string; readonly source: "clips" | "lip-sync" }[];
+  readonly problems: readonly string[];
+  readonly sounds: readonly {
+    readonly atSeconds: number;
+    readonly id: string;
+    readonly kind: "effect" | "music" | "speech";
+    readonly plannedSeconds: number;
+    readonly seconds: number;
+  }[];
+  readonly state: "blocked" | "planned" | "published" | "skipped";
+}
+
+/** Stage 12 on one track: the clips that need their mouths moved, those that do not, the films. */
 export interface VersionsStatus {
   readonly approved: boolean;
   readonly clips: readonly ClipVersion[];
+  /** The film in the language of the mouths, then the one in the film's own; empty while gated. */
+  readonly finals: readonly FinalFilm[];
   readonly nextStep: string;
   readonly notices: readonly string[];
   readonly problems: readonly string[];

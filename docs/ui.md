@@ -178,7 +178,16 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   Rachunek lip-syncu stoi w **rozpoznaniach i zadaniach**, osobno, bo druga mówiąca
   postać w klipie kosztuje rozpoznanie na wyniku pierwszego zadania, a pod nim lista zadań:
   postać, twarz, okno w ms i kwestie. Klipy bez mówiącego w kadrze stoją w stanie jako
-  „bez zmian”.
+  „bez zmian”. Pod klipami stoją **dwa filmy toru** (`finals` z `check`): FINAL w języku
+  ust i FINAL w języku filmu, każdy z odtwarzaczem, stanem, dryfem wejść i własnym
+  „Zatwierdź” i „Odrzuć…”, bo każdy film to osobny osąd. Film w języku ust przyjmuje się
+  z checklistą QC filmu (`animation`, `timing`, `acting`, `lip-sync`, `continuity`), drugi
+  bez listy. Film, którego wejścia się zmieniły, nie dostaje „Zatwierdź”, bo terminal by
+  odmówił: lekarstwem jest złożenie go od nowa. Składa je blok „Złożenie filmu (bez
+  płacenia)” (`versions final`), jak montaż etapu 8: wybór filmu, próba na sucho, która
+  pokazuje klipy obrazu ze źródłem każdego i każdy dźwięk z sekundą filmu obok sekundy
+  planu, i ponowne złożenie gotowego filmu. Wspólny obraz `versions/episode.mp4` nie ma
+  własnej zgody, więc panel go nie pokazuje.
 - **Plan wysyłki etapu 4** per tor: patrz niżej.
 - **Płatne wywołanie**: pola modelu, limitu tokenów i nowej próby, przycisk
   „Generuj" z podglądem i rachunkiem, i dopiero po nim przycisk „Kup".
@@ -238,7 +247,8 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    (skrypt i kwestie, arkusz i stemy). Gdy w bloku stoi przycisk zatwierdzenia, blok jedzie
    z dołem okna, więc obraz zaznaczony na końcu galerii zatwierdza się bez wracania na
    górę. Gdy nie ma czego przyjąć, stoi w miejscu i niczego nie zasłania. Przy klatce
-   otwarcia i klatkach wejściowych nad „Zatwierdź” stoi **checklista QC**: pole na każde
+   otwarcia, klatkach wejściowych i filmie etapu 12 w języku ust nad „Zatwierdź” stoi
+   **checklista QC**: pole na każde
    kryterium, którego etap wymaga (lista `checks` z jego `check`, przy kilku klatkach suma
    ich list). Przycisk odblokowuje się dopiero przy pełnej liście, bo niepełnej terminal by
    odmówił, a komenda pod nim niesie `--checks` z tym, co zaznaczono. Nowy rysunek albo
@@ -249,7 +259,10 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    powód, bez którego terminal odrzucenia nie przyjmie, a przy klatce otwarcia i samych
    klatkach wejściowych także pola na niespełnione kryteria QC (`--fail`). Powód trafia do
    oceny i na drabinę („odrzucone: …”). Odrzucenie niczego nie kupuje ani nie rysuje;
-   odrzucone można nadal zatwierdzić. Dalej stoi „Narysuj ponownie”. Przycisk niczego nie
+   odrzucone można nadal zatwierdzić. W etapie 12 odrzuca się też gotowy film
+   (`--artifact en`), ze swojej karty; nowy film składa `versions final --regenerate`, ale
+   dopiero po poprawieniu części, której dotyczyła uwaga (np. `sound-design levels`), bo
+   złożenie powodu nie czyta. Dalej stoi „Narysuj ponownie”. Przycisk niczego nie
    kupuje. Włącza „Nową płatną próbę” zaznaczonych pozycji, rozwija blok generowania,
    przewija do niego i uruchamia darmowy podgląd, więc płaci się dalej wyłącznie
    przyciskiem „Kup” pod przeczytanym rachunkiem. Nowa próba odrzuconej pozycji bez własnej
@@ -257,8 +270,9 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
 4. **Generowanie (płatne)**: zwinięte, chyba że komórka jest „gotowa do generowania”.
    Tam kupowanie jest tym, po co się przyszło; przy przeglądzie ponowny zakup jest
    rzadszym pytaniem. Prompty z podglądu są zwinięte każdy osobno, a rachunek stoi nad nimi.
-5. **Reszta**, zwinięta: montaż i miksy (bez płacenia, otwarte, gdy etap jest gotowy),
-   publikacja z archiwum, plan wysyłki, reżyseria, poziomy i decyzje odcinka.
+5. **Reszta**, zwinięta: montaż, miksy i filmy etapu 12 (bez płacenia, otwarte, gdy etap
+   jest gotowy albo któregoś filmu brakuje), publikacja z archiwum, plan wysyłki, reżyseria,
+   poziomy i decyzje odcinka.
 
 Długie uzasadnienia zostają na stronie, ale pod „Jak to działa” w swoim bloku: są
 dokumentacją decyzji, a kto przeczytał je raz, nie powinien przedzierać się przez nie
@@ -525,7 +539,9 @@ języku mówi film, a resolver buduje ścieżki i niczego nie rozstrzyga. Język
 z `episode show --json`.
 
 Etap 12 przyjmuje tylko z torem. Wersja klipu to identyfikator klipu (`C01`), ten sam, który
-bierze `--artifact`, a obrazek twarzy to `face:C01:0.png`. Format obrazka wybiera dostawca,
+bierze `--artifact`, gotowy film to kod jego języka (`en`), też jak w `--artifact`, a obrazek
+twarzy to `face:C01:0.png`. Wspólny obraz obu filmów (`episode`) dostaje 404: nie ma własnej
+zgody i nikt nie ogląda niemego cięcia, ogląda się filmy. Format obrazka wybiera dostawca,
 tak jak przy końcówce klipu, ale tu jest już zapisany: `check` podaje ścieżkę każdego
 obrazka, więc panel pyta z rozszerzeniem, które tam przeczytał, a resolver buduje ścieżkę
 w tym formacie, zamiast go zgadywać. Przyjmuje tylko dwa, które zapisuje układ (`png`,

@@ -416,6 +416,25 @@ export const INTENTS = {
     ...artifacts(one.artifacts),
   ],
   /**
+   * Stage 12, accepted: one finished film, by its language.
+   *
+   * A film is its own judgement rather than one of a list, and the one whose
+   * mouths moved is accepted against a checklist, so it carries what was
+   * ticked and the CLI names what was not; the other film has none to tick.
+   */
+  approveFilm: (one: Judged & { readonly artifact: string }): readonly string[] => [
+    "approve",
+    one.projectId,
+    one.episodeId,
+    "--stage",
+    "versions",
+    "--track",
+    one.track,
+    "--artifact",
+    one.artifact,
+    ...checklist(one.checks),
+  ],
+  /**
    * Stage 10, accepted: this track's full mix, and nothing to narrow.
    *
    * `--track` is the choice of question rather than a narrowing, exactly as
@@ -829,6 +848,33 @@ export const INTENTS = {
     "--title",
     one.title,
     ...flag("--aspect-ratio", one.aspectRatio),
+  ],
+  /**
+   * Stage 12: one language's film of this track, laid over the shared picture.
+   *
+   * Stage 8's reading, because it buys nothing either: the local engine cuts
+   * the picture once and lays one language's lines over it beside the stems,
+   * so `--dry-run` is the plan rather than a bill, and the same command lays
+   * the film without it. `--regenerate` guards an accepted film, not a wallet.
+   */
+  makeFilm: (
+    one: TrackRef & {
+      readonly dryRun: boolean;
+      readonly language: string;
+      readonly regenerate: boolean;
+    }
+  ): readonly string[] => [
+    "versions",
+    "final",
+    one.projectId,
+    one.episodeId,
+    "--track",
+    one.track,
+    "--language",
+    one.language,
+    ...(one.regenerate ? ["--regenerate"] : []),
+    ...(one.dryRun ? ["--dry-run"] : []),
+    "--json",
   ],
   /**
    * Stage 9's per-track half: it buys nothing, so it has no preview.
