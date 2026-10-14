@@ -2,14 +2,16 @@
  * Internal to the import module: XML read into a tree, nothing more.
  *
  * A Word part is generated, well-formed and namespace-prefixed the same way by
- * every producer that matters, so a tokenizer and a stack are enough, and the
+ * every producer that matters, so a scanner and a stack are enough, and the
  * walker matches `w:p` by its prefixed name. Entities are decoded; a DOCTYPE is
- * skipped and never resolved, so a part cannot make this read anything else.
+ * refused rather than read, so a part cannot make this read anything else.
+ *
+ * The scanner moves forward with `indexOf` and never backtracks, because the
+ * bytes come from somebody's document: a regular expression with two
+ * quantifiers over the same characters turns `<a<a<a…` into an afternoon. The
+ * tree is capped too, so a part of tiny tags ends as a refusal, not as memory.
  */
 
-const XML_TOKEN =
-  /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[([\s\S]*?)\]\]>|<!DOCTYPE[^>]*>|<(\/?)([^\s/>]+)([^>]*?)(\/?)>|([^<]+)/g;
-const XML_ATTRIBUTE = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 const XML_ENTITY = /&(?:#x([0-9a-fA-F]+)|#(\d+)|(lt|gt|amp|quot|apos));/g;
 const NAMED_ENTITIES = new Map([
   ["amp", "&"],
@@ -18,6 +20,17 @@ const NAMED_ENTITIES = new Map([
   ["lt", "<"],
   ["quot", '"'],
 ]);
+const WHITESPACE = new Set([" ", "\t", "\n", "\r"]);
+const LAST_CODE_POINT = 0x10_ff_ff;
+/** About forty times a long treatment's `document.xml`. */
+const MAX_NODES = 2_000_000;
+const NO_ATTRIBUTES: ReadonlyMap<string, string> = new Map();
+/** What opens with `<` and is not a tag: where it ends, and whether it is text. */
+const DELIMITED = [
+  { close: "-->", open: "<!--", text: false },
+  { close: "]]>", open: "<![CDATA[", text: true },
+  { close: "?>", open: "<?", text: false },
+] as const;
 
 export interface XmlElement {
   readonly attributes: ReadonlyMap<string, string>;
@@ -31,6 +44,17 @@ interface OpenElement extends XmlElement {
   readonly children: XmlNode[];
 }
 
+type Token =
+  | { readonly kind: "skip" }
+  | { readonly kind: "text"; readonly text: string }
+  | {
+      readonly attributes: string;
+      readonly closing: boolean;
+      readonly kind: "tag";
+      readonly name: string;
+      readonly selfClosing: boolean;
+    };
+
 export class XmlError extends Error {
   constructor(message: string) {
     super(message);
@@ -40,21 +64,32 @@ export class XmlError extends Error {
 
 /** The root element of one part; `part` names it in the refusal. */
 export function parseXml(text: string, part: string): XmlElement {
-  const document: OpenElement = { attributes: new Map(), children: [], name: "#document" };
+  const document: OpenElement = { attributes: NO_ATTRIBUTES, children: [], name: "#document" };
   const stack: OpenElement[] = [document];
+  let nodes = 0;
+  let at = 0;
 
-  for (const match of text.matchAll(XML_TOKEN)) {
-    const [, cdata, closing, name, attributes = "", selfClosing, characters] = match;
+  while (at < text.length) {
+    const open = text.indexOf("<", at);
+    const end = open === -1 ? text.length : open;
     const parent = stack.at(-1) ?? document;
 
-    if (characters !== undefined || cdata !== undefined) {
-      parent.children.push(cdata ?? decode(characters ?? ""));
-    } else if (name !== undefined) {
-      tag(
-        stack,
-        { attributes, closing: closing === "/", name, selfClosing: selfClosing === "/" },
-        part
-      );
+    if (end > at) {
+      parent.children.push(decode(text.slice(at, end)));
+      nodes += 1;
+    }
+
+    if (open === -1) {
+      break;
+    }
+
+    const markup = markupAt(text, open, part);
+
+    nodes += place(stack, markup.token, part);
+    at = markup.end;
+
+    if (nodes > MAX_NODES) {
+      throw new XmlError(`${part}: dokument jest zbyt złożony (ponad ${MAX_NODES} węzłów)`);
     }
   }
 
@@ -67,20 +102,102 @@ export function parseXml(text: string, part: string): XmlElement {
   return root;
 }
 
-function tag(
-  stack: OpenElement[],
-  token: {
-    readonly attributes: string;
-    readonly closing: boolean;
-    readonly name: string;
-    readonly selfClosing: boolean;
-  },
+/** One `<…>` starting at `open`, and the index just past it. */
+function markupAt(
+  text: string,
+  open: number,
   part: string
-): void {
+): { readonly end: number; readonly token: Token } {
+  for (const delimited of DELIMITED) {
+    if (text.startsWith(delimited.open, open)) {
+      const close = text.indexOf(delimited.close, open + delimited.open.length);
+
+      if (close === -1) {
+        throw new XmlError(`${part}: niepoprawny XML, ${delimited.open} bez ${delimited.close}`);
+      }
+
+      return {
+        end: close + delimited.close.length,
+        token: delimited.text
+          ? { kind: "text", text: text.slice(open + delimited.open.length, close) }
+          : { kind: "skip" },
+      };
+    }
+  }
+
+  if (text.startsWith("<!", open)) {
+    throw new XmlError(`${part}: deklaracja <! (np. DOCTYPE) nie jest obsługiwana`);
+  }
+
+  const close = tagEnd(text, open);
+
+  if (close === -1) {
+    throw new XmlError(`${part}: niepoprawny XML, znacznik bez >`);
+  }
+
+  const inner = text.slice(open + 1, close);
+  const closing = inner.startsWith("/");
+  const selfClosing = !closing && inner.endsWith("/");
+  const body = inner.slice(closing ? 1 : 0, selfClosing ? -1 : inner.length);
+  const space = firstSpace(body);
+
+  return {
+    end: close + 1,
+    token: {
+      attributes: space === -1 ? "" : body.slice(space),
+      closing,
+      kind: "tag",
+      name: space === -1 ? body : body.slice(0, space),
+      selfClosing,
+    },
+  };
+}
+
+/** The `>` that closes the tag at `open`, skipping any inside a quoted value. */
+function tagEnd(text: string, open: number): number {
+  let quote: string | null = null;
+
+  for (let at = open + 1; at < text.length; at += 1) {
+    const character = text[at];
+
+    if (quote !== null) {
+      quote = character === quote ? null : quote;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === ">") {
+      return at;
+    }
+  }
+
+  return -1;
+}
+
+function firstSpace(text: string): number {
+  for (let at = 0; at < text.length; at += 1) {
+    if (WHITESPACE.has(text[at] ?? "")) {
+      return at;
+    }
+  }
+
+  return -1;
+}
+
+/** Puts one token into the tree, and says how many nodes it added. */
+function place(stack: OpenElement[], token: Token, part: string): number {
   const parent = stack.at(-1);
 
-  if (parent === undefined) {
-    throw new XmlError(`${part}: niepoprawny XML przy <${token.name}>`);
+  if (parent === undefined || token.kind === "skip") {
+    return 0;
+  }
+
+  if (token.kind === "text") {
+    parent.children.push(token.text);
+
+    return 1;
+  }
+
+  if (token.name === "") {
+    throw new XmlError(`${part}: niepoprawny XML, znacznik bez nazwy`);
   }
 
   if (token.closing) {
@@ -90,11 +207,11 @@ function tag(
 
     stack.pop();
 
-    return;
+    return 0;
   }
 
   const element: OpenElement = {
-    attributes: parseAttributes(token.attributes),
+    attributes: parseAttributes(token.attributes, part),
     children: [],
     name: token.name,
   };
@@ -104,25 +221,57 @@ function tag(
   if (!token.selfClosing) {
     stack.push(element);
   }
+
+  return 1;
 }
 
-function parseAttributes(text: string): Map<string, string> {
+/** `a="1" b='2'`, read forward: a name, `=`, a quoted value, again. */
+function parseAttributes(text: string, part: string): ReadonlyMap<string, string> {
+  let at = skipSpace(text, 0);
+
+  if (at === text.length) {
+    return NO_ATTRIBUTES;
+  }
+
   const attributes = new Map<string, string>();
 
-  for (const [, name = "", double, single] of text.matchAll(XML_ATTRIBUTE)) {
-    attributes.set(name, decode(double ?? single ?? ""));
+  while (at < text.length) {
+    const equals = text.indexOf("=", at);
+    const quoteAt = equals === -1 ? -1 : skipSpace(text, equals + 1);
+    const quote = quoteAt === -1 ? undefined : text[quoteAt];
+    const close = quote === '"' || quote === "'" ? text.indexOf(quote, quoteAt + 1) : -1;
+
+    if (close === -1) {
+      throw new XmlError(`${part}: niepoprawny atrybut w „${text.slice(at, at + 40)}”`);
+    }
+
+    attributes.set(text.slice(at, equals).trim(), decode(text.slice(quoteAt + 1, close)));
+    at = skipSpace(text, close + 1);
   }
 
   return attributes;
 }
 
+function skipSpace(text: string, from: number): number {
+  let at = from;
+
+  while (at < text.length && WHITESPACE.has(text[at] ?? "")) {
+    at += 1;
+  }
+
+  return at;
+}
+
+/** Entities decoded; a reference to no character is kept as it was written. */
 function decode(text: string): string {
   return text.replace(XML_ENTITY, (whole, hex?: string, decimal?: string, named?: string) => {
     if (named !== undefined) {
       return NAMED_ENTITIES.get(named) ?? whole;
     }
 
-    return String.fromCodePoint(Number.parseInt(hex ?? decimal ?? "", hex === undefined ? 10 : 16));
+    const code = Number.parseInt(hex ?? decimal ?? "", hex === undefined ? 10 : 16);
+
+    return code <= LAST_CODE_POINT ? String.fromCodePoint(code) : whole;
   });
 }
 

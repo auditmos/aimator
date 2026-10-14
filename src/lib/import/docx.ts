@@ -23,10 +23,10 @@ import { type Archive, ArchiveError, openArchive, readEntry } from "./zip.js";
  * the words it would have lost, instead of a document that is quietly shorter.
  */
 
+/** A part of the document as XML; the parsed tree is many times this. */
+const MAX_XML_BYTES = 64 * 1024 * 1024;
 const HEADING_STYLE = /^heading (\d)$/i;
 const FILE_EXTENSION = /\.([A-Za-z0-9]{1,5})$/;
-const EDGE_SPACE = /^(\s*)([\s\S]*?)(\s*)$/;
-const LINE_BREAK = /\s*\n\s*/g;
 const OFF = new Set(["0", "false", "off"]);
 
 export interface DocxImage {
@@ -119,7 +119,7 @@ export function convertDocx(bytes: Buffer, link: ImageLink): Result<DocxConversi
     }
 
     if (cause instanceof RangeError || (cause as NodeJS.ErrnoException).code?.startsWith("Z_")) {
-      return err(new DocxError("plik .docx jest uszkodzony: archiwum kończy się w pół wpisu"));
+      return err(new DocxError("plik .docx jest uszkodzony albo zbyt złożony, by go przeczytać"));
     }
 
     throw cause;
@@ -207,7 +207,7 @@ function pageFurniture(walk: Walk): string[] {
 }
 
 function readText(archive: Archive, name: string): string {
-  return readEntry(archive, name).toString("utf8");
+  return readEntry(archive, name, MAX_XML_BYTES).toString("utf8");
 }
 
 // ---------------------------------------------------------------- the parts
@@ -395,7 +395,7 @@ function paragraph(node: XmlElement, walk: Walk): Block | null {
   }
 
   if (level !== undefined) {
-    return { kind: "heading", level, text: text.replace(LINE_BREAK, " ") };
+    return { kind: "heading", level, text: oneLine(text) };
   }
 
   const list = listReference(properties) ?? styleList(properties, walk.styles);
@@ -703,11 +703,28 @@ function render(inlines: readonly Inline[], emphasis: boolean): string {
     .join("");
 }
 
+/**
+ * Emphasis around the words, never around the spaces beside them. Cut with
+ * `trim` rather than a pattern: `(\s*)$` after a lazy core is quadratic on a
+ * long run of spaces, and the run is somebody else's.
+ */
 function emphasise(inline: Extract<Inline, { kind: "text" }>): string {
   const marker = `${inline.bold ? "**" : ""}${inline.italic ? "*" : ""}`;
-  const [, lead = "", core = "", trail = ""] = EDGE_SPACE.exec(inline.text) ?? [];
+  const start = inline.text.length - inline.text.trimStart().length;
+  const core = inline.text.trim();
 
-  return marker === "" || core === "" ? inline.text : `${lead}${marker}${core}${marker}${trail}`;
+  return marker === "" || core === ""
+    ? inline.text
+    : `${inline.text.slice(0, start)}${marker}${core}${marker}${inline.text.slice(start + core.length)}`;
+}
+
+/** A heading on one line: whatever surrounds a break becomes one space. */
+function oneLine(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .join(" ");
 }
 
 function markdownOf(blocks: readonly Block[]): string {
@@ -739,7 +756,7 @@ function blockMarkdown(block: Block, shift: number): string {
       return `${indent}${marker} ${block.text.replaceAll("\n", `\n${indent}  `)}`;
     }
     case "table": {
-      const width = Math.max(...block.rows.map((row) => row.length));
+      const width = block.rows.reduce((widest, row) => Math.max(widest, row.length), 0);
       const lines = block.rows.map(
         (row) => `| ${Array.from({ length: width }, (_, index) => row[index] ?? "").join(" | ")} |`
       );

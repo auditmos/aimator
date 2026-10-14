@@ -43,8 +43,14 @@ import { convertDocx, type DocxConversion } from "./docx.js";
 
 /** The engine that wrote the bytes, and the version that decides whether it would again. */
 const CONVERTER = "docx-markdown 1";
-const HEADING = /^(#{1,6})[ \t]+(.+?)[ \t]*$/;
-const IMAGE_LINK = /!\[[^\]]*\]\(([^)\s]+)\)/g;
+/**
+ * Both patterns read a file a person may have edited, so neither may
+ * backtrack: no lazy group before a run that can match the same characters,
+ * and no class that runs across the next `[` or `(`. The title is trimmed in
+ * code rather than by a trailing `[ \t]*$`.
+ */
+const HEADING = /^(#{1,6})[ \t]+(.*)$/;
+const IMAGE_LINK = /!\[[^[\]]*\]\(([^()\s]+)\)/g;
 
 const importFileSchema = z.strictObject({
   id: z.string().min(1),
@@ -345,7 +351,11 @@ function sectionsOf(markdown: string, imageOf: (link: string) => string | null):
     const current = sections.at(-1);
 
     if (heading !== null) {
-      sections.push({ level: heading[1]?.length ?? 1, lines: [line], title: heading[2] ?? "" });
+      sections.push({
+        level: heading[1]?.length ?? 1,
+        lines: [line],
+        title: (heading[2] ?? "").trim(),
+      });
     } else if (current === undefined) {
       sections.push({ level: 0, lines: [line], title: null });
     } else {

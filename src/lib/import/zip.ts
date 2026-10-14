@@ -16,6 +16,12 @@ const LOCAL_HEADER = 0x04_03_4b_50;
 const ZIP64 = 0xff_ff_ff_ff;
 /** Far above any picture a treatment holds, and below what a bomb declares. */
 const MAX_ENTRY_BYTES = 512 * 1024 * 1024;
+/**
+ * The whole archive unpacked. Checked against what the directory declares,
+ * before a byte is inflated, so overlapping entries and a thousand pictures
+ * that each pass `MAX_ENTRY_BYTES` are refused alike.
+ */
+const MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024;
 
 interface ZipEntry {
   readonly compressed: number;
@@ -71,6 +77,14 @@ export function openArchive(bytes: Buffer): Archive {
     at += 46 + nameLength + bytes.readUInt16LE(at + 30) + bytes.readUInt16LE(at + 32);
   }
 
+  const unpacked = [...entries.values()].reduce((sum, entry) => sum + entry.size, 0);
+
+  if (unpacked > MAX_ARCHIVE_BYTES) {
+    throw new ArchiveError(
+      `plik .docx po rozpakowaniu miałby ${unpacked} B, więcej niż ${MAX_ARCHIVE_BYTES} B; nie rozpakowano niczego`
+    );
+  }
+
   return { bytes, entries };
 }
 
@@ -86,8 +100,11 @@ function endOfDirectory(bytes: Buffer): number {
   throw new ArchiveError("to nie jest plik .docx: brak katalogu archiwum ZIP");
 }
 
-/** One entry's bytes, checked against the size and CRC the directory declares. */
-export function readEntry(archive: Archive, name: string): Buffer {
+/**
+ * One entry's bytes, checked against the size and CRC the directory declares.
+ * `limit` is lower for a part that will be parsed, whose tree outweighs it.
+ */
+export function readEntry(archive: Archive, name: string, limit = MAX_ENTRY_BYTES): Buffer {
   const entry = archive.entries.get(name);
 
   if (entry === undefined) {
@@ -99,8 +116,10 @@ export function readEntry(archive: Archive, name: string): Buffer {
     throw new ArchiveError(`${name}: dokument jest zaszyfrowany, zapisz go bez hasła`);
   }
 
-  if (entry.size > MAX_ENTRY_BYTES || entry.compressed === ZIP64) {
-    throw new ArchiveError(`${name}: część dokumentu jest za duża (${entry.size} B)`);
+  if (entry.size > Math.min(limit, MAX_ENTRY_BYTES) || entry.compressed === ZIP64) {
+    throw new ArchiveError(
+      `${name}: część dokumentu jest za duża (${entry.size} B, limit ${Math.min(limit, MAX_ENTRY_BYTES)} B)`
+    );
   }
 
   const { bytes } = archive;

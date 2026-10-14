@@ -71,7 +71,10 @@ const RELS = `<Relationships xmlns="http://schemas.openxmlformats.org/package/20
 </Relationships>`;
 
 /** A zip, written the way Word writes one: XML deflated, pictures stored. */
-function zip(files: Readonly<Record<string, Buffer | string>>): Buffer {
+function zip(
+  files: Readonly<Record<string, Buffer | string>>,
+  declared: Readonly<Record<string, number>> = {}
+): Buffer {
   const locals: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
@@ -88,13 +91,13 @@ function zip(files: Readonly<Record<string, Buffer | string>>): Buffer {
     local.writeUInt16LE(method, 8);
     local.writeUInt32LE(crc32(data), 14);
     local.writeUInt32LE(packed.length, 18);
-    local.writeUInt32LE(data.length, 22);
+    local.writeUInt32LE(declared[name] ?? data.length, 22);
     local.writeUInt16LE(nameBytes.length, 26);
     entry.writeUInt32LE(0x02_01_4b_50, 0);
     entry.writeUInt16LE(method, 10);
     entry.writeUInt32LE(crc32(data), 16);
     entry.writeUInt32LE(packed.length, 20);
-    entry.writeUInt32LE(data.length, 24);
+    entry.writeUInt32LE(declared[name] ?? data.length, 24);
     entry.writeUInt16LE(nameBytes.length, 28);
     entry.writeUInt32LE(offset, 42);
     locals.push(local, nameBytes, packed);
@@ -115,20 +118,34 @@ function zip(files: Readonly<Record<string, Buffer | string>>): Buffer {
   return Buffer.concat([...locals, directory, end]);
 }
 
-/** A `.docx` around `body`, with styles, lists, two pictures, a link and a page header. */
-function docx(body: string): Buffer {
-  return zip({
-    "_rels/.rels": `<Relationships><Relationship Id="rId1" Type="${RELATIONSHIP}/officeDocument" Target="word/document.xml"/></Relationships>`,
-    "[Content_Types].xml": "<Types/>",
-    "word/_rels/document.xml.rels": RELS,
-    "word/document.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+/**
+ * A `.docx` around `body`, with styles, lists, two pictures, a link and a page
+ * header. `document` replaces the whole main part, `declared` lies about sizes.
+ */
+function docx(
+  body: string,
+  overrides: {
+    readonly declared?: Readonly<Record<string, number>>;
+    readonly document?: string;
+  } = {}
+): Buffer {
+  return zip(
+    {
+      "_rels/.rels": `<Relationships><Relationship Id="rId1" Type="${RELATIONSHIP}/officeDocument" Target="word/document.xml"/></Relationships>`,
+      "[Content_Types].xml": "<Types/>",
+      "word/_rels/document.xml.rels": RELS,
+      "word/document.xml":
+        overrides.document ??
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="w" xmlns:r="r"><w:body>${body}<w:sectPr/></w:body></w:document>`,
-    "word/header1.xml": `<w:hdr xmlns:w="w">${p(t("Miko | 1"))}</w:hdr>`,
-    "word/media/image1.png": IMAGE,
-    "word/media/image2.jpeg": PHOTO,
-    "word/numbering.xml": NUMBERING,
-    "word/styles.xml": STYLES,
-  });
+      "word/header1.xml": `<w:hdr xmlns:w="w">${p(t("Miko | 1"))}</w:hdr>`,
+      "word/media/image1.png": IMAGE,
+      "word/media/image2.jpeg": PHOTO,
+      "word/numbering.xml": NUMBERING,
+      "word/styles.xml": STYLES,
+    },
+    overrides.declared
+  );
 }
 
 async function source(bytes: Buffer, name = "treatment.docx"): Promise<string> {
@@ -346,7 +363,82 @@ describe("addImport", () => {
   });
 });
 
+/**
+ * A document is somebody else's bytes. Each case here once took a pattern that
+ * backtracks, or memory nothing capped, so a regression shows up as a timeout
+ * or a crashed worker rather than a wrong answer.
+ */
+describe("addImport with a hostile document", () => {
+  const RUN = 200_000;
+
+  it("refuses an archive that would unpack beyond its limit, before unpacking anything", async () => {
+    const bytes = zip(
+      { "word/document.xml": "<w:document/>" },
+      { "word/document.xml": 0xf0_00_00_00 }
+    );
+
+    expect(errorOf(await add(bytes))).toContain("nie rozpakowano niczego");
+  });
+
+  it("refuses an XML part too large to parse", async () => {
+    const bytes = docx(TREATMENT, { declared: { "word/document.xml": 100 * 1024 * 1024 } });
+
+    expect(errorOf(await add(bytes))).toContain("word/document.xml: część dokumentu jest za duża");
+  });
+
+  it("refuses a part with more nodes than it can hold", async () => {
+    const document = `<w:document><w:body>${"<w:p/>".repeat(2_000_001)}</w:body></w:document>`;
+
+    expect(errorOf(await add(docx("", { document })))).toContain("zbyt złożony");
+  });
+
+  it("refuses markup that never closes, in one pass", async () => {
+    const opened = (tail: string): Buffer => docx("", { document: `<w:document><w:body>${tail}` });
+
+    expect(errorOf(await add(opened("<a".repeat(RUN)), "a"))).toContain("znacznik bez >");
+    expect(errorOf(await add(opened(`<!--${"-".repeat(RUN)}`), "b"))).toContain("<!-- bez -->");
+    expect(errorOf(await add(opened(`<w:p ${"a".repeat(RUN)}>`), "c"))).toContain(
+      "niepoprawny atrybut"
+    );
+    expect(errorOf(await add(opened('<!DOCTYPE x [<!ENTITY e "x">]>'), "d"))).toContain("DOCTYPE");
+  });
+
+  it("keeps long runs of spaces in headings and emphasis, without stalling", async () => {
+    const spaces = " ".repeat(RUN);
+    const result = await add(docx(p(t(`a${spaces}b`), style("Nagwek1")) + p(bold(`${spaces}x`))));
+
+    expect(result.ok ? result.data.sections.map(({ title }) => title) : []).toEqual([
+      `a${spaces}b`,
+    ]);
+    // Compared as a boolean: a failed match on two strings this long would
+    // spend a minute in the diff, and read as the very stall it guards against.
+    expect(
+      (await readFile(join(root, "imports", "miko", "material.md"), "utf8")).endsWith("\n\n**x**\n")
+    ).toBe(true);
+  });
+
+  it("keeps a reference to no character as it was written", async () => {
+    await add(docx(p(t("&#99999999; i &amp;"))));
+
+    expect(await readFile(join(root, "imports", "miko", "material.md"), "utf8")).toBe(
+      "&#99999999; i &\n"
+    );
+  });
+});
+
 describe("showImport", () => {
+  it("reads a material.md edited into a maze of half-written links, in one pass", async () => {
+    await add(docx(TREATMENT));
+    await appendFile(join(root, "imports", "miko", "material.md"), "![](".repeat(200_000));
+
+    const shown = await showImport({ importId: "miko", workspace });
+
+    expect(shown.ok ? shown.data.images.map(({ sections }) => sections) : []).toEqual([
+      ["T03", "T04"],
+      ["T04"],
+    ]);
+  });
+
   it("derives the sections from material.md as it is now, and says it was edited", async () => {
     await add(docx(TREATMENT));
     await appendFile(join(root, "imports", "miko", "material.md"), "\n## Dopisane\n\nTekst.\n");
