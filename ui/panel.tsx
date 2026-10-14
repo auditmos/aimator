@@ -669,12 +669,44 @@ export function Notices(props: { readonly notices: readonly string[] }): JSX.Ele
  * answer that asks for something; a success says so in one word and opens on
  * request.
  */
+/** Where a purchase's result stands on its page, and how to get there. */
+interface ResultPlace {
+  /** Opens that block and scrolls to it; see `Block`'s `reveal`. */
+  readonly reveal: () => void;
+  /** The block's own title, said in the dock's button. */
+  readonly title: string;
+}
+
+/** A result place, bound to the one purchase whose answer it belongs under. */
+export interface ResultOffer extends ResultPlace {
+  readonly argv: readonly string[];
+}
+
+const OfferResult = createContext<(offer: ResultOffer) => void>(() => undefined);
+
+/**
+ * The way a panel tells the dock where its purchase lands.
+ *
+ * The dock stands at the bottom of every screen and knows commands, not
+ * pages, so the panel that bought something is the only one that can say
+ * which of its blocks now holds the result. It says so when it buys, and the
+ * dock offers the way there under that purchase's answer and nowhere else.
+ */
+export function ResultOffers(props: {
+  readonly children: ReactNode;
+  readonly onOffer: (offer: ResultOffer) => void;
+}): JSX.Element {
+  return <OfferResult.Provider value={props.onOffer}>{props.children}</OfferResult.Provider>;
+}
+
 export function RunDock(props: {
   readonly argv: readonly string[] | null;
+  /** Where the last purchase landed, if the panel that made it said. */
+  readonly result: ResultOffer | null;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element | null {
-  const { argv, run, running } = props;
+  const { argv, result, run, running } = props;
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const toggle = useCallback(() => setOpen((current) => !current), []);
@@ -709,6 +741,13 @@ export function RunDock(props: {
       <div className="dock-bar">
         <span className="dock-state">{run.ok ? "✓ Gotowe" : "✕ Odmowa"}</span>
         {argv === null ? null : <code className="dock-command">{commandLine(argv)}</code>}
+        {/* Only under the answer to the purchase it was offered for: the
+            same array, so a command started since then takes it away. */}
+        {run.ok && result !== null && result.argv === argv ? (
+          <button className="dock-button" onClick={result.reveal} type="button">
+            Przejdź do wyniku ({result.title})
+          </button>
+        ) : null}
         <button className="dock-button" onClick={toggle} type="button">
           {open ? "Ukryj wynik" : "Pokaż wynik"}
         </button>
@@ -963,6 +1002,11 @@ export function PaidCall<Report extends PaidReport>(props: {
    * magnitude and are therefore two numbers rather than one.
    */
   readonly read: (report: Report) => Priced;
+  /**
+   * The block on this page that a finished purchase fills, which the dock
+   * then offers to go to. A stage without one buys exactly as before.
+   */
+  readonly result?: ResultPlace;
   /** Grows when "Narysuj ponownie" sends somebody here; see `useRedraw`. */
   readonly reveal?: number;
   readonly running: boolean;
@@ -977,11 +1021,13 @@ export function PaidCall<Report extends PaidReport>(props: {
     preview,
     projectRun,
     read,
+    result,
     reveal = 0,
     running,
     sent,
   } = props;
   const [previewed, setPreviewed] = useState<Previewed | null>(null);
+  const offer = useContext(OfferResult);
 
   useEffect(() => {
     if (sent === null || !(sent.includes("--dry-run") && projectRun?.ok === true)) {
@@ -1004,10 +1050,20 @@ export function PaidCall<Report extends PaidReport>(props: {
   }, [projectRun, read, sent]);
 
   const runBuy = useCallback(() => {
-    if (previewed !== null) {
-      onRun(buy(previewed.send));
+    if (previewed === null) {
+      return;
     }
-  }, [onRun, previewed]);
+
+    const argv = buy(previewed.send);
+
+    // Offered before it is sent, under the very array sent: the dock holds
+    // the offer to the purchase by identity, so any later command drops it.
+    if (result !== undefined) {
+      offer({ ...result, argv });
+    }
+
+    onRun(argv);
+  }, [offer, onRun, previewed, result]);
 
   return (
     <Block fold={open} hint={note} reveal={reveal} title="Generowanie (płatne)">

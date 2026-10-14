@@ -33,6 +33,9 @@ function importUrl(importId: string, artifact: string): string {
   return `/api/import/${encodeURIComponent(importId)}/${encodeURIComponent(artifact)}`;
 }
 
+/** The block a purchase fills, named once: on the page and in the dock's button. */
+const GROUPING = "Podział";
+
 /** A picture beside its section's heading, cropped square: enough to tell two apart. */
 const THUMB = 48;
 
@@ -279,6 +282,12 @@ export function ImportPanel(props: {
   const material = useImportText(importId, "material", revision);
   const [flags, setFlags] = useState<SendFlags>(NO_FLAGS);
   const [shown, setShown] = useState<string | null>(null);
+  /** Grows each time the dock sends somebody to the grouping a purchase wrote. */
+  const [revealed, setRevealed] = useState(0);
+  const result = useMemo(
+    () => ({ reveal: () => setRevealed((count) => count + 1), title: GROUPING }),
+    []
+  );
   const preview = useMemo(
     () =>
       INTENTS.previewGrouping({
@@ -393,7 +402,7 @@ export function ImportPanel(props: {
         </Block>
       )}
 
-      <Block title="Podział">
+      <Block reveal={revealed} title={GROUPING}>
         {report.grouped.length === 0 ? (
           <p className="panel-empty">
             Materiał nie jest jeszcze podzielony. Podział kupuje się niżej, w „Generowanie
@@ -420,6 +429,7 @@ export function ImportPanel(props: {
         preview={preview}
         projectRun={run}
         read={asCalls}
+        result={result}
         running={running}
         sent={sent}
       >

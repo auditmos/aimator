@@ -312,6 +312,13 @@ trafiło. Kliknięty przycisk zostaje w pełnym kolorze, dostaje znacznik i wiel
 rozwija się sama, bo to jedyna odpowiedź, która czegoś wymaga; sukces rozwija się na
 żądanie. Odmowę samego serwera (np. żądanie bez `argv`) pasek pokazuje tak samo.
 
+Po udanym **zakupie** pasek może też zaprowadzić do tego, co kupiono: „Przejdź do wyniku
+(Podział)” rozwija blok, który zakup wypełnił, i przewija do niego stronę. Który blok to
+jest, mówi panel, który kupił, w chwili zakupu, bo pasek zna komendy, a nie strony.
+Przycisk stoi tylko pod odpowiedzią na tamten zakup: każda późniejsza komenda i każda
+zmiana ekranu go zabiera. Na razie mówi to tylko import; panel etapu, który nie wskazał
+bloku, kupuje tak jak wcześniej, bez tego przycisku.
+
 „Gotowe” nie wyprzedza skutków komendy. Serwer ogłasza zakończoną komendę na strumieniu
 odcinka dopiero **za** drabiną przeczytaną po jej zakończeniu, w tej samej kolejce, a
 otwarty odcinek czyta wyniki z tego strumienia, nie ze strumienia katalogu roboczego.

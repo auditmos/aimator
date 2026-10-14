@@ -19,7 +19,7 @@ import {
 } from "./ladder";
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
-import { Commands, plural, RunDock, SettledStage } from "./panel";
+import { Commands, plural, type ResultOffer, ResultOffers, RunDock, SettledStage } from "./panel";
 import { NewEpisode, NewProject, PreparePanel, ProjectApproval } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
@@ -1061,6 +1061,8 @@ export function App(): JSX.Element {
   );
   /** The argv of the last command started here, which the answer does not repeat. */
   const [sent, setSent] = useState<readonly string[] | null>(null);
+  /** Where the last purchase's result stands on its page; see `ResultOffers`. */
+  const [offer, setOffer] = useState<ResultOffer | null>(null);
 
   /**
    * The workspace's own stream, open on every screen.
@@ -1158,6 +1160,8 @@ export function App(): JSX.Element {
     setShownRoute(routeKey);
     setRun(null);
     setPending(null);
+    // The block it would reveal belongs to the screen being left.
+    setOffer(null);
   }
 
   /**
@@ -1199,58 +1203,62 @@ export function App(): JSX.Element {
         </div>
       </header>
       <main className="wrap" id="main">
-        {route.kind === "home" ? (
-          <section aria-labelledby="home-title">
-            <h1 className="sr-only" id="home-title">
-              aimator
-            </h1>
-            <Choices
-              label="Od czego zacząć"
-              load={{ href: OPEN, label: "Wczytaj projekt" }}
-              make={{ href: NEW, label: "Nowy projekt" }}
-            >
-              {/* Quieter than the two choices: a document is brought in once,
+        <ResultOffers onOffer={setOffer}>
+          {route.kind === "home" ? (
+            <section aria-labelledby="home-title">
+              <h1 className="sr-only" id="home-title">
+                aimator
+              </h1>
+              <Choices
+                label="Od czego zacząć"
+                load={{ href: OPEN, label: "Wczytaj projekt" }}
+                make={{ href: NEW, label: "Nowy projekt" }}
+              >
+                {/* Quieter than the two choices: a document is brought in once,
                   before a project, and what it becomes is still a new one. */}
-              <p className="home-aside">
-                <a href={IMPORTS}>Importuj materiał z Worda</a>
-              </p>
-            </Choices>
-          </section>
-        ) : null}
-        {route.kind === "imports" ? (
-          <Imports listing={listing} onRun={start} run={run} running={running} />
-        ) : null}
-        {route.kind === "import" ? (
-          <ImportScreen
-            importId={route.importId}
-            key={route.importId}
-            listing={listing}
-            onRun={start}
-            run={run}
-            running={running}
-          />
-        ) : null}
-        {route.kind === "new" ? (
-          <>
-            <Back href={HOME} label="Start" />
-            <NewProject onCreated={createdProject} onRun={start} run={run} running={running} />
-          </>
-        ) : null}
-        {route.kind === "open" ? <OpenProject listing={listing} refusal={listingRefusal} /> : null}
-        {"projectId" in route ? (
-          <ProjectScreens
-            listing={listing}
-            listingRefusal={listingRefusal}
-            onRun={start}
-            route={route}
-            run={run}
-            running={running}
-            runs={runs}
-          />
-        ) : null}
+                <p className="home-aside">
+                  <a href={IMPORTS}>Importuj materiał z Worda</a>
+                </p>
+              </Choices>
+            </section>
+          ) : null}
+          {route.kind === "imports" ? (
+            <Imports listing={listing} onRun={start} run={run} running={running} />
+          ) : null}
+          {route.kind === "import" ? (
+            <ImportScreen
+              importId={route.importId}
+              key={route.importId}
+              listing={listing}
+              onRun={start}
+              run={run}
+              running={running}
+            />
+          ) : null}
+          {route.kind === "new" ? (
+            <>
+              <Back href={HOME} label="Start" />
+              <NewProject onCreated={createdProject} onRun={start} run={run} running={running} />
+            </>
+          ) : null}
+          {route.kind === "open" ? (
+            <OpenProject listing={listing} refusal={listingRefusal} />
+          ) : null}
+          {"projectId" in route ? (
+            <ProjectScreens
+              listing={listing}
+              listingRefusal={listingRefusal}
+              onRun={start}
+              route={route}
+              run={run}
+              running={running}
+              runs={runs}
+            />
+          ) : null}
+        </ResultOffers>
       </main>
       {/* One place for every answer, on every screen: see RunDock. */}
-      <RunDock argv={sent} run={run} running={running} />
+      <RunDock argv={sent} result={offer} run={run} running={running} />
     </>
   );
 }
