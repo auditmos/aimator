@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -314,6 +314,55 @@ describe("groupImport", () => {
       "pliki poprawione ręcznie i nadpisał tę pracę: imports/miko/grouped/style.md"
     );
     expect(calls).toBe(1);
+  });
+
+  describe("with its record edited to name files outside grouped/", () => {
+    const SECRET = "sekret spoza importu";
+
+    beforeEach(async () => {
+      await group();
+      await mkdir(join(root, "projects"), { recursive: true });
+      await writeFile(join(scratch, "outside.txt"), SECRET);
+      await writeFile(join(root, "projects", "keep.md"), SECRET);
+    });
+
+    async function tamper(paths: readonly string[]): Promise<void> {
+      const file = grouped("import.stage.json");
+      const stage = JSON.parse(await readFile(file, "utf8"));
+
+      stage.artifacts.grouping.outputs.push(
+        ...paths.map((path) => ({ path, sha256: sha256Of(Buffer.from(SECRET)) }))
+      );
+      await writeFile(file, JSON.stringify(stage));
+    }
+
+    it("removes nothing it did not write there, and says the record was edited", async () => {
+      await tamper(["../outside.txt", "projects/keep.md"]);
+
+      const result = await group({ regenerate: true });
+
+      expect(errorOf(result)).toContain(
+        "imports/miko/grouped/import.stage.json wymienia pliki spoza imports/miko/grouped/: ../outside.txt, projects/keep.md"
+      );
+      expect(calls).toBe(1);
+      expect(existsSync(join(scratch, "outside.txt"))).toBe(true);
+      expect(existsSync(join(root, "projects", "keep.md"))).toBe(true);
+    });
+
+    it("sends the model nothing it did not write there", async () => {
+      await tamper(["imports/miko/../../../outside.txt", "imports/miko/../../projects/keep.md"]);
+
+      const bodies: string[] = [];
+      const send = completion(ANSWER);
+      const capture = ((url: string, init?: RequestInit) => {
+        bodies.push(String(init?.body ?? ""));
+        return send(url, init);
+      }) as unknown as typeof fetch;
+
+      await group({ fetch: capture, instruction: "Postaw Miko w stylu.", regenerate: true });
+
+      expect(bodies.join("")).not.toContain(SECRET);
+    });
   });
 
   it("refuses an import that does not exist, naming the command that makes one", async () => {

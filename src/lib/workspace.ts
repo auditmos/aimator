@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 import { err, ok, type Result } from "./result.js";
 
 /**
@@ -600,6 +600,20 @@ export function resolveWorkspace(root: string | undefined): Result<Workspace> {
  */
 export function workspacePath(workspace: Workspace, recorded: string): string {
   return join(workspace.root, ...recorded.split("/"));
+}
+
+/**
+ * Whether a recorded path names something inside `directory`.
+ *
+ * A record is read back from disk, where anybody can edit it, so a stage
+ * about to remove or send what a record names asks here first. Every segment
+ * is checked rather than the joined result alone, so `..` never resolves.
+ */
+export function recordedUnder(workspace: Workspace, directory: string, recorded: string): boolean {
+  return (
+    recorded.split("/").every((segment) => SAFE_SEGMENT.test(segment)) &&
+    workspacePath(workspace, recorded).startsWith(`${directory}${sep}`)
+  );
 }
 
 /**

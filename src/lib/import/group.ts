@@ -31,6 +31,7 @@ import {
   type ImportPaths,
   importPaths,
   type RunPaths,
+  recordedUnder,
   type Workspace,
   workspacePath,
 } from "../workspace.js";
@@ -126,10 +127,16 @@ export async function groupImport(input: GroupInput): Promise<Result<GroupReport
     return stored;
   }
 
-  const previous = await previousOutputs(paths.data.groupedStage);
+  const { previous, strays } = await previousOutputs(input.workspace, paths.data);
   const edited = input.republish ? await handEdited(input.workspace, previous) : [];
+  const stagePath = toWorkspacePath(input.workspace.root, paths.data.groupedStage);
   const problems = [
     ...blockers(input, paths.data, stored.data),
+    ...(strays.length === 0
+      ? []
+      : [
+          `${stagePath} wymienia pliki spoza ${toWorkspacePath(input.workspace.root, paths.data.grouped)}/: ${strays.join(", ")}; ten rekord zmieniono poza aimatorem, a grupowanie niczego według niego nie usunie ani nie wyśle; usuń ${stagePath}, a następna próba zacznie od zera`,
+        ]),
     ...(edited.length === 0
       ? []
       : [
@@ -257,11 +264,23 @@ function stage(
   };
 }
 
-/** What the previous record says this step published, as recorded paths. */
-async function previousOutputs(stagePath: string): Promise<readonly RecordedFile[]> {
-  const file = await readJson(stagePath, stageFileSchema);
+/**
+ * What the previous record says this step published, which is what a new
+ * grouping removes, keeps and quotes. Only while every path in it lies under
+ * `grouped/`: a record is a file anybody can edit, and one that names
+ * something else is reported in `strays` and trusted for nothing.
+ */
+async function previousOutputs(
+  workspace: Workspace,
+  paths: ImportPaths
+): Promise<{ readonly previous: readonly RecordedFile[]; readonly strays: readonly string[] }> {
+  const file = await readJson(paths.groupedStage, stageFileSchema);
+  const outputs = file.ok ? (file.data.artifacts[KEY]?.outputs ?? []) : [];
+  const strays = outputs
+    .filter(({ path }) => !recordedUnder(workspace, paths.grouped, path))
+    .map(({ path }) => path);
 
-  return file.ok ? (file.data.artifacts[KEY]?.outputs ?? []) : [];
+  return { previous: strays.length === 0 ? outputs : [], strays };
 }
 
 /** Published files whose bytes are no longer what was published: somebody's work. */
