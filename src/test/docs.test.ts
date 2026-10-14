@@ -19,8 +19,8 @@ import { imageTracks } from "../lib/workspace.js";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 
-/** Documents a reader is handed: the front page and everything under `docs/`. */
-const READER_DOCS = ["README.md", "docs"];
+/** Documents a reader is handed: the front page, the order of work and everything under `docs/`. */
+const READER_DOCS = ["README.md", "PIPELINE.md", "docs"];
 
 /**
  * Dotted directories are tooling, not documentation. `site/` is skipped for a

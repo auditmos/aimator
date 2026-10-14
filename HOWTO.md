@@ -75,7 +75,8 @@ kształcie, w jakim leżą, włącznie z `project.md`, który dostaje swój hash
 chwili i w żadnej wcześniejszej. Edytuj zatwierdzony artefakt później, a akceptacja znika,
 i `check` to powie.
 
-Żadne polecenie etapu 0 nie woła płatnego API.
+Poza próbką głosu postaci (`character sample`) żadne polecenie etapu 0 nie woła płatnego
+API.
 
 ## Environment Variables
 

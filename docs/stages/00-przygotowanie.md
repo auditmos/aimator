@@ -1,14 +1,14 @@
 # Etap 0: przygotowanie projektu i odcinka
 
-Rozmowa, nie generacja. Ustala zasady wspólne serii i sześć decyzji odcinka. **Żadne
-polecenie tego etapu nie woła płatnego API.**
+Rozmowa, nie generacja. Ustala zasady wspólne serii i sześć decyzji odcinka. **Poza
+próbką głosu postaci żadne polecenie tego etapu nie woła płatnego API.**
 
 | | |
 |---|---|
 | **Wejście** | Twój pomysł, plik źródłowy odcinka, opcjonalnie zdjęcia postaci i obrazy stylu |
 | **Wyjście** | `project.json`, `project.md`, `style.json`, `style/sources/`, `source.md`, `episode.json`, `characters/<id>/sources/` |
 | **Bramka** | `check`, potem `approve`; otwiera etapy 1 i 2 |
-| **Koszt** | darmowy |
+| **Koszt** | darmowy, poza próbką głosu postaci |
 
 ## Najprościej: skillem
 

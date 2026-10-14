@@ -72,7 +72,7 @@ plików stanu i szczegóły walidacji, jest w [docs/pipeline.md](docs/pipeline.m
 
 | Etap | Na wejściu | Na wyjściu | Koszt |
 |---|---|---|---|
-| [0. przygotowanie](docs/stages/00-przygotowanie.md) | Twój pomysł, plik źródłowy odcinka, zdjęcia postaci, obrazy stylu | zasady projektu, obsada, obrazy stylu, decyzje odcinka | darmowy |
+| [0. przygotowanie](docs/stages/00-przygotowanie.md) | Twój pomysł, plik źródłowy odcinka, zdjęcia postaci, obrazy stylu | zasady projektu, obsada, obrazy stylu, decyzje odcinka | darmowy, poza próbką głosu postaci |
 | [1. scenariusz](docs/stages/01-scenariusz.md) | zasady projektu + plik źródłowy | `screenplay.md`: sceny z czasami | 1 wywołanie tekstowe |
 | [2. postać](docs/stages/02-postac.md) | zasady projektu, zdjęcia albo opis postaci | karta, 8 widoków, `hero.png` per postać i tor | do 10 obrazów |
 | [3. lista ujęć](docs/stages/03-lista-ujec.md) | zatwierdzony scenariusz | `shot-list.md`: sceny, ujęcia i klipy | 1 wywołanie tekstowe |
@@ -97,9 +97,10 @@ Dwa etapy mogą biec równolegle: [2. postać](docs/stages/02-postac.md) nie zal
 
 Wymagania:
 
-- [Node.js](https://nodejs.org/) >= 22 i [pnpm](https://pnpm.io/)
-- [ffmpeg](https://ffmpeg.org/) dla etapów 8, 9 i 10. Skleja klipy, kładzie na nich
-  narrację i składa pełną ścieżkę, za każdym razem kopiując obraz bez przekodowania; gdy
+- [Node.js](https://nodejs.org/) >= 22 i [pnpm](https://pnpm.io/) 12
+- [ffmpeg](https://ffmpeg.org/) dla etapów 8, 9, 10 i 12 oraz etapu 7 przy modelu Kling.
+  Skleja klipy, kładzie na nich dźwięk i wycina ostatnią klatkę klipu, za każdym razem
+  kopiując obraz bez przekodowania; gdy
   go nie ma, te etapy odmawiają zamiast szukać objazdu. Reszta narzędzia, razem z `check`,
   działa bez niego, bo werdykty czytają pudełka MP4, nagłówki RIFF i ramki MP3, nie wołają
   dekodera.
@@ -117,6 +118,9 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 ```
 /prepare-project
 ```
+
+Kolejność komend od etapu 0 do gotowego filmu, w terminalu i w UI, jest na jednej stronie:
+[PIPELINE.md](PIPELINE.md).
 
 Etap 0 pyta o wygląd serii słowami, które ustala [docs/slownik.md](docs/slownik.md): jedno
 pojęcie, jedno słowo, po polsku w rozmowie i po angielsku w prompcie. Jak opisać styl, żeby
