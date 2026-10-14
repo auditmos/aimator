@@ -1,5 +1,6 @@
 import { type JSX, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
+import { type ImportedCharacter, useImportedCharacters } from "./import";
 import { Action, artifactUrl, Field, Lightbox, type Picture, useOwnRun, Zoomable } from "./panel";
 import type { CastEntry, ProjectOverview, Refusal, RunDone } from "./types";
 
@@ -169,6 +170,99 @@ function CharacterCard(props: {
 }
 
 /**
+ * One character a grouping found: the id is its file's name and stays so, the
+ * name is the one its file writes. Only a name the file no longer writes is
+ * asked for; another spelling is what "Dopisz postać" below is for.
+ */
+function ImportedRow(props: {
+  readonly character: ImportedCharacter;
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly running: boolean;
+  /** Among several imports, which one found it. */
+  readonly source: boolean;
+}): JSX.Element {
+  const { character, onRun, projectId, running, source } = props;
+  const [name, setName] = useState(character.name ?? "");
+  const add = useMemo(
+    () => INTENTS.addCharacter({ characterId: character.characterId, name, projectId }),
+    [character.characterId, name, projectId]
+  );
+
+  return (
+    <li>
+      <div className="cast-imported-who">
+        {character.name === null ? (
+          <Field
+            id={`imported-${character.importId}-${character.characterId}`}
+            label="Nazwa"
+            onValue={setName}
+            value={name}
+          />
+        ) : (
+          <strong>{character.name}</strong>
+        )}
+        <code className="cast-id">{character.characterId}</code>
+        {source ? <span className="cast-id">z importu {character.importId}</span> : null}
+      </div>
+      <Action argv={add} disabled={running} label="Dodaj do obsady" onRun={onRun} />
+    </li>
+  );
+}
+
+/**
+ * The characters the grouped imports found, each one click from the cast.
+ *
+ * Being in a grouping is not being cast: a character seen once is a stage-5
+ * reference rather than a member, so nothing is taken in wholesale and each is
+ * added by its own button. Who is cast already is left out by id, which is
+ * what `character new` would refuse on.
+ */
+function ImportedCast(props: {
+  readonly cast: readonly CastEntry[];
+  readonly onRun: (argv: readonly string[]) => void;
+  readonly projectId: string;
+  readonly revision: object | null;
+  readonly running: boolean;
+}): JSX.Element | null {
+  const { cast, onRun, projectId, revision, running } = props;
+  const found = useImportedCharacters(revision);
+
+  if (found.length === 0) {
+    return null;
+  }
+
+  const left = found.filter(({ characterId }) => !cast.some(({ id }) => id === characterId));
+  const several = new Set(found.map(({ importId }) => importId)).size > 1;
+
+  return (
+    <div className="cast-new">
+      <h3>Z podziału importu</h3>
+      <p className="actions-note">
+        Do obsady trafia tylko postać, która wraca; widziana raz to referencja etapu 5. Imię jest
+        przepisane z pliku podziału. Podstawę, opis albo zdjęcia, wybierasz potem na karcie postaci.
+      </p>
+      {left.length === 0 ? (
+        <p className="panel-empty">Każda postać z podziału jest już w obsadzie.</p>
+      ) : (
+        <ul className="cast-imported">
+          {left.map((character) => (
+            <ImportedRow
+              character={character}
+              key={`${character.importId}/${character.characterId}`}
+              onRun={onRun}
+              projectId={projectId}
+              running={running}
+              source={several}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
  * A character the project has not named yet.
  *
  * The fields empty themselves once the CLI has said yes, because the name
@@ -303,6 +397,15 @@ export function ProjectCast(props: {
             />
           </div>
         ))}
+        {overview === null ? null : (
+          <ImportedCast
+            cast={overview.cast}
+            onRun={onRun}
+            projectId={projectId}
+            revision={revision}
+            running={running}
+          />
+        )}
         <NewCharacter onRun={onRun} projectId={projectId} run={run} running={running} />
       </section>
 

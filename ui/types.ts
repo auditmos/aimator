@@ -847,7 +847,12 @@ export interface ImportedSection {
 export interface ImportOverview {
   readonly command: "import show";
   /** The files `import group` wrote, each under what it holds: `series`, `character:miko`. */
-  readonly grouped: readonly { readonly destination: string; readonly path: string }[];
+  readonly grouped: readonly {
+    readonly destination: string;
+    /** A character's name as its file writes it; null for any other file, or when it no longer does. */
+    readonly name: string | null;
+    readonly path: string;
+  }[];
   readonly images: readonly {
     readonly id: string;
     /** Its name inside the document, `word/media/image1.png`. */

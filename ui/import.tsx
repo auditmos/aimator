@@ -91,17 +91,32 @@ export interface ImportedEpisode {
   readonly source: string;
 }
 
-/** What a grouping calls an episode's file: `episode:01-miko-i-skarb-na-talerzu`. */
-const EPISODE = "episode:";
+/** One character a grouping found, offered to `character new` under its file's name. */
+export interface ImportedCharacter {
+  /** `miko`: the name the grouping gave the file, which is the id the cast takes. */
+  readonly characterId: string;
+  readonly importId: string;
+  /** As its file writes it; null when the file no longer does, and the person types it. */
+  readonly name: string | null;
+}
+
+/** One file of one grouping, with the absolute path a command takes it from. */
+interface GroupedOf {
+  readonly destination: string;
+  readonly importId: string;
+  readonly name: string | null;
+  /** The workspace root `import list` names, joined to the path `import show` gives under it. */
+  readonly source: string;
+}
 
 /**
- * Every episode file of every grouped import in the workspace, for a new
- * episode to start from. Empty while it is being read, and when no import
- * has a grouping that found one; a refusal is no file to offer either.
+ * Every file of every grouped import in the workspace. Empty while it is
+ * being read, and when no import has a grouping; a refusal is no file to
+ * offer either.
  */
-export function useImportedEpisodes(revision: unknown): readonly ImportedEpisode[] {
+function useGroupedFiles(revision: unknown): readonly GroupedOf[] {
   const listing = useImports(revision);
-  const [episodes, setEpisodes] = useState<readonly ImportedEpisode[]>([]);
+  const [files, setFiles] = useState<readonly GroupedOf[]>([]);
 
   useEffect(() => {
     if (listing === null || "error" in listing) {
@@ -109,25 +124,24 @@ export function useImportedEpisodes(revision: unknown): readonly ImportedEpisode
     }
 
     let cancelled = false;
-    const read = async ({ id }: { readonly id: string }): Promise<ImportedEpisode[]> => {
+    const read = async ({ id }: { readonly id: string }): Promise<GroupedOf[]> => {
       const response = await fetch(`/api/import/${encodeURIComponent(id)}`);
       const body = (await response.json()) as ImportOverview | Refusal;
 
       return "error" in body
         ? []
-        : body.grouped
-            .filter(({ destination }) => destination.startsWith(EPISODE))
-            .map(({ destination, path }) => ({
-              episode: destination.slice(EPISODE.length),
-              importId: id,
-              source: `${listing.workspace}/${path}`,
-            }));
+        : body.grouped.map(({ destination, name, path }) => ({
+            destination,
+            importId: id,
+            name,
+            source: `${listing.workspace}/${path}`,
+          }));
     };
 
     Promise.all(listing.imports.filter(({ grouped }) => grouped > 0).map(read))
       .then((all) => {
         if (!cancelled) {
-          setEpisodes(all.flat());
+          setFiles(all.flat());
         }
       })
       .catch(() => undefined);
@@ -137,7 +151,47 @@ export function useImportedEpisodes(revision: unknown): readonly ImportedEpisode
     };
   }, [listing]);
 
-  return episodes;
+  return files;
+}
+
+/** What a grouping calls an episode's file: `episode:01-miko-i-skarb-na-talerzu`. */
+const EPISODE = "episode:";
+
+/** What a grouping calls a character's file: `character:miko`. */
+const CHARACTER = "character:";
+
+/** Every episode file of every grouped import in the workspace, for a new episode to start from. */
+export function useImportedEpisodes(revision: unknown): readonly ImportedEpisode[] {
+  const files = useGroupedFiles(revision);
+
+  return useMemo(
+    () =>
+      files
+        .filter(({ destination }) => destination.startsWith(EPISODE))
+        .map(({ destination, importId, source }) => ({
+          episode: destination.slice(EPISODE.length),
+          importId,
+          source,
+        })),
+    [files]
+  );
+}
+
+/** Every character of every grouped import in the workspace, for the cast to take in. */
+export function useImportedCharacters(revision: unknown): readonly ImportedCharacter[] {
+  const files = useGroupedFiles(revision);
+
+  return useMemo(
+    () =>
+      files
+        .filter(({ destination }) => destination.startsWith(CHARACTER))
+        .map(({ destination, importId, name }) => ({
+          characterId: destination.slice(CHARACTER.length),
+          importId,
+          name,
+        })),
+    [files]
+  );
 }
 
 /** The text of one file of an import, or nothing while there is none to show. */

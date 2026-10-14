@@ -96,7 +96,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
-  identyfikatora nie wpisuje się drugi raz; pod kartami `character new`. Zdjęcia stoją na
+  identyfikatora nie wpisuje się drugi raz; pod kartami „Z podziału importu”: każda postać,
+  którą znalazł podział importu (`import show --json`), a której obsada jeszcze nie ma, z
+  imieniem z jej pliku i własnym „Dodaj do obsady” (`character new`). Nic nie trafia do
+  obsady hurtem, bo postać widziana raz to referencja etapu 5. Pole imienia pojawia się
+  tylko przy postaci, której plik imienia już nie zapisuje. Niżej `character new` do
+  wpisania ręcznie. Zdjęcia stoją na
   karcie jako miniatury, a nie ścieżki, bo podstawa ze zdjęć to decyzja o twarzy; każde
   otwiera się na całe okno jak obraz w galeriach etapów. Resolver podaje je pod
   `prepare/<nazwa pliku>?character=<id>`, pod nazwą, z jaką skopiował je `character add`;

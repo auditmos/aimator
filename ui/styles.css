@@ -850,6 +850,32 @@ h1 {
 .panel .cast-new h3 {
   margin-top: 0;
 }
+/* The characters a grouping found: one line each, who it is in a column of
+   its own, so every button starts at the same place whatever its command. */
+.cast-imported {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+}
+.cast-imported li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+.cast-imported-who {
+  display: flex;
+  flex: 0 1 20rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  min-width: 0;
+}
 /* Drift: the same quiet box as the problems, because it is the same kind of
    news, and the paths in it read as names rather than as a warning. */
 .drift {
@@ -1004,6 +1030,12 @@ h1 {
   gap: 0.75rem;
   align-items: center;
   margin-top: 1rem;
+}
+/* A character a grouping found: the action follows the column of names. */
+.cast-imported .actions {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
 }
 .action {
   min-height: 44px;
