@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
 import {
@@ -758,6 +758,26 @@ describe("addCharacterSources", () => {
         "projects/demo/characters/ewa/sources/01-front.png",
       ]);
       expect(await readdir(sources())).toEqual(["01-front.png"]);
+    });
+
+    it("should never delete a file a hand-edited record places outside the character's sources", async () => {
+      await makeProject();
+      const photo = join(scratch, "portret.png");
+      const front = join(scratch, "01-front.png");
+      const outside = join(scratch, "cudzy.txt");
+      await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]));
+      await writeFile(front, Buffer.from([0x89, 0x50, 0x4e, 0x47, 2]));
+      await writeFile(outside, "nie twoje");
+      await add([photo], { basis: "photographs" });
+      const projectJson = join(root, "projects/demo/project.json");
+      const file = JSON.parse(await readFile(projectJson, "utf8"));
+      file.characters.ewa.sources[0].path = relative(root, outside);
+      await writeFile(projectJson, JSON.stringify(file, null, 2));
+
+      const result = await add([front], { replace: true });
+
+      expect(result.ok ? result.data.removed : null).toEqual([]);
+      expect(await readFile(outside, "utf8")).toBe("nie twoje");
     });
   });
 });

@@ -29,6 +29,7 @@ import { err, ok, type Result } from "../result.js";
 import {
   type CharacterPaths,
   characterPaths,
+  characterSource,
   type EpisodePaths,
   episodeIdFromSource,
   episodePaths,
@@ -1206,6 +1207,13 @@ async function approvalLapses(stagePath: string): Promise<boolean> {
   return stage.ok && isApproved(stage.data);
 }
 
+/** Whether a recorded path names a file straight inside this character's sources. */
+function ownSource(workspace: Workspace, paths: CharacterPaths, path: string): boolean {
+  const own = characterSource(paths, basename(path));
+
+  return own.ok && toWorkspacePath(workspace.root, own.data) === path;
+}
+
 export async function addCharacterSources(input: AddSourcesInput): Promise<Result<Stage0Report>> {
   const resolved = await resolveCharacter(input);
 
@@ -1271,9 +1279,12 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
     created.push(path);
   }
 
+  // A record a hand edit pointed outside this character's sources leaves
+  // project.json like any other, but its file is not this command's to delete.
   const removed = entry.sources
     .filter((old) => !recorded.some((asset) => asset.path === old.path))
-    .map((old) => old.path);
+    .map((old) => old.path)
+    .filter((path) => ownSource(input.workspace, paths, path));
 
   // Supplying an image *is* the declaration that this character is built from
   // images of that kind; it is never inferred from an empty directory.
