@@ -21,6 +21,19 @@ pnpm dev reject <projekt> <odcinek> --stage <etap> --note "<powód>"   # „nie�
   poprawia poprzednią wersję, zamiast pisać nową. Nic nie ponawia się samo.
 - Zainstalowane narzędzie wywołuje się jako `aimator` zamiast `pnpm dev`.
 
+## Przed etapem 0: import materiału
+
+Gdy materiał już istnieje w Wordzie, darmowy import zamienia go na `material.md` i obrazy
+w `imports/<id>/`, niczego nie rozstrzygając i nie zakładając projektu:
+
+```bash
+pnpm dev import add <id> --source <plik.docx> --dry-run
+pnpm dev import add <id> --source <plik.docx>
+pnpm dev import show <id>                               # sekcje, obrazy, uwagi
+```
+
+Szczegóły w [docs/import.md](docs/import.md).
+
 ## Etapy po kolei
 
 | Etap | Komenda | `--stage` | Czeka na |

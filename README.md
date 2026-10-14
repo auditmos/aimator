@@ -119,6 +119,10 @@ Potem zacznij od [etapu 0](docs/stages/00-przygotowanie.md), najlepiej skillem:
 /prepare-project
 ```
 
+Masz już serię albo odcinek w dokumencie Worda, np. treatment z obrazami? Najpierw
+zaimportuj go do Markdownu i osobnych obrazów, bez zakładania projektu:
+[docs/import.md](docs/import.md).
+
 Kolejność komend od etapu 0 do gotowego filmu, w terminalu i w UI, jest na jednej stronie:
 [PIPELINE.md](PIPELINE.md).
 
