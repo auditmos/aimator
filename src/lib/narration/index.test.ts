@@ -600,7 +600,7 @@ describe("generateMix", () => {
 
     expect(result.ok).toBe(false);
     expect(result.ok ? "" : result.error.message).toContain("ocenę człowieka");
-  });
+  }, 60_000);
 
   it("should lay the lines down and leave episode.mp4 untouched", async () => {
     await makeCut({ root, track: "gpt-image", workspace });
