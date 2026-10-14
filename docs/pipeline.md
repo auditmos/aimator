@@ -11,6 +11,8 @@ Artefakty leżą poza repozytorium, w katalogu z `AIMATOR_WORKSPACE`.
 
 ```
 $AIMATOR_WORKSPACE/
+├── imports/<import-id>/              materiał sprzed etapu 0, poza każdym projektem:
+│                                     source.docx, material.md, images/, grouped/, runs/
 └── projects/<project-id>/
     ├── project.json                  identyfikator, tytuł, proporcje, obsada
     ├── project.md                    zasady wspólne, jedyny plik pisany ręcznie
@@ -104,6 +106,15 @@ której narzędzie nie dotrzymuje.
 tabelą poniżej, bo czyta je wszystko: proporcje obrazu, podstawa postaci i zasady wspólne
 nie mają innej drogi do etapów, które ich potrzebują. Oba są artefaktami etapu 0, więc
 reguła „każdy etap konsumuje wyłącznie artefakty wcześniejszych etapów" pozostaje spełniona.
+
+**Import leży obok projektów i nie jest etapem.** `imports/<import-id>/` to dokument Worda
+zamieniony na `material.md` i obrazy, a po płatnym podziale także `grouped/`: sekcje
+materiału skopiowane dosłownie pod przydziałem do serii, stylu, postaci albo odcinka.
+Niczego nie rozstrzyga i nikt go nie zatwierdza. Etap 0 bierze z niego pliki tak samo jak
+z każdej innej ścieżki (`episode add --source`, `character add --source`), czyli kopią
+bajtów z sha256, więc żaden artefakt projektu nie ma importu za wejście, a poprawka
+albo usunięcie importu nie cofa żadnej zgody. Układ, rekordy i odmowy opisuje
+[import.md](import.md).
 
 ## Plik etapu
 

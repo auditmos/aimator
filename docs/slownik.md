@@ -50,6 +50,19 @@ Jak te pojęcia składają się w opis rysunku, pokazuje [docs/styl.md](styl.md)
 | **proporcje postaci** | figure proportions | Stosunek głowy do ciała i stopień deformacji sylwetki. W `project.md` wiersz „Proporcje i stylizacja postaci". |
 | **proporcje obrazu** | aspect ratio | Kształt kadru, na przykład `16:9`. W `project.json` jako `aspectRatio`. |
 
+## Import
+
+Gdy seria istnieje już jako dokument, rozmowa etapu 0 zaczyna się od niego. Jak powstaje,
+opisuje [docs/import.md](import.md).
+
+| Po polsku | In English | Co znaczy |
+|---|---|---|
+| **import** | import | Dokument Worda skopiowany do `imports/<id>/` i zamieniony na materiał, zanim powstał projekt. Niczego nie rozstrzyga; płatny jest w nim tylko podział. |
+| **materiał** | material | Treść dokumentu jako `material.md`, w słowach i języku autora: materiał w rozumieniu reguły 9. Co z niego trafi do `project.md`, jest propozycją, dopóki człowiek jej nie potwierdzi. |
+| **sekcja** | section | Materiał od nagłówka do następnego, `T01`, `T02`, liczony na nowo z obecnego `material.md`. |
+| **podział** | grouping | Wynik `import group`: każda sekcja przydzielona i skopiowana dosłownie do `grouped/`. Model wskazał tylko, dokąd idzie sekcja; nikt podziału nie zatwierdza. |
+| **przydział** | destination | Dokąd idzie sekcja i czego dotyczy plik podziału: `series`, `style`, `character:<id>`, `episode:NN-slug` albo `other`. |
+
 ## Proporcje i proporcje
 
 Para, która myli się po polsku najczęściej, bo jedno słowo nazywa dwie niezależne decyzje,

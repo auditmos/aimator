@@ -1,6 +1,6 @@
 ---
 name: prepare-project
-description: Run stage 0 of the animation pipeline — establish a project's shared creative rules, its cast including the voices of the narrator and of every character who speaks, and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
+description: Run stage 0 of the animation pipeline — establish a project's shared creative rules, its cast including the voices of the narrator and of every character who speaks, and an episode's five production settings, then save them as the artifacts every later stage consumes. Use whenever someone wants to start a new animated project or series, add an episode to an existing one, or asks to "przygotuj projekt", "nowa seria", "nowy odcinek", "etap 0", "przygotowanie serii i odcinka". Also use when a later stage refuses because stage 0 is incomplete, or when a series or an episode starts from a Word document brought in with `aimator import`. Not for generating a screenplay, images, clips or the final cut — those are later stages and they call paid APIs.
 ---
 
 # Stage 0 — prepare a project and an episode
@@ -19,12 +19,12 @@ aimator episode show <project-id> <episode-id> --json   # source and its six dec
 aimator check <project-id> --stage prepare --json       # the verdict on stage 0 alone
 ```
 
-None of these writes anything. `show` is a description: an undecided field comes back as
-`null`, a question to ask and never a value to fill in. `check` is the verdict, and its
-`problems` are your agenda. Keep `--stage prepare`: with an episode id and no flag, `check`
-glues stages 0, 1, 3 and 4. Read `project.md` and the episode's `source.md` as files, but
-never the JSON files: the commands above are the contract that reads them. Borrow nothing
-from another project or conversation, and if the project or the episode source is unnamed, ask.
+None of these writes anything. `show` describes: an undecided field is `null`, a question to ask
+and never a value to fill in. `check` is the verdict, and its `problems` are your agenda. Keep
+`--stage prepare`: with an episode id and no flag, `check` glues stages 0, 1, 3 and 4. Read
+`project.md` and `source.md` as files, never the JSON: the commands above are the contract that
+reads it. Borrow nothing from another project or conversation; ask if the project or source is
+unnamed. Material from a Word document or an import: read [references/import.md](references/import.md) first.
 
 ## 2. Collect decisions
 

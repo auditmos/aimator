@@ -128,6 +128,7 @@ src/
 │   ├── imports.test.ts # The shape: one export at the entry, no stage reaching
 │   │                   #            into another
 │   └── stages/       # Internal: fragment, flags, dispatch, renderers, and their tests
+│       ├── import.ts         # Before etap 0: a Word document converted, and its grouping
 │       ├── project.ts        # Etap 0: the rules, and who narrates
 │       ├── episode.ts        # Etap 0: the five production settings
 │       ├── character.ts      # Etap 0's cast and voices, etap 2's images: one command
@@ -198,6 +199,17 @@ src/
     │   ├── schema.ts     # Internal: <stage>.stage.json, one shape for all stages
     │   ├── store.ts      # Internal: bytes, digests, the single dry-run gate
     │   └── review.ts     # Internal: digest verification and creative approval
+    ├── import/       # Folder form: a Word document before stage 0, beside the projects
+    │   ├── index.ts      # Public: addImport, showImport, listImports, groupImport
+    │   ├── zip.ts        # Internal: a zip read out of memory, bounded before inflating
+    │   ├── xml.ts        # Internal: XML into a tree; control characters refused
+    │   ├── docx.ts       # Internal: the walk to Markdown; text it cannot place refuses
+    │   ├── material.ts   # Internal: the import on disk, sections derived on every read
+    │   ├── prompt.ts     # Internal: the routing instruction and the answer schema
+    │   ├── validate.ts   # Internal: the grouping verdict, every section and nothing else
+    │   ├── group.ts      # Internal: the paid call; files are sections copied verbatim
+    │   ├── index.test.ts # Conversion and refusals, through the entry
+    │   └── group.test.ts # Gate/bill/verdict/sweep, through the entry
     ├── project/      # Folder form: index.ts is the only entry (stage 0)
     │   ├── index.ts      # Public: initProject, addEpisode, setEpisodeSettings,
     │   │                 #         addCharacter, addCharacterSources, setCharacterBasis,
@@ -399,6 +411,7 @@ ui/                    # The client: browser files where the browser files go
 ├── index.html         # Vite's entry, served in middleware mode by src/ui/serve.ts
 ├── main.tsx           # The one place the browser and the application meet
 ├── app.tsx            # Start (new or existing project), then one project and its ladder
+├── import.tsx         # Before etap 0: a Word document brought in, and its grouping
 ├── ladder.tsx         # The ladder at two distances: thirteen stages, then one stage
 ├── panel.tsx          # What every stage panel repeats, in one place
 ├── panel.test.ts      # The readers: a stage's report as a bill and as a prompt
@@ -604,6 +617,20 @@ ids the sender will list; it does not stop the sender from carrying one the plan
 not have known. The composer learned the same lesson one level down: a clip is told to
 continue from its first image, not to compose one, and the free preview says exactly what
 the paid call will.
+
+`lib/import` is **not a stage**, and where it writes is what makes that true. It turns a Word
+document into `imports/<id>/material.md` and its pictures, beside `projects/` rather than
+under one, so nothing it does can lapse an approval: stage 0 takes its files the way it takes
+any path, as a copy with a digest, and no artifact of a project names an import as an input.
+Its one paid call goes through `lib/text-model` like every text stage's, as the first caller
+with no episode, which is why the archive is owned by whatever has a `runs` directory rather
+than by an episode. The call **routes and never writes**: the answer holds only section ids and
+destinations, and every grouped file is sections copied out of `material.md`, so "lifted,
+not invented" holds by construction and the verdict only has to prove the routing complete.
+The converter takes no dependency and refuses rather than drops: text it cannot place, a
+control character, a zip bigger than its limits, each stops the import before anything is
+written, because a document that comes out quietly shorter is the one failure nobody would
+see.
 
 `src/site` sits **beside** `src/lib` rather than inside it, and that is the whole point of
 where it is: it is not a stage, it consumes no stage's artifacts and it never reads
