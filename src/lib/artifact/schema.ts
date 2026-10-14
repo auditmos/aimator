@@ -49,6 +49,9 @@ export const stageNames = [
   // A character's voice in one language, and the sample bought to hear it. Not
   // a numbered row either: it sits beside stage 0, whose casting it completes.
   "voice",
+  // A document brought in and sorted before any project exists. Not a row and
+  // not inside a project: it is material waiting for stage 0, under imports/.
+  "import",
 ] as const;
 
 const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });

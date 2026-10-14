@@ -16,6 +16,10 @@ const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const ARTIFACT_ID = /^[A-Z]\d{2,}$/;
 /** `S01`: one style frame of a project, and its own file name. */
 const STYLE_ID = /^S\d{2,}$/;
+/** `I01`: one image an imported document held, and its own file name. */
+const IMPORT_IMAGE_ID = /^I\d{2,}$/;
+/** `png`, `jpg`, `emf`: an image keeps the format it arrived in. */
+const IMAGE_EXTENSION = /^[a-z0-9]{1,5}$/;
 /** `pl`, `en`, `pt-BR`: a language code, the one an episode's `--language` takes. */
 const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 /** One path segment that cannot escape the directory it is joined onto. */
@@ -635,6 +639,68 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
     style: join(root, "style.json"),
     styleSources: join(root, "style", "sources"),
   });
+}
+
+/**
+ * One imported document, waiting beside the projects rather than inside one.
+ *
+ * Not a project and not stage 0: an import holds material somebody brought,
+ * converted and sorted, and nothing in it is a decision. Keeping it out of
+ * `projects/` is what lets it be redone or thrown away without lapsing a single
+ * approval, and what keeps `list` from mistaking it for a project.
+ */
+export interface ImportPaths {
+  /** `import.json`: where the document came from, and its digest. */
+  readonly file: string;
+  /** The images the document held, `I01.png`, in the bytes it held them. */
+  readonly images: string;
+  /** `material.md`: the whole document as Markdown, images where they stood. */
+  readonly material: string;
+  readonly root: string;
+  /** The document itself, copied in, so the conversion can always be redone. */
+  readonly source: string;
+  readonly stage: string;
+}
+
+/** Where the imports are, for the question `projectsRoot` answers about projects. */
+export function importsRoot(workspace: Workspace): string {
+  return join(workspace.root, "imports");
+}
+
+export function importPaths(workspace: Workspace, importId: string): Result<ImportPaths> {
+  if (!PROJECT_ID.test(importId)) {
+    return err(
+      new IdentifierError(
+        importId,
+        `invalid import id "${importId}": must start with an ASCII letter or digit and contain only letters, digits, - and _`
+      )
+    );
+  }
+
+  const root = join(importsRoot(workspace), importId);
+
+  return ok({
+    file: join(root, "import.json"),
+    images: join(root, "images"),
+    material: join(root, "material.md"),
+    root,
+    source: join(root, "source.docx"),
+    stage: join(root, "import.stage.json"),
+  });
+}
+
+/**
+ * One image of an import, `images/I01.png`. The extension is the format the
+ * document held it in, because the bytes are copied rather than re-encoded.
+ */
+export function importImage(paths: ImportPaths, id: string, extension: string): Result<string> {
+  if (!IMPORT_IMAGE_ID.test(id)) {
+    return err(new IdentifierError(id, `invalid image id "${id}": expected a form like I01`));
+  }
+
+  return IMAGE_EXTENSION.test(extension)
+    ? ok(join(paths.images, `${id}.${extension}`))
+    : err(new IdentifierError(extension, `invalid image extension "${extension}"`));
 }
 
 /**
