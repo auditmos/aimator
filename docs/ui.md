@@ -25,8 +25,11 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   zapisuje adres, więc odświeżenie zostaje w miejscu, a przycisk „wstecz” przeglądarki
   cofa. Wordmark w nagłówku wraca na start.
 - **Nowy projekt** (`#/nowy`): sam formularz `project init` (identyfikator, tytuł,
-  proporcje). Gdy CLI powie „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod
-  formularzem, słowo w słowo.
+  proporcje). Proporcje wybiera się z listy najczęstszych (16:9, 9:16, 1:1, 4:5, 4:3,
+  21:9), a lista otwiera się na „nierozstrzygnięte”, bo ta decyzja nie ma wartości
+  domyślnej. Inne proporcje podaje się w terminalu przez `--aspect-ratio`. Gdy CLI powie
+  „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod formularzem, słowo
+  w słowo.
 - **Wczytaj projekt** (`#/wczytaj`): projekty z `list --json` jako lista odnośników z
   liczbą odcinków i znakiem etapu 0. Pusty katalog roboczy mówi o tym i odsyła do nowego
   projektu. Znak to odpowiedź `check <id> --stage prepare` (pod `/api/prepare/<id>`)

@@ -57,6 +57,22 @@ const EMPTY: Settings = {
 };
 
 /**
+ * The ratios the new-project form offers, most common first.
+ *
+ * A shortlist, not the CLI's rule: `--aspect-ratio` takes any w:h both image
+ * tracks can draw, so a ratio missing here is one terminal command away. The
+ * form opens on no choice, because the ratio is a decision with no default.
+ */
+const ASPECT_RATIOS: readonly { readonly label: string; readonly value: string }[] = [
+  { label: "16:9 · YouTube, TV", value: "16:9" },
+  { label: "9:16 · vertical drama, Reels, TikTok", value: "9:16" },
+  { label: "1:1 · kwadrat", value: "1:1" },
+  { label: "4:5 · feed Instagrama", value: "4:5" },
+  { label: "4:3 · klasyczny telewizor", value: "4:3" },
+  { label: "21:9 · kino panoramiczne", value: "21:9" },
+];
+
+/**
  * The project a workspace does not have yet, which is where everything starts.
  *
  * It is a screen of its own rather than a form inside stage 0's panel, because
@@ -75,6 +91,10 @@ export function NewProject(props: {
   const [projectId, setProjectId] = useState("");
   const [title, setTitle] = useState("");
   const [aspectRatio, setAspectRatio] = useState("");
+  const chooseRatio = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => setAspectRatio(event.target.value),
+    []
+  );
   /**
    * The identifier that was actually sent, not the one in the field now.
    *
@@ -122,13 +142,17 @@ export function NewProject(props: {
           placeholder="Dzielna Ewa"
           value={title}
         />
-        <Field
-          id="prepare-ratio"
-          label="Proporcje"
-          onValue={setAspectRatio}
-          placeholder="16:9"
-          value={aspectRatio}
-        />
+        <div className="field">
+          <label htmlFor="prepare-ratio">Proporcje</label>
+          <select id="prepare-ratio" onChange={chooseRatio} value={aspectRatio}>
+            <option value="">nierozstrzygnięte</option>
+            {ASPECT_RATIOS.map((one) => (
+              <option key={one.value} value={one.value}>
+                {one.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <Action argv={argv} disabled={running} label="Załóż projekt" onRun={submit} primary />
     </section>
