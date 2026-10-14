@@ -216,12 +216,16 @@ src/
     │   │                 #         checkStage0, approveStage0,
     │   │                 #         readStage0Inputs, readStage0Character, showProject,
     │   │                 #         showEpisode, setStyle, readStage0Style,
-    │   │                 #         setLipSync, readLipSync
+    │   │                 #         setLipSync, readLipSync, draftRules
     │   ├── schema.ts     # Internal: Zod schemas for the artifacts
-    │   ├── template.ts   # Internal: the project.md scaffold, and its Style Bible gate
+    │   ├── template.ts   # Internal: the project.md scaffold, its fields, and its
+    │   │                 #           Style Bible gate
+    │   ├── draft.ts      # Internal: project.md drafted from an import; never over a hand edit
+    │   ├── draft-prompt.ts # Internal: the instruction and the answer: one value per field
     │   ├── style.ts      # Internal: the style decision, and the images brought in
     │   ├── lip-sync.ts   # Internal: the language of the mouths, kept out of episode.json
     │   ├── index.test.ts # Tests through the entry
+    │   ├── draft.test.ts # Bill/fields/provenance/hand edits, through the entry
     │   └── style.test.ts # The style decision, and what changing it lapses
     ├── screenplay/   # Folder form: index.ts is the only entry (stage 1)
     │   ├── index.ts      # Public: generateScreenplay, checkScreenplay, approveScreenplay,
@@ -1113,6 +1117,9 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
   the accepted script into the language of the mouths. Not `AIMATOR_DIALOGUE_MODEL`, for the
   same reason: lifting a line and rewriting it in another language to fit a window are two
   tasks. It names a model, never the language; that is the episode's `lip-sync.json`.
+- `AIMATOR_RULES_MODEL` is `project draft`'s, the model that fills `project.md` from an
+  import's grouping. Not `AIMATOR_IMPORT_MODEL`: sorting a document and proposing a series'
+  rules from it are two call sites.
 - `AIMATOR_FFMPEG` is the only variable here that names a **program** rather than a model or
   a key, and the only one whose absence has a sensible answer. Every other one refuses a
   default because a model nobody chose is not a decision; "the ffmpeg on this machine" is

@@ -108,4 +108,6 @@ które wypisuje i `import add`, i każde późniejsze `import show`.
 
 Przeczytaj `material.md` i popraw to, co konwersja oddała źle, potem obejrzyj
 `import group <id> --dry-run` i kup podział. Projekt z tego materiału zakłada etap 0,
-najwygodniej skillem `/prepare-project` ([etap 0](stages/00-przygotowanie.md)).
+najwygodniej skillem `/prepare-project` ([etap 0](stages/00-przygotowanie.md)) albo
+w lokalnym UI. Zasady wspólne mogą zacząć od płatnego szkicu z podziału:
+`project draft <projekt> --import <id>` ([szkic zasad](stages/00-przygotowanie.md#szkic-zasad-z-importu)).

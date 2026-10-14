@@ -45,7 +45,144 @@ export function styleBibleProblems(rules: string): readonly string[] {
       ];
 }
 
-export function renderRules(title: string): string {
+/**
+ * Every answer the rules ask for, keyed, with the label it stands under and
+ * what a person is told to write there. One list for the scaffold and for a
+ * draft, so a draft can fill a field only where the scaffold has one.
+ */
+const FIELDS = {
+  alwaysNever: {
+    hint: 'hard rules for the whole drawing, or an explicit "none".',
+    label: "Always / never",
+  },
+  approved: { hint: "zakres decyzji.", label: "Zatwierdzone przez użytkownika" },
+  audience: { hint: "dla kogo i jak opowiadamy.", label: "Odbiorcy i ton" },
+  cast: { hint: 'albo jawne „brak stałej obsady".', label: "Stała obsada drugoplanowa" },
+  continuity: {
+    hint: "co ma pozostać stałe między scenami i odcinkami.",
+    label: "Ciągłość i ograniczenia",
+  },
+  episodeRule: {
+    hint: "co opowiada pojedynczy odcinek i jak wiąże się z resztą.",
+    label: "Zasada odcinka",
+  },
+  linework: { hint: "outer and inner line weight, taper, colour.", label: "Linework rule" },
+  opening: {
+    hint: "wymagana kompozycja albo jawny brak dodatkowych ograniczeń.",
+    label: "Otwarcie",
+  },
+  openQuestions: {
+    hint: `wymień tylko sprawy nieblokujące scenariusza i oznacz pomysły jako propozycje.
+Jeśli nie ma otwartych spraw, wpisz „Brak". Decyzje wymagane rozstrzygnij w etapie 0.`,
+    label: "Propozycje i otwarte kwestie",
+  },
+  palette: { hint: "5–8 colours, each with a hex value.", label: "Palette" },
+  prepared: {
+    hint: "data i rozmowa lub dokument, na podstawie których powstały zasady.",
+    label: "Przygotowano",
+  },
+  proportions: {
+    hint: `stosunek głowy do ciała i stopień
+  deformacji. To co innego niż proporcje obrazu i trzeba ustalić jedno i drugie.`,
+    label: "Proporcje i stylizacja postaci",
+  },
+  props: {
+    hint: `albo jawne „brak". Każdy wymieniony opisz: kształt,
+  wielkość względem postaci, materiał, barwa, zużycie. Sama nazwa to nie opis.`,
+    label: "Powracające rekwizyty",
+  },
+  protagonist: {
+    hint: "uczestnik wydarzeń, obserwator, narrator.",
+    label: "Główny bohater i jego rola",
+  },
+  relations: {
+    hint: `jak postacie mają się do siebie
+  skalą, kto jest ile wyższy i czy głowy są tej samej wielkości, oraz co jest rysowane
+  identycznie u każdej z nich. Proporcja podana osobno dla każdej postaci **nie wystarcza**:
+  dwie niezależne proporcje nie wyznaczają jeszcze relacji między nimi, a etap postaci
+  rysuje każdą osobno.`,
+    label: "Relacje i wspólne zasady rysowania postaci",
+  },
+  scenery: {
+    hint: `miejsca, do których seria wraca, i co jest w nich
+  stałe: paleta, światło, sprzęty, które nie mogą się przesuwać. Albo jawne „brak".`,
+    label: "Powracająca sceneria",
+  },
+  styleLine: {
+    hint: `5–7 comma-separated phrases in Style Stack order, repeated
+  verbatim in every image prompt.`,
+    label: "Style line",
+  },
+  theme: { hint: "co łączy odcinki.", label: "Temat projektu" },
+  traits: {
+    hint: `kolor i kształt włosów, krój i barwa stroju,
+  cechy szczególne. Przy \`characterBasis: "description"\` **to jest jedyne wejście etapu
+  postaci**, czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.`,
+    label: "Stałe cechy wyglądu i stroju",
+  },
+  world: { hint: "ustalenia wspólne.", label: "Świat i czas akcji" },
+} as const;
+
+type RuleField = keyof typeof FIELDS;
+
+/** What fills each field; a field left out keeps its marker and its hint. */
+export type RuleValues = Partial<Readonly<Record<RuleField, string>>>;
+
+/** The fields in the order `project.md` asks them, which `FIELDS`, sorted by key, cannot say. */
+const ORDER: readonly RuleField[] = [
+  "theme",
+  "episodeRule",
+  "audience",
+  "world",
+  "protagonist",
+  "proportions",
+  "traits",
+  "cast",
+  "relations",
+  "props",
+  "styleLine",
+  "palette",
+  "linework",
+  "alwaysNever",
+  "opening",
+  "scenery",
+  "continuity",
+  "prepared",
+  "approved",
+  "openQuestions",
+];
+
+/** The fields `values` leaves to a person, by the label each stands under, in document order. */
+export function leftOpen(values: RuleValues): readonly string[] {
+  return ORDER.filter((field) => values[field] === undefined).map((field) => FIELDS[field].label);
+}
+
+/**
+ * `project.md`: the scaffold when no value is given, and a draft when some are.
+ *
+ * A bullet's value starts after its label and its further lines are indented
+ * into the bullet; a value that is itself a list starts on the line below.
+ */
+export function renderRules(title: string, values: RuleValues = {}): string {
+  const open = (field: RuleField): string => {
+    const value = values[field];
+
+    if (value === undefined) {
+      return ` ${PLACEHOLDER} ${FIELDS[field].hint}`;
+    }
+
+    const lines = value.split("\n").map((row, index) => {
+      if (index === 0 || row === "") {
+        return row;
+      }
+
+      return `  ${row}`;
+    });
+
+    return value.startsWith("- ") ? `\n  ${lines.join("\n")}` : ` ${lines.join("\n")}`;
+  };
+  const line = (field: RuleField): string => `- ${FIELDS[field].label}:${open(field)}`;
+
   return `# ${title}, zasady wspólne
 
 > Uzupełnij każdy ${PLACEHOLDER} zatwierdzonymi ustaleniami, a następnie usuń ten cytat.
@@ -57,45 +194,35 @@ export function renderRules(title: string): string {
 
 ## Zatwierdzone założenia
 
-- Temat projektu: ${PLACEHOLDER} co łączy odcinki.
-- Zasada odcinka: ${PLACEHOLDER} co opowiada pojedynczy odcinek i jak wiąże się z resztą.
-- Odbiorcy i ton: ${PLACEHOLDER} dla kogo i jak opowiadamy.
-- Świat i czas akcji: ${PLACEHOLDER} ustalenia wspólne.
+${line("theme")}
+${line("episodeRule")}
+${line("audience")}
+${line("world")}
 
 ## Bohaterowie i wygląd
 
-- Główny bohater i jego rola: ${PLACEHOLDER} uczestnik wydarzeń, obserwator, narrator.
-- Proporcje i stylizacja postaci: ${PLACEHOLDER} stosunek głowy do ciała i stopień
-  deformacji. To co innego niż proporcje obrazu i trzeba ustalić jedno i drugie.
-- Stałe cechy wyglądu i stroju: ${PLACEHOLDER} kolor i kształt włosów, krój i barwa stroju,
-  cechy szczególne. Przy \`characterBasis: "description"\` **to jest jedyne wejście etapu
-  postaci**, czego tu nie ma, tego model dopowie sobie inaczej w każdym przebiegu.
-- Stała obsada drugoplanowa: ${PLACEHOLDER} albo jawne „brak stałej obsady".
-- Relacje i wspólne zasady rysowania postaci: ${PLACEHOLDER} jak postacie mają się do siebie
-  skalą, kto jest ile wyższy i czy głowy są tej samej wielkości, oraz co jest rysowane
-  identycznie u każdej z nich. Proporcja podana osobno dla każdej postaci **nie wystarcza**:
-  dwie niezależne proporcje nie wyznaczają jeszcze relacji między nimi, a etap postaci
-  rysuje każdą osobno.
-- Powracające rekwizyty: ${PLACEHOLDER} albo jawne „brak". Każdy wymieniony opisz: kształt,
-  wielkość względem postaci, materiał, barwa, zużycie. Sama nazwa to nie opis.
+${line("protagonist")}
+${line("proportions")}
+${line("traits")}
+${line("cast")}
+${line("relations")}
+${line("props")}
 - Materiały postaci: podstawa i zdjęcia wynikają z \`project.json\` (\`characterBasis\`,
   \`characterSources\`); nie wpisuj tu akceptacji, która nie nastąpiła.
 
 ## Style Bible
 
-- Style line: ${PLACEHOLDER} 5–7 comma-separated phrases in Style Stack order, repeated
-  verbatim in every image prompt.
-- Palette: ${PLACEHOLDER} 5–8 colours, each with a hex value.
-- Linework rule: ${PLACEHOLDER} outer and inner line weight, taper, colour.
-- Always / never: ${PLACEHOLDER} hard rules for the whole drawing, or an explicit "none".
+${line("styleLine")}
+${line("palette")}
+${line("linework")}
+${line("alwaysNever")}
 
 ## Obraz i ciągłość
 
 - Proporcje obrazu: zapisane w \`project.json\` jako \`aspectRatio\`.
-- Otwarcie: ${PLACEHOLDER} wymagana kompozycja albo jawny brak dodatkowych ograniczeń.
-- Powracająca sceneria: ${PLACEHOLDER} miejsca, do których seria wraca, i co jest w nich
-  stałe: paleta, światło, sprzęty, które nie mogą się przesuwać. Albo jawne „brak".
-- Ciągłość i ograniczenia: ${PLACEHOLDER} co ma pozostać stałe między scenami i odcinkami.
+${line("opening")}
+${line("scenery")}
+${line("continuity")}
 
 ## Źródła i ustawienia odcinków
 
@@ -105,12 +232,11 @@ Indywidualna fabuła powstaje dopiero w etapie scenariusza.
 
 ## Pochodzenie ustaleń
 
-- Przygotowano: ${PLACEHOLDER} data i rozmowa lub dokument, na podstawie których powstały zasady.
-- Zatwierdzone przez użytkownika: ${PLACEHOLDER} zakres decyzji.
+${line("prepared")}
+${line("approved")}
 
 ## Propozycje i otwarte kwestie
 
-${PLACEHOLDER} wymień tylko sprawy nieblokujące scenariusza i oznacz pomysły jako propozycje.
-Jeśli nie ma otwartych spraw, wpisz „Brak". Decyzje wymagane rozstrzygnij w etapie 0.
+${values.openQuestions ?? `${PLACEHOLDER} ${FIELDS.openQuestions.hint}`}
 `;
 }

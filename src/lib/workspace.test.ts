@@ -82,6 +82,9 @@ describe("projectPaths", () => {
       prepareStage: "/srv/aimator/projects/48-praw-wladzy/prepare.stage.json",
       root: "/srv/aimator/projects/48-praw-wladzy",
       rules: "/srv/aimator/projects/48-praw-wladzy/project.md",
+      rulesDraft: "/srv/aimator/projects/48-praw-wladzy/rules.stage.json",
+      rulesLock: "/srv/aimator/projects/48-praw-wladzy/rules.lock",
+      runs: "/srv/aimator/projects/48-praw-wladzy/runs",
       style: "/srv/aimator/projects/48-praw-wladzy/style.json",
       styleSources: "/srv/aimator/projects/48-praw-wladzy/style/sources",
     });

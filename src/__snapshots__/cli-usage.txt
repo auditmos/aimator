@@ -26,6 +26,15 @@ Import materiału (przed etapem 0, nie zakłada projektu; płatne jest tylko gro
 
 Etap 0. Przygotowanie projektu i odcinka:
   project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
+  project draft <id> --import <id-importu> [--model <id>] [--max-output-tokens <n>]
+                [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+                [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
+    Jedno płatne wywołanie modelu tekstowego (AIMATOR_RULES_MODEL): szkic
+    project.md z podziału importu, z serii, stylu i postaci, bez odcinków. Model
+    wypełnia pola szablonu albo zostawia TODO(etap-0), gdzie materiał milczy;
+    plik składa kod i sam wpisuje, skąd szkic pochodzi. "Zatwierdzone przez
+    użytkownika" zostaje człowiekowi, więc check nie przepuści nieczytanego
+    szkicu. Pisze tylko na nietknięty szkielet albo na własny nietknięty szkic.
   project show <id> [--json]
     Co projekt trzyma: tytuł, proporcje, narratora i obsadę, każdą postać z
     podstawą (zdjęcia albo opis w project.md) i zdjęciami. Opis, nie werdykt:

@@ -1,10 +1,13 @@
 import { type CastVoice, voicesOf } from "../../lib/character-voice/index.js";
+import { env } from "../../lib/env.js";
 import {
   approveStage0,
   type CastEntry,
   checkStage0,
+  draftRules,
   initProject,
   type ProjectOverview,
+  type RulesDraftReport,
   setNarratorVoice,
   setStyle,
   showProject,
@@ -16,6 +19,10 @@ import {
   type Approval,
   answerFlag,
   answerStage0,
+  correctionLines,
+  instructionOf,
+  MODEL_ID,
+  maxOutputTokensOf,
   modeOf,
   type Parsed,
   parse,
@@ -27,6 +34,15 @@ import {
 
 /** Stage 0's project half: the rules a series shares, and who narrates it. */
 export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
+  project draft <id> --import <id-importu> [--model <id>] [--max-output-tokens <n>]
+                [--dry-run] [--json] [--regenerate [--instruction <uwaga>]]
+                [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
+    Jedno płatne wywołanie modelu tekstowego (AIMATOR_RULES_MODEL): szkic
+    project.md z podziału importu, z serii, stylu i postaci, bez odcinków. Model
+    wypełnia pola szablonu albo zostawia TODO(etap-0), gdzie materiał milczy;
+    plik składa kod i sam wpisuje, skąd szkic pochodzi. "Zatwierdzone przez
+    użytkownika" zostaje człowiekowi, więc check nie przepuści nieczytanego
+    szkicu. Pisze tylko na nietknięty szkielet albo na własny nietknięty szkic.
   project show <id> [--json]
     Co projekt trzyma: tytuł, proporcje, narratora i obsadę, każdą postać z
     podstawą (zdjęcia albo opis w project.md) i zdjęciami. Opis, nie werdykt:
@@ -309,7 +325,128 @@ async function runProjectShow(argv: readonly string[]): Promise<Result<string>> 
   );
 }
 
+/** `--model` wins over the environment; neither has a default. */
+function rulesModelOf(parsed: Parsed): Result<string | null> {
+  const flag = parsed.values.model;
+  const value = typeof flag === "string" ? flag : (env.AIMATOR_RULES_MODEL ?? null);
+
+  if (value !== null && !MODEL_ID.test(value)) {
+    return err(new UsageError(`niepoprawny identyfikator modelu "${value}"`));
+  }
+
+  return ok(value);
+}
+
+/** The one paid subcommand of a project: a bill and the prompt first, then one call. */
+async function runProjectDraft(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, {
+    import: { type: "string" },
+    instruction: { type: "string" },
+    json: { type: "boolean" },
+    "max-output-tokens": { type: "string" },
+    model: { type: "string" },
+    regenerate: { type: "boolean" },
+    republish: { type: "boolean" },
+  });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const importId = requireFlag(parsed.data, "import");
+  const instruction = instructionOf(parsed.data);
+  const workspace = workspaceOf(parsed.data);
+  const model = rulesModelOf(parsed.data);
+  const tokens = maxOutputTokensOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (!importId.ok) {
+    return importId;
+  }
+  if (!instruction.ok) {
+    return instruction;
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+  if (!model.ok) {
+    return model;
+  }
+  if (!tokens.ok) {
+    return tokens;
+  }
+
+  if (parsed.data.values.regenerate === true && parsed.data.values.republish === true) {
+    return err(
+      new UsageError(
+        "--regenerate i --republish wykluczają się: pierwsze płaci za nową odpowiedź, drugie publikuje zapisaną"
+      )
+    );
+  }
+
+  const mode = modeOf(parsed.data);
+  // The key is read only on the paid path: a dry run must never need a secret.
+  const result = await draftRules({
+    apiKey: mode === "dry-run" ? null : (env.OPENAI_API_KEY ?? null),
+    fetch,
+    importId: importId.data,
+    instruction: instruction.data,
+    maxOutputTokens: tokens.data,
+    mode,
+    model: model.data,
+    projectId: projectId.data,
+    regenerate: parsed.data.values.regenerate === true,
+    republish: parsed.data.values.republish === true,
+    workspace: workspace.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return ok(
+    answerFlag(parsed.data) === "json"
+      ? JSON.stringify({ command: "project draft", ...result.data }, null, 2)
+      : renderDraft(result.data, mode)
+  );
+}
+
+/** The bill and the prompt before a call; the file and what is left of it after. */
+function renderDraft(report: RulesDraftReport, mode: "apply" | "dry-run"): string {
+  const what = `projektu "${report.projectId}" z importu "${report.importId}"`;
+  const lines =
+    mode === "dry-run"
+      ? [
+          `Próba na sucho: nic nie zapisano, nic nie wysłano. Szkic zasad ${what}`,
+          `  płatnych wywołań do wykonania: ${report.paidCalls}`,
+          "  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga",
+        ]
+      : [
+          `Szkic zasad ${what}, próba ${report.runId ?? ""}`,
+          `  płatnych wywołań wykonanych: ${report.paidCalls}`,
+          `  + ${report.rules}`,
+          `  zostało do uzupełnienia (${report.left.length}): ${report.left.join(", ")}`,
+        ];
+
+  lines.push(...correctionLines(report.correction));
+  lines.push(...report.problems.map((problem) => `  ! ${problem}`));
+  lines.push(`Dalej: ${report.nextStep}`);
+
+  if (report.prompt !== null) {
+    lines.push("", "--- prompt wysłany do modelu (dokładnie ten tekst) ---", report.prompt);
+  }
+
+  return lines.join("\n");
+}
+
 export async function runProject(argv: readonly string[]): Promise<Result<string>> {
+  if (argv[0] === "draft") {
+    return runProjectDraft(argv.slice(1));
+  }
+
   if (argv[0] === "voice") {
     return runProjectVoice(argv.slice(1));
   }

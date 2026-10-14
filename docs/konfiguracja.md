@@ -28,6 +28,7 @@ sekret ani po sieć.
 
 ```dotenv
 AIMATOR_IMPORT_MODEL=…                # import materiału, tekstowy; przydziela sekcje
+AIMATOR_RULES_MODEL=…                 # szkic project.md z podziału importu, tekstowy
 AIMATOR_SCREENPLAY_MODEL=…            # etap 1
 AIMATOR_IMAGE_MODEL_GPT_IMAGE=…       # etap 2, tor gpt-image
 AIMATOR_IMAGE_MODEL_SEEDREAM=…        # etap 2, tor seedream

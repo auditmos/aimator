@@ -35,6 +35,7 @@ import {
   projectPaths,
   type Workspace,
 } from "../workspace.js";
+import { draftFrom, type RulesDraftInput, type RulesDraftReport } from "./draft.js";
 import { lipSyncOf, readLipSync } from "./lip-sync.js";
 import {
   audioModes,
@@ -55,6 +56,7 @@ import {
 import { planStyle, readStyleFile, type StyleDecision, styleOutputs } from "./style.js";
 import { PLACEHOLDER, renderRules, styleBibleProblems } from "./template.js";
 
+export type { RulesDraftReport } from "./draft.js";
 export { type LipSyncChoice, readLipSync, setLipSync } from "./lip-sync.js";
 /** The five episode decisions, all made. A later stage reads them, never the draft. */
 export type { ReadySettings as EpisodeSettings, ShotListSettings } from "./schema.js";
@@ -532,6 +534,40 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
         reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
       })
     : written;
+}
+
+/**
+ * `project.md` drafted from an import's grouping: one paid text call, and a
+ * proposal a person reads, corrects and approves like rules they wrote.
+ */
+export async function draftRules(input: RulesDraftInput): Promise<Result<RulesDraftReport>> {
+  const paths = await resolveProject(input);
+
+  if (!paths.ok) {
+    return paths;
+  }
+
+  const [file, digest] = await Promise.all([
+    readProjectFile(paths.data.file),
+    readDigest(paths.data.file),
+  ]);
+
+  if (!file.ok) {
+    return file;
+  }
+
+  if (!digest.ok) {
+    return digest;
+  }
+
+  return await draftFrom(input, {
+    file: {
+      path: toWorkspacePath(input.workspace.root, paths.data.file),
+      sha256: digest.data.sha256,
+    },
+    paths: paths.data,
+    title: file.data.title,
+  });
 }
 
 export async function initProject(input: InitProjectInput): Promise<Result<Stage0Report>> {

@@ -28,6 +28,12 @@ An empty `grouped` means nobody bought one. **Never buy it**: name
 `aimator import group <import-id> --dry-run`, as you would a voice sample. The interview works
 from `material.md` alone; a grouping only saves reading it.
 
+A rules draft is paid too: `project draft <project-id> --import <import-id>` fills `project.md`
+from the grouping and leaves a marker where the material is silent. Never buy it either; name
+its `--dry-run` when the user would rather correct a draft than answer from scratch. A draft
+the user bought is read with them field by field, like a proposal of your own; its open
+markers are this interview's questions.
+
 ## What each grouped file proposes
 
 - `series.md`: the premise, the world, the tone and the audience.

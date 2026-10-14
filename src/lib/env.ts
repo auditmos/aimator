@@ -102,6 +102,12 @@ export const env = createEnv({
      */
     AIMATOR_PROMPTS_MODEL: z.string().min(1).optional(),
     /**
+     * The text model `project draft` asks to fill `project.md` from an import's
+     * grouping. Its own variable, not the import's: sorting a document and
+     * proposing a series' rules from it are two call sites and two decisions.
+     */
+    AIMATOR_RULES_MODEL: z.string().min(1).optional(),
+    /**
      * The text model stage 1 sends the screenplay prompt to. Optional because
      * `--dry-run` has to work without it, and because a default here would be
      * a model choice nobody made, on a command that spends money.

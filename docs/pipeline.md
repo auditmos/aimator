@@ -15,7 +15,10 @@ $AIMATOR_WORKSPACE/
 │                                     source.docx, material.md, images/, grouped/, runs/
 └── projects/<project-id>/
     ├── project.json                  identyfikator, tytuł, proporcje, obsada
-    ├── project.md                    zasady wspólne, jedyny plik pisany ręcznie
+    ├── project.md                    zasady wspólne, pisane ręcznie albo od szkicu z importu
+    ├── rules.stage.json              rekord szkicu project.md (project draft), osobno od
+    │                                 prepare.stage.json, bo szkic jest do poprawiania
+    ├── runs/<runId>/                 archiwum płatnych prób szkicu
     ├── narration.json                jak narrator CZYTA (etap 9), osobno od project.json,
     │                                 bo to suwak, a project.json jest wejściem wszystkiego
     ├── mix.json                      jak głośno siedzi podkład i jak ustępuje pod mową
@@ -112,9 +115,21 @@ zamieniony na `material.md` i obrazy, a po płatnym podziale także `grouped/`: 
 materiału skopiowane dosłownie pod przydziałem do serii, stylu, postaci albo odcinka.
 Niczego nie rozstrzyga i nikt go nie zatwierdza. Etap 0 bierze z niego pliki tak samo jak
 z każdej innej ścieżki (`episode add --source`, `character add --source`), czyli kopią
-bajtów z sha256, więc żaden artefakt projektu nie ma importu za wejście, a poprawka
+bajtów z sha256, więc żaden rekord etapu 0 nie ma importu za wejście, a poprawka
 albo usunięcie importu nie cofa żadnej zgody. Układ, rekordy i odmowy opisuje
 [import.md](import.md).
+
+**Szkic zasad z importu jest propozycją, nie rekordem etapu 0.** `project draft <projekt>
+--import <id>` kupuje jedno wywołanie tekstowe: model podaje wartość każdego pola szablonu
+`project.md` z podziału (seria, styl, postacie, reszta; bez odcinków, bo fabuła należy do
+etapu 1) albo `null`, gdy materiał milczy, a plik składa kod z tego samego szablonu co
+`init`, więc struktura, którą czyta etap 0, nie może wrócić zepsuta. Wiersz „Przygotowano”
+wpisuje kod, a „Zatwierdzone przez użytkownika” zostaje ze znacznikiem, więc `check` nie
+przepuści szkicu, którego nikt nie przeczytał. Rekord szkicu leży w `rules.stage.json` obok
+`prepare.stage.json`, nie w nim: etap 0 weryfikuje hash każdego wyjścia, które ten plik
+wymienia, a szkic istnieje po to, żeby go poprawić. Ma za wejście `project.json` i pliki
+podziału, ale nie jest wejściem niczego, więc i tu import nie może cofnąć zgody. Szkic pisze
+wyłącznie na nietknięty szkielet albo na własny nietknięty szkic; cudzą pracę zostawia.
 
 ## Plik etapu
 

@@ -52,6 +52,9 @@ export const stageNames = [
   // A document brought in and sorted before any project exists. Not a row and
   // not inside a project: it is material waiting for stage 0, under imports/.
   "import",
+  // project.md drafted by a model from an import. Inside stage 0 but not its
+  // record: a draft is a proposal a person edits, and stage 0 verifies digests.
+  "rules",
 ] as const;
 
 const recordedFileSchema = z.strictObject({ path: z.string().min(1), sha256: sha256Schema });

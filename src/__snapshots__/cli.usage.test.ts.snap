@@ -1238,6 +1238,85 @@ Płaskie 2D. Paleta dziesięciu barw.
 "
 `;
 
+exports[`every command >   project draft <id> --import <id-importu> [--model <id>] [--max-output-tokens <n>] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano, nic nie wysłano. Szkic zasad projektu "ewa" z importu "miko"
+  płatnych wywołań do wykonania: 0
+  OPENAI_API_KEY nie był czytany, bo próba na sucho nie sięga po sekrety; płatne wywołanie go wymaga
+  ! import "miko" nie ma podziału, a szkic czyta podział: aimator import group miko --dry-run
+  ! projects/ewa/project.md poprawiono ręcznie, a szkic nadpisałby tę pracę; poprawiaj go dalej albo, jeśli tej pracy nie potrzebujesz, usuń projects/ewa/project.md, a szkic zacznie od szkieletu
+Dalej: usuń powyższe przeszkody przed płatnym wywołaniem
+
+--- prompt wysłany do modelu (dokładnie ten tekst) ---
+# Task: draft the shared rules of an animated series from its imported material
+
+A person is preparing a short animated series in a production pipeline. They
+brought a document (a director's treatment, a series bible) that was converted
+and sorted by what each part is about. You receive those parts below. From
+them, fill the fields of the series' shared rules, \`project.md\`: the decisions
+every episode and every generated image of the series relies on.
+
+What you write is a **proposal**. The person reads every field, corrects it and
+approves the rules themselves; nothing you return is accepted until they do.
+
+## How to fill a field
+
+- Use only what the material states or clearly implies. Condense and rephrase
+  freely, but invent nothing: no trait, colour, rule or place the material does
+  not support.
+- When the material does not answer a field, return \`null\`. The field then
+  stays open for the person to answer. An empty field costs them one answer; a
+  guess presented as the material's costs them a wrong series.
+- Never write the plot of an episode. Each episode's story is written later,
+  from that episode's own source; the rules only say what holds across them.
+- Write in the language of the material, keeping its names, **except the four
+  Style Bible fields**, which are English, because every image model receives
+  them verbatim as an instruction.
+- Plain text. A field may hold several lines and a list of \`- \` items. No
+  headings: a line starting with \`#\` would break the document.
+- Image links like \`![I01](images/I01.png)\` stand for pictures you cannot see.
+  Do not describe what they might show.
+
+## The Style Bible
+
+- \`styleLine\`: 5–7 comma-separated phrases, in this order of layers: format,
+  medium, linework, shading, palette, texture, light and mood, composition.
+  Only the layers that set this style apart. Only what is there (what must not
+  be there belongs in \`alwaysNever\`), no value judgements such as "beautiful"
+  or "high quality".
+- **Never a studio, film, artist or series name** in any Style Bible field,
+  even one the material uses as a reference (an earlier film of the same
+  series included). Describe the look such a name stands for instead.
+- \`palette\`: 5–8 colours, each a name and a hex value. Colours the material
+  names may be turned into hex values; the person will check them.
+
+## Fields
+
+- \`theme\`: what connects the episodes: the subject of the series.
+- \`episodeRule\`: what a single episode tells, and how it ties to the rest of the series.
+- \`audience\`: who the series is for (age) and how it speaks to them: the tone.
+- \`world\`: the shared world and time of the action.
+- \`protagonist\`: the main character and their role: participant, observer or narrator.
+- \`proportions\`: how figures are stylised: head-to-body ratio and degree of deformation (not the frame's aspect ratio).
+- \`traits\`: each recurring character's fixed look and costume: hair colour and shape, cut and colour of clothes, distinguishing features. One \`- Name: …\` item per character. When a character is drawn from a description, this is the only thing the drawing stage reads, so be complete and concrete.
+- \`cast\`: the recurring supporting cast, or explicitly 'brak stałej obsady'.
+- \`relations\`: how the characters relate in scale (who is taller and by how much, whether heads are the same size) and what is drawn identically on all of them.
+- \`props\`: recurring props, each described by shape, size against the characters, material, colour and wear; or explicitly 'brak'.
+- \`styleLine\`: (English) the style line described above.
+- \`palette\`: (English) 5–8 colours, each a name and a hex value.
+- \`linework\`: (English) outer and inner line weight, taper and colour; for 3D, how edges and outlines read.
+- \`alwaysNever\`: (English) hard rules for the whole drawing, or an explicit 'none'.
+- \`opening\`: a required composition of an episode's opening, or explicitly no extra constraint.
+- \`scenery\`: the places the series returns to and what is fixed in each (palette, light, objects that must not move), or explicitly 'brak'.
+- \`continuity\`: what must stay the same between scenes and between episodes.
+- \`openQuestions\`: only open issues that do not block writing an episode, ideas marked as proposals; 'Brak' when there are none.
+
+# The material, part by part
+
+
+"
+`;
+
 exports[`every command >   project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Utworzono projekt "nowy"

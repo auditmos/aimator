@@ -27,7 +27,9 @@ ze wskazanego pliku źródłowego.
 
 ```bash
 pnpm dev project init dzielna-ewa --title "Dzielna Ewa" --aspect-ratio 16:9
-# uzupełnij każdy TODO(etap-0) w project.md; to jedyny plik pisany ręcznie
+# uzupełnij każdy TODO(etap-0) w project.md; to jedyny plik pisany ręcznie,
+# chyba że seria przyszła z Worda: wtedy szkic z podziału importu (płatny)
+pnpm dev project draft dzielna-ewa --import treatment --dry-run
 # wymień każdą powracającą postać, nie tylko główną
 pnpm dev character new dzielna-ewa ewa --name "Ewa"
 pnpm dev character add dzielna-ewa ewa --source ~/Zdjecia/portret.jpg
@@ -149,6 +151,30 @@ je ocenia, a dopiero to polecenie mówi, jakie są teraz. Pod `--json` wypisuje 
 `settings` z sześcioma decyzjami, `null` tam, gdzie nikt nie zdecydował, i `lipSync`:
 kod języka ust, `none` albo `null`). `lipSync` stoi obok `settings`, a nie w nim, bo
 mieszka w `lip-sync.json`, a nie w `episode.json`.
+
+## Szkic zasad z importu
+
+Gdy seria przyszła jako dokument Worda i ma już [podział](../import.md), `project.md` nie
+musi zaczynać się od pustego szkieletu:
+
+```bash
+pnpm dev project draft miko --import miko --dry-run   # prompt i rachunek, nic nie wysyła
+pnpm dev project draft miko --import miko             # jedno płatne wywołanie
+pnpm dev project draft miko --import miko --regenerate --instruction "Paleta cieplejsza."
+```
+
+Model (`AIMATOR_RULES_MODEL` albo `--model`) czyta podział bez odcinków, bo fabuła należy
+do [etapu 1](01-scenariusz.md), i podaje wartość każdego pola albo nic, gdy materiał
+milczy; wtedy pole zostaje z `TODO(etap-0)`. Style Bible pisze po angielsku i bez nazw
+studiów, filmów i artystów. Plik składa kod z szablonu, wiersz „Przygotowano” wpisuje sam,
+a „Zatwierdzone przez użytkownika” zostawia Tobie, więc `check` nie przepuści szkicu, póki
+go nie przeczytasz i nie uzupełnisz. To nadal propozycja: poprawiasz ją jak własny tekst,
+a `approve` daje to samo „tak”, co zawsze.
+
+Szkic pisze tylko na nietknięty szkielet albo na własny szkic, którego nikt nie ruszył.
+Po ręcznej poprawce odmawia, żeby jej nie nadpisać; nowy szkic dostaniesz wtedy dopiero
+po usunięciu `project.md`. Rekord leży w `rules.stage.json`, a archiwum próby w `runs/`
+projektu.
 
 ## Pomysł bez pliku
 

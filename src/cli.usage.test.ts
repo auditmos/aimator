@@ -625,6 +625,16 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "gpt-image-2.5-sunburst",
     "--dry-run",
   ],
+  "  project draft <id> --import <id-importu> [--model <id>] [--max-output-tokens <n>]": [
+    "project",
+    "draft",
+    PROJECT,
+    "--import",
+    "miko",
+    "--model",
+    "gpt-6-astra",
+    "--dry-run",
+  ],
   "  project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]": [
     "project",
     "init",

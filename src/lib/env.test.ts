@@ -21,6 +21,10 @@ describe("env", () => {
     expect(["string", "undefined"]).toContain(typeof env.AIMATOR_IMPORT_MODEL);
   });
 
+  it("should expose the rules draft model as an optional string", () => {
+    expect(["string", "undefined"]).toContain(typeof env.AIMATOR_RULES_MODEL);
+  });
+
   it("should expose OPENAI_API_KEY as an optional string", () => {
     expect(["string", "undefined"]).toContain(typeof env.OPENAI_API_KEY);
   });

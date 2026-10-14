@@ -86,6 +86,16 @@ export interface ProjectPaths {
   readonly root: string;
   readonly rules: string;
   /**
+   * The record of `project.md` drafted by a model from an import, in a file of
+   * its own rather than in `prepare.stage.json`: stage 0 verifies every output
+   * that file names, and a draft exists to be edited by hand afterwards.
+   */
+  readonly rulesDraft: string;
+  /** A file, not a directory, for the reason `CharacterTrackPaths.lock` gives. */
+  readonly rulesLock: string;
+  /** The archive of every paid attempt at the project level, as an episode keeps its own. */
+  readonly runs: string;
+  /**
    * Which style frames every film frame carries, a stage-0 decision with a file
    * of its own for the reason `narration.json` has one: `project.json` is a
    * recorded input of nearly everything, and a style frame is an input of film
@@ -650,6 +660,9 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
     prepareStage: join(root, "prepare.stage.json"),
     root,
     rules: join(root, "project.md"),
+    rulesDraft: join(root, "rules.stage.json"),
+    rulesLock: join(root, "rules.lock"),
+    runs: join(root, "runs"),
     style: join(root, "style.json"),
     styleSources: join(root, "style", "sources"),
   });
