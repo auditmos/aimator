@@ -1,5 +1,6 @@
 import { type JSX, type SyntheticEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
+import { stageName } from "./ladder";
 import {
   Action,
   asCalls,
@@ -24,8 +25,8 @@ import type { ImportListing, ImportOverview, Refusal, RunDone } from "./types";
  * file: it is no stage, it has no cell on any ladder and nothing on it is
  * approved. What it shows is `import show`; what it does is `import add` and
  * the one paid `import group`, bought in the same two steps as every stage.
- * What the material becomes is stage 0's, which `/prepare-project` runs with a
- * person, so the screen ends where the CLI's "Dalej" ends: at the files.
+ * What the material becomes is stage 0's, so once a grouping is there the
+ * next step is a new project, offered with the import's name and nothing more.
  */
 
 /** One file of an import by what it is: `material`, `I01.png`, `character:miko`. */
@@ -271,13 +272,15 @@ function GroupedText(props: {
  */
 export function ImportPanel(props: {
   readonly importId: string;
+  /** Where a project starts from this import; the address is the app's to know. */
+  readonly newProjectHref: string;
   readonly onRun: (argv: readonly string[]) => void;
   /** Whatever moves when the workspace does; the import is re-read on it. */
   readonly revision: unknown;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { importId, onRun, revision, run, running } = props;
+  const { importId, newProjectHref, onRun, revision, run, running } = props;
   const answer = useAnswer<ImportOverview>(`/api/import/${encodeURIComponent(importId)}`, revision);
   const material = useImportText(importId, "material", revision);
   const [flags, setFlags] = useState<SendFlags>(NO_FLAGS);
@@ -336,10 +339,23 @@ export function ImportPanel(props: {
 
   return (
     <div className="stage-body">
-      <div className="next-card">
-        <p className="next-label">Następny krok</p>
-        <p className="next-what">{report.nextStep}</p>
-      </div>
+      {report.grouped.length === 0 ? (
+        <div className="next-card">
+          <p className="next-label">Następny krok</p>
+          <p className="next-what">{report.nextStep}</p>
+        </div>
+      ) : (
+        <div className="next-card">
+          <p className="next-label">Następny krok</p>
+          <p className="next-what">
+            <span className="next-stage">Etap 0</span> {stageName(0)}
+          </p>
+          <a className="action action-primary next-go" href={newProjectHref}>
+            Załóż projekt z tego materiału
+          </a>
+          <p className="next-terminal">W terminalu: {report.nextStep}</p>
+        </div>
+      )}
 
       <Block title="Materiał">
         <dl className="verdict">

@@ -824,7 +824,11 @@ export interface Refusal {
 /** The imports in the workspace, as `import list --json` prints them. */
 export interface ImportListing {
   readonly command: "import list";
-  readonly imports: readonly string[];
+  readonly imports: readonly {
+    /** The files its grouping published; none before anybody bought one. */
+    readonly grouped: number;
+    readonly id: string;
+  }[];
   readonly workspace: string;
 }
 

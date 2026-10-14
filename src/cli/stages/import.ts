@@ -51,7 +51,8 @@ export const USAGE = `Import materiału (przed etapem 0, nie zakłada projektu; 
     je przelicza, obrazy i sekcje, które je pokazują, pliki podziału oraz
     uwagi: co konwersja pominęła i co zmieniono ręcznie. Niczego nie zapisuje.
   import list [--json]
-    Identyfikatory importów w katalogu roboczym. Niczego nie zapisuje.`;
+    Importy w katalogu roboczym, każdy z liczbą plików podziału: import
+    podzielony jest gotowy do etapu 0. Niczego nie zapisuje.`;
 
 /** Copies and converts: free, and nothing in it is a decision. */
 async function runImportAdd(parsed: Parsed): Promise<Result<string>> {
@@ -244,8 +245,14 @@ async function runImportList(parsed: Parsed): Promise<Result<string>> {
   return ok(
     [
       `Importy w ${workspace.data.root}:`,
-      ...(imports.length === 0 ? ["  Brak importów."] : imports.map((id) => `  ${id}`)),
-      `Dalej: ${first === undefined ? "aimator import add <id> --source <plik.docx>" : `aimator import show ${first}`}`,
+      ...(imports.length === 0
+        ? ["  Brak importów."]
+        : imports.map(({ grouped, id }) =>
+            grouped === 0
+              ? `  ${id}  niepodzielony`
+              : `  ${id}  podzielony (plików: ${grouped}), gotowy do etapu 0`
+          )),
+      `Dalej: ${first === undefined ? "aimator import add <id> --source <plik.docx>" : `aimator import show ${first.id}`}`,
     ].join("\n")
   );
 }

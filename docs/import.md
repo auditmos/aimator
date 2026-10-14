@@ -16,7 +16,7 @@ aimator import add <id> --source <plik.docx>             # kopia i konwersja
 aimator import show <id>                                 # sekcje, obrazy, podział, uwagi
 aimator import group <id> --dry-run                      # prompt i rachunek, nic nie wysyła
 aimator import group <id>                                # płatny podział materiału
-aimator import list                                      # identyfikatory importów
+aimator import list                                      # importy i liczba plików podziału
 ```
 
 Każda przyjmuje `--json` i wypisuje wtedy ten sam obiekt, który renderuje tekst. Import

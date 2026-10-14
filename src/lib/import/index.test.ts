@@ -405,6 +405,9 @@ describe("listImports", () => {
     await mkdir(join(root, "imports", ".zapas"));
     await writeFile(join(root, "imports", "notatka.txt"), "x");
 
-    expect(await listImports(workspace)).toEqual(["a", "b"]);
+    expect(await listImports(workspace)).toEqual([
+      { grouped: 0, id: "a" },
+      { grouped: 0, id: "b" },
+    ]);
   });
 });

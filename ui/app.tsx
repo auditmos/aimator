@@ -99,7 +99,8 @@ const CONNECTION_NOTE: Record<Connection, string | null> = {
  */
 type Route =
   | { readonly kind: "home" }
-  | { readonly kind: "new" }
+  /** A new project, from an import's page when `importId` names one. */
+  | { readonly importId: string | null; readonly kind: "new" }
   | { readonly kind: "open" }
   | { readonly kind: "imports" }
   | { readonly importId: string; readonly kind: "import" }
@@ -129,6 +130,11 @@ const IMPORTS = "#/import";
 
 function importHref(importId: string): string {
   return `${IMPORTS}/${encodeURIComponent(importId)}`;
+}
+
+/** The new-project form, opened from an import that is ready for stage 0. */
+function newFromImportHref(importId: string): string {
+  return `${NEW}/import/${encodeURIComponent(importId)}`;
 }
 
 function projectHref(projectId: string): string {
@@ -179,7 +185,7 @@ function routeOf(hash: string): Route {
     .split("/");
 
   if (first === "nowy") {
-    return { kind: "new" };
+    return { importId: second === "import" ? segment(third) : null, kind: "new" };
   }
 
   if (first === "wczytaj") {
@@ -1007,7 +1013,16 @@ function Imports(props: {
         <p className="empty">Katalog roboczy nie ma jeszcze żadnego importu.</p>
       ) : null}
       {imports === null || imports.length === 0 ? null : (
-        <PickList items={imports.map((id) => ({ href: importHref(id), id }))} />
+        <PickList
+          items={imports.map(({ grouped, id }) => ({
+            href: importHref(id),
+            id,
+            meta:
+              grouped === 0
+                ? "niepodzielony · następny krok: podział"
+                : `podzielony, ${plural(grouped, ["plik", "pliki", "plików"])} · gotowy do etapu 0`,
+          }))}
+        />
       )}
     </section>
   );
@@ -1032,6 +1047,7 @@ function ImportScreen(props: {
       <Commands>
         <ImportPanel
           importId={importId}
+          newProjectHref={newFromImportHref(importId)}
           onRun={onRun}
           revision={listing}
           run={run}
@@ -1237,8 +1253,19 @@ export function App(): JSX.Element {
           ) : null}
           {route.kind === "new" ? (
             <>
-              <Back href={HOME} label="Start" />
-              <NewProject onCreated={createdProject} onRun={start} run={run} running={running} />
+              {route.importId === null ? (
+                <Back href={HOME} label="Start" />
+              ) : (
+                <Back href={importHref(route.importId)} label={`Import ${route.importId}`} />
+              )}
+              <NewProject
+                importId={route.importId}
+                key={route.importId ?? ""}
+                onCreated={createdProject}
+                onRun={start}
+                run={run}
+                running={running}
+              />
             </>
           ) : null}
           {route.kind === "open" ? (

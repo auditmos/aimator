@@ -100,7 +100,11 @@ describe("import show and list", () => {
 
     expect(shown.command).toBe("import show");
     expect(shown.material).toBe("imports/miko/material.md");
-    expect(listed).toEqual({ command: "import list", imports: ["miko"], workspace: root });
+    expect(listed).toEqual({
+      command: "import list",
+      imports: [{ grouped: 0, id: "miko" }],
+      workspace: root,
+    });
   });
 
   it("says so when there is nothing to list", async () => {

@@ -916,7 +916,7 @@ order the episodes first appear.
 exports[`every command >   import list [--json] 1`] = `
 "ok
 Importy w <workspace>:
-  miko
+  miko  niepodzielony
 Dalej: aimator import show miko"
 `;
 

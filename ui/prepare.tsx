@@ -80,15 +80,20 @@ const ASPECT_RATIOS: readonly { readonly label: string; readonly value: string }
  * one. What it hands back is the identifier it created, and only once the CLI
  * has said yes: the screen then moves into that project, and a refusal stays
  * here, under the form, in the terminal's words.
+ *
+ * Opened from an import, it proposes the import's identifier and nothing
+ * else: the title and the ratio are decisions the material cannot make.
  */
 export function NewProject(props: {
+  /** The import this project starts from, or nothing when it starts empty. */
+  readonly importId: string | null;
   readonly onCreated: (projectId: string) => void;
   readonly onRun: (argv: readonly string[]) => void;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { onCreated, onRun, run, running } = props;
-  const [projectId, setProjectId] = useState("");
+  const { importId, onCreated, onRun, run, running } = props;
+  const [projectId, setProjectId] = useState(importId ?? "");
   const [title, setTitle] = useState("");
   const [aspectRatio, setAspectRatio] = useState("");
   const chooseRatio = useCallback(
@@ -127,6 +132,13 @@ export function NewProject(props: {
         Zakłada katalog serii i szkielet <code>project.md</code>. Zasady wspólne uzupełnia się potem
         w tym pliku ręcznie: to jedyny artefakt tego narzędzia pisany przez człowieka.
       </p>
+      {importId === null ? null : (
+        <p className="actions-note">
+          Materiał z importu <code>{importId}</code> nie trafia do projektu sam: projekt zaczyna się
+          pusty, a to, co z podziału ma do niego wejść, dodaje się w kolejnych krokach etapu 0.
+          Identyfikator podpowiada import; tytuł i proporcje wybierasz sam.
+        </p>
+      )}
       <div className="send">
         <Field
           id="prepare-project"

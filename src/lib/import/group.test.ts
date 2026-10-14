@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { docx } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
-import { addImport, groupImport, showImport } from "./index.js";
+import { addImport, groupImport, listImports, showImport } from "./index.js";
 
 /**
  * Grouping: the one paid step of an import, through the module entry. The
@@ -399,5 +399,17 @@ describe("groupImport", () => {
     expect(errorOf(await group({ importId: "brak" }))).toBe(
       'import "brak" nie istnieje: aimator import add brak --source <plik.docx>'
     );
+  });
+});
+
+describe("listImports", () => {
+  it("counts the files each grouping published, none before anybody bought one", async () => {
+    await prepare("sad");
+    await group();
+
+    expect(await listImports(workspace)).toEqual([
+      { grouped: 6, id: "miko" },
+      { grouped: 0, id: "sad" },
+    ]);
   });
 });

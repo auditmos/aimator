@@ -28,11 +28,14 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   dokument przynosi się raz, przed projektem, a to, czym się stanie, i tak zaczyna się od
   nowego projektu. Formularz `import add` (identyfikator i ścieżka do `.docx` wklejona
   z Findera, z powodu opisanego niżej przy etapie 0), a pod nim importy z `import list
-  --json`, czytane na nowo przy każdej zmianie w katalogu roboczym. Gdy CLI powie „tak”,
+  --json`, czytane na nowo przy każdej zmianie w katalogu roboczym, każdy ze swoim stanem:
+  „niepodzielony” albo „podzielony, N plików · gotowy do etapu 0”. Gdy CLI powie „tak”,
   ekran przechodzi do importu; odmowa, na przykład zajęty identyfikator, zostaje w pasku
   na dole słowo w słowo.
 - **Strona importu** (`#/import/<id>`): to, co mówi `import show --json`, i nic więcej.
-  Najpierw następny krok, zdanie CLI bez zmian. Potem materiał: dokument, z którego
+  Najpierw następny krok: przed podziałem zdanie CLI bez zmian, po nim etap 0 z przyciskiem
+  „Załóż projekt z tego materiału”, a zdanie CLI pod nim jako to, co to samo znaczy
+  w terminalu. Potem materiał: dokument, z którego
   pochodzi, sekcje `T01…` z nagłówkiem, liczbą znaków i miniaturami obrazów, które
   pokazują, oraz uwagi (co konwersja pominęła, co zmieniono ręcznie, podział starszy od
   materiału). Treść `material.md` jest zwinięta. Obrazy stoją w galerii, każdy z nazwą
@@ -41,14 +44,16 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   `episode:01-…`), czytany dopiero po rozwinięciu. Na końcu „Generowanie (płatne)”, czyli
   `import group` w tych samych dwóch krokach co każdy płatny etap: „Generuj” to próba na
   sucho z rachunkiem i całym promptem, „Kup” pojawia się dopiero po niej. Nic tu się nie
-  zatwierdza, bo podział to propozycja, którą czyta skill `/prepare-project`, więc ekran
-  kończy się tam, gdzie kończy się „Dalej” w CLI.
+  zatwierdza, bo podział to propozycja, a to, co z niej wejdzie do projektu, rozstrzyga
+  etap 0.
 - **Nowy projekt** (`#/nowy`): sam formularz `project init` (identyfikator, tytuł,
   proporcje). Proporcje wybiera się z listy najczęstszych (16:9, 9:16, 1:1, 4:5, 4:3,
   21:9), a lista otwiera się na „nierozstrzygnięte”, bo ta decyzja nie ma wartości
   domyślnej. Inne proporcje podaje się w terminalu przez `--aspect-ratio`. Gdy CLI powie
   „tak”, ekran przechodzi do tego projektu; odmowa zostaje pod formularzem, słowo
-  w słowo.
+  w słowo. Otwarty ze strony importu (`#/nowy/import/<id>`) podpowiada identyfikator
+  importu i nic więcej: tytułu i proporcji materiał nie rozstrzyga, a projekt zaczyna się
+  pusty, bo nic z importu nie trafia do niego samo.
 - **Wczytaj projekt** (`#/wczytaj`): projekty z `list --json` jako lista odnośników z
   liczbą odcinków i znakiem etapu 0. Pusty katalog roboczy mówi o tym i odsyła do nowego
   projektu. Znak to odpowiedź `check <id> --stage prepare` (pod `/api/prepare/<id>`)

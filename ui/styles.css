@@ -399,6 +399,10 @@ h1 {
 .next-card-done {
   border-left-color: var(--color-success-text);
 }
+/* On an import's page the card stands over the blocks rather than alone. */
+.stage-body > .next-card {
+  margin-bottom: 1rem;
+}
 /* A label, not a badge: a cyan pill here once looked like a button and did
    nothing when clicked. */
 .next-label {

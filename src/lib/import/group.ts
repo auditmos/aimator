@@ -268,12 +268,13 @@ function stage(
 /**
  * What `show` says about a finished grouping: the files it wrote, and whether
  * the material has moved on since, which leaves those files sorting text that
- * `material.md` no longer holds.
+ * `material.md` no longer holds. `list` asks for the files alone, with no
+ * material read, so it is handed none and told nothing about one.
  */
 export async function groupingOf(
   workspace: Workspace,
   paths: ImportPaths,
-  material: { readonly sha256: string }
+  material: { readonly sha256: string } | null
 ): Promise<{
   readonly files: readonly Pick<GroupedFile, "destination" | "path">[];
   readonly notices: readonly string[];
@@ -295,7 +296,7 @@ export async function groupingOf(
       return destination === null ? [] : [{ destination: labelOf(destination), path }];
     }),
     notices:
-      read === material.sha256
+      material === null || read === material.sha256
         ? []
         : [
             `${materialPath} zmieniono po podziale; ${toWorkspacePath(workspace.root, paths.grouped)}/ dzieli poprzednią treść, nowy podział kupuje --regenerate`,

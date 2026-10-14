@@ -203,11 +203,30 @@ export async function showImport(input: ImportInput): Promise<Result<ImportRepor
   );
 }
 
-/** The imports in the workspace, by id; a directory that could not be one is skipped. */
-export async function listImports(workspace: Workspace): Promise<readonly string[]> {
-  const listing = await listDirectory(importsRoot(workspace));
+/** One import as `list` names it: which, and whether its grouping is there yet. */
+interface ListedImport {
+  /** The files its grouping published; none before anybody bought one. */
+  readonly grouped: number;
+  readonly id: string;
+}
 
-  return (listing?.others ?? []).filter((id) => importPaths(workspace, id).ok);
+/** The imports in the workspace, by id; a directory that could not be one is skipped. */
+export async function listImports(workspace: Workspace): Promise<readonly ListedImport[]> {
+  const listing = await listDirectory(importsRoot(workspace));
+  const listed: ListedImport[] = [];
+
+  for (const id of listing?.others ?? []) {
+    const paths = importPaths(workspace, id);
+
+    if (paths.ok) {
+      // biome-ignore lint/performance/noAwaitInLoops: a handful of imports, listed in order
+      const grouping = await groupingOf(workspace, paths.data, null);
+
+      listed.push({ grouped: grouping.files.length, id });
+    }
+  }
+
+  return listed;
 }
 
 interface PlannedImport {

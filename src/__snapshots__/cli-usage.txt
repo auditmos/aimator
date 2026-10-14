@@ -21,7 +21,8 @@ Import materiału (przed etapem 0, nie zakłada projektu; płatne jest tylko gro
     je przelicza, obrazy i sekcje, które je pokazują, pliki podziału oraz
     uwagi: co konwersja pominęła i co zmieniono ręcznie. Niczego nie zapisuje.
   import list [--json]
-    Identyfikatory importów w katalogu roboczym. Niczego nie zapisuje.
+    Importy w katalogu roboczym, każdy z liczbą plików podziału: import
+    podzielony jest gotowy do etapu 0. Niczego nie zapisuje.
 
 Etap 0. Przygotowanie projektu i odcinka:
   project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]

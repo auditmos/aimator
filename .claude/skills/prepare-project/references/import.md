@@ -12,7 +12,7 @@ exactly like a suggestion of your own. Material stays in its author's language (
 ## Read it before you ask
 
 ```sh
-aimator import list --json                # the imports, and the workspace root
+aimator import list --json                # the imports, grouped or not, and the workspace root
 aimator import show <import-id> --json    # sections, images, grouped files, notices
 ```
 
