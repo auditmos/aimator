@@ -846,22 +846,8 @@ Biome and `tsconfig` already enforce the mechanical rules: `noExplicitAny`, `noU
 - Return `Result<T>` (`src/lib/result.ts`) for recoverable errors; let unexpected errors propagate to the caller
 - Throw typed error classes extending `Error`, never a bare `new Error(string)`
 
-```ts
-class ValidationError extends Error {
-  readonly field: string;
-
-  constructor(field: string, message: string) {
-    super(message);
-    this.name = "ValidationError";
-    this.field = field;
-  }
-}
-
-function parsePort(raw: string): Result<number> {
-  const port = Number(raw);
-  return Number.isInteger(port) ? ok(port) : err(new ValidationError("port", raw));
-}
-```
+`IdentifierError` in [src/lib/workspace.ts](src/lib/workspace.ts) is the shape: a named class
+carrying the value it refused, handed back through `err(...)`.
 
 ## Scripts
 
@@ -996,6 +982,8 @@ and a default would have silently changed what one of them asserted.
 
 ## Commit Format
 
+<important if="you are writing a commit message, choosing its type or scope, or asking why a release did or did not happen">
+
 Conventional Commits enforced via commitlint:
 
 ```
@@ -1031,7 +1019,11 @@ closing it after the last phase is what releases, with the notes of every commit
 previous tag. Nothing in the workflow needs editing per PRD. The cost is deliberate: an
 unrelated `fix` waits with the PRD, which is the right trade for a solo repository.
 
+</important>
+
 ## Environment Variables
+
+<important if="you are adding, renaming or removing an environment variable, or adding a paid call site that needs a model variable">
 
 - Define schemas in `src/lib/env.ts` using `@t3-oss/env-core` + Zod
 - `.env.example` is the committed reference; add every new variable to it
@@ -1100,6 +1092,8 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
   not a choice between engines, it is the engine. The variable exists for a build that is
   not on `PATH`, never for picking a different tool.
 
+</important>
+
 ## Development Workflow
 
 1. Plan the change, exploring the existing code first
@@ -1112,9 +1106,26 @@ unrelated `fix` waits with the PRD, which is the right trade for a solo reposito
    and neither develops an episode's plot, which belongs to stage 1
 7. Commit with a conventional commit message; the pre-commit hook runs lint + tests
 
-## Formatting Rules
+## Writing a skill
 
-- Biome with the `ultracite/biome/core` preset
-- Line width: 100 (overrides the preset's 80)
-- Indentation: 2 spaces (from the preset)
-- Unused imports: warned
+<important if="you are writing or changing a skill under .claude/skills">
+
+- **One concept, one word, from [docs/slownik.md](docs/slownik.md):** the Polish word in
+  conversation, the English one in a skill's instructions. A concept the glossary lacks
+  gets a row there rather than a phrasing of its own in one skill, because a synonym in a
+  conversation becomes a synonym in a prompt.
+- **`SKILL.md` holds what applies from the first sentence of a conversation.** The rest
+  goes to a file under that skill's own `references/`, and every pointer to it says when
+  to load it, as `develop-series` does for
+  [references/elementy.md](.claude/skills/develop-series/references/elementy.md): a
+  reference loaded unconditionally saves no context, it only adds a hop. A pointer is a
+  Markdown link, never a path in backticks, because the link check cannot see a quoted
+  path. A skill never reads another skill's `references/`; that is the module rule above,
+  applied to prose.
+- **The length is a limit:** `develop-series` within 100 lines, `prepare-project` within
+  120, the extra twenty for its save commands, both held by
+  [src/test/docs.test.ts](src/test/docs.test.ts). Instructions like these arrive marked as
+  possibly irrelevant, and the longer the file, the more of it is read as optional, so
+  what does not fit moves to a reference file instead of raising the limit.
+
+</important>

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { run } from "../cli/index.js";
@@ -60,6 +60,55 @@ const SKILLS = COMMITTED.filter((path) => path.startsWith(".claude/skills/")).ma
 /** The skills that point the conversation at pages rather than copy them. */
 const STAGE_0_SKILLS = [".claude/skills/develop-series", ".claude/skills/prepare-project"];
 const QUOTED = /`([^`\s]+)`/g;
+
+/** A part of AGENTS.md that applies only sometimes, each tag on a line of its own. */
+const CONDITION_OPEN = /^<important if="([^"]+)">$/;
+const CONDITION_CLOSE = "</important>";
+const HEADING = /^(#+) /;
+
+/** The sections of AGENTS.md every task needs, by their headings. */
+const UNCONDITIONAL = [
+  "## Project Overview",
+  "## Project Structure",
+  "## Pipeline rules",
+  "### Module boundaries",
+  "## Testing Conventions",
+];
+
+interface ConditionalBlock {
+  readonly condition: string;
+  /** The line of the opening tag. */
+  readonly from: number;
+  /**
+   * The line of the closing tag. A block that never closes before the next one
+   * opens runs to the end of the file, which is how an unclosed tag reads.
+   */
+  readonly to: number;
+}
+
+function conditionalBlocks(lines: readonly string[]): ConditionalBlock[] {
+  const blocks: ConditionalBlock[] = [];
+  let open: { condition: string; from: number } | undefined;
+
+  for (const [index, line] of lines.entries()) {
+    const [, condition] = CONDITION_OPEN.exec(line.trim()) ?? [];
+    if (condition !== undefined) {
+      if (open !== undefined) {
+        blocks.push({ ...open, to: lines.length });
+      }
+      open = { condition, from: index };
+    } else if (line.trim() === CONDITION_CLOSE && open !== undefined) {
+      blocks.push({ ...open, to: index });
+      open = undefined;
+    }
+  }
+
+  if (open !== undefined) {
+    blocks.push({ ...open, to: lines.length });
+  }
+
+  return blocks;
+}
 
 function markdownUnder(path: string): string[] {
   const prefix = `${relative(repoRoot, path)}/`;
@@ -225,6 +274,60 @@ describe("documentation", () => {
     }
     expect(files.length).toBeGreaterThanOrEqual(STAGE_0_SKILLS.length);
     expect(quoted).toEqual([]);
+  });
+
+  /**
+   * The glossary governs one kind of task, so AGENTS.md points at it under a
+   * condition that names that task. Unconditional, it would be one more line in
+   * a file whose every line arrives marked as possibly irrelevant.
+   */
+  it("should point work on a skill at the glossary, under a condition of its own", () => {
+    const lines = readRepoFile("AGENTS.md").split("\n");
+    const block = conditionalBlocks(lines).find(({ condition }) =>
+      condition.includes(".claude/skills")
+    );
+    const body = block === undefined ? "" : lines.slice(block.from + 1, block.to).join("\n");
+
+    expect([...body.matchAll(LOCAL_LINK)].map(([, target]) => target)).toContain("docs/slownik.md");
+  });
+
+  /**
+   * The other half of the same reading: what every task needs stays bare,
+   * because a condition that matches every task reads as no condition. The
+   * sections are listed here because that judgement is the specification; the
+   * check is that no line of one stands inside a block, wherever it opened.
+   */
+  it("should keep what every task needs out of every condition", () => {
+    const lines = readRepoFile("AGENTS.md").split("\n");
+    const blocks = conditionalBlocks(lines);
+    // A tag standing in the blank lines before the next heading wraps nothing.
+    const conditional = (line: string, index: number): boolean =>
+      line.trim() !== "" && blocks.some((block) => block.from < index && index < block.to);
+
+    const wrapped = UNCONDITIONAL.filter((heading) => {
+      const from = lines.indexOf(heading);
+      const level = heading.indexOf(" ");
+      const next = lines.findIndex(
+        (line, index) =>
+          index > from && (HEADING.exec(line)?.[1]?.length ?? Number.POSITIVE_INFINITY) <= level
+      );
+      const to = next === -1 ? lines.length : next;
+      return lines.slice(from, to).some((line, offset) => conditional(line, from + offset));
+    });
+
+    expect(UNCONDITIONAL.filter((heading) => !lines.includes(heading))).toEqual([]);
+    expect(wrapped).toEqual([]);
+  });
+
+  /**
+   * Two agents read this file under two names. A copy in place of the link is
+   * two files holding one truth, and they drift at the first edit; the tools
+   * that rewrite a CLAUDE.md write a file, not a link.
+   */
+  it("should keep CLAUDE.md a link to AGENTS.md", () => {
+    const path = join(repoRoot, "CLAUDE.md");
+    expect(lstatSync(path).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(path)).toBe("AGENTS.md");
   });
 
   /**
