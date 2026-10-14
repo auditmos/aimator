@@ -273,7 +273,10 @@ function renderContents(report: ImportReport): string[] {
   );
 
   if (report.grouped.length > 0) {
-    lines.push(`Podział (${report.grouped.length}):`, ...report.grouped.map((path) => `  ${path}`));
+    lines.push(
+      `Podział (${report.grouped.length}):`,
+      ...report.grouped.map(({ destination, path }) => `  ${path}  ${destination}`)
+    );
   }
 
   lines.push(...report.notices.map((notice) => `  · ${notice}`));

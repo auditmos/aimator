@@ -72,12 +72,19 @@ interface ImportImage {
   readonly sections: readonly string[];
 }
 
+/** One file of a grouping: what it holds, `character:miko`, and where it is. */
+interface GroupedEntry {
+  readonly destination: string;
+  /** Workspace-relative. */
+  readonly path: string;
+}
+
 /** What one import holds, the same object whether it was just written or read back. */
 export interface ImportReport {
   /** What this call wrote, workspace-relative; empty when it only read. */
   readonly created: readonly string[];
   /** The files `import group` wrote under `grouped/`, workspace-relative; empty before it ran. */
-  readonly grouped: readonly string[];
+  readonly grouped: readonly GroupedEntry[];
   readonly images: readonly ImportImage[];
   readonly importId: string;
   /** `material.md`, workspace-relative. */
@@ -274,7 +281,7 @@ function reportOf(
   sections: readonly MaterialSection[],
   extra: {
     readonly created: readonly string[];
-    readonly grouped: readonly string[];
+    readonly grouped: readonly GroupedEntry[];
     readonly notices: readonly string[];
   }
 ): ImportReport {

@@ -376,12 +376,12 @@ describe("groupImport", () => {
     const shown = await showImport({ importId: "miko", workspace });
 
     expect(shown.ok ? shown.data.grouped : []).toEqual([
-      "imports/miko/grouped/series.md",
-      "imports/miko/grouped/style.md",
-      "imports/miko/grouped/characters/miko.md",
-      "imports/miko/grouped/episodes/01-pola.md",
-      "imports/miko/grouped/episodes/02-sad.md",
-      "imports/miko/grouped/other.md",
+      { destination: "series", path: "imports/miko/grouped/series.md" },
+      { destination: "style", path: "imports/miko/grouped/style.md" },
+      { destination: "character:miko", path: "imports/miko/grouped/characters/miko.md" },
+      { destination: "episode:01-pola", path: "imports/miko/grouped/episodes/01-pola.md" },
+      { destination: "episode:02-sad", path: "imports/miko/grouped/episodes/02-sad.md" },
+      { destination: "other", path: "imports/miko/grouped/other.md" },
     ]);
     expect(shown.ok ? shown.data.nextStep : "").toBe(
       "przeczytaj imports/miko/grouped/; projekt z tego materiału zakłada skill /prepare-project"

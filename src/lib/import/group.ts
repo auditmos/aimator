@@ -26,6 +26,7 @@ import {
   textPrompt,
 } from "../text-model/index.js";
 import {
+  groupedDestination,
   groupedFile,
   type ImportDestination,
   type ImportPaths,
@@ -273,7 +274,10 @@ export async function groupingOf(
   workspace: Workspace,
   paths: ImportPaths,
   material: { readonly sha256: string }
-): Promise<{ readonly files: readonly string[]; readonly notices: readonly string[] }> {
+): Promise<{
+  readonly files: readonly Pick<GroupedFile, "destination" | "path">[];
+  readonly notices: readonly string[];
+}> {
   const file = await readJson(paths.groupedStage, stageFileSchema);
   const record = file.ok ? file.data.artifacts[KEY] : undefined;
 
@@ -285,9 +289,11 @@ export async function groupingOf(
   const read = record.inputs.find(({ path }) => path === materialPath)?.sha256;
 
   return {
-    files: record.outputs
-      .map(({ path }) => path)
-      .filter((path) => recordedUnder(workspace, paths.grouped, path)),
+    files: record.outputs.flatMap(({ path }) => {
+      const destination = groupedDestination(workspace, paths, path);
+
+      return destination === null ? [] : [{ destination: labelOf(destination), path }];
+    }),
     notices:
       read === material.sha256
         ? []

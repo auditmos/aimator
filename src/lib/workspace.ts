@@ -735,6 +735,42 @@ export function importImage(paths: ImportPaths, id: string, extension: string): 
     : err(new IdentifierError(extension, `invalid image extension "${extension}"`));
 }
 
+/** The directory under `grouped/` each kind with an id is written to. */
+const GROUPED_DIRECTORIES = { character: "characters", episode: "episodes" } as const;
+
+/**
+ * The destination a recorded file under `grouped/` was written for, the way
+ * back from `groupedFile`, or null for a path that is none of them. A screen
+ * names a grouped file by its destination, never by where it lies.
+ */
+export function groupedDestination(
+  workspace: Workspace,
+  paths: ImportPaths,
+  recorded: string
+): ImportDestination | null {
+  if (!recordedUnder(workspace, paths.grouped, recorded)) {
+    return null;
+  }
+
+  const inner = workspacePath(workspace, recorded)
+    .slice(paths.grouped.length + 1)
+    .split(sep);
+  const [first, second] = inner;
+  const plain = first?.endsWith(".md") === true ? first.slice(0, -3) : "";
+
+  if (inner.length === 1 && (plain === "other" || plain === "series" || plain === "style")) {
+    return { kind: plain };
+  }
+
+  const kind = (["character", "episode"] as const).find(
+    (one) => GROUPED_DIRECTORIES[one] === first
+  );
+
+  return inner.length === 2 && kind !== undefined && second?.endsWith(".md") === true
+    ? { id: second.slice(0, -3), kind }
+    : null;
+}
+
 /** What a grouping sorts a section into; a character and an episode carry an id. */
 export type ImportDestination =
   | { readonly kind: "other" | "series" | "style" }
@@ -752,13 +788,7 @@ export function groupedFile(paths: ImportPaths, destination: ImportDestination):
   }
 
   return PROJECT_ID.test(destination.id)
-    ? ok(
-        join(
-          paths.grouped,
-          destination.kind === "character" ? "characters" : "episodes",
-          `${destination.id}.md`
-        )
-      )
+    ? ok(join(paths.grouped, GROUPED_DIRECTORIES[destination.kind], `${destination.id}.md`))
     : err(
         new IdentifierError(
           destination.id,
