@@ -282,7 +282,10 @@ function renderContents(report: ImportReport): string[] {
   if (report.grouped.length > 0) {
     lines.push(
       `Podział (${report.grouped.length}):`,
-      ...report.grouped.map(({ destination, path }) => `  ${path}  ${destination}`)
+      ...report.grouped.map(
+        ({ destination, name, path }) =>
+          `  ${path}  ${destination}${name === null ? "" : `  „${name}”`}`
+      )
     );
   }
 

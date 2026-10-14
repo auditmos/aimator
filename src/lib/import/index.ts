@@ -6,6 +6,7 @@ import {
   localProducer,
   newRecord,
   type RecordedFile,
+  readDigest,
   readJson,
   readSupplied,
   type StageFile,
@@ -75,6 +76,8 @@ interface ImportImage {
 /** One file of a grouping: what it holds, `character:miko`, and where it is. */
 interface GroupedEntry {
   readonly destination: string;
+  /** A character's name as its file writes it; null for any other file, or when it no longer does. */
+  readonly name: string | null;
   /** Workspace-relative. */
   readonly path: string;
 }
@@ -187,11 +190,14 @@ export async function showImport(input: ImportInput): Promise<Result<ImportRepor
   }
 
   const grouping = await groupingOf(input.workspace, paths.data, stored.data.material);
+  const grouped = await Promise.all(
+    grouping.files.map(async (file) => ({ ...file, name: await nameOf(input.workspace, file) }))
+  );
 
   return ok(
     reportOf(input, paths.data, stored.data.file, stored.data.sections, {
       created: [],
-      grouped: grouping.files,
+      grouped,
       notices: [
         ...(await drift(input.workspace, paths.data, stored.data.file, {
           material: stored.data.material.sha256,
@@ -201,6 +207,66 @@ export async function showImport(input: ImportInput): Promise<Result<ImportRepor
       ],
     })
   );
+}
+
+/** What a grouping calls a character's file: `character:miko`. */
+const CHARACTER = "character:";
+
+/**
+ * The name a character's file writes for it, read back rather than stored.
+ * The grouping asked for the id as the name in lowercase ASCII, so the first
+ * run of words that folds to the id is the name. Null for any other file, and
+ * when nothing in the file folds to the id, which a hand edit or a loose id
+ * can cause: a name here is what `character new` is offered, never a decision.
+ */
+async function nameOf(
+  workspace: Workspace,
+  file: { readonly destination: string; readonly path: string }
+): Promise<string | null> {
+  if (!file.destination.startsWith(CHARACTER)) {
+    return null;
+  }
+
+  const bytes = await readDigest(workspacePath(workspace, file.path));
+
+  return bytes.ok
+    ? nameIn(file.destination.slice(CHARACTER.length), bytes.data.bytes.toString("utf8"))
+    : null;
+}
+
+const WORD = /[\p{L}\p{N}]+/gu;
+const CONTROL = /\p{Cc}/u;
+const MARK = /\p{M}/gu;
+
+function nameIn(id: string, text: string): string | null {
+  const words = [...text.matchAll(WORD)];
+
+  for (const [start, first] of words.entries()) {
+    let slug = "";
+
+    for (const word of words.slice(start)) {
+      slug = slug === "" ? fold(word[0]) : `${slug}-${fold(word[0])}`;
+
+      if (slug === id) {
+        const name = text.slice(first.index, word.index + word[0].length);
+
+        // Words are letters and digits; what joins them is the file's own,
+        // and a line break or an escape is no part of a name.
+        return CONTROL.test(name) ? null : name;
+      }
+
+      if (!id.startsWith(`${slug}-`)) {
+        break;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** A word as the grouping spells it in an id: "Łucja" is `lucja`. */
+function fold(word: string): string {
+  return word.toLowerCase().normalize("NFD").replace(MARK, "").replaceAll("ł", "l");
 }
 
 /** One import as `list` names it: which, and whether its grouping is there yet. */

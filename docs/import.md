@@ -84,6 +84,12 @@ poprzedni, a `--republish` publikuje zapisaną odpowiedź jeszcze raz, niczego n
 wysyłając i nie nadpisując pliku poprawionego ręcznie. Gdy `material.md` zmieni się po
 podziale, `import show` o tym mówi.
 
+Imienia postaci podział nigdzie nie zapisuje osobno: `import show` czyta je z jej pliku,
+szukając pierwszych słów, które po zdjęciu polskich znaków i wielkich liter dają jej
+identyfikator (`Dżdżownica` to `dzdzownica`). To propozycja dla `character new`, nie
+decyzja: gdy plik po poprawce ręcznej już takich słów nie ma, imienia brak i trzeba je
+wpisać.
+
 ## Czego konwerter odmawia
 
 Żaden fragment tekstu nie może zginąć po cichu. Jeśli w treści dokumentu jest tekst,

@@ -376,12 +376,24 @@ describe("groupImport", () => {
     const shown = await showImport({ importId: "miko", workspace });
 
     expect(shown.ok ? shown.data.grouped : []).toEqual([
-      { destination: "series", path: "imports/miko/grouped/series.md" },
-      { destination: "style", path: "imports/miko/grouped/style.md" },
-      { destination: "character:miko", path: "imports/miko/grouped/characters/miko.md" },
-      { destination: "episode:01-pola", path: "imports/miko/grouped/episodes/01-pola.md" },
-      { destination: "episode:02-sad", path: "imports/miko/grouped/episodes/02-sad.md" },
-      { destination: "other", path: "imports/miko/grouped/other.md" },
+      { destination: "series", name: null, path: "imports/miko/grouped/series.md" },
+      { destination: "style", name: null, path: "imports/miko/grouped/style.md" },
+      {
+        destination: "character:miko",
+        name: "Miko",
+        path: "imports/miko/grouped/characters/miko.md",
+      },
+      {
+        destination: "episode:01-pola",
+        name: null,
+        path: "imports/miko/grouped/episodes/01-pola.md",
+      },
+      {
+        destination: "episode:02-sad",
+        name: null,
+        path: "imports/miko/grouped/episodes/02-sad.md",
+      },
+      { destination: "other", name: null, path: "imports/miko/grouped/other.md" },
     ]);
     expect(shown.ok ? shown.data.nextStep : "").toBe(
       "przeczytaj imports/miko/grouped/; projekt z tego materiału zakłada skill /prepare-project"
@@ -393,6 +405,39 @@ describe("groupImport", () => {
     expect(edited.ok ? edited.data.notices : []).toContain(
       "imports/miko/material.md zmieniono po podziale; imports/miko/grouped/ dzieli poprzednią treść, nowy podział kupuje --regenerate"
     );
+  });
+
+  it("names a character as its file writes it, and no longer once the file does not", async () => {
+    await writeFile(
+      join(root, "imports", "miko", "material.md"),
+      MATERIAL.replace("## Miko\n\nMiko to ciekawski kot.", "## Sąsiedzi\n\nPani Łucja zna Miko.")
+    );
+    await group({
+      fetch: completion({
+        ...ANSWER,
+        characters: [{ id: "pani-lucja", name: "Pani Łucja" }],
+        sections: ANSWER.sections.map((section) =>
+          section.id === "T04" ? { ...section, routes: ["character:pani-lucja"] } : section
+        ),
+      }),
+    });
+    const character = async (): Promise<unknown> => {
+      const shown = await showImport({ importId: "miko", workspace });
+
+      return shown.ok
+        ? shown.data.grouped.find(({ destination }) => destination.startsWith("character:"))
+        : null;
+    };
+
+    expect(await character()).toEqual({
+      destination: "character:pani-lucja",
+      name: "Pani Łucja",
+      path: "imports/miko/grouped/characters/pani-lucja.md",
+    });
+
+    await writeFile(grouped("characters", "pani-lucja.md"), "## Sąsiedzi\n\nSąsiadka zna Miko.\n");
+
+    expect(await character()).toMatchObject({ destination: "character:pani-lucja", name: null });
   });
 
   it("refuses an import that does not exist, naming the command that makes one", async () => {
