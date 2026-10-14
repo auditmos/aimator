@@ -60,8 +60,8 @@ export const USAGE = `  reject <id> <episode-id> --stage <etap> [--track <tor>] 
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
     artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
     i sound-design bez --track, dialogue i versions --artifact jest wymagane,
-    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze, kroki
-    pośrednie ani filmy.`;
+    jak w approve; versions odrzuca klip wersji (C01) i gotowy film (en), nie
+    twarze, kroki pośrednie ani wspólny obraz.`;
 
 /** A stage that has produced nothing here yet: there is no result to say no to. */
 class NothingToRejectError extends Error {
@@ -201,8 +201,30 @@ function twoLevels(episode: Locate, track: Locate): Locate {
 
 const artifactFlag = (keys: readonly string[]): string => `--artifact ${keys.join(",")}`;
 
-/** A clip of stage 12, `C01`: the one key there a no may name. */
+/** A clip of stage 12, `C01`: one of the two keys there a no may name. */
 const CLIP_VERSION = /^C\d{2,}$/;
+
+/** A finished film of stage 12, keyed by its language: `en`, `pt-BR`. */
+const FILM = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * Stage 12's keys, each sent back to what makes it: a clip's version is a new
+ * lip-sync job, and a film is laid again over the picture, one per language.
+ */
+function versionsAgain(on: TrackOn, keys: readonly string[]): string {
+  const scope = `${on.projectId} ${on.episodeId} --track ${on.track}`;
+  const clips = keys.filter((key) => CLIP_VERSION.test(key));
+  const films = keys.filter((key) => !CLIP_VERSION.test(key));
+
+  return [
+    ...(clips.length > 0
+      ? [`aimator versions lip-sync ${scope} --regenerate ${artifactFlag(clips)}`]
+      : []),
+    ...films.map(
+      (language) => `aimator versions final ${scope} --language ${language} --regenerate`
+    ),
+  ].join("; ");
+}
 
 /**
  * Stage 11's keys, each sent back to the command that buys it again: the
@@ -378,13 +400,15 @@ const STAGES: Readonly<Record<string, Locate>> = {
   versions: trackStage({
     check: checkVersions,
     file: (paths) => paths.versionsStage,
-    // A clip's version is all a person rejects here: `faces:C01` is what the
-    // provider found, `C01:ewa` a step with one face moved and not the next,
-    // and a film (`en`) or the picture under both (`episode`) is not remade by
-    // lip-sync, which is the remedy a no here points at.
-    named: { allowed: "C01[,C02] (wersja klipu)", takes: (key) => CLIP_VERSION.test(key) },
-    regenerate: (on, keys) =>
-      `aimator versions lip-sync ${on.projectId} ${on.episodeId} --track ${on.track} --regenerate ${artifactFlag(keys)}`,
+    // What a person watches is all they reject here: a clip's version and a
+    // finished film. `faces:C01` is what the provider found, `C01:ewa` a step
+    // with one face moved and not the next, and the picture under both films
+    // (`episode`) is a silent cut nobody watches, remade whenever a clip is.
+    named: {
+      allowed: "C01[,C02] (wersja klipu) albo <kod> (film w tym języku)",
+      takes: (key) => CLIP_VERSION.test(key) || FILM.test(key),
+    },
+    regenerate: versionsAgain,
   }),
 };
 

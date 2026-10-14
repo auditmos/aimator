@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { generateReferences } from "../lib/references/index.js";
+import { generateFinal } from "../lib/versions/index.js";
 import { resolveWorkspace, type Workspace } from "../lib/workspace.js";
 import {
   API_KEY,
@@ -14,6 +15,7 @@ import {
   makeTrack,
   makeUpstream,
   makeVersions,
+  muxer,
   PROJECT,
   recorder,
   VOICE,
@@ -465,8 +467,8 @@ describe("reject, across the scopes approve takes", () => {
  * script, its translation and every line; a clip's version beside its faces
  * and the steps it was made in. Assumptions: `--artifact` is required, as on
  * their yes, because a no about every one of them is a decision nobody made;
- * stage 12 takes a no about a clip's version alone, the only thing a person
- * watches there; "Dalej" names the command that buys each refused artifact
+ * stage 12 takes a no about what a person watches there, a clip's version or
+ * a finished film (below); "Dalej" names the command that buys each refused artifact
  * again. Not tested: what a lip-sync redone after a no looks like.
  */
 describe("reject --stage dialogue and --stage versions", () => {
@@ -627,7 +629,7 @@ describe("reject --stage dialogue and --stage versions", () => {
 
   it("should refuse a no about every clip's version at once", async () => {
     expect(said(await rejectVersion())).toContain(
-      "--artifact jest wymagane: C01[,C02] (wersja klipu)"
+      "--artifact jest wymagane: C01[,C02] (wersja klipu) albo <kod> (film w tym języku)"
     );
   });
 
@@ -638,14 +640,16 @@ describe("reject --stage dialogue and --stage versions", () => {
     );
   });
 
-  /** A no on a film, or on the picture under both, would send it to lip-sync, which made neither. */
-  it("should refuse a no about a finished film or the picture it is laid over", async () => {
-    expect(said(await rejectVersion("--artifact", "en"))).toContain(
-      "nie da się odrzucić en w --stage versions"
-    );
+  /** The picture under both films is a silent cut nobody watches, so nobody says no to it. */
+  it("should refuse a no about the picture the films are laid over", async () => {
     expect(said(await rejectVersion("--artifact", "episode"))).toContain(
       "nie da się odrzucić episode w --stage versions"
     );
+  });
+
+  /** A film no one has laid yet is refused the way a clip with no version is. */
+  it("should refuse a no about a film that has not been made", async () => {
+    expect(said(await rejectVersion("--artifact", "en"))).toContain("nie ma czego odrzucić: en");
   });
 
   it("should reject a clip's version and send it back to lip-sync", async () => {
@@ -667,6 +671,184 @@ describe("reject --stage dialogue and --stage versions", () => {
       note: "usta spóźnione",
       status: "rejected",
     });
+  });
+});
+
+/**
+ * Stage 12's finished films, which a no can name by their language as a yes
+ * does. Assumptions: a film is laid out of parts already accepted and buys
+ * nothing, so its remedy is the same film laid again, `versions final
+ * --regenerate`; a no names it alone, or beside a clip's version, and each
+ * kind is sent back to its own command; the refusal reaches the stage's object
+ * as a film without a yes whose next step is that remedy. Not tested: what a
+ * person changes before laying it again, which is a part of another stage.
+ */
+describe("reject --stage versions, a finished film", () => {
+  let filmed = "";
+
+  /** The three-clip cut: C01 lip-synced, C02 and C03 as they are. */
+  function filmAnswer(): string {
+    const clipIds = ["C01", "C02", "C03"];
+
+    return JSON.stringify({
+      ...JSON.parse(chainAnswer()),
+      clips: clipIds.map((id) => ({
+        id,
+        prompt: `Akcja klipu ${id}.`,
+        referenceIds: ["hero:ewa", "hero:tata", "R01"],
+      })),
+      entryFrames: clipIds.slice(1).map((id) => ({
+        clipId: id,
+        prompt: `Pierwsza chwila klipu ${id}.`,
+      })),
+    });
+  }
+
+  beforeAll(async () => {
+    filmed = await mkdtemp(join(tmpdir(), "aimator-reject-filmed-"));
+    const sources = await mkdtemp(join(tmpdir(), "aimator-reject-filmed-src-"));
+    const resolved = resolveWorkspace(filmed);
+
+    if (!resolved.ok) {
+      throw resolved.error;
+    }
+
+    await makeUpstream({
+      answer: filmAnswer(),
+      approvePackage: true,
+      dialogue: true,
+      root: filmed,
+      scratch: sources,
+      shotList: "three-clips",
+      voiceId: VOICE,
+      workspace: resolved.data,
+    });
+    await makeTrack({ root: filmed, track: TRACK, workspace: resolved.data });
+    await makeDialogue({ filmLines: true, workspace: resolved.data });
+    await makeSoundDesign({ workspace: resolved.data });
+    await makeVersions({ faces: { C01: { 0: "ewa" } }, seconds: 10, workspace: resolved.data });
+
+    for (const language of ["en", "pl"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: one film at a time, over one picture
+      const film = await generateFinal({
+        episodeId: EPISODE,
+        language,
+        mode: "apply",
+        mux: muxer(),
+        projectId: PROJECT,
+        regenerate: false,
+        track: TRACK,
+        workspace: resolved.data,
+      });
+
+      if (!film.ok) {
+        throw film.error;
+      }
+    }
+
+    await rm(sources, { force: true, recursive: true });
+  }, 240_000);
+
+  afterAll(async () => {
+    await rm(filmed, { force: true, recursive: true });
+  });
+
+  function rejectFilm(...flags: readonly string[]) {
+    return run([
+      "reject",
+      PROJECT,
+      EPISODE,
+      "--stage",
+      "versions",
+      "--track",
+      TRACK,
+      ...flags,
+      "--note",
+      "muzyka zagłusza Ewę",
+      "--workspace",
+      filmed,
+    ]);
+  }
+
+  async function filmRecord(key: string): Promise<{ readonly review: object }> {
+    const path = join(
+      filmed,
+      "projects",
+      PROJECT,
+      "episodes",
+      EPISODE,
+      TRACK,
+      "versions.stage.json"
+    );
+
+    return JSON.parse(await readFile(path, "utf8")).artifacts[key];
+  }
+
+  it("should reject a finished film and send it back to be laid again", async () => {
+    const result = await rejectFilm("--artifact", "en");
+
+    expect(result.ok ? result.data : result.error.message).toContain(
+      `Dalej: popraw z tą uwagą: aimator versions final ${PROJECT} ${EPISODE} --track ${TRACK} --language en --regenerate`
+    );
+    expect((await filmRecord("en")).review).toMatchObject({
+      note: "muzyka zagłusza Ewę",
+      status: "rejected",
+    });
+  });
+
+  /** The stage's own object says the film has no yes, and that laying it again is what is next. */
+  it("should leave the stage pointing at the rejected film, laid again", async () => {
+    const result = await rejectFilm("--artifact", "en", "--json");
+    const status = JSON.parse(result.ok ? result.data : "{}") as {
+      finals: { approved: boolean; id: string; note: string }[];
+      nextStep: string;
+    };
+
+    expect(status.finals.find((one) => one.id === "en")).toMatchObject({
+      approved: false,
+      note: expect.stringContaining("odrzucony: muzyka zagłusza Ewę"),
+    });
+    expect(status.nextStep).toBe(
+      `aimator versions final ${PROJECT} ${EPISODE} --track ${TRACK} --language en --regenerate`
+    );
+  });
+
+  /**
+   * A rejected film is still a finished one: left alone until asked for again,
+   * and the answer says how. Laid again, it is a new film with no yes and no no.
+   */
+  it("should leave a rejected film alone without --regenerate, and lay a new one with it", async () => {
+    const resolved = resolveWorkspace(filmed);
+    const lay = (regenerate: boolean) =>
+      generateFinal({
+        episodeId: EPISODE,
+        language: "en",
+        mode: "apply",
+        mux: muxer(),
+        projectId: PROJECT,
+        regenerate,
+        track: TRACK,
+        workspace: resolved.ok ? resolved.data : { root: "" },
+      });
+    const left = await lay(false);
+    const laid = await lay(true);
+
+    expect(left.ok ? { nextStep: left.data.nextStep, state: left.data.state } : null).toEqual({
+      nextStep: `aimator versions final ${PROJECT} ${EPISODE} --track ${TRACK} --language en --regenerate`,
+      state: "skipped",
+    });
+    expect(laid.ok ? laid.data.state : null).toBe("published");
+    expect((await filmRecord("en")).review).toMatchObject({ note: null, status: "pending" });
+  });
+
+  /** One no about both kinds: each is sent to its own command, the clips together. */
+  it("should send a clip's version and a film back to their own commands", async () => {
+    const result = await rejectFilm("--artifact", "C01,pl");
+    const scope = `${PROJECT} ${EPISODE} --track ${TRACK}`;
+
+    expect(result.ok ? result.data : result.error.message).toContain(
+      `Dalej: popraw z tą uwagą: aimator versions lip-sync ${scope} --regenerate --artifact C01; aimator versions final ${scope} --language pl --regenerate`
+    );
   });
 });
 

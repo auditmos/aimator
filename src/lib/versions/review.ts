@@ -150,6 +150,8 @@ interface ClipInspection {
 interface FinalInspection {
   /** What an approval of this film may not write over. */
   readonly blocking: readonly string[];
+  /** A person watched it and said no; laying it again is what follows. */
+  readonly rejected: boolean;
   readonly state: FinalFilm;
 }
 
@@ -190,6 +192,7 @@ async function inspectFinal(
   if (record === undefined) {
     return ok({
       blocking: [],
+      rejected: false,
       state: {
         approved: false,
         checks,
@@ -237,14 +240,17 @@ async function inspectFinal(
     ),
   ];
 
+  const rejected = record.review.status === "rejected";
+
   return ok({
     blocking,
+    rejected,
     state: {
       approved: record.review.status === "approved" && blocking.length === 0,
       checks,
       id: language,
       inputsChanged,
-      note: `próba ${record.runId}`,
+      note: `próba ${record.runId}${rejected ? `, odrzucony: ${record.review.note ?? ""}` : ""}`,
       state: "completed",
     },
   });
@@ -440,7 +446,7 @@ function nextStep(
     return finalCommand(input, film.state.id);
   }
 
-  return film.blocking.length > 0
+  return film.blocking.length > 0 || film.rejected
     ? `${finalCommand(input, film.state.id)} --regenerate`
     : `${approveCommand(input, [film.state.id])}${checksFlag(film.state.checks)}`;
 }

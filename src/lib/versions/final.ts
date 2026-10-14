@@ -129,13 +129,13 @@ function approveHint(input: FinalInput, film: FinalFilm | undefined): string {
   return `obejrzyj całość i zatwierdź: aimator approve ${input.projectId} ${input.episodeId} --stage ${STAGE} --track ${input.track} --artifact ${input.language}${checksFlag(film?.checks ?? [])}`;
 }
 
-/** Where a person goes from a film that is already there. */
-function afterwards(input: FinalInput, film: FinalFilm | undefined): string {
+/** Where a person goes from a film that is already there: a no is answered by laying it again. */
+function afterwards(input: FinalInput, film: FinalFilm | undefined, rejected: boolean): string {
   if (film?.approved === true) {
     return `film ${input.language} na torze ${input.track} jest przyjęty`;
   }
 
-  return (film?.inputsChanged.length ?? 0) > 0
+  return rejected || (film?.inputsChanged.length ?? 0) > 0
     ? `${finalCommand(input)} --regenerate`
     : approveHint(input, film);
 }
@@ -442,6 +442,7 @@ export async function generateFinal(input: FinalInput): Promise<Result<FinalRepo
   const { film, picture } = read.data;
   const problems = [...read.data.problems, ...(engine.ok ? [] : [engine.error.message])];
   const finished = film?.state === "completed" && !input.regenerate;
+  const rejected = stage12.data.stage.artifacts[input.language]?.review.status === "rejected";
   const report = {
     actualSeconds: picture.seconds,
     created: [],
@@ -458,7 +459,7 @@ export async function generateFinal(input: FinalInput): Promise<Result<FinalRepo
 
     return ok({
       ...report,
-      nextStep: problems[0] ?? (finished ? afterwards(input, film) : finalCommand(input)),
+      nextStep: problems[0] ?? (finished ? afterwards(input, film, rejected) : finalCommand(input)),
       problems,
       state: problems.length > 0 ? "blocked" : state,
     });
@@ -469,7 +470,12 @@ export async function generateFinal(input: FinalInput): Promise<Result<FinalRepo
   }
 
   if (finished) {
-    return ok({ ...report, nextStep: afterwards(input, film), problems: [], state: "skipped" });
+    return ok({
+      ...report,
+      nextStep: afterwards(input, film, rejected),
+      problems: [],
+      state: "skipped",
+    });
   }
 
   return await holdingLock(

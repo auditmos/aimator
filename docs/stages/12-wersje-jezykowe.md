@@ -156,13 +156,25 @@ takiego, który powstał dopiero po złożeniu filmu. `check` pokazuje stan obu 
 (`film en: …`, `film pl: …`, w `--json` pole `finals`), a etap jest zatwierdzony dopiero
 ze zgodą na każdy klip wersji i na oba filmy.
 
-`reject … --stage versions --track <tor> --artifact C01 --note <uwaga>` zapisuje „nie” na
-tych samych zasadach: `--artifact` jest wymagane i wskazuje wyłącznie klip wersji, nie
-`faces:C01` (to, co znalazł dostawca), krok `C01:ewa`, film (`en`, `pl`) ani obraz
-`episode`; film, który nie przechodzi oceny, zostaje bez zgody. Odrzucony klip kupuje się od
-nowa przez `versions lip-sync … --artifact C01 --regenerate`; jeśli uwaga dotyczy tego, kto
-jest kim, najpierw poprawia się przypisanie przez `versions bind`. Lip-sync uwagi nie czyta,
-więc zostaje ona w rekordzie dla człowieka.
+`reject … --stage versions --track <tor> --artifact C01[,C02]|<kod> --note <uwaga>` zapisuje
+„nie” na tych samych zasadach: `--artifact` jest wymagane i wskazuje klip wersji albo film
+po kodzie języka (`en`, `pl`), nie `faces:C01` (to, co znalazł dostawca), krok `C01:ewa`
+ani obraz `episode`, którego nikt nie ogląda. Filmu, który jeszcze nie powstał, nie da się
+odrzucić, tak jak klipu bez wersji. Jedno „nie” może wskazać klipy i filmy naraz, a
+„Dalej:” podaje wtedy osobne polecenie dla klipów i dla każdego filmu.
+
+Odrzucony klip kupuje się od nowa przez `versions lip-sync … --artifact C01 --regenerate`;
+jeśli uwaga dotyczy tego, kto jest kim, najpierw poprawia się przypisanie przez
+`versions bind`. Odrzucony film składa się od nowa przez
+`versions final … --language <kod> --regenerate`. Do tego czasu `check` pokazuje uwagę
+przy filmie (`film en: completed, próba …, odrzucony: <uwaga>`), „Dalej:” wskazuje to
+polecenie, a `versions final` bez `--regenerate` zostawia film bez zmian i mówi to samo.
+Nowy film nie ma ani zgody, ani odmowy. **Film powstaje wyłącznie z części, które już mają
+zgodę, i niczego nie kupuje, więc złożony z tych samych części wyjdzie taki sam.** Najpierw
+poprawia się część, o której mówi uwaga: poziomy przez `sound-design levels`, kwestię albo
+przekład w etapie 11, stem w etapie 10 albo klip wersji tutaj. Dopiero potem składa się
+film. Ani lip-sync, ani składanie filmu uwagi nie czyta, więc zostaje ona w rekordzie dla
+człowieka.
 
 ---
 

@@ -349,8 +349,8 @@ Wspólne:
     z checklistą QC (opening-frame, entry:Cnn). --regenerate odrzuconego
     artefaktu bez --instruction poprawia go według tej uwagi. W soundtrack
     i sound-design bez --track, dialogue i versions --artifact jest wymagane,
-    jak w approve; versions odrzuca tylko klip wersji (C01), nie twarze, kroki
-    pośrednie ani filmy.
+    jak w approve; versions odrzuca klip wersji (C01) i gotowy film (en), nie
+    twarze, kroki pośrednie ani wspólny obraz.
 
   --audio      music-and-effects | dialogue | narration | dialogue-and-narration
   --nature     law-or-idea | synopsis | screenplay

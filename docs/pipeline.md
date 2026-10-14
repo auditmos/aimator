@@ -200,8 +200,9 @@ Obowiązują we wszystkich etapach.
   artefakty różnych rodzajów (etapy 9 i 10 na poziomie odcinka: skrypt albo arkusz cue
   i nagrania; etap 11: skrypt, przekład i kwestie; etap 12: klip wersji obok twarzy
   i kroków, a także dwa filmy i obraz pod nimi), `--artifact` jest wymagane jak
-  w `approve`, a etap 12 odrzuca wyłącznie klip wersji. Wymaga `--note`, bo odrzucenie bez powodu
-  nie ma czym zasilić poprawki, i zapisuje w rekordzie `review.status = "rejected"`,
+  w `approve`, a etap 12 odrzuca klip wersji i film, nigdy twarze, krok ani obraz.
+  Wymaga `--note`, bo odrzucenie bez powodu nie ma czym zasilić poprawki, i zapisuje
+  w rekordzie `review.status = "rejected"`,
   `review.note`, `reviewer` i `reviewedAt`. Na klatkach z checklistą QC (klatka otwarcia,
   `entry:Cnn`) `--fail` dopisuje niezaliczone kryteria do `review.failed`; gdzie indziej
   `--fail` to odmowa. Nie sprawdza bajtów, bo „nie" nie potrzebuje dowodu, że wynik jest
@@ -2303,3 +2304,9 @@ albo `all`), bo to w nim ruszono usta; bez niej albo z niepełną listą `approv
 i wymienia brakujące kryteria. Film w języku filmu przyjmuje się bez checklisty.
 `approved` w obiekcie `check` oznacza każdy klip wersji i oba filmy, a `finals` niesie stan
 każdego filmu z jego `checks`.
+
+`reject` przyjmuje te same klucze poza krokiem i obrazem. Odrzucony film zostaje
+`completed` bez zgody, z uwagą w `note`, a `nextStep` i „Dalej:" prowadzą do
+`versions final … --language <kod> --regenerate`. Film powstaje z części, które już mają
+zgodę, więc poprawia się najpierw część, której dotyczy uwaga, a nowy film nie ma ani
+zgody, ani odmowy.
