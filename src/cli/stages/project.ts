@@ -11,6 +11,7 @@ import {
   setNarratorVoice,
   setStyle,
   showProject,
+  writeRules,
 } from "../../lib/project/index.js";
 import { err, ok, type Result } from "../../lib/result.js";
 import type { Workspace } from "../../lib/workspace.js";
@@ -45,6 +46,10 @@ export const USAGE = `  project init <id> --title <tytuł> [--aspect-ratio <w:h>
     Plik składa kod i sam wpisuje, skąd szkic pochodzi; "Zatwierdzone przez
     użytkownika" zostaje człowiekowi. Pisze tylko na nietknięty szkielet albo na
     własny nietknięty szkic.
+  project rules <id> --text <treść> [--json]
+    Zapisuje project.md dokładnie tym tekstem: zapis edytora, w tym lokalnego
+    UI. Niczego nie ocenia, bo zasady ocenia check, a w połowie pisany plik to
+    zwykły stan; odmawia tylko pustego. Zmiana po akceptacji ją unieważnia.
   project show <id> [--json]
     Co projekt trzyma: tytuł, proporcje, narratora i obsadę, każdą postać z
     podstawą (zdjęcia albo opis w project.md) i zdjęciami. Opis, nie werdykt:
@@ -444,9 +449,56 @@ function renderDraft(report: RulesDraftReport, mode: "apply" | "dry-run"): strin
   return lines.join("\n");
 }
 
+/** The editor's save: the whole file, as typed. */
+async function runProjectRules(argv: readonly string[]): Promise<Result<string>> {
+  const parsed = parse(argv, { json: { type: "boolean" }, text: { type: "string" } });
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const projectId = requirePositional(parsed.data, 0, "project-id");
+  const { text } = parsed.data.values;
+  const workspace = workspaceOf(parsed.data);
+
+  if (!projectId.ok) {
+    return projectId;
+  }
+  if (typeof text !== "string") {
+    return err(new UsageError("brak --text: project rules zapisuje project.md podanym tekstem"));
+  }
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  const mode = modeOf(parsed.data);
+  const result = await writeRules({
+    mode,
+    projectId: projectId.data,
+    text,
+    workspace: workspace.data,
+  });
+
+  return result.ok
+    ? ok(
+        answerStage0(
+          answerFlag(parsed.data),
+          "project rules",
+          `Zapisano zasady projektu "${projectId.data}"`,
+          result.data,
+          mode
+        )
+      )
+    : result;
+}
+
 export async function runProject(argv: readonly string[]): Promise<Result<string>> {
   if (argv[0] === "draft") {
     return runProjectDraft(argv.slice(1));
+  }
+
+  if (argv[0] === "rules") {
+    return runProjectRules(argv.slice(1));
   }
 
   if (argv[0] === "voice") {

@@ -645,6 +645,14 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "16:9",
     "--dry-run",
   ],
+  "  project rules <id> --text <treść> [--json]": [
+    "project",
+    "rules",
+    PROJECT,
+    "--text",
+    "# Zasady\n\nUstalone.\n",
+    "--dry-run",
+  ],
   "  project show <id> [--json]": ["project", "show", PROJECT],
   "  project style <id> --generated --count <1-4> [--json]": [
     "project",

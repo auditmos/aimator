@@ -16,6 +16,7 @@ import {
   setNarratorVoice,
   showEpisode,
   showProject,
+  writeRules,
 } from "./index.js";
 
 let root = "";
@@ -838,6 +839,72 @@ describe("setNarratorVoice", () => {
     const status = await checkStage0({ projectId: "demo", workspace });
 
     expect(status.ok ? status.data.ready : null).toBe(true);
+  });
+});
+
+describe("writeRules", () => {
+  const RULES = "# Demo, zasady wspólne\n\n- Temat projektu: TODO(etap-0) propozycja: Odwaga.\n";
+
+  function rules(): Promise<string> {
+    return readFile(join(root, "projects/demo/project.md"), "utf8");
+  }
+
+  it("should write project.md with exactly the text it was given, and count what is left", async () => {
+    await makeProject();
+    const result = await writeRules({ mode: "apply", projectId: "demo", text: RULES, workspace });
+
+    expect(await rules()).toBe(RULES);
+    expect(result.ok ? result.data.nextStep : "").toBe(
+      "w project.md zostało znaczników TODO(etap-0): 1; etap 0 nie przejdzie, póki choć jeden zostanie"
+    );
+    expect(result.ok ? result.data.reused : []).toEqual(["projects/demo/project.md"]);
+  });
+
+  it("should write nothing on a dry run", async () => {
+    await makeProject();
+    const scaffold = await rules();
+
+    await writeRules({ mode: "dry-run", projectId: "demo", text: RULES, workspace });
+
+    expect(await rules()).toBe(scaffold);
+  });
+
+  it("should refuse an empty text rather than leave the project without rules", async () => {
+    await makeProject();
+    const result = await writeRules({ mode: "apply", projectId: "demo", text: " \n", workspace });
+
+    expect(result.ok ? null : result.error.message).toBe(
+      "project.md nie może być pusty; zasady wspólne to wejście każdego etapu"
+    );
+  });
+
+  it("should say that changed rules lapse an approval, and that check then reports it", async () => {
+    await makeProject();
+    await fillRules();
+    await addEpisode({
+      mode: "apply",
+      projectId: "demo",
+      settings: FULL_SETTINGS,
+      sourcePath: await makeSource(),
+      workspace,
+    });
+    await approveStage0({ mode: "apply", note: null, projectId: "demo", reviewer: "t", workspace });
+
+    const result = await writeRules({
+      mode: "apply",
+      projectId: "demo",
+      text: "# Demo\n\nInaczej.\n",
+      workspace,
+    });
+    const status = await checkStage0({ projectId: "demo", workspace });
+
+    expect(result.ok ? result.data.problems : []).toEqual([
+      "akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve demo",
+    ]);
+    expect(result.ok ? result.data.nextStep : "").toBe("aimator check demo");
+    expect(status.ok ? status.data.changedSinceApproval : null).toEqual([
+      "projects/demo/project.md",
+    ]);
   });
 });
 

@@ -216,7 +216,7 @@ src/
     │   │                 #         checkStage0, approveStage0,
     │   │                 #         readStage0Inputs, readStage0Character, showProject,
     │   │                 #         showEpisode, setStyle, readStage0Style,
-    │   │                 #         setLipSync, readLipSync, draftRules
+    │   │                 #         setLipSync, readLipSync, draftRules, writeRules
     │   ├── schema.ts     # Internal: Zod schemas for the artifacts
     │   ├── template.ts   # Internal: the project.md scaffold, its fields, and its
     │   │                 #           Style Bible gate

@@ -1344,6 +1344,14 @@ Próba na sucho: nic nie zapisano. Utworzono projekt "nowy"
 Dalej: zadeklaruj obsadę: aimator character new nowy <postać> --name <nazwa>"
 `;
 
+exports[`every command >   project rules <id> --text <treść> [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Zapisano zasady projektu "ewa"
+  = projects/ewa/project.md
+  ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
+Dalej: aimator check ewa"
+`;
+
 exports[`every command >   project show <id> [--json] 1`] = `
 "ok
 Projekt "ewa": Dzielna Ewa

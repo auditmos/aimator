@@ -179,6 +179,17 @@ Po ręcznej poprawce odmawia, żeby jej nie nadpisać; nowy szkic dostaniesz wte
 po usunięciu `project.md`. Rekord leży w `rules.stage.json`, a archiwum próby w `runs/`
 projektu.
 
+Propozycję przyjmujesz, usuwając `TODO(etap-0) propozycja:` przed nią, w dowolnym
+edytorze albo na ekranie „Zasady wspólne” lokalnego UI, który zapisuje plik tym poleceniem:
+
+```bash
+pnpm dev project rules miko --text "$(cat poprawiony-project.md)"
+```
+
+Zapisuje `project.md` dokładnie podanym tekstem i niczego nie ocenia, bo zasady ocenia
+`check`; odmawia tylko pustego pliku. Zmiana po akceptacji etapu 0 ją unieważnia, tak samo
+jak edycja w edytorze.
+
 ## Pomysł bez pliku
 
 Pomysł na jedno zdanie nie musi leżeć w pliku. `--idea` przyjmuje go wprost, a `--episode`

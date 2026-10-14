@@ -219,6 +219,10 @@ interface ProjectInput {
   readonly projectId: string;
   readonly workspace: Workspace;
 }
+type WriteRulesInput = ProjectInput & {
+  /** The whole of `project.md`, as it is to stand on disk. */
+  readonly text: string;
+};
 type InitProjectInput = ProjectInput & {
   readonly aspectRatio: string | null;
   readonly title: string;
@@ -572,6 +576,56 @@ export async function draftRules(input: RulesDraftInput): Promise<Result<RulesDr
     },
     paths: paths.data,
   });
+}
+
+/**
+ * `project.md`, written with exactly the text given: the editor's save, for a
+ * screen that may not touch the file itself. Nothing in it is checked here,
+ * because `check` is where rules are judged and a half-written file is the
+ * ordinary state of one being written; only an empty one is refused, since a
+ * project without rules is no draft of anything.
+ */
+export async function writeRules(input: WriteRulesInput): Promise<Result<Stage0Report>> {
+  const project = await resolveProject(input);
+
+  if (!project.ok) {
+    return project;
+  }
+
+  if (input.text.trim() === "") {
+    return err(
+      new InvalidInputError(
+        "rules",
+        "project.md nie może być pusty; zasady wspólne to wejście każdego etapu"
+      )
+    );
+  }
+
+  const lapsed = await approvalLapses(project.data.prepareStage);
+  const written = await applyWrites(
+    [{ kind: "text", text: input.text, to: project.data.rules }],
+    input.mode
+  );
+  const left = input.text.split(PLACEHOLDER).length - 1;
+
+  return written.ok
+    ? ok({
+        approved: false,
+        changedSinceApproval: [],
+        created: [],
+        nextStep:
+          left === 0
+            ? `aimator check ${input.projectId}`
+            : `w project.md zostało znaczników ${PLACEHOLDER}: ${left}; etap 0 nie przejdzie, póki choć jeden zostanie`,
+        problems: lapsed
+          ? [
+              `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`,
+            ]
+          : [],
+        ready: false,
+        reused: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+      })
+    : written;
 }
 
 export async function initProject(input: InitProjectInput): Promise<Result<Stage0Report>> {

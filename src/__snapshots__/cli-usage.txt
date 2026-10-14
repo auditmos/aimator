@@ -37,6 +37,10 @@ Etap 0. Przygotowanie projektu i odcinka:
     Plik składa kod i sam wpisuje, skąd szkic pochodzi; "Zatwierdzone przez
     użytkownika" zostaje człowiekowi. Pisze tylko na nietknięty szkielet albo na
     własny nietknięty szkic.
+  project rules <id> --text <treść> [--json]
+    Zapisuje project.md dokładnie tym tekstem: zapis edytora, w tym lokalnego
+    UI. Niczego nie ocenia, bo zasady ocenia check, a w połowie pisany plik to
+    zwykły stan; odmawia tylko pustego. Zmiana po akceptacji ją unieważnia.
   project show <id> [--json]
     Co projekt trzyma: tytuł, proporcje, narratora i obsadę, każdą postać z
     podstawą (zdjęcia albo opis w project.md) i zdjęciami. Opis, nie werdykt:
