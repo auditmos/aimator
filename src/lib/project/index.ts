@@ -13,6 +13,7 @@ import {
   type RecordedFile,
   readDigest,
   readJson,
+  readSupplied,
   type StageFile,
   serialize,
   sha256Of,
@@ -853,16 +854,18 @@ async function readSource(input: EpisodeSource): Promise<Result<SourceMaterial>>
       : identity;
   }
 
+  // Read before the name is judged: a path pasted with its quotes names no
+  // file, and blaming the name it ends in would send somebody to rename it.
+  const source = await readSupplied(input.sourcePath);
+
+  if (!source.ok) {
+    return source;
+  }
+
   const identity = episodeIdFromSource(basename(input.sourcePath));
 
   if (!identity.ok) {
     return identity;
-  }
-
-  const source = await readDigest(input.sourcePath);
-
-  if (!source.ok) {
-    return source;
   }
 
   if (source.data.bytes.byteLength === 0) {
@@ -1087,7 +1090,7 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
 
   // Hash every photo first: de-duplication compares digests, so the decision
   // for one file depends on the ones before it and must stay ordered.
-  const digests = await Promise.all(input.sourcePaths.map((path) => readDigest(path)));
+  const digests = await Promise.all(input.sourcePaths.map((path) => readSupplied(path)));
 
   for (const [index, sourcePath] of input.sourcePaths.entries()) {
     const digest = digests[index];

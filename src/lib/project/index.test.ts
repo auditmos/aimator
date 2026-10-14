@@ -311,6 +311,29 @@ describe("addEpisode", () => {
     expect(Buffer.compare(original, copied)).toBe(0);
   });
 
+  it("should say a source pasted with its quotes is quoted, not misnamed", async () => {
+    await makeProject();
+    const add = async (sourcePath: string): Promise<string> => {
+      const result = await addEpisode({
+        mode: "apply",
+        projectId: "demo",
+        settings: {},
+        sourcePath,
+        workspace,
+      });
+
+      return result.ok ? "" : result.error.message;
+    };
+
+    expect(await add(`'${await makeSource()}'`)).toContain(
+      "ścieżka jest ujęta w apostrofy albo cudzysłów, podaj ją bez nich"
+    );
+    expect(await add(`"${scratch}"`)).toContain(
+      "ścieżka jest ujęta w apostrofy albo cudzysłów, podaj ją bez nich"
+    );
+    expect(await readdir(join(root, "projects/demo"))).not.toContain("episodes");
+  });
+
   it("should write settings as nulls until they are decided", async () => {
     await makeProject();
     await addEpisode({
@@ -527,6 +550,24 @@ describe("addCharacterSources", () => {
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
     expect(project.characters.ewa.sources).toHaveLength(1);
     expect(project.characters.ewa.sources[0].originPath).toBe(photo);
+  });
+
+  it("should say a photo pasted with its quotes is quoted", async () => {
+    await makeProject();
+    const photo = join(scratch, "portret.png");
+    await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+
+    const result = await addCharacterSources({
+      characterId: "ewa",
+      mode: "apply",
+      projectId: "demo",
+      sourcePaths: [`'${photo}'`],
+      workspace,
+    });
+
+    expect(result.ok ? "" : result.error.message).toBe(
+      `nie można odczytać pliku '${photo}'; ścieżka jest ujęta w apostrofy albo cudzysłów, podaj ją bez nich`
+    );
   });
 
   it("should not record the same photo twice", async () => {

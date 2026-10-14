@@ -6,8 +6,8 @@ import {
   localProducer,
   newRecord,
   type RecordedFile,
-  readDigest,
   readJson,
+  readSupplied,
   type StageFile,
   serialize,
   sha256Of,
@@ -117,7 +117,7 @@ export async function addImport(input: AddImportInput): Promise<Result<ImportRep
     );
   }
 
-  const source = await readDigest(input.sourcePath);
+  const source = await readSupplied(input.sourcePath);
 
   if (!source.ok) {
     return source;

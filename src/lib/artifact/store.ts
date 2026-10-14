@@ -101,6 +101,33 @@ export async function readDigest(path: string): Promise<Result<FileDigest>> {
   }
 }
 
+/** A path that starts or ends with a quote a shell would have taken off. */
+const QUOTED = /^['"‘’“”„]|['"‘’“”]$/u;
+
+/**
+ * A file a person named on the command line or in a field: a document, a
+ * source, a photo.
+ *
+ * Its refusal speaks to that person rather than to a log, and names the one
+ * mistake that leaves no other trace: a path pasted with its quotes, which the
+ * screen hands over verbatim, as it must, and no file is ever named.
+ */
+export async function readSupplied(path: string): Promise<Result<FileDigest>> {
+  const digest = await readDigest(path);
+
+  if (digest.ok) {
+    return digest;
+  }
+
+  const quoted = QUOTED.test(path)
+    ? "; ścieżka jest ujęta w apostrofy albo cudzysłów, podaj ją bez nich"
+    : "";
+
+  return err(
+    new FileError(path, `nie można odczytać pliku ${path}${quoted}`, { cause: digest.error })
+  );
+}
+
 export async function readJson<T>(path: string, schema: ZodType<T>): Promise<Result<T>> {
   const digest = await readDigest(path);
 

@@ -227,6 +227,21 @@ describe("addImport", () => {
     );
   });
 
+  it("says a path pasted with its quotes is quoted, writing nothing", async () => {
+    const quoted = `'${await source(docx(TREATMENT))}'`;
+    const result = await addImport({
+      importId: "miko",
+      mode: "apply",
+      sourcePath: quoted,
+      workspace,
+    });
+
+    expect(errorOf(result)).toBe(
+      `nie można odczytać pliku ${quoted}; ścieżka jest ujęta w apostrofy albo cudzysłów, podaj ją bez nich`
+    );
+    expect(existsSync(join(root, "imports"))).toBe(false);
+  });
+
   it("refuses a damaged document instead of writing a damaged picture", async () => {
     const bytes = docx(TREATMENT);
     const at = bytes.indexOf(DOCX_IMAGE);

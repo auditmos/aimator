@@ -43,6 +43,7 @@ export {
   nowIso,
   readDigest,
   readJson,
+  readSupplied,
   removeFile,
   serialize,
   sha256Of,
