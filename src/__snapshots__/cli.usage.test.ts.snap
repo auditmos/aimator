@@ -1248,26 +1248,37 @@ Próba na sucho: nic nie zapisano, nic nie wysłano. Szkic zasad projektu "ewa" 
 Dalej: usuń powyższe przeszkody przed płatnym wywołaniem
 
 --- prompt wysłany do modelu (dokładnie ten tekst) ---
-# Task: draft the shared rules of an animated series from its imported material
+# Task: draft the shared rules of an animated series from what is known about it
 
 A person is preparing a short animated series in a production pipeline. They
 brought a document (a director's treatment, a series bible) that was converted
-and sorted by what each part is about. You receive those parts below. From
-them, fill the fields of the series' shared rules, \`project.md\`: the decisions
-every episode and every generated image of the series relies on.
+and sorted by what each part is about, and they have started the project. You
+receive what the project already holds and those parts below. From them, answer
+every field of the series' shared rules, \`project.md\`: the decisions every
+episode and every generated image of the series relies on.
 
 What you write is a **proposal**. The person reads every field, corrects it and
 approves the rules themselves; nothing you return is accepted until they do.
 
-## How to fill a field
+## How to answer a field
 
-- Use only what the material states or clearly implies. Condense and rephrase
-  freely, but invent nothing: no trait, colour, rule or place the material does
-  not support.
-- When the material does not answer a field, return \`null\`. The field then
-  stays open for the person to answer. An empty field costs them one answer; a
-  guess presented as the material's costs them a wrong series.
-- Never write the plot of an episode. Each episode's story is written later,
+Answer every field, and say for each which kind of answer it is:
+
+- \`grounded: true\` when the material states it or clearly implies it. Condense
+  and rephrase freely, but add nothing the material does not support: no trait,
+  colour, rule or place of your own inside a grounded answer.
+- \`grounded: false\` when the material does not settle it and you propose it:
+  the answer the material most supports, or the usual choice for a series like
+  this one. Say it concretely, as a recommendation the person can take as it
+  is. It is shown to them as a proposal and stays open until they accept it.
+  Never mark a proposal as grounded: a guess presented as the material's costs
+  them a wrong series.
+
+And for every answer:
+
+- Episodes are here so you learn what recurs in the series: places, props,
+  the look, the cast, the length and the shape of an episode. **Never write the
+  plot of an episode** into a field. Each episode's story is written later,
   from that episode's own source; the rules only say what holds across them.
 - Write in the language of the material, keeping its names, **except the four
   Style Bible fields**, which are English, because every image model receives
@@ -1287,8 +1298,8 @@ approves the rules themselves; nothing you return is accepted until they do.
 - **Never a studio, film, artist or series name** in any Style Bible field,
   even one the material uses as a reference (an earlier film of the same
   series included). Describe the look such a name stands for instead.
-- \`palette\`: 5–8 colours, each a name and a hex value. Colours the material
-  names may be turned into hex values; the person will check them.
+- \`palette\`: 5–8 colours, each a name and a hex value. Turning a colour the
+  material names into a hex value keeps it grounded; the person will check it.
 
 ## Fields
 
@@ -1310,6 +1321,12 @@ approves the rules themselves; nothing you return is accepted until they do.
 - \`scenery\`: the places the series returns to and what is fixed in each (palette, light, objects that must not move), or explicitly 'brak'.
 - \`continuity\`: what must stay the same between scenes and between episodes.
 - \`openQuestions\`: only open issues that do not block writing an episode, ideas marked as proposals; 'Brak' when there are none.
+
+# The project
+
+- Title: Dzielna Ewa
+- Frame aspect ratio: 16:9
+- Cast: ewa (Ewa), tata (Tata)
 
 # The material, part by part
 

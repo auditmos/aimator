@@ -120,9 +120,11 @@ albo usunięcie importu nie cofa żadnej zgody. Układ, rekordy i odmowy opisuje
 [import.md](import.md).
 
 **Szkic zasad z importu jest propozycją, nie rekordem etapu 0.** `project draft <projekt>
---import <id>` kupuje jedno wywołanie tekstowe: model podaje wartość każdego pola szablonu
-`project.md` z podziału (seria, styl, postacie, reszta; bez odcinków, bo fabuła należy do
-etapu 1) albo `null`, gdy materiał milczy, a plik składa kod z tego samego szablonu co
+--import <id>` kupuje jedno wywołanie tekstowe: model odpowiada na każde pole szablonu
+`project.md` z całego podziału (odcinki tylko po to, co powraca, bo fabuła należy do etapu
+1) i z faktów `project.json`, mówiąc przy każdym, czy to stoi w materiale, czy to jego
+propozycja. Propozycja stoi za `TODO(etap-0) propozycja:`, więc blokuje etap 0 tak samo jak
+puste pole, dopóki człowiek jej nie przyjmie. Plik składa kod z tego samego szablonu co
 `init`, więc struktura, którą czyta etap 0, nie może wrócić zepsuta. Wiersz „Przygotowano”
 wpisuje kod, a „Zatwierdzone przez użytkownika” zostaje ze znacznikiem, więc `check` nie
 przepuści szkicu, którego nikt nie przeczytał. Rekord szkicu leży w `rules.stage.json` obok

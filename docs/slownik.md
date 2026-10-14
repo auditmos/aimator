@@ -62,7 +62,7 @@ opisuje [docs/import.md](import.md).
 | **sekcja** | section | Materiał od nagłówka do następnego, `T01`, `T02`, liczony na nowo z obecnego `material.md`. |
 | **podział** | grouping | Wynik `import group`: każda sekcja przydzielona i skopiowana dosłownie do `grouped/`. Model wskazał tylko, dokąd idzie sekcja; nikt podziału nie zatwierdza. |
 | **przydział** | destination | Dokąd idzie sekcja i czego dotyczy plik podziału: `series`, `style`, `character:<id>`, `episode:NN-slug` albo `other`. |
-| **szkic zasad** | rules draft | `project.md` wypełniony przez model z podziału importu (`project draft`): propozycja do poprawy, nigdy „tak”. Pole, na które materiał nie odpowiada, zostaje z `TODO(etap-0)`. |
+| **szkic zasad** | rules draft | `project.md` wypełniony przez model z podziału importu (`project draft`): propozycja do poprawy, nigdy „tak”. Co model tylko proponuje, a czego materiał nie mówi, stoi za `TODO(etap-0) propozycja:` i czeka na przyjęcie. |
 
 ## Proporcje i proporcje
 

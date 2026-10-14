@@ -46,38 +46,39 @@ const GROUPING = {
   ],
 };
 
-const EMPTY = {
-  alwaysNever: null,
-  audience: null,
-  cast: null,
-  continuity: null,
-  episodeRule: null,
-  linework: null,
-  opening: null,
-  openQuestions: null,
-  palette: null,
-  proportions: null,
-  props: null,
-  protagonist: null,
-  relations: null,
-  scenery: null,
-  styleLine: null,
-  theme: null,
-  traits: null,
-  world: null,
-};
+/** What the material settles, and what the model only proposes. */
+function said(text: string): { grounded: boolean; text: string } {
+  return { grounded: true, text };
+}
+
+function proposed(text: string): { grounded: boolean; text: string } {
+  return { grounded: false, text };
+}
 
 const ANSWER = {
-  ...EMPTY,
-  audience: "Dzieci 4–9 lat, ciepło i z humorem.",
-  styleLine: "stylized 3D CGI, soft rounded shapes, warm pastel palette, warm kitchen light",
-  theme: "Jedzenie ma wartość.",
-  traits: "- Miko: błękitna bluza, beżowe spodnie.\n- Pola: żółta sukienka.",
+  alwaysNever: proposed("none"),
+  audience: said("Dzieci 4–9 lat, ciepło i z humorem."),
+  cast: proposed("brak stałej obsady"),
+  continuity: proposed("Kuchnia i lodówka zawsze te same."),
+  episodeRule: proposed("Jeden odcinek, jedno odkrycie o jedzeniu."),
+  linework: proposed("no outlines, soft rounded edges"),
+  opening: proposed("brak dodatkowych ograniczeń"),
+  openQuestions: proposed("Brak"),
+  palette: proposed("mint #A8E6CF, cream #FFF5E1"),
+  proportions: proposed("głowa do ciała 1:3"),
+  props: proposed("brak"),
+  protagonist: proposed("Miko, uczestnik wydarzeń."),
+  relations: proposed("Dzieci tej samej wielkości głowy."),
+  scenery: proposed("- Kuchnia: kremowa, słoneczna.\n- Lodówka: miętowa."),
+  styleLine: said("stylized 3D CGI, soft rounded shapes, warm pastel palette, warm kitchen light"),
+  theme: said("Jedzenie ma wartość."),
+  traits: said("- Miko: błękitna bluza, beżowe spodnie.\n- Pola: żółta sukienka."),
+  world: proposed("Współczesna polska kuchnia."),
 };
 
 /** The line the code writes, never the model: when, by what, from which parts. */
 const PROVENANCE =
-  /- Przygotowano: \d{4}-\d{2}-\d{2}, szkic modelu gpt-test z importu „miko” \(series, style, postacie: 1\)\. Propozycja do przeczytania i poprawy, nie decyzja\.\n/;
+  /- Przygotowano: \d{4}-\d{2}-\d{2}, szkic modelu gpt-test z importu „miko” \(series, style, postacie: 1, odcinki: 1\)\. Propozycja do przeczytania i poprawy, nie decyzja\.\n/;
 
 let root = "";
 let scratch = "";
@@ -188,14 +189,17 @@ describe("draftRules", () => {
     expect(result.ok ? result.data.prompt : "").toContain(
       "<<< character:miko\n## Miko\n\nMiko to solenizant w błękitnej bluzie.\n>>> character:miko"
     );
-    // An episode's story is stage 1's, from the episode's own source.
-    expect(result.ok ? result.data.prompt : "").not.toContain("znajduje skarb");
+    // What recurs is learnt from an episode too; its plot is forbidden by the task.
+    expect(result.ok ? result.data.prompt : "").toContain("<<< episode:01-pola\n");
+    expect(result.ok ? result.data.prompt : "").toContain(
+      "# The project\n\n- Title: Miko\n- Frame aspect ratio: 16:9\n- Cast: nobody declared yet\n"
+    );
     expect(calls).toBe(0);
     expect(await rules()).toBe(scaffold);
     expect(existsSync(join(root, "projects", "miko", "rules.stage.json"))).toBe(false);
   });
 
-  it("fills the fields the answer filled, and leaves the rest and the approval to a person", async () => {
+  it("fills what the material says, keeps each proposal behind its marker, and leaves the yes", async () => {
     await prepare();
     const result = await draft();
     const text = await rules();
@@ -208,9 +212,15 @@ describe("draftRules", () => {
     expect(text).toContain(
       "## Style Bible\n\n- Style line: stylized 3D CGI, soft rounded shapes, warm pastel palette, warm kitchen light\n"
     );
-    expect(text).toContain("- Zasada odcinka: TODO(etap-0) co opowiada pojedynczy odcinek");
+    expect(text).toContain(
+      "- Zasada odcinka: TODO(etap-0) propozycja: Jeden odcinek, jedno odkrycie o jedzeniu.\n"
+    );
+    expect(text).toContain(
+      "- Powracająca sceneria: TODO(etap-0) propozycja:\n  - Kuchnia: kremowa, słoneczna.\n  - Lodówka: miętowa.\n"
+    );
     expect(text).toMatch(PROVENANCE);
     expect(text).toContain("- Zatwierdzone przez użytkownika: TODO(etap-0) zakres decyzji.");
+    expect(result.ok ? result.data.left : []).toContain("Zasada odcinka");
     expect(result.ok ? result.data.left : []).toContain("Zatwierdzone przez użytkownika");
     expect(result.ok ? result.data.left : []).not.toContain("Temat projektu");
     expect(result.ok ? result.data.created : []).toContain("projects/miko/project.md");
@@ -234,6 +244,7 @@ describe("draftRules", () => {
       "imports/miko/grouped/series.md",
       "imports/miko/grouped/style.md",
       "imports/miko/grouped/characters/miko.md",
+      "imports/miko/grouped/episodes/01-pola.md",
     ]);
     expect(record.artifacts.rules.outputs.map(({ path }: { path: string }) => path)).toEqual([
       "projects/miko/project.md",
@@ -249,7 +260,7 @@ describe("draftRules", () => {
     await draft();
 
     const again = await draft({
-      fetch: completion({ ...ANSWER, theme: "Drugi szkic." }),
+      fetch: completion({ ...ANSWER, theme: said("Drugi szkic.") }),
       regenerate: true,
     });
 
@@ -272,13 +283,13 @@ describe("draftRules", () => {
     const result = await draft({
       fetch: completion({
         ...ANSWER,
-        opening: "  ",
-        theme: "TODO(etap-0) do ustalenia",
-        world: "Kuchnia\n## Nowa sekcja",
+        opening: proposed("  "),
+        theme: proposed("TODO(etap-0) do ustalenia"),
+        world: said("Kuchnia\n## Nowa sekcja"),
       }),
     });
 
-    expect(errorOf(result)).toContain("pole opening jest puste; brak odpowiedzi to null");
+    expect(errorOf(result)).toContain("pole opening jest puste");
     expect(errorOf(result)).toContain("pole theme zawiera znacznik TODO(etap-0)");
     expect(errorOf(result)).toContain("pole world zawiera nagłówek");
     expect(await rules()).toBe(scaffold);

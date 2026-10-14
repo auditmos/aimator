@@ -561,12 +561,16 @@ export async function draftRules(input: RulesDraftInput): Promise<Result<RulesDr
   }
 
   return await draftFrom(input, {
+    facts: {
+      aspectRatio: file.data.aspectRatio,
+      cast: Object.entries(file.data.characters).map(([id, entry]) => ({ id, name: entry.name })),
+      title: file.data.title,
+    },
     file: {
       path: toWorkspacePath(input.workspace.root, paths.data.file),
       sha256: digest.data.sha256,
     },
     paths: paths.data,
-    title: file.data.title,
   });
 }
 

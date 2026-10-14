@@ -163,13 +163,16 @@ pnpm dev project draft miko --import miko             # jedno płatne wywołanie
 pnpm dev project draft miko --import miko --regenerate --instruction "Paleta cieplejsza."
 ```
 
-Model (`AIMATOR_RULES_MODEL` albo `--model`) czyta podział bez odcinków, bo fabuła należy
-do [etapu 1](01-scenariusz.md), i podaje wartość każdego pola albo nic, gdy materiał
-milczy; wtedy pole zostaje z `TODO(etap-0)`. Style Bible pisze po angielsku i bez nazw
-studiów, filmów i artystów. Plik składa kod z szablonu, wiersz „Przygotowano” wpisuje sam,
-a „Zatwierdzone przez użytkownika” zostawia Tobie, więc `check` nie przepuści szkicu, póki
-go nie przeczytasz i nie uzupełnisz. To nadal propozycja: poprawiasz ją jak własny tekst,
-a `approve` daje to samo „tak”, co zawsze.
+Model (`AIMATOR_RULES_MODEL` albo `--model`) czyta cały podział, także odcinki, ale tylko
+po to, co w serii powraca (miejsca, rekwizyty, wygląd); fabuła należy do
+[etapu 1](01-scenariusz.md) i do zasad nie trafia. Dostaje też tytuł, proporcje i obsadę
+z `project.json`. Odpowiada na **każde** pole i mówi przy każdym, czy to stoi w materiale,
+czy to jego propozycja. Pierwsze jest wpisane wprost, drugie stoi za
+`TODO(etap-0) propozycja:`, więc masz gotową odpowiedź, a `check` i tak jej nie przepuści,
+dopóki jej nie przyjmiesz, usuwając znacznik, albo nie zmienisz. Style Bible pisze po
+angielsku i bez nazw studiów, filmów i artystów. Plik składa kod z szablonu, wiersz
+„Przygotowano” wpisuje sam, a „Zatwierdzone przez użytkownika” zostawia Tobie. To nadal
+propozycja: `approve` daje to samo „tak”, co zawsze.
 
 Szkic pisze tylko na nietknięty szkielet albo na własny szkic, którego nikt nie ruszył.
 Po ręcznej poprawce odmawia, żeby jej nie nadpisać; nowy szkic dostaniesz wtedy dopiero

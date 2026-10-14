@@ -30,6 +30,7 @@ import {
   buildPrompt,
   DRAFT_FORMAT,
   type DraftAnswer,
+  type DraftFacts,
   type DraftMaterial,
   PROMPT_VERSION,
 } from "./draft-prompt.js";
@@ -39,10 +40,12 @@ import { leftOpen, PLACEHOLDER, type RuleValues, renderRules } from "./template.
  * Internal to the project module: `project.md` drafted from an import.
  *
  * One paid text call through `lib/text-model`, whose order of operations it
- * keeps. The model fills the scaffold's fields from the import's grouping and
- * the code renders the document, so stage 0 reads the same structure it would
- * from a person. It is a proposal and nothing more: stage 0 still blocks on
- * every marker left, and on approval, which no draft can give.
+ * keeps. The model answers every field of the scaffold from the import's
+ * grouping and the project's own facts, and the code renders the document, so
+ * stage 0 reads the same structure it would from a person. What the material
+ * states is filled in; what the model only proposes keeps the marker in front
+ * of it, so stage 0 still blocks on it until a person takes it, and on
+ * approval, which no draft can give.
  *
  * Its record lives in `rules.stage.json`, not in `prepare.stage.json`, because
  * stage 0 verifies every output that file names and a draft exists to be
@@ -68,10 +71,11 @@ export interface RulesDraftInput {
 
 /** What the module entry already read about the project. */
 interface DraftProject {
-  /** `project.json`, by digest: the title the draft renders under. */
+  /** The title the draft renders under, the ratio and the cast the model is told. */
+  readonly facts: DraftFacts;
+  /** `project.json`, by digest. */
   readonly file: RecordedFile;
   readonly paths: ProjectPaths;
-  readonly title: string;
 }
 
 export interface RulesDraftReport {
@@ -200,8 +204,9 @@ export async function draftFrom(
 }
 
 /**
- * Every grouped part but the episodes, whose stories stage 1 writes from each
- * episode's own source, read in the grouping's order with their digests.
+ * Every grouped part, episodes included, read in the grouping's order with
+ * their digests. An episode tells what recurs (places, props, the look); the
+ * prompt forbids carrying its plot, which stage 1 writes from its own source.
  */
 async function readMaterial(input: RulesDraftInput): Promise<Result<Material>> {
   const shown = await showImport({ importId: input.importId, workspace: input.workspace });
@@ -214,10 +219,6 @@ async function readMaterial(input: RulesDraftInput): Promise<Result<Material>> {
   const parts: DraftMaterial[] = [];
 
   for (const entry of shown.data.grouped) {
-    if (entry.destination.startsWith("episode:")) {
-      continue;
-    }
-
     // biome-ignore lint/performance/noAwaitInLoops: a handful of small files, read in order
     const read = await readDigest(workspacePath(input.workspace, entry.path));
 
@@ -242,10 +243,6 @@ function blockers(input: RulesDraftInput, material: Material): string[] {
   if (material.grouped === 0) {
     problems.push(
       `import "${input.importId}" nie ma podziału, a szkic czyta podział: aimator import group ${input.importId} --dry-run`
-    );
-  } else if (material.parts.length === 0) {
-    problems.push(
-      `podział importu "${input.importId}" ma same odcinki, a szkic zasad czyta serię, styl i postacie`
     );
   }
 
@@ -277,7 +274,7 @@ async function overwriteProblems(project: DraftProject, rules: string): Promise<
     return [];
   }
 
-  const scaffold = sha256Of(Buffer.from(renderRules(project.title)));
+  const scaffold = sha256Of(Buffer.from(renderRules(project.facts.title)));
   const record = await readJson(project.paths.rulesDraft, stageFileSchema);
   const drafted = record.ok
     ? record.data.artifacts[KEY]?.outputs.find(({ path }) => path === rules)?.sha256
@@ -302,7 +299,7 @@ function stage(
     inputs: [project.file, ...material.inputs],
     key: KEY,
     lock: project.paths.rulesLock,
-    prompt: buildPrompt(material.parts),
+    prompt: buildPrompt(project.facts, material.parts),
     promptVersion: PROMPT_VERSION,
     publish: (publication) => publish(input, project, material, publication),
     replaced: () => replaced(project.paths),
@@ -338,15 +335,16 @@ async function publish(
     return await refuse(input.workspace, archive, verdict.error);
   }
 
-  const values: RuleValues = { ...verdict.data, prepared: provenance(input, material) };
-  const text = renderRules(project.title, values);
-  const left = leftOpen(values);
+  const prepared = provenance(input, material);
+  const text = renderRules(project.facts.title, { ...verdict.data.values, prepared });
+  // Open is whatever the material did not settle: every proposal, and the yes.
+  const left = leftOpen({ ...verdict.data.grounded, prepared });
 
   await writeNew(
     archive.validation,
     serialize({
       checkedAt: nowIso(),
-      filled: Object.keys(verdict.data).length,
+      grounded: Object.keys(verdict.data.grounded).length,
       left: left.length,
       promptVersion: PROMPT_VERSION,
       structuralValidation: "passed",
@@ -387,49 +385,66 @@ function readAnswer(text: string): Result<DraftAnswer, string> {
 
 const HEADING = /^\s*#/m;
 
+/** What a proposal is rendered behind: the marker stage 0 counts, and the word for it. */
+const PROPOSAL = `${PLACEHOLDER} propozycja:`;
+
+/** A validated answer: every field as rendered, and the ones the material itself settles. */
+interface Verdict {
+  /** Only the grounded fields, which is what tells a filled field from an open one. */
+  readonly grounded: RuleValues;
+  /** Every field, a proposal behind its marker. */
+  readonly values: RuleValues;
+}
+
 /**
- * The fields the answer filled, trimmed, or every reason it cannot fill them.
+ * Every field as it will stand in `project.md`, or every reason it cannot.
  *
  * Only what would break the document or pass for a person's answer is
  * refused: a value that is blank, that carries the marker stage 0 counts, or
  * that opens a heading and so a section the template never had. Whether a
- * value is true to the material is for the person who reads it.
+ * value is true to the material is for the person who reads it. A proposal
+ * is written behind the marker, so it stays open until somebody takes it; a
+ * list starts on the line below it, where the template puts a list.
  */
-function validateDraft(answer: DraftAnswer): Result<RuleValues, string> {
+function validateDraft(answer: DraftAnswer): Result<Verdict, string> {
+  const grounded: Record<string, string> = {};
   const values: Record<string, string> = {};
   const problems: string[] = [];
 
   for (const [key, raw] of Object.entries(answer)) {
-    if (raw === null) {
-      continue;
-    }
-
-    const value = raw.trim();
+    const value = raw.text.trim();
 
     if (value === "") {
-      problems.push(`pole ${key} jest puste; brak odpowiedzi to null`);
+      problems.push(`pole ${key} jest puste`);
     } else if (value.includes(PLACEHOLDER)) {
-      problems.push(`pole ${key} zawiera znacznik ${PLACEHOLDER}; brak odpowiedzi to null`);
+      problems.push(`pole ${key} zawiera znacznik ${PLACEHOLDER}, który stawia tylko kod`);
     } else if (HEADING.test(value)) {
       problems.push(`pole ${key} zawiera nagłówek, który złamałby strukturę project.md`);
-    } else {
+    } else if (raw.grounded) {
+      grounded[key] = value;
       values[key] = value;
+    } else {
+      values[key] = value.startsWith("- ") ? `${PROPOSAL}\n${value}` : `${PROPOSAL} ${value}`;
     }
   }
 
-  return problems.length === 0 ? ok(values as RuleValues) : err(problems.join("\n"));
+  return problems.length === 0
+    ? ok({ grounded: grounded as RuleValues, values: values as RuleValues })
+    : err(problems.join("\n"));
 }
 
 /** When and from what, said by the code: a model is not asked where its own text came from. */
 function provenance(input: RulesDraftInput, material: Material): string {
-  const characters = material.parts.filter(({ destination }) =>
-    destination.startsWith("character:")
-  ).length;
+  const count = (prefix: string): number =>
+    material.parts.filter(({ destination }) => destination.startsWith(prefix)).length;
+  const characters = count("character:");
+  const episodes = count("episode:");
   const parts = [
     ...material.parts
       .map(({ destination }) => destination)
-      .filter((destination) => !destination.startsWith("character:")),
+      .filter((destination) => !destination.includes(":")),
     ...(characters === 0 ? [] : [`postacie: ${characters}`]),
+    ...(episodes === 0 ? [] : [`odcinki: ${episodes}`]),
   ];
   const model = input.model === null || input.model === "" ? "" : ` ${input.model}`;
 
