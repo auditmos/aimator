@@ -22,7 +22,7 @@ import {
   writeNew,
 } from "../artifact/index.js";
 import { err, ok, type Result } from "../result.js";
-import type { EpisodePaths, RunPaths, Workspace } from "../workspace.js";
+import type { RunPaths, Workspace } from "../workspace.js";
 import { archivedBy, previousFile, runPaths } from "../workspace.js";
 import {
   buildRequest,
@@ -55,7 +55,11 @@ import { type Replaced, revisionPrompt } from "./revision.js";
 /** Everything the lifecycle needs that is not about one particular artifact. */
 interface TextCall {
   readonly apiKey: string;
-  readonly episode: EpisodePaths;
+  /**
+   * Whoever keeps the run archive. Only `runs` is read, so an import being
+   * grouped, which has no episode, archives its attempts the way stages do.
+   */
+  readonly episode: { readonly runs: string };
   readonly fetch: typeof fetch;
   /** A schema the provider enforces, or `null` for a plain Markdown answer. */
   readonly format: ResponseFormat | null;

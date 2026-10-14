@@ -652,11 +652,25 @@ export function projectPaths(workspace: Workspace, projectId: string): Result<Pr
 export interface ImportPaths {
   /** `import.json`: where the document came from, and its digest. */
   readonly file: string;
+  /**
+   * `grouped/`: the material sorted by what each part is about, every file
+   * copied out of `material.md` verbatim. Written by `import group` alone.
+   */
+  readonly grouped: string;
+  /**
+   * The grouping's state file, in the directory it writes, which is rule 1's
+   * "one per directory": the conversion and the grouping are one stage.
+   */
+  readonly groupedStage: string;
   /** The images the document held, `I01.png`, in the bytes it held them. */
   readonly images: string;
+  /** A file, not a directory, for the reason `CharacterTrackPaths.lock` gives. */
+  readonly lock: string;
   /** `material.md`: the whole document as Markdown, images where they stood. */
   readonly material: string;
   readonly root: string;
+  /** The archive of every paid attempt to group, as an episode keeps its own. */
+  readonly runs: string;
   /** The document itself, copied in, so the conversion can always be redone. */
   readonly source: string;
   readonly stage: string;
@@ -681,9 +695,13 @@ export function importPaths(workspace: Workspace, importId: string): Result<Impo
 
   return ok({
     file: join(root, "import.json"),
+    grouped: join(root, "grouped"),
+    groupedStage: join(root, "grouped", "import.stage.json"),
     images: join(root, "images"),
+    lock: join(root, "import.lock"),
     material: join(root, "material.md"),
     root,
+    runs: join(root, "runs"),
     source: join(root, "source.docx"),
     stage: join(root, "import.stage.json"),
   });
@@ -1292,9 +1310,12 @@ export function mixRunPaths(paths: { readonly runs: string }, runId: string): Mi
   };
 }
 
-/** The archive of one attempt. Run ids are minted by `lib/artifact`. */
-export function runPaths(episode: EpisodePaths, runId: string): RunPaths {
-  const root = join(episode.runs, runId);
+/**
+ * The archive of one attempt, under whoever keeps the runs: an episode, or an
+ * import that is being grouped. Run ids are minted by `lib/artifact`.
+ */
+export function runPaths(owner: { readonly runs: string }, runId: string): RunPaths {
+  const root = join(owner.runs, runId);
 
   return {
     previous: join(root, "previous"),
