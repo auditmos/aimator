@@ -67,7 +67,12 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   od znaku odcinka czyta się na nowo przy każdej zmianie w katalogu roboczym.
 - **Widok projektu** (`#/projekt/<id>`): to samo pytanie o jeden poziom niżej, „Nowy
   odcinek” albo „Wczytaj odcinek”, pod nimi ten sam znak etapu 0, a pod znakiem: gdy
-  etap 0 jest niekompletny, słowa samego `check`, czyli listę braków z odmowy; gdy pliki
+  etap 0 jest niekompletny, listę „co zostało”, po wierszu na miejsce, w którym się to
+  poprawia: zasady wspólne (liczba znaczników TODO), obsada (postacie bez podstawy z
+  imienia) i każdy odcinek (brakujące decyzje), każdy wiersz z odnośnikiem. Wiersze są
+  czytane z `project.md`, `project show` i `episode show`, nie ze zdań `check`, więc to
+  mapa, nie werdykt: pełna odpowiedź `check` stoi pod nimi zwinięta i rozwija się sama,
+  gdy każdy wiersz jest odhaczony, a `check` nadal odmawia. Gdy pliki
   się zgadzają, a nikt ich nie przyjął, zwinięte „Przeczytaj zasady (project.md)” i
   przycisk „Zatwierdź etap 0” (`approve <id> --stage prepare`). Etap 0 należy do
   projektu, więc projekt bez odcinka też da się tu zatwierdzić, a nie tylko z terminala;
@@ -166,7 +171,8 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   roboczym, bo `project.md` pisze się w edytorze. Założenie projektu, obsada i dodanie odcinka mają
   własne ekrany, bo pyta się o nie na innym poziomie niż o odcinek. Gdy `status` odmawia (np.
   etap 0 jest niekompletny), panel etapu 0 stoi na przeglądzie zamiast listy etapów, bo to
-  w nim naprawia się to, o co drabina się zatrzymała. Pliki podaje się **ścieżką w polu
+  w nim naprawia się to, o co drabina się zatrzymała; nad nim ta sama lista „co zostało”
+  co na widoku projektu, a nie ściana odmowy. Pliki podaje się **ścieżką w polu
   tekstowym**; patrz niżej.
 - **Panel etapu 1**: werdykt `check` (stan pliku, zatwierdzenie,
   sceny i sumy czasów), problemy w słowach etapu, dryf wejść wypisany plik po pliku,

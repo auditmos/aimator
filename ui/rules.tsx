@@ -43,6 +43,11 @@ const PROPOSAL = `${MARKER} propozycja:`;
 /** The scaffold's line for the yes, while nobody has written it. */
 const APPROVED = `- Zatwierdzone przez użytkownika: ${MARKER}`;
 
+/** The lines of `project.md` that still carry the marker, which stage 0 waits on. */
+export function markedLines(rules: string): readonly string[] {
+  return rules.split("\n").filter((line) => line.includes(MARKER));
+}
+
 /** What a button beside a line does to the file. */
 type LineEdit = "accept" | "approve" | "unquote";
 
@@ -319,7 +324,7 @@ export function ProjectRules(props: {
     },
     [onRun]
   );
-  const marked = rules === null ? [] : rules.split("\n").filter((line) => line.includes(MARKER));
+  const marked = rules === null ? [] : markedLines(rules);
   const open = marked.length;
   /** Fields with no answer at all: not a proposal, not the quote, not the yes. */
   const unanswered = marked.filter(

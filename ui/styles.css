@@ -296,6 +296,50 @@ h1 {
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
+/* What stage 0 still waits on: one line per place it is put right, the
+   check's own words folded under them. */
+.prepare-gaps {
+  width: min(100%, 44rem);
+}
+.prepare-gaps ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.gap {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.gap-mark {
+  flex: none;
+  width: 1rem;
+  color: var(--color-warning-text);
+}
+.gap-done .gap-mark {
+  color: var(--color-neutral-400);
+}
+.gap-state {
+  color: var(--color-neutral-400);
+}
+.prepare-details {
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+.prepare-details summary {
+  cursor: pointer;
+}
+.prepare-details .prepare-words {
+  margin-top: 0.5rem;
+}
+/* The same list on an episode whose stage 0 is unfinished, above its panel. */
+.episode-gaps {
+  margin-top: 1rem;
+}
 /* Stage 0's yes on the project's screen: the rules folded above the button,
    because a yes is given to something read. */
 .project-approval {

@@ -1,8 +1,17 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
+import { useProjectOverview } from "./cast";
 import { type ImportedEpisode, useImportedEpisodes } from "./import";
-import { Action, Block, Field, Problems, Said, useArtifactText, useOwnRun } from "./panel";
-import type { EpisodeOverview, Refusal, RunDone, Stage0Report, StatusCell } from "./types";
+import { Action, Block, Field, Problems, plural, Said, useArtifactText, useOwnRun } from "./panel";
+import { markedLines } from "./rules";
+import type {
+  CastEntry,
+  EpisodeOverview,
+  Refusal,
+  RunDone,
+  Stage0Report,
+  StatusCell,
+} from "./types";
 
 /**
  * Stage 0, which is the one stage a person writes rather than buys.
@@ -629,6 +638,180 @@ export function NewEpisode(props: {
       <SettingsFields change={change} settings={settings} />
       <Action argv={add} disabled={running} label="Dodaj odcinek" onRun={submit} primary />
     </section>
+  );
+}
+
+/** `episode show` for each episode, asked again whenever the workspace moves. */
+function useEpisodeOverviews(
+  projectId: string,
+  episodes: readonly string[],
+  revision: unknown
+): ReadonlyMap<string, EpisodeOverview> {
+  const [known, setKnown] = useState<ReadonlyMap<string, EpisodeOverview>>(new Map());
+  const key = episodes.join("\n");
+
+  useEffect(() => {
+    let cancelled = false;
+    const read = async (episodeId: string): Promise<EpisodeOverview | null> => {
+      const response = await fetch(
+        `/api/episode/${encodeURIComponent(projectId)}/${encodeURIComponent(episodeId)}`
+      );
+      const body = (await response.json()) as EpisodeOverview | Refusal;
+
+      return "error" in body ? null : body;
+    };
+
+    Promise.all(key === "" ? [] : key.split("\n").map(read))
+      .then((all) => {
+        if (!cancelled) {
+          setKnown(new Map(all.flatMap((one) => (one === null ? [] : [[one.episodeId, one]]))));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [key, projectId, revision]);
+
+  return known;
+}
+
+/** One line of what stage 0 still waits on: where it is put right, and how it stands. */
+function Gap(props: {
+  readonly done: boolean;
+  /** Null where the place is this very screen. */
+  readonly href: string | null;
+  readonly label: string;
+  readonly state: string;
+}): JSX.Element {
+  const { done, href, label, state } = props;
+
+  return (
+    <li className={done ? "gap gap-done" : "gap"}>
+      <span aria-hidden="true" className="gap-mark">
+        {done ? "✓" : "○"}
+      </span>
+      <span>
+        {href === null ? label : <a href={href}>{label}</a>}{" "}
+        <span className="gap-state">{state}</span>
+      </span>
+    </li>
+  );
+}
+
+/** A few names, then how many more. A dot between them, because a name may hold a comma. */
+function someOf(names: readonly string[]): string {
+  return names.length <= 4
+    ? names.join(" · ")
+    : `${names.slice(0, 4).join(" · ")} i jeszcze ${names.length - 4}`;
+}
+
+/** Said while a place has not answered yet. */
+const READING = "czytam…";
+
+function rulesState(open: number | null): string {
+  if (open === null) {
+    return READING;
+  }
+
+  return open === 0
+    ? "bez znaczników TODO"
+    : `${plural(open, ["znacznik TODO", "znaczniki TODO", "znaczników TODO"])} do rozstrzygnięcia`;
+}
+
+function castState(cast: readonly CastEntry[] | null, baseless: readonly CastEntry[]): string {
+  if (cast === null) {
+    return READING;
+  }
+
+  if (cast.length === 0) {
+    return "pusta: dodaj powracające postacie";
+  }
+
+  return baseless.length === 0
+    ? `${plural(cast.length, ["postać", "postacie", "postaci"])}, każda z podstawą`
+    : `${baseless.length} bez podstawy: ${someOf(baseless.map(({ name }) => name))}`;
+}
+
+function episodeState(missing: readonly string[] | null): string {
+  if (missing === null) {
+    return READING;
+  }
+
+  return missing.length === 0
+    ? "decyzje podjęte"
+    : `brakuje: ${missing.map((label) => label.toLowerCase()).join(", ")}`;
+}
+
+/**
+ * What stage 0 still waits on, one line per place it is put right: the rules,
+ * the cast, each episode's decisions, each a link to that place.
+ *
+ * The lines are read from what those places show (`project.md`, `project
+ * show`, `episode show`) rather than out of the check's sentences, which are
+ * written for a terminal. They are a map, not the verdict: the check may know
+ * of something none of them shows, so its own words stay one click below, and
+ * open by themselves once every line here is ticked while the check still
+ * says no.
+ */
+export function PrepareGaps(props: {
+  readonly castHref: string;
+  /** Where an episode's decisions are put right; null on that episode's own screen. */
+  readonly episodeHref: ((episodeId: string) => string) | null;
+  readonly episodes: readonly string[];
+  readonly projectId: string;
+  readonly revision: object | null;
+  readonly rulesHref: string;
+  /** The check's refusal, as it said it. */
+  readonly words: string;
+}): JSX.Element {
+  const { castHref, episodeHref, episodes, projectId, revision, rulesHref, words } = props;
+  const rules = useArtifactText({ artifact: "rules", projectId, stage: "prepare" }, revision);
+  const shown = useProjectOverview(projectId, revision);
+  const decided = useEpisodeOverviews(projectId, episodes, revision);
+  const open = rules === null ? null : markedLines(rules).length;
+  const cast = shown.kind === "shown" ? shown.overview.cast : null;
+  const baseless = (cast ?? []).filter(
+    (entry) => entry.basis === null || (entry.basis !== "description" && entry.sources.length === 0)
+  );
+  const castDone = cast !== null && cast.length > 0 && baseless.length === 0;
+  const missing = episodes.map((episodeId) => {
+    const overview = decided.get(episodeId);
+
+    return {
+      episodeId,
+      // The longest clip is stage 3's decision, so stage 0 does not wait on it.
+      missing:
+        overview === undefined
+          ? null
+          : undecided(overview.settings).filter(
+              (label) => label !== DECISION_LABELS.maxClipSeconds
+            ),
+    };
+  });
+  const everyDone = open === 0 && castDone && missing.every((one) => one.missing?.length === 0);
+
+  return (
+    <div className="prepare-gaps">
+      <ul>
+        <Gap done={open === 0} href={rulesHref} label="Zasady wspólne" state={rulesState(open)} />
+        <Gap done={castDone} href={castHref} label="Obsada" state={castState(cast, baseless)} />
+        {missing.map((one) => (
+          <Gap
+            done={one.missing?.length === 0}
+            href={episodeHref === null ? null : episodeHref(one.episodeId)}
+            key={one.episodeId}
+            label={`Odcinek ${one.episodeId}`}
+            state={episodeState(one.missing)}
+          />
+        ))}
+      </ul>
+      <details className="prepare-details" open={everyDone}>
+        <summary>Pełna odpowiedź sprawdzenia</summary>
+        <p className="prepare-words">{words}</p>
+      </details>
+    </div>
   );
 }
 

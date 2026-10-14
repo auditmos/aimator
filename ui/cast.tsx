@@ -36,7 +36,7 @@ type Shown =
  * A failed read keeps the last answer rather than blanking it, for the reason
  * the ladder does: an old answer is still the answer somebody was reading.
  */
-function useProjectOverview(projectId: string, revision: object | null): Shown {
+export function useProjectOverview(projectId: string, revision: object | null): Shown {
   const [shown, setShown] = useState<Shown>({ kind: "loading" });
 
   useEffect(() => {

@@ -20,7 +20,7 @@ import {
 import { MixPanel, NarrationPanel } from "./narration";
 import { OpeningFramePanel } from "./opening-frame";
 import { Commands, plural, type ResultOffer, ResultOffers, RunDock, SettledStage } from "./panel";
-import { NewEpisode, NewProject, PreparePanel, ProjectApproval } from "./prepare";
+import { NewEpisode, NewProject, PrepareGaps, PreparePanel, ProjectApproval } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
 import { ProjectRules } from "./rules";
@@ -515,23 +515,45 @@ function usePrepareReadiness(
  * the stage knows how to make.
  */
 function PrepareStanding(props: {
+  readonly episodes: readonly string[];
   readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
-  readonly revision: unknown;
+  readonly revision: object | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { onRun, projectId, revision, running } = props;
+  const { episodes, onRun, projectId, revision, running } = props;
   const answer = usePrepareReadiness([projectId], revision).get(projectId) ?? "loading";
   // The same condition the CLI records under, and the episode panel shows its
   // button under: files that hold together, and nobody's yes on them yet.
   const acceptable =
     answer !== "loading" && !("error" in answer) && answer.ready && !answer.approved;
-  const words = answer !== "loading" && "error" in answer ? answer.error.message : null;
+  const refusal = answer !== "loading" && "error" in answer ? answer.error : null;
+  // The episode's overview rather than its stage-0 cell: while stage 0 is
+  // unfinished the ladder is refused, and the overview is where the episode's
+  // stage-0 panel then stands.
+  const episodeOf = useCallback(
+    (episodeId: string) => episodeHref(projectId, episodeId),
+    [projectId]
+  );
 
   return (
     <div className="prepare-standing">
       <PrepareReadiness answer={answer} />
-      {words === null ? null : <p className="prepare-words">{words}</p>}
+      {refusal?.name === "NotReadyError" ? (
+        <PrepareGaps
+          castHref={castHref(projectId)}
+          episodeHref={episodeOf}
+          episodes={episodes}
+          projectId={projectId}
+          revision={revision}
+          rulesHref={rulesHref(projectId)}
+          words={refusal.message}
+        />
+      ) : null}
+      {/* Any other refusal is a project this screen cannot read; its words are all there is. */}
+      {refusal === null || refusal.name === "NotReadyError" ? null : (
+        <p className="prepare-words">{refusal.message}</p>
+      )}
       {acceptable ? (
         <ProjectApproval
           onRun={onRun}
@@ -778,7 +800,8 @@ function EpisodeView(props: {
 }): JSX.Element {
   const { episodeId, onRun, place, projectId, run, running, runs } = props;
   const [status, setStatus] = useState<EpisodeStatus | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  /** A new object on every answer, which is also what re-reads the gaps under it. */
+  const [refusal, setRefusal] = useState<Refusal["error"] | null>(null);
   const [connection, setConnection] = useState<Connection>("opening");
   const hrefOf = useCallback(
     (to: string) => stageHref(projectId, episodeId, to),
@@ -796,7 +819,7 @@ function EpisodeView(props: {
       setConnection("live");
     });
     events.addEventListener("refusal", (event) => {
-      setRefusal((JSON.parse(event.data) as Refusal).error.message);
+      setRefusal((JSON.parse(event.data) as Refusal).error);
       setConnection("live");
     });
     // While an episode is open, its answers are read here rather than off the
@@ -832,7 +855,25 @@ function EpisodeView(props: {
       <h1 id="episode-title">
         <span className="title-context">{projectId} /</span> {episodeId}
       </h1>
-      <Notices connection={connection} ladderless={ladderless} refusal={refusal} />
+      <Notices
+        connection={connection}
+        ladderless={ladderless}
+        refusal={refusal === null || refusal.name === "NotReadyError" ? null : refusal.message}
+      />
+      {/* An unfinished stage 0 is the one refusal with a map: what is left, where. */}
+      {refusal?.name === "NotReadyError" ? (
+        <div className="episode-gaps">
+          <PrepareGaps
+            castHref={castHref(projectId)}
+            episodeHref={null}
+            episodes={[episodeId]}
+            projectId={projectId}
+            revision={refusal}
+            rulesHref={rulesHref(projectId)}
+            words={refusal.message}
+          />
+        </div>
+      ) : null}
       {ladderless && overview ? (
         <Commands>
           <div className="stage-body">
@@ -1003,6 +1044,7 @@ function ProjectScreens(props: {
         make={{ href: newEpisodeHref(project.id), label: "Nowy odcinek" }}
       >
         <PrepareStanding
+          episodes={project.episodes}
           onRun={onRun}
           projectId={project.id}
           revision={listing}
