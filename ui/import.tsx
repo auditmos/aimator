@@ -82,6 +82,64 @@ export function useImports(revision: unknown): ImportListing | Refusal | null {
   return useAnswer<ImportListing>("/api/imports", revision);
 }
 
+/** One episode file a grouping proposes, where `episode add --source` takes it from. */
+export interface ImportedEpisode {
+  /** `01-miko-i-skarb-na-talerzu`: the name the grouping gave the file. */
+  readonly episode: string;
+  readonly importId: string;
+  /** The workspace root `import list` names, joined to the path `import show` gives under it. */
+  readonly source: string;
+}
+
+/** What a grouping calls an episode's file: `episode:01-miko-i-skarb-na-talerzu`. */
+const EPISODE = "episode:";
+
+/**
+ * Every episode file of every grouped import in the workspace, for a new
+ * episode to start from. Empty while it is being read, and when no import
+ * has a grouping that found one; a refusal is no file to offer either.
+ */
+export function useImportedEpisodes(revision: unknown): readonly ImportedEpisode[] {
+  const listing = useImports(revision);
+  const [episodes, setEpisodes] = useState<readonly ImportedEpisode[]>([]);
+
+  useEffect(() => {
+    if (listing === null || "error" in listing) {
+      return;
+    }
+
+    let cancelled = false;
+    const read = async ({ id }: { readonly id: string }): Promise<ImportedEpisode[]> => {
+      const response = await fetch(`/api/import/${encodeURIComponent(id)}`);
+      const body = (await response.json()) as ImportOverview | Refusal;
+
+      return "error" in body
+        ? []
+        : body.grouped
+            .filter(({ destination }) => destination.startsWith(EPISODE))
+            .map(({ destination, path }) => ({
+              episode: destination.slice(EPISODE.length),
+              importId: id,
+              source: `${listing.workspace}/${path}`,
+            }));
+    };
+
+    Promise.all(listing.imports.filter(({ grouped }) => grouped > 0).map(read))
+      .then((all) => {
+        if (!cancelled) {
+          setEpisodes(all.flat());
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listing]);
+
+  return episodes;
+}
+
 /** The text of one file of an import, or nothing while there is none to show. */
 function useImportText(importId: string, artifact: string, revision: unknown): string | null {
   const [text, setText] = useState<string | null>(null);

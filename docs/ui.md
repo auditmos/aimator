@@ -96,7 +96,11 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
 - **Nowy odcinek** (`#/projekt/<id>/nowy-odcinek`): źródło i sześć decyzji, czyli
   `episode add`. Źródło to ścieżka do pliku albo pomysł wpisany w polu tekstowym, razem
   z numerem i slugiem (`03-wanda`), czyli `--idea` i `--episode`; numeru ekran nie
-  wylicza, bo numer odcinka to decyzja. Identyfikator odcinka czyta CLI, z nazwy pliku
+  wylicza, bo numer odcinka to decyzja. Gdy któryś import ma podział z plikami odcinków,
+  źródło otwiera się na „plik z importu”: lista tych plików (`miko · 01-…`, z `import show
+  --json` każdego podzielonego importu) zaczyna od „nierozstrzygnięte”, a wybrany trafia
+  do `--source` pełną ścieżką, złożoną z katalogu roboczego z `import list --json`
+  i ścieżki z `show`. Identyfikator odcinka czyta CLI, z nazwy pliku
   albo z `--episode`, więc ekran go nie zgaduje: pamięta, jakie odcinki projekt miał
   w chwili wysłania komendy, i przechodzi do tego, który po niej pojawił się w `list`.
 - **Wczytaj odcinek** (`#/projekt/<id>/odcinki`): odcinki projektu jako lista odnośników.

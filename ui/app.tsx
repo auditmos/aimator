@@ -913,6 +913,7 @@ function ProjectScreens(props: {
           onCreated={createdEpisode}
           onRun={onRun}
           projectId={project.id}
+          revision={listing}
           run={run}
           running={running}
         />

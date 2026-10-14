@@ -1,5 +1,6 @@
 import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
+import { type ImportedEpisode, useImportedEpisodes } from "./import";
 import { Action, Block, Field, Problems, Said, useArtifactText, useOwnRun } from "./panel";
 import type { EpisodeOverview, Refusal, RunDone, Stage0Report, StatusCell } from "./types";
 
@@ -401,8 +402,54 @@ function Episode(props: {
   );
 }
 
-/** Where a new episode's source comes from: a file on disk, or an idea typed here. */
-type SourceKind = "file" | "idea";
+/**
+ * Where a new episode's source comes from: a file on disk, a file an
+ * import's grouping proposes, or an idea typed here.
+ */
+type SourceKind = "file" | "idea" | "import";
+
+/**
+ * The episode files of the workspace's imports, offered by name.
+ *
+ * A choice rather than a path to paste, but it lands in `--source` as the
+ * full path all the same, so `episode.json` records the file in `imports/`.
+ * It opens on no file, because which episode comes first is a decision.
+ */
+function ImportedFields(props: {
+  readonly episodes: readonly ImportedEpisode[];
+  readonly onSource: (value: string) => void;
+  readonly source: string;
+}): JSX.Element {
+  const { episodes, onSource, source } = props;
+  const choose = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => onSource(event.target.value),
+    [onSource]
+  );
+
+  return (
+    <div className="field">
+      <label htmlFor="episode-imported">Plik z podziału</label>
+      <select
+        aria-describedby="episode-imported-hint"
+        id="episode-imported"
+        onChange={choose}
+        value={source}
+      >
+        <option value="">nierozstrzygnięte</option>
+        {episodes.map((one) => (
+          <option key={one.source} value={one.source}>
+            {one.importId} · {one.episode}
+          </option>
+        ))}
+      </select>
+      {source === "" ? null : (
+        <p className="field-hint" id="episode-imported-hint">
+          <code>{source}</code>
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * The idea itself, several lines because it becomes `source.md`, and the
@@ -462,29 +509,39 @@ export function NewEpisode(props: {
   readonly onCreated: (episodeId: string) => void;
   readonly onRun: (argv: readonly string[]) => void;
   readonly projectId: string;
+  /** Whatever moves when the workspace does; the imports are re-read on it. */
+  readonly revision: unknown;
   readonly run: RunDone | null;
   readonly running: boolean;
 }): JSX.Element {
-  const { episodes, onCreated, onRun, projectId, run, running } = props;
-  const [kind, setKind] = useState<SourceKind>("file");
+  const { episodes, onCreated, onRun, projectId, revision, run, running } = props;
+  const imported = useImportedEpisodes(revision);
+  /** What somebody chose; until then, an import's files when there are any. */
+  const [chosen, setChosen] = useState<SourceKind | null>(null);
+  const kind = chosen ?? (imported.length > 0 ? "import" : "file");
   const [source, setSource] = useState("");
+  const [importedSource, setImportedSource] = useState("");
   const [idea, setIdea] = useState("");
   const [episodeId, setEpisodeId] = useState("");
   const { change, settings } = useSettings(EMPTY);
   /** The episodes that existed when the command was sent, or null before. */
   const [known, setKnown] = useState<readonly string[] | null>(null);
-  const chooseKind = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) =>
-      setKind(event.target.value === "idea" ? "idea" : "file"),
-    []
-  );
-  const add = useMemo(
-    () =>
-      kind === "idea"
-        ? INTENTS.addEpisodeIdea({ ...settings, episodeId, idea, projectId })
-        : INTENTS.addEpisode({ ...settings, projectId, source }),
-    [episodeId, idea, kind, projectId, settings, source]
-  );
+  const chooseKind = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    const { value } = event.target;
+
+    setChosen(value === "idea" || value === "import" ? value : "file");
+  }, []);
+  const add = useMemo(() => {
+    if (kind === "idea") {
+      return INTENTS.addEpisodeIdea({ ...settings, episodeId, idea, projectId });
+    }
+
+    return INTENTS.addEpisode({
+      ...settings,
+      projectId,
+      source: kind === "import" ? importedSource : source,
+    });
+  }, [episodeId, idea, importedSource, kind, projectId, settings, source]);
   const submit = useCallback(
     (one: readonly string[]) => {
       setKnown(episodes);
@@ -515,19 +572,30 @@ export function NewEpisode(props: {
             nazwy pliku bez <code>.md</code> (<code>03-wanda</code>), bo numer odcinka to decyzja;
             <code>episode.json</code> zapisze, że nic nie skopiowano.
           </>
-        ) : (
+        ) : null}
+        {kind === "import" ? (
+          <>
+            Plik odcinka z podziału importu trafia do <code>--source</code> pełną ścieżką, więc{" "}
+            <code>episode.json</code> zapisuje, że pochodzi z <code>imports/</code>. Numer i
+            identyfikator odcinka biorą się z nazwy, którą zaproponował podział; inny numer to plik
+            zapisany pod inną nazwą i podany ścieżką. Obrazy, które plik linkuje, do projektu nie
+            przechodzą: etap 1 czyta sam tekst.
+          </>
+        ) : null}
+        {kind === "file" ? (
           <>
             Plik podaje się <strong>ścieżką</strong>, wklejoną z Findera; trafia do{" "}
             <code>--source</code> bez zmian, więc <code>episode.json</code> zapisuje prawdziwe
             pochodzenie pliku. Numer i identyfikator odcinka biorą się z jego nazwy (
             <code>NN-tytul.md</code>).
           </>
-        )}
+        ) : null}
       </p>
       <div className="send">
         <div className="field">
           <label htmlFor="episode-kind">Źródło</label>
           <select id="episode-kind" onChange={chooseKind} value={kind}>
+            {imported.length === 0 ? null : <option value="import">plik z importu</option>}
             <option value="file">plik ze ścieżki</option>
             <option value="idea">pomysł wpisany tutaj</option>
           </select>
@@ -539,7 +607,15 @@ export function NewEpisode(props: {
             onEpisodeId={setEpisodeId}
             onIdea={setIdea}
           />
-        ) : (
+        ) : null}
+        {kind === "import" ? (
+          <ImportedFields
+            episodes={imported}
+            onSource={setImportedSource}
+            source={importedSource}
+          />
+        ) : null}
+        {kind === "file" ? (
           <Field
             id="episode-source"
             label="Ścieżka do pliku źródłowego"
@@ -547,7 +623,7 @@ export function NewEpisode(props: {
             placeholder="/Users/ktos/Filmy/01-burza.md"
             value={source}
           />
-        )}
+        ) : null}
       </div>
       <p className="actions-note">{SETTINGS_NOTE}</p>
       <SettingsFields change={change} settings={settings} />
