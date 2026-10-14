@@ -7,6 +7,7 @@ import { CAST_USAGE as CAST, USAGE as CHARACTER } from "./stages/character.js";
 import { USAGE as CLIPS } from "./stages/clips.js";
 import { USAGE as DIALOGUE } from "./stages/dialogue.js";
 import { USAGE as EPISODE } from "./stages/episode.js";
+import { USAGE as IMPORT } from "./stages/import.js";
 import { USAGE as NARRATION } from "./stages/narration.js";
 import { USAGE as OPENING_FRAME } from "./stages/opening-frame.js";
 import { USAGE as PROJECT } from "./stages/project.js";
@@ -75,6 +76,7 @@ artefaktów z jedną uwagą to błąd użycia.`;
  */
 export const USAGE = [
   "Usage: aimator <command>",
+  IMPORT,
   ["Etap 0. Przygotowanie projektu i odcinka:", PROJECT, CAST, EPISODE].join("\n"),
   SCREENPLAY,
   CHARACTER,

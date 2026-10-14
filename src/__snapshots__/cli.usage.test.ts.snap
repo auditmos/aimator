@@ -823,6 +823,42 @@ Odcinek "01-burza" (nr 1) w projekcie "ewa"
   Język ust: nierozstrzygnięte"
 `;
 
+exports[`every command >   import add <id> --source <plik.docx> [--json] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Import "pola" z <scratch>/treatment.docx
+  + imports/pola/source.docx
+  + imports/pola/images/I01.png
+  + imports/pola/material.md
+  + imports/pola/import.json
+  + imports/pola/import.stage.json
+Materiał: imports/pola/material.md
+Sekcje (1):
+  T01  # Pola  22 zn.  I01
+Obrazy (1):
+  I01  imports/pola/images/I01.png  ← word/media/image1.png  w T01
+  · pominięto nagłówek lub stopkę strony: „Miko | 1”
+Dalej: przeczytaj imports/pola/material.md i popraw, co konwersja oddała źle; projekt z tego materiału zakłada skill /prepare-project"
+`;
+
+exports[`every command >   import list [--json] 1`] = `
+"ok
+Importy w <workspace>:
+  miko
+Dalej: aimator import show miko"
+`;
+
+exports[`every command >   import show <id> [--json] 1`] = `
+"ok
+Import "miko" z <scratch>/treatment.docx
+Materiał: imports/miko/material.md
+Sekcje (1):
+  T01  # Pola  22 zn.  I01
+Obrazy (1):
+  I01  imports/miko/images/I01.png  ← word/media/image1.png  w T01
+  · pominięto nagłówek lub stopkę strony: „Miko | 1”
+Dalej: przeczytaj imports/miko/material.md i popraw, co konwersja oddała źle; projekt z tego materiału zakłada skill /prepare-project"
+`;
+
 exports[`every command >   list [--json] 1`] = `
 "ok
 Katalog roboczy: <workspace>

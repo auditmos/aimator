@@ -9,6 +9,7 @@ import { runCharacter } from "./stages/character.js";
 import { runClip } from "./stages/clips.js";
 import { runDialogue } from "./stages/dialogue.js";
 import { runEpisode } from "./stages/episode.js";
+import { runImport } from "./stages/import.js";
 import { runNarration } from "./stages/narration.js";
 import { runOpeningFrame } from "./stages/opening-frame.js";
 import { runProject } from "./stages/project.js";
@@ -35,6 +36,7 @@ const COMMANDS: Readonly<Record<string, (argv: readonly string[]) => Promise<Res
   clip: runClip,
   dialogue: runDialogue,
   episode: runEpisode,
+  import: runImport,
   list: runList,
   narration: runNarration,
   "opening-frame": runOpeningFrame,

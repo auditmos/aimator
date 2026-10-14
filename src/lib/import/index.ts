@@ -58,6 +58,8 @@ const importFileSchema = z.strictObject({
   images: z.array(
     z.strictObject({ id: z.string().min(1), part: z.string().min(1), path: z.string().min(1) })
   ),
+  /** What the conversion left out on purpose, said again by every `show`. */
+  omitted: z.array(z.string()),
   originPath: z.string().min(1),
   schemaVersion: z.literal(1),
   source: z.strictObject({ path: z.string().min(1), sha256: sha256Schema }),
@@ -99,7 +101,7 @@ interface ImportImage {
 }
 
 /** What one import holds, the same object whether it was just written or read back. */
-interface ImportReport {
+export interface ImportReport {
   /** What this call wrote, workspace-relative; empty when it only read. */
   readonly created: readonly string[];
   readonly images: readonly ImportImage[];
@@ -176,7 +178,7 @@ export async function addImport(input: AddImportInput): Promise<Result<ImportRep
     ? ok(
         reportOf(input, paths.data, planned.data.file, conversion.data.markdown, {
           created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
-          notices: conversion.data.notices,
+          notices: [],
         })
       )
     : written;
@@ -264,6 +266,7 @@ function planImport(
   const file: ImportFile = {
     id: input.importId,
     images,
+    omitted: [...conversion.notices],
     originPath: input.sourcePath,
     schemaVersion: 1,
     source: { path: toWorkspacePath(root, paths.source), sha256: sourceSha },
@@ -304,6 +307,7 @@ function reportOf(
   extra: { readonly created: readonly string[]; readonly notices: readonly string[] }
 ): ImportReport {
   const sections = sectionsOf(markdown, (link) => imageAt(input.workspace, paths, file, link));
+  const material = toWorkspacePath(input.workspace.root, paths.material);
 
   return {
     created: extra.created,
@@ -312,9 +316,9 @@ function reportOf(
       sections: sections.filter((section) => section.images.includes(image.id)).map(({ id }) => id),
     })),
     importId: input.importId,
-    material: toWorkspacePath(input.workspace.root, paths.material),
-    nextStep: `aimator import show ${input.importId}`,
-    notices: extra.notices,
+    material,
+    nextStep: `przeczytaj ${material} i popraw, co konwersja oddała źle; projekt z tego materiału zakłada skill /prepare-project`,
+    notices: [...file.omitted, ...extra.notices],
     originPath: file.originPath,
     sections,
   };

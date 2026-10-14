@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { run } from "./cli/index.js";
 import { resolveWorkspace, type Workspace } from "./lib/workspace.js";
-import { EPISODE, makeCut, makeUpstream, PROJECT, png } from "./test/fixture.js";
+import { docx, EPISODE, makeCut, makeUpstream, PROJECT, png } from "./test/fixture.js";
 
 /**
  * The CLI's behaviour, frozen.
@@ -566,6 +566,16 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "--dry-run",
   ],
   "  episode show <id> <episode-id> [--json]": ["episode", "show", ...ON],
+  "  import add <id> --source <plik.docx> [--json]": [
+    "import",
+    "add",
+    "pola",
+    "--source",
+    "<scratch>/treatment.docx",
+    "--dry-run",
+  ],
+  "  import list [--json]": ["import", "list"],
+  "  import show <id> [--json]": ["import", "show", "miko"],
   "  list [--json]": ["list"],
   "  narration direction <id> [--stability <0-1>] [--style <0-1>] [--speed <0.7-1.2>]": [
     "narration",
@@ -847,6 +857,26 @@ beforeAll(async () => {
   await writeFile(join(scratch, "02-Slonce.md"), "# Słońce\n\nEwa czeka na słońce.\n", "utf8");
   await writeFile(join(scratch, "ewa-2.png"), "not really a png", "utf8");
   await writeFile(join(scratch, "styl.png"), png(64, 64, 3));
+  await writeFile(
+    join(scratch, "treatment.docx"),
+    docx(
+      '<w:p><w:pPr><w:pStyle w:val="Nagwek1"/></w:pPr><w:r><w:t>Pola</w:t></w:r></w:p><w:p><w:r><w:drawing><a:blip r:embed="rId10"/></w:drawing></w:r></w:p>'
+    )
+  );
+
+  // `import show` needs an import to read; the table's own `add` is a dry run.
+  const imported = await run([
+    "import",
+    "add",
+    "miko",
+    "--source",
+    join(scratch, "treatment.docx"),
+    "--workspace",
+    root,
+  ]);
+  if (!imported.ok) {
+    throw imported.error;
+  }
 
   const help = await run(["--help"]);
   if (!help.ok) {

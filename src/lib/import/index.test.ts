@@ -2,17 +2,16 @@ import { existsSync } from "node:fs";
 import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { crc32, deflateRawSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { jpeg, png } from "../../test/fixture.js";
+import { DOCX_IMAGE, DOCX_PHOTO, docx, zip } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
 import { addImport, listImports, showImport } from "./index.js";
 
 /**
  * The import: a `.docx` turned into `material.md` and its images, waiting
- * beside the projects. The document is built here, part by part, so each test
- * says exactly which Word construct it is about.
+ * beside the projects. Each test writes the body it is about, paragraph by
+ * paragraph; the package around it, styles and pictures, is the fixture's.
  *
  * Assumptions it encodes, stated before the first test:
  *
@@ -28,10 +27,6 @@ let root = "";
 let scratch = "";
 let workspace: Workspace = { root: "" };
 
-const RELATIONSHIP = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const IMAGE = png(4, 4, 1);
-const PHOTO = jpeg(4, 4);
-
 const t = (text: string): string => `<w:r><w:t xml:space="preserve">${text}</w:t></w:r>`;
 const bold = (text: string): string =>
   `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${text}</w:t></w:r>`;
@@ -45,108 +40,6 @@ const drawing = (inner: string): string =>
 const picture = (id: string): string =>
   drawing(`<pic:pic><pic:blipFill><a:blip r:embed="${id}"/></pic:blipFill></pic:pic>`);
 const cell = (text: string): string => `<w:tc><w:tcPr/>${p(t(text))}</w:tc>`;
-
-const STYLES = `<w:styles xmlns:w="w">
-<w:style w:type="paragraph" w:styleId="Normalny"><w:name w:val="Normal"/></w:style>
-<w:style w:type="paragraph" w:styleId="Tytu"><w:name w:val="Title"/><w:basedOn w:val="Normalny"/></w:style>
-<w:style w:type="paragraph" w:styleId="Nagwek1"><w:name w:val="heading 1"/></w:style>
-<w:style w:type="paragraph" w:styleId="Nagwek2"><w:name w:val="heading 2"/></w:style>
-<w:style w:type="paragraph" w:styleId="Listapunktowana"><w:name w:val="List Bullet"/><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:style>
-</w:styles>`;
-
-const NUMBERING = `<w:numbering xmlns:w="w">
-<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl><w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum>
-<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum>
-<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
-<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
-</w:numbering>`;
-
-const RELS = `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="${RELATIONSHIP}/styles" Target="styles.xml"/>
-<Relationship Id="rId2" Type="${RELATIONSHIP}/numbering" Target="numbering.xml"/>
-<Relationship Id="rId10" Type="${RELATIONSHIP}/image" Target="media/image1.png"/>
-<Relationship Id="rId11" Type="${RELATIONSHIP}/image" Target="media/image2.jpeg"/>
-<Relationship Id="rId20" Type="${RELATIONSHIP}/hyperlink" Target="https://example.com/miko" TargetMode="External"/>
-<Relationship Id="rId30" Type="${RELATIONSHIP}/header" Target="header1.xml"/>
-</Relationships>`;
-
-/** A zip, written the way Word writes one: XML deflated, pictures stored. */
-function zip(
-  files: Readonly<Record<string, Buffer | string>>,
-  declared: Readonly<Record<string, number>> = {}
-): Buffer {
-  const locals: Buffer[] = [];
-  const central: Buffer[] = [];
-  let offset = 0;
-
-  for (const [name, content] of Object.entries(files)) {
-    const data = typeof content === "string" ? Buffer.from(content) : content;
-    const method = typeof content === "string" ? 8 : 0;
-    const packed = method === 8 ? deflateRawSync(data) : data;
-    const nameBytes = Buffer.from(name);
-    const local = Buffer.alloc(30);
-    const entry = Buffer.alloc(46);
-
-    local.writeUInt32LE(0x04_03_4b_50, 0);
-    local.writeUInt16LE(method, 8);
-    local.writeUInt32LE(crc32(data), 14);
-    local.writeUInt32LE(packed.length, 18);
-    local.writeUInt32LE(declared[name] ?? data.length, 22);
-    local.writeUInt16LE(nameBytes.length, 26);
-    entry.writeUInt32LE(0x02_01_4b_50, 0);
-    entry.writeUInt16LE(method, 10);
-    entry.writeUInt32LE(crc32(data), 16);
-    entry.writeUInt32LE(packed.length, 20);
-    entry.writeUInt32LE(declared[name] ?? data.length, 24);
-    entry.writeUInt16LE(nameBytes.length, 28);
-    entry.writeUInt32LE(offset, 42);
-    locals.push(local, nameBytes, packed);
-    central.push(entry, nameBytes);
-    offset += 30 + nameBytes.length + packed.length;
-  }
-
-  const directory = Buffer.concat(central);
-  const end = Buffer.alloc(22);
-  const count = Object.keys(files).length;
-
-  end.writeUInt32LE(0x06_05_4b_50, 0);
-  end.writeUInt16LE(count, 8);
-  end.writeUInt16LE(count, 10);
-  end.writeUInt32LE(directory.length, 12);
-  end.writeUInt32LE(offset, 16);
-
-  return Buffer.concat([...locals, directory, end]);
-}
-
-/**
- * A `.docx` around `body`, with styles, lists, two pictures, a link and a page
- * header. `document` replaces the whole main part, `declared` lies about sizes.
- */
-function docx(
-  body: string,
-  overrides: {
-    readonly declared?: Readonly<Record<string, number>>;
-    readonly document?: string;
-  } = {}
-): Buffer {
-  return zip(
-    {
-      "_rels/.rels": `<Relationships><Relationship Id="rId1" Type="${RELATIONSHIP}/officeDocument" Target="word/document.xml"/></Relationships>`,
-      "[Content_Types].xml": "<Types/>",
-      "word/_rels/document.xml.rels": RELS,
-      "word/document.xml":
-        overrides.document ??
-        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="w" xmlns:r="r"><w:body>${body}<w:sectPr/></w:body></w:document>`,
-      "word/header1.xml": `<w:hdr xmlns:w="w">${p(t("Miko | 1"))}</w:hdr>`,
-      "word/media/image1.png": IMAGE,
-      "word/media/image2.jpeg": PHOTO,
-      "word/numbering.xml": NUMBERING,
-      "word/styles.xml": STYLES,
-    },
-    overrides.declared
-  );
-}
 
 async function source(bytes: Buffer, name = "treatment.docx"): Promise<string> {
   const path = join(scratch, name);
@@ -243,8 +136,8 @@ describe("addImport", () => {
     const result = await add(docx(TREATMENT));
     const images = join(root, "imports", "miko", "images");
 
-    expect((await readFile(join(images, "I01.png"))).equals(IMAGE)).toBe(true);
-    expect((await readFile(join(images, "I02.jpg"))).equals(PHOTO)).toBe(true);
+    expect((await readFile(join(images, "I01.png"))).equals(DOCX_IMAGE)).toBe(true);
+    expect((await readFile(join(images, "I02.jpg"))).equals(DOCX_PHOTO)).toBe(true);
     expect(result.ok ? result.data.images : []).toEqual([
       {
         id: "I01",
@@ -336,7 +229,7 @@ describe("addImport", () => {
 
   it("refuses a damaged document instead of writing a damaged picture", async () => {
     const bytes = docx(TREATMENT);
-    const at = bytes.indexOf(IMAGE);
+    const at = bytes.indexOf(DOCX_IMAGE);
 
     bytes.writeUInt8(255 - bytes.readUInt8(at + 40), at + 40);
 
@@ -447,17 +340,21 @@ describe("showImport", () => {
 
     expect(shown.ok ? shown.data.sections.map(({ title }) => title).at(-1) : "").toBe("Dopisane");
     expect(shown.ok ? shown.data.notices : []).toEqual([
+      "pominięto nagłówek lub stopkę strony: „Miko | 1”",
       "imports/miko/material.md poprawiono ręcznie po imporcie; sekcje są liczone z obecnej treści",
     ]);
   });
 
-  it("reports an image that went missing", async () => {
+  it("says again what the conversion left out, and reports an image that went missing", async () => {
     await add(docx(TREATMENT));
     await rm(join(root, "imports", "miko", "images", "I02.jpg"));
 
     const shown = await showImport({ importId: "miko", workspace });
 
-    expect(shown.ok ? shown.data.notices : []).toEqual(["brak obrazu imports/miko/images/I02.jpg"]);
+    expect(shown.ok ? shown.data.notices : []).toEqual([
+      "pominięto nagłówek lub stopkę strony: „Miko | 1”",
+      "brak obrazu imports/miko/images/I02.jpg",
+    ]);
   });
 
   it("refuses an import that does not exist, naming the command that makes one", async () => {

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
 import { sha256Of } from "../lib/artifact/index.js";
 import { approveAssembly, generateAssembly } from "../lib/assembly/index.js";
 import { approveVoice, generateSample, setVoice } from "../lib/character-voice/index.js";
@@ -396,6 +397,114 @@ function media(codec: string, fps: number, seconds: number): Buffer {
     ])
   );
 }
+
+const RELATIONSHIP = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+/**
+ * A zip, written the way Word writes one: XML deflated, pictures stored.
+ * `declared` lies about an entry's unpacked size, which is how a bomb looks to
+ * a reader that trusts the directory, without the gigabytes.
+ */
+export function zip(
+  files: Readonly<Record<string, Buffer | string>>,
+  declared: Readonly<Record<string, number>> = {}
+): Buffer {
+  const locals: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+
+  for (const [name, content] of Object.entries(files)) {
+    const data = typeof content === "string" ? Buffer.from(content) : content;
+    const method = typeof content === "string" ? 8 : 0;
+    const packed = method === 8 ? deflateRawSync(data) : data;
+    const nameBytes = Buffer.from(name);
+    const local = Buffer.alloc(30);
+    const entry = Buffer.alloc(46);
+
+    local.writeUInt32LE(0x04_03_4b_50, 0);
+    local.writeUInt16LE(method, 8);
+    local.writeUInt32LE(crc32(data), 14);
+    local.writeUInt32LE(packed.length, 18);
+    local.writeUInt32LE(declared[name] ?? data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    entry.writeUInt32LE(0x02_01_4b_50, 0);
+    entry.writeUInt16LE(method, 10);
+    entry.writeUInt32LE(crc32(data), 16);
+    entry.writeUInt32LE(packed.length, 20);
+    entry.writeUInt32LE(declared[name] ?? data.length, 24);
+    entry.writeUInt16LE(nameBytes.length, 28);
+    entry.writeUInt32LE(offset, 42);
+    locals.push(local, nameBytes, packed);
+    central.push(entry, nameBytes);
+    offset += 30 + nameBytes.length + packed.length;
+  }
+
+  const directory = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  const count = Object.keys(files).length;
+
+  end.writeUInt32LE(0x06_05_4b_50, 0);
+  end.writeUInt16LE(count, 8);
+  end.writeUInt16LE(count, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+
+  return Buffer.concat([...locals, directory, end]);
+}
+
+/**
+ * A `.docx` around `body`, the WordprocessingML of its paragraphs: styles with
+ * the ids Polish Word gives them (`Tytu`, `Nagwek1`), two kinds of list, two
+ * pictures (`rId10` a PNG, `rId11` a JPEG), a link (`rId20`) and a page header.
+ * `document` replaces the whole main part, and `declared` lies about sizes.
+ */
+export function docx(
+  body: string,
+  overrides: {
+    readonly declared?: Readonly<Record<string, number>>;
+    readonly document?: string;
+  } = {}
+): Buffer {
+  return zip(
+    {
+      "_rels/.rels": `<Relationships><Relationship Id="rId1" Type="${RELATIONSHIP}/officeDocument" Target="word/document.xml"/></Relationships>`,
+      "[Content_Types].xml": "<Types/>",
+      "word/_rels/document.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="${RELATIONSHIP}/styles" Target="styles.xml"/>
+<Relationship Id="rId2" Type="${RELATIONSHIP}/numbering" Target="numbering.xml"/>
+<Relationship Id="rId10" Type="${RELATIONSHIP}/image" Target="media/image1.png"/>
+<Relationship Id="rId11" Type="${RELATIONSHIP}/image" Target="media/image2.jpeg"/>
+<Relationship Id="rId20" Type="${RELATIONSHIP}/hyperlink" Target="https://example.com/miko" TargetMode="External"/>
+<Relationship Id="rId30" Type="${RELATIONSHIP}/header" Target="header1.xml"/>
+</Relationships>`,
+      "word/document.xml":
+        overrides.document ??
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="w" xmlns:r="r"><w:body>${body}<w:sectPr/></w:body></w:document>`,
+      "word/header1.xml": '<w:hdr xmlns:w="w"><w:p><w:r><w:t>Miko | 1</w:t></w:r></w:p></w:hdr>',
+      "word/media/image1.png": DOCX_IMAGE,
+      "word/media/image2.jpeg": DOCX_PHOTO,
+      "word/numbering.xml": `<w:numbering xmlns:w="w">
+<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl><w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum>
+<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
+<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>`,
+      "word/styles.xml": `<w:styles xmlns:w="w">
+<w:style w:type="paragraph" w:styleId="Normalny"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Tytu"><w:name w:val="Title"/><w:basedOn w:val="Normalny"/></w:style>
+<w:style w:type="paragraph" w:styleId="Nagwek1"><w:name w:val="heading 1"/></w:style>
+<w:style w:type="paragraph" w:styleId="Nagwek2"><w:name w:val="heading 2"/></w:style>
+<w:style w:type="paragraph" w:styleId="Listapunktowana"><w:name w:val="List Bullet"/><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:style>
+</w:styles>`,
+    },
+    overrides.declared
+  );
+}
+
+/** The two pictures every `docx` carries, as their bytes, to compare against. */
+export const DOCX_IMAGE = png(4, 4, 1);
+export const DOCX_PHOTO = jpeg(4, 4);
 
 /** The canonical image of a character: what stage 2 hands to stages 4 and on. */
 const HERO = png(1536, 2304);

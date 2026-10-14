@@ -1,5 +1,20 @@
 Usage: aimator <command>
 
+Import materiału (darmowy; przed etapem 0, nie zakłada projektu):
+  import add <id> --source <plik.docx> [--json]
+    Kopiuje dokument Worda do imports/<id>/ i zamienia go na material.md:
+    nagłówki, akapity, pogrubienia, listy, tabele, a obrazy jako images/I01.png
+    w bajtach, w których dokument je trzymał, w miejscu, w którym stały.
+    Fragment tekstu, którego konwerter nie umie umieścić (np. pole tekstowe,
+    przypis), odrzuca cały import, zanim cokolwiek zapisze. Import się nie
+    nadpisuje: nowa próba to nowy identyfikator.
+  import show <id> [--json]
+    Sekcje T01… liczone z nagłówków obecnego material.md, więc ręczna poprawka
+    je przelicza, obrazy i sekcje, które je pokazują, oraz uwagi: co konwersja
+    pominęła i co zmieniono ręcznie. Niczego nie zapisuje.
+  import list [--json]
+    Identyfikatory importów w katalogu roboczym. Niczego nie zapisuje.
+
 Etap 0. Przygotowanie projektu i odcinka:
   project init <id> --title <tytuł> [--aspect-ratio <w:h>] [--json]
   project show <id> [--json]
