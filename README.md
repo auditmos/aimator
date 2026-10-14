@@ -97,7 +97,7 @@ Dwa etapy mogą biec równolegle: [2. postać](docs/stages/02-postac.md) nie zal
 
 Wymagania:
 
-- [Node.js](https://nodejs.org/) >= 22 i [pnpm](https://pnpm.io/) 12
+- [Node.js](https://nodejs.org/) >= 22.2 i [pnpm](https://pnpm.io/) 12
 - [ffmpeg](https://ffmpeg.org/) dla etapów 8, 9, 10 i 12 oraz etapu 7 przy modelu Kling.
   Skleja klipy, kładzie na nich dźwięk i wycina ostatnią klatkę klipu, za każdym razem
   kopiując obraz bez przekodowania; gdy

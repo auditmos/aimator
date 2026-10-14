@@ -67,7 +67,7 @@
   },
   "packageManager": "pnpm@12.4.2",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.2"
   },
   "knip": {
     "entry": [
