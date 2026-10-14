@@ -65,6 +65,24 @@ export function toWorkspacePath(workspaceRoot: string, absolute: string): string
   return relative(workspaceRoot, absolute).split("\\").join("/");
 }
 
+/**
+ * A paid answer that arrived and failed its verdict. It is archived rather than
+ * published, and the message says so, because the person reading it is about to
+ * decide whether to pay again: a malformed answer is not a reason to.
+ */
+export class AnswerFormatError extends Error {
+  /** Where the answer was kept, relative to the workspace. */
+  readonly archived: string;
+
+  constructor(reason: string, archived: string) {
+    super(
+      `${reason}. Odpowiedź zachowano w ${archived}, to błąd formatu wyniku, nie powód do --regenerate.`
+    );
+    this.name = "AnswerFormatError";
+    this.archived = archived;
+  }
+}
+
 export async function exists(path: string): Promise<boolean> {
   try {
     await access(path);

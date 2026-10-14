@@ -1,4 +1,5 @@
 import {
+  AnswerFormatError,
   applyWrites,
   type Correction,
   nowIso,
@@ -428,8 +429,6 @@ async function refuse(
   );
 
   return err(
-    new Error(
-      `${reason}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
-    )
+    new AnswerFormatError(reason, toWorkspacePath(input.workspace.root, archive.response))
   );
 }

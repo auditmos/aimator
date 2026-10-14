@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  AnswerFormatError,
   applyWrites,
   emptyStage,
   modelProducer,
@@ -829,8 +830,9 @@ async function publish(
     );
 
     return err(
-      new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(call.workspace.root, data.run.root)}, to błąd formatu wyniku, nie powód do --regenerate.`
+      new AnswerFormatError(
+        verdict.error.message,
+        toWorkspacePath(call.workspace.root, data.run.root)
       )
     );
   }

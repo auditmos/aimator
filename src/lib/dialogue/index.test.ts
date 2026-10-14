@@ -813,6 +813,7 @@ describe("publishing the translation", () => {
     const [, archived = ""] = ARCHIVED.exec(message) ?? [];
 
     expect(message).toContain("brakuje D02 (U03, ewa)");
+    expect(result.ok ? "" : result.error.name).toBe("AnswerFormatError");
     expect(await readFile(join(root, archived), "utf8")).toContain("Dad, is the storm coming?");
     await expect(readFile(translationPath(), "utf8")).rejects.toThrow();
   });

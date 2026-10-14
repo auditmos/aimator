@@ -1,4 +1,5 @@
 import {
+  AnswerFormatError,
   applyWrites,
   type Correction,
   nowIso,
@@ -471,8 +472,9 @@ async function publishSheet(
     );
 
     return err(
-      new Error(
-        `${verdict.error.message}. Odpowiedź zachowano w ${toWorkspacePath(input.workspace.root, archive.response)}, to błąd formatu wyniku, nie powód do --regenerate.`
+      new AnswerFormatError(
+        verdict.error.message,
+        toWorkspacePath(input.workspace.root, archive.response)
       )
     );
   }

@@ -33,6 +33,7 @@ export {
   stageFileSchema,
 } from "./schema.js";
 export {
+  AnswerFormatError,
   applyWrites,
   emptyDirectories,
   exists,
