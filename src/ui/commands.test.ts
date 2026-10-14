@@ -83,6 +83,7 @@ const scope = {
   stability: "0.35",
   style: "0.4",
   subtitles: "none",
+  text: "# Dzielna Ewa, zasady wspólne\n",
   title: "Dzielna Ewa",
   track: "gpt-image",
   videoModel: "dreamina-seedance-2-5-260628",

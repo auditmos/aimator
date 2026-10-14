@@ -250,6 +250,8 @@ interface Everything extends Delivery, Failed, ImportRef, Judged, Levels, Send, 
   readonly name: string;
   readonly source: string;
   readonly sources: readonly string[];
+  /** Stage 0: the whole of `project.md`, as the editor holds it. */
+  readonly text: string;
   readonly title: string;
   readonly videoModel: string;
   readonly voiceId: string;
@@ -1432,6 +1434,17 @@ export const INTENTS = {
     one.track,
     ...flag("--artifact", one.artifact),
     "--json",
+  ],
+  /**
+   * Stage 0: `project.md` saved from the screen's editor, the whole file as
+   * it stands in the field. The screen never writes the file itself.
+   */
+  writeRules: (one: ProjectRef & { readonly text: string }): readonly string[] => [
+    "project",
+    "rules",
+    one.projectId,
+    "--text",
+    one.text,
   ],
 } as const satisfies Record<string, (one: Everything) => readonly string[]>;
 

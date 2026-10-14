@@ -428,6 +428,41 @@ h1 {
   line-height: 1;
   color: var(--color-warning-text);
 }
+/* The edit a line offers, small enough to sit at the end of the line it changes. */
+.rules-edit {
+  padding: 0 0.5rem;
+  margin-left: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--color-neutral-50);
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--color-neutral-800);
+  border: 1px solid var(--color-neutral-500);
+  border-radius: 0.25rem;
+}
+.rules-edit:hover:not(:disabled) {
+  border-color: var(--color-brand-ink);
+}
+.rules-edit:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+/* The whole file in one field: the same face and size as the file read above. */
+.rules-field {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-neutral-50);
+  resize: vertical;
+  background: var(--color-neutral-950);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.25rem;
+}
 /* A line of project.md still waiting for a person: the marker stage 0 counts. */
 .rules-open {
   color: var(--color-warning-text);

@@ -86,7 +86,13 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   importu spośród tych, które mają podział (jedyny jest wybrany od razu, z kilku żaden).
   Bez takiego importu ekran mówi, gdzie się go robi. Po zakupie pasek na dole prowadzi do
   „Zasady (project.md)”. Szkic to propozycja: nic tu się nie zatwierdza, a wiersz
-  „Zatwierdzone przez użytkownika” zostaje człowiekowi.
+  „Zatwierdzone przez użytkownika” zostaje człowiekowi. Plik się tu też pisze, zawsze przez
+  `project rules <id> --text` z całym plikiem, bo ekranowi nie wolno dotknąć pliku samemu:
+  przy wierszu z propozycją jest „Przyjmij” (zdejmuje `TODO(etap-0) propozycja:`, tekst
+  zostaje), przy cytacie na górze „Usuń cytat”, przy zatwierdzeniu „Przyjmuję całość”
+  (wpisuje „całość zasad” z dzisiejszą datą), a „Edytuj” otwiera cały plik w polu
+  z „Zapisz” i „Anuluj”. „Zaproponuj odpowiedzi” stoi na karcie tylko wtedy, gdy któreś pole
+  nie ma żadnej odpowiedzi, bo po szkicu każde ma już propozycję.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
