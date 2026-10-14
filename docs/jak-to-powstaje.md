@@ -37,13 +37,14 @@ flowchart TB
     S9["9. Narracja<br/>narrated.mp4, lektor na obrazie"]
     S11["11. Dialog<br/>kwestie postaci, głosem obsady"]
     S10["10. Muzyka i efekty<br/>mixed.mp4, film ze wszystkim"]
-    S12["12. Wersje językowe<br/>usta postaci w drugim języku, klip po klipie"]
+    S12["12. Wersje językowe<br/>usta w drugim języku, potem film w każdym języku"]
     S8 --> S9 --> S10
     S11 --> S10
     S11 --> S12
+    S10 --> S12
   end
 
-  OUT(["Dwa filmy, po jednym na każdy tor obrazu"])
+  OUT(["Na każdym torze film w każdym języku"])
 
   IN --> S0
   S4 --> S5
@@ -51,6 +52,7 @@ flowchart TB
   S7 --> S12
   S3 --> S11
   S10 --> OUT
+  S12 --> OUT
 ```
 
 Dwie rzeczy, których na obrazku nie widać:
@@ -217,15 +219,20 @@ postaci ruszają się do jej kwestii w drugim języku. Etap pracuje osobno na ka
 i klip po klipie. Najpierw dostawca znajduje twarze w przyjętym klipie, potem człowiek mówi,
 która twarz jest którą postacią, i dopiero wtedy usta są poruszane, zawsze jedna postać
 naraz. Klip, w którym nikt widoczny nie mówi, przechodzi bez zmian, a kwestia spoza kadru
-zostaje bez lip-syncu, bo nie ma czyich ust poruszyć. Etap oddaje wersję każdego klipu, nie
-gotowy film.
+zostaje bez lip-syncu, bo nie ma czyich ust poruszyć. Z przyjętych wersji klipów etap składa
+na końcu dwa gotowe filmy toru: jeden obraz, sklejony raz, a na nim kwestie języka ust albo
+języka filmu, przy tej samej muzyce i tych samych efektach. Film w języku ust przyjmuje się
+z checklistą QC, bo to w nim ruszono usta; drugi to klasyczny dubbing.
 
 - **Potrzebuje:** decyzji, w jakim języku ruszają się usta, przyjętych klipów tego toru oraz
-  przyjętego przekładu i kwestii [etapu 11](stages/11-dialog.md) w tym języku.
-- **Produkuje:** twarze każdego klipu z ich przypisaniem do postaci i `versions/clips/Cnn.mp4`,
-  czyli klip z ustami w drugim języku.
+  przyjętego przekładu i kwestii [etapu 11](stages/11-dialog.md) w obu językach, a do filmów
+  także przyjętej muzyki i efektów [etapu 10](stages/10-muzyka-i-efekty.md).
+- **Produkuje:** twarze każdego klipu z ich przypisaniem do postaci, `versions/clips/Cnn.mp4`,
+  czyli klip z ustami w drugim języku, i dwa filmy, `versions/<język ust>.mp4`
+  i `versions/<język filmu>.mp4`.
 - **Koszt:** jedno rozpoznanie twarzy na klip i jedno zadanie lip-sync na każdą mówiącą
-  postać; każda kolejna postać w tym samym klipie dokłada jedno rozpoznanie.
+  postać; każda kolejna postać w tym samym klipie dokłada jedno rozpoznanie. Filmy niczego
+  nie kupują, składa je ffmpeg.
 - [Komendy tego etapu](stages/12-wersje-jezykowe.md)
 
 ## Projekcja i podpis
