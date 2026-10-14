@@ -55,6 +55,11 @@ describe("run", () => {
     expect(result.ok ? null : result.error.message).toContain("unknown command: nope");
   });
 
+  it("should print a control character it was handed as text, refusal or answer", async () => {
+    const result = await run(["\u001b[2J\r"]);
+    expect(result.ok ? null : result.error.message).toBe("unknown command: \\u001b[2J\\u000d");
+  });
+
   it("should fail on an unknown subcommand", async () => {
     const result = await cli("episode", "publish");
     expect(result.text).toContain("nieznane polecenie: episode publish");

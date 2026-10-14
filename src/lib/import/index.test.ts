@@ -310,6 +310,23 @@ describe("addImport with a hostile document", () => {
     ).toBe(true);
   });
 
+  it("refuses a character a terminal would execute, written or referenced, writing nothing", async () => {
+    const refusals = [
+      errorOf(await add(docx(p(t("Pola\u001b[2J"), style("Nagwek1"))), "a")),
+      errorOf(await add(docx(p(t("Pola&#27;]0;x&#7;"))), "b")),
+      errorOf(await add(docx(p(t("Pola\u009b31m"))), "c")),
+    ];
+
+    expect(refusals).toEqual([
+      expect.stringContaining(
+        "word/document.xml: dokument zawiera niewidoczny znak sterujący U+001B zaraz po „Pola”"
+      ),
+      expect.stringContaining("U+001B zaraz po „Pola”"),
+      expect.stringContaining("U+009B zaraz po „Pola”"),
+    ]);
+    expect(existsSync(join(root, "imports"))).toBe(false);
+  });
+
   it("keeps a reference to no character as it was written", async () => {
     await add(docx(p(t("&#99999999; i &amp;"))));
 

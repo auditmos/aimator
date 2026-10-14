@@ -4,7 +4,8 @@
  * A Word part is generated, well-formed and namespace-prefixed the same way by
  * every producer that matters, so a scanner and a stack are enough, and the
  * walker matches `w:p` by its prefixed name. Entities are decoded; a DOCTYPE is
- * refused rather than read, so a part cannot make this read anything else.
+ * refused rather than read, so a part cannot make this read anything else, and
+ * so is a control character, so a part cannot write to anybody's terminal.
  *
  * The scanner moves forward with `indexOf` and never backtracks, because the
  * bytes come from somebody's document: a regular expression with two
@@ -75,7 +76,7 @@ export function parseXml(text: string, part: string): XmlElement {
     const parent = stack.at(-1) ?? document;
 
     if (end > at) {
-      parent.children.push(decode(text.slice(at, end)));
+      parent.children.push(printable(decode(text.slice(at, end)), part));
       nodes += 1;
     }
 
@@ -191,7 +192,7 @@ function place(stack: OpenElement[], token: Token, part: string): number {
   }
 
   if (token.kind === "text") {
-    parent.children.push(token.text);
+    parent.children.push(printable(token.text, part));
 
     return 1;
   }
@@ -245,7 +246,10 @@ function parseAttributes(text: string, part: string): ReadonlyMap<string, string
       throw new XmlError(`${part}: niepoprawny atrybut w „${text.slice(at, at + 40)}”`);
     }
 
-    attributes.set(text.slice(at, equals).trim(), decode(text.slice(quoteAt + 1, close)));
+    attributes.set(
+      text.slice(at, equals).trim(),
+      printable(decode(text.slice(quoteAt + 1, close)), part)
+    );
     at = skipSpace(text, close + 1);
   }
 
@@ -273,6 +277,33 @@ function decode(text: string): string {
 
     return code <= LAST_CODE_POINT ? String.fromCodePoint(code) : whole;
   });
+}
+
+/**
+ * `text` as it was, unless it holds a character a terminal would execute: C0
+ * but the tab and the two line ends, which XML forbids outright, and DEL and
+ * C1, which it only discourages. Word writes none of them, so one here was put
+ * there, and a heading carrying it would rewrite the screen of whoever reads
+ * the material. Refused rather than dropped, for the reason hidden text is.
+ */
+function printable(text: string, part: string): string {
+  for (let at = 0; at < text.length; at += 1) {
+    const code = text.charCodeAt(at);
+
+    if (
+      (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+      (code >= 0x7f && code <= 0x9f)
+    ) {
+      const before = text.slice(Math.max(0, at - 30), at).trim();
+      const where = before === "" ? "" : ` zaraz po „${before}”`;
+
+      throw new XmlError(
+        `${part}: dokument zawiera niewidoczny znak sterujący U+${code.toString(16).toUpperCase().padStart(4, "0")}${where}; usuń go w Wordzie i zapisz dokument ponownie`
+      );
+    }
+  }
+
+  return text;
 }
 
 /** The element children of `node`, all of them or those named `name`. */

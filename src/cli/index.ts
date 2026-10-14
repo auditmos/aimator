@@ -58,6 +58,18 @@ const COMMANDS: Readonly<Record<string, (argv: readonly string[]) => Promise<Res
  * function instead of spawning a process.
  */
 export async function run(argv: string[]): Promise<Result<string>> {
+  const result = await dispatch(argv);
+
+  if (result.ok) {
+    return ok(printable(result.data));
+  }
+
+  result.error.message = printable(result.error.message);
+
+  return result;
+}
+
+async function dispatch(argv: string[]): Promise<Result<string>> {
   const [command, ...rest] = argv;
 
   if (command === undefined || command === "--help") {
@@ -71,4 +83,28 @@ export async function run(argv: string[]): Promise<Result<string>> {
   return handler === undefined
     ? err(new UsageError(`unknown command: ${command}`))
     : await handler(rest);
+}
+
+/**
+ * What a terminal would execute rather than print, written out as `\u001b`:
+ * C0 but the tab and the line break, DEL and C1. An answer carries text this
+ * tool did not write, a heading from somebody's document, a model's reply, a
+ * word from argv, and none of it may retitle the window or clear the screen.
+ * JSON stays JSON: `JSON.stringify` already escapes C0, and inside a string
+ * `\u009b` reads back as the very character it replaced.
+ */
+function printable(text: string): string {
+  let printed = "";
+  let from = 0;
+
+  for (let at = 0; at < text.length; at += 1) {
+    const code = text.charCodeAt(at);
+
+    if ((code < 0x20 && code !== 0x09 && code !== 0x0a) || (code >= 0x7f && code <= 0x9f)) {
+      printed += `${text.slice(from, at)}\\u${code.toString(16).padStart(4, "0")}`;
+      from = at + 1;
+    }
+  }
+
+  return from === 0 ? text : printed + text.slice(from);
 }

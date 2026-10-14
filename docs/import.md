@@ -54,6 +54,8 @@ którego konwerter nie umie umieścić w Markdownie, cały import zostaje odrzuc
 cokolwiek zapisze, a komunikat cytuje ten tekst. Tak samo kończą się:
 
 - pole tekstowe i przypisy (ich treść trzeba przenieść do zwykłego tekstu),
+- niewidoczny znak sterujący (np. `U+001B`), który terminal wykonałby zamiast wypisać:
+  Word takich nie zapisuje, więc komunikat podaje kod znaku i tekst tuż przed nim,
 - plik, który nie jest `.docx`, zaszyfrowany albo uszkodzony (zła suma kontrolna części),
 - dokument za duży: ponad 2 GiB po rozpakowaniu, część ponad 512 MiB, część XML ponad
   64 MiB albo ponad 2 mln węzłów XML. Limity sprawdza się przed rozpakowaniem, więc

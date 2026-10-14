@@ -74,6 +74,23 @@ describe("import add", () => {
   });
 });
 
+describe("import show of a material that writes to the terminal", () => {
+  it("prints its control characters as text, not as commands", async () => {
+    await cli("import", "add", "miko", "--source", source);
+    // OSC 0 retitles the window, CSI 2J clears the screen, U+009B is CSI in 8 bits.
+    await writeFile(
+      join(root, "imports", "miko", "material.md"),
+      "# Pola\u001b]0;pwned\u0007\u001b[2J\u009b31m\n"
+    );
+
+    const shown = await cli("import", "show", "miko");
+
+    expect(shown.text).toContain("# Pola\\u001b]0;pwned\\u0007\\u001b[2J\\u009b31m  0 zn.");
+    expect(shown.text).not.toContain("\u001b");
+    expect(shown.text).not.toContain("\u009b");
+  });
+});
+
 describe("import show and list", () => {
   it("prints an import and the list of them, with --json", async () => {
     await cli("import", "add", "miko", "--source", source);
