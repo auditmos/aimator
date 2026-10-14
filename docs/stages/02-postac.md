@@ -5,7 +5,7 @@ kanoniczny wygląd każdej powracającej postaci: kartę, osiem widoków i obraz
 
 | | |
 |---|---|
-| **Wejście** | `project.json`, `project.md`, a przy podstawie `photographs` także `characters/<id>/sources/` |
+| **Wejście** | `project.json`, `project.md`, a przy podstawie `design` albo `photographs` także `characters/<id>/sources/` |
 | **Wyjście** | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, **per postać i per tor** |
 | **Bramka** | zatwierdzony [etap 0](00-przygotowanie.md); potem ocena każdego obrazu z osobna |
 | **Koszt** | płatny; do dziesięciu wywołań obrazowych na postać i tor |
@@ -29,12 +29,28 @@ Dodatkowe flagi: `--artifact card|hero|<widok>,...`, `--model <id>`, `--json`,
 
 `--regenerate --artifact card --instruction "Przywróć brakującą rękę."` poprawia
 opublikowany obraz zamiast rysować go od zera: idzie on jako `Image 1: previous:card`, przed
-zdjęciami, kartą i widokami, a model zmienia tylko to, co nazywa uwaga. Poprzedni obraz liczy
+obrazami postaci, kartą i widokami, a model zmienia tylko to, co nazywa uwaga. Poprzedni obraz liczy
 się do limitu toru, więc hero na seedream, które już niesie dziesięć obrazów, z uwagą jest
 odmową z liczbami. Szczegóły na stronie [etapu 5](05-referencje.md#poprawka-z-uwagą).
 
 Nazwy widoków: `front`, `slight-left`, `slight-right`, `three-quarter-left`,
 `three-quarter-right`, `profile-left`, `profile-right`, `rear`.
+
+## Skąd postać bierze wygląd
+
+Z podstawy, którą ustawia [etap 0](00-przygotowanie.md), i każda z trzech mówi modelowi
+co innego:
+
+- **`design`**: obrazy idą jako `Image N: design 01-front.png`, a prompt każe odwzorować
+  projekt wiernie (proporcje, twarz, włosy, kolory, kostium, materiały) i niczego w nim
+  nie poprawiać, bo projekt jest już w stylu serii.
+- **`photographs`**: obrazy idą jako `Image N: photograph portret.jpg`, a prompt przenosi
+  kształty osoby do stylu serii, bez pikseli, faktury i światła zdjęcia.
+- **`description`**: nie idzie żaden obraz, a jedynym źródłem jest opis w `project.md`.
+
+Obrazem głównym jest pierwszy według nazwy pliku. Karta niesie wszystkie obrazy postaci,
+widok obraz główny, kartę i resztę, a hero obraz główny, kartę, osiem widoków i resztę
+(na seedream bez reszty, bo tor przyjmuje dziesięć obrazów).
 
 ## Etap 2 jako obiekt
 

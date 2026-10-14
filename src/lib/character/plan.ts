@@ -154,13 +154,13 @@ export async function buildPlan(
   scope: Scope,
   artifact: CharacterArtifact
 ): Promise<Result<Plan>> {
-  const photographs = scope.stage0.sources.map((source) => basenameOf(source.path));
+  const sources = scope.stage0.sources.map((source) => basenameOf(source.path));
   const instruction = input.instruction ?? null;
   const slots = referencePlan({
     artifact,
     basis: scope.stage0.basis,
     correcting: instruction !== null,
-    photographs,
+    sources,
     track: input.track,
   });
 
@@ -282,7 +282,7 @@ function pathOf(scope: Scope, slot: ReferenceSlot): Result<string> {
   const source = scope.stage0.sources.find((entry) => basenameOf(entry.path) === slot.name);
 
   return source === undefined
-    ? err(new Stage2BlockedError([`nie znaleziono zdjęcia ${slot.name} w materiałach postaci`]))
+    ? err(new Stage2BlockedError([`nie znaleziono pliku ${slot.name} w materiałach postaci`]))
     : ok(source.path);
 }
 
@@ -294,7 +294,7 @@ function expectedDigest(scope: Scope, slot: ReferenceSlot): string | null {
     return null;
   }
 
-  if (slot.kind === "photograph") {
+  if (slot.kind === "photograph" || slot.kind === "design") {
     return (
       scope.stage0.sources.find((entry) => basenameOf(entry.path) === slot.name)?.sha256 ?? null
     );

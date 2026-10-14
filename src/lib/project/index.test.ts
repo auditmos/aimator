@@ -538,6 +538,7 @@ describe("addCharacterSources", () => {
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
     const result = await addCharacterSources({
+      basis: "photographs",
       characterId: "ewa",
       mode: "apply",
       projectId: "demo",
@@ -559,6 +560,7 @@ describe("addCharacterSources", () => {
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
     const result = await addCharacterSources({
+      basis: "photographs",
       characterId: "ewa",
       mode: "apply",
       projectId: "demo",
@@ -576,6 +578,7 @@ describe("addCharacterSources", () => {
     const photo = join(scratch, "portret.png");
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await addCharacterSources({
+      basis: "photographs",
       characterId: "ewa",
       mode: "apply",
       projectId: "demo",
@@ -583,6 +586,7 @@ describe("addCharacterSources", () => {
       workspace,
     });
     const again = await addCharacterSources({
+      basis: "photographs",
       characterId: "ewa",
       mode: "apply",
       projectId: "demo",
@@ -593,6 +597,168 @@ describe("addCharacterSources", () => {
     expect(again.ok ? again.data.created : null).toEqual([]);
     const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
     expect(project.characters.ewa.sources).toHaveLength(1);
+  });
+
+  it("should record a design's images as a design, not as photographs", async () => {
+    await makeProject();
+    const front = join(scratch, "01-front.png");
+    const profile = join(scratch, "02-profil.png");
+    await writeFile(front, Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]));
+    await writeFile(profile, Buffer.from([0x89, 0x50, 0x4e, 0x47, 2]));
+
+    const result = await addCharacterSources({
+      basis: "design",
+      characterId: "ewa",
+      mode: "apply",
+      projectId: "demo",
+      sourcePaths: [front, profile],
+      workspace,
+    });
+
+    expect(result.ok ? result.data.created : null).toEqual([
+      "projects/demo/characters/ewa/sources/01-front.png",
+      "projects/demo/characters/ewa/sources/02-profil.png",
+    ]);
+    const project = JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8"));
+    expect(project.characters.ewa.basis).toBe("design");
+    expect(project.characters.ewa.sources).toHaveLength(2);
+  });
+
+  it("should refuse to mix a design into photographs, writing nothing", async () => {
+    await makeProject();
+    const photo = join(scratch, "portret.png");
+    const front = join(scratch, "01-front.png");
+    await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]));
+    await writeFile(front, Buffer.from([0x89, 0x50, 0x4e, 0x47, 2]));
+    await addCharacterSources({
+      basis: "photographs",
+      characterId: "ewa",
+      mode: "apply",
+      projectId: "demo",
+      sourcePaths: [photo],
+      workspace,
+    });
+    const before = await readFile(join(root, "projects/demo/project.json"), "utf8");
+
+    const mixed = await addCharacterSources({
+      basis: "design",
+      characterId: "ewa",
+      mode: "apply",
+      projectId: "demo",
+      sourcePaths: [front],
+      workspace,
+    });
+
+    expect(mixed.ok ? "" : mixed.error.message).toBe(
+      'postać "ewa" ma już zdjęcia (1), a obrazy projektu i zdjęcia się nie mieszają: etap postaci odwzorowuje projekt wiernie, a zdjęcie przenosi do stylu serii'
+    );
+    expect(await readFile(join(root, "projects/demo/project.json"), "utf8")).toBe(before);
+    expect(await readdir(join(root, "projects/demo/characters/ewa/sources"))).toEqual([
+      "portret.png",
+    ]);
+  });
+
+  describe("from a directory, and replaced", () => {
+    const sources = (): string => join(root, "projects/demo/characters/ewa/sources");
+    const recorded = async (): Promise<{ basis: string; sources: { path: string }[] }> =>
+      JSON.parse(await readFile(join(root, "projects/demo/project.json"), "utf8")).characters.ewa;
+    const add = (
+      sourcePaths: readonly string[],
+      more: { basis?: "design" | "photographs"; replace?: boolean } = {}
+    ): ReturnType<typeof addCharacterSources> =>
+      addCharacterSources({
+        basis: more.basis ?? "design",
+        characterId: "ewa",
+        mode: "apply",
+        projectId: "demo",
+        replace: more.replace ?? false,
+        sourcePaths,
+        workspace,
+      });
+
+    it("should take every image straight inside a directory, by name, and skip hidden files", async () => {
+      await makeProject();
+      const folder = join(scratch, "ewa-projekt");
+      await mkdir(folder);
+      await writeFile(join(folder, "02-profil.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 2]));
+      await writeFile(join(folder, "01-front.jpg"), Buffer.from([0xff, 0xd8, 0xff, 1]));
+      await writeFile(join(folder, ".DS_Store"), "x");
+
+      const result = await add([folder]);
+
+      expect(result.ok ? result.data.created : null).toEqual([
+        "projects/demo/characters/ewa/sources/01-front.jpg",
+        "projects/demo/characters/ewa/sources/02-profil.png",
+      ]);
+      expect((await recorded()).sources).toHaveLength(2);
+    });
+
+    it("should refuse a directory holding anything but images, writing nothing", async () => {
+      await makeProject();
+      const folder = join(scratch, "ewa-projekt");
+      await mkdir(join(folder, "stare"), { recursive: true });
+      await writeFile(join(folder, "01-front.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]));
+      await writeFile(join(folder, "notatki.txt"), "x");
+
+      const result = await add([folder]);
+
+      expect(result.ok ? "" : result.error.message).toBe(
+        `katalog ${folder} ma coś poza obrazami (PNG, JPEG, WebP): notatki.txt, stare/; obrazy postaci leżą wprost w nim i nic więcej`
+      );
+      expect((await recorded()).sources).toHaveLength(0);
+    });
+
+    it("should refuse a directory with no image in it", async () => {
+      await makeProject();
+      const folder = join(scratch, "pusty");
+      await mkdir(folder);
+
+      const result = await add([folder]);
+
+      expect(result.ok ? "" : result.error.message).toBe(`katalog ${folder} nie ma żadnego obrazu`);
+    });
+
+    it("should refuse a new version under a name already recorded, unless it replaces", async () => {
+      await makeProject();
+      const front = join(scratch, "01-front.png");
+      await writeFile(front, Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]));
+      await add([front]);
+      await writeFile(front, Buffer.from([0x89, 0x50, 0x4e, 0x47, 2]));
+
+      const again = await add([front]);
+
+      expect(again.ok ? "" : again.error.message).toBe(
+        'postać "ewa" ma już plik 01-front.png z inną treścią; nową wersję wnosi --replace'
+      );
+
+      const replaced = await add([front], { replace: true });
+
+      expect(replaced.ok).toBe(true);
+      expect((await recorded()).sources).toHaveLength(1);
+      expect(await readFile(join(sources(), "01-front.png"))).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 2])
+      );
+    });
+
+    it("should replace photographs with a design, removing the copies it no longer records", async () => {
+      await makeProject();
+      const photo = join(scratch, "portret.png");
+      const front = join(scratch, "01-front.png");
+      await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]));
+      await writeFile(front, Buffer.from([0x89, 0x50, 0x4e, 0x47, 2]));
+      await add([photo], { basis: "photographs" });
+
+      const result = await add([front], { replace: true });
+
+      expect(result.ok ? result.data.removed : null).toEqual([
+        "projects/demo/characters/ewa/sources/portret.png",
+      ]);
+      expect((await recorded()).basis).toBe("design");
+      expect((await recorded()).sources.map(({ path }) => path)).toEqual([
+        "projects/demo/characters/ewa/sources/01-front.png",
+      ]);
+      expect(await readdir(sources())).toEqual(["01-front.png"]);
+    });
   });
 });
 
@@ -767,6 +933,7 @@ describe("setCharacterBasis", () => {
     const photo = join(scratch, "portret.png");
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     const result = await addCharacterSources({
+      basis: "photographs",
       characterId: "ewa",
       mode: "apply",
       projectId: "demo",
@@ -1227,6 +1394,7 @@ describe("showProject", () => {
     const photo = join(scratch, "portret.png");
     await writeFile(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await addCharacterSources({
+      basis: "photographs",
       characterId: "tata",
       mode: "apply",
       projectId: "demo",

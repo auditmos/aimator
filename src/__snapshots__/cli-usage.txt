@@ -60,7 +60,15 @@ Etap 0. Przygotowanie projektu i odcinka:
     dopiero etapy 5, 6 i 7, które dołączają obrazy stylu po załącznikach treści,
     jako style:Snn.
   character new <id> <character-id> --name <nazwa> [--json]
-  character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
+  character design <id> <character-id> --source <plik|katalog> [--source ...]
+                   [--replace] [--json]
+    Projekt postaci: jej własne obrazy, już w stylu serii, z kilku stron (do 7).
+    Etap postaci odwzorowuje go wiernie, a zdjęcia przenosi do stylu serii, więc
+    obrazy projektu i zdjęcia jednej postaci się nie mieszają. Katalog to obrazy
+    (PNG, JPEG, WebP) leżące wprost w nim, a obraz główny to pierwszy według
+    nazwy. --replace: podane obrazy stają się całą listą, kopie spoza niej znikają.
+  character add <id> <character-id> --source <plik|katalog> [--source ...]
+                [--replace] [--json]
   character describe <id> <character-id> [--json]
   character voice <id> <character-id> --language <kod> --voice-id <id głosu> [--json]
     Obsadza głos postaci w jednym języku: id głosu dostawcy, dosłownie, w
@@ -407,8 +415,9 @@ Wspólne:
                profile-right, rear
 
 Obsada jest jawną decyzją: wymień każdą powracającą postać przez "character new".
-Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę,
-zdjęcia ("character add") albo opis w project.md ("character describe").
+Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę:
+projekt postaci ("character design"), zdjęcia ("character add") albo opis
+w project.md ("character describe").
 
 Globalne:
   --workspace <ścieżka>  katalog artefaktów (domyślnie AIMATOR_WORKSPACE)

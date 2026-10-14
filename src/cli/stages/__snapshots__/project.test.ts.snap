@@ -30,6 +30,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
   "nextStep": "materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj",
   "problems": [],
   "ready": false,
+  "removed": [],
   "reused": [],
   "stage": "prepare",
 }
@@ -58,7 +59,7 @@ exports[`every stage-0 command under --json > should print the stage's report fo
   "changedSinceApproval": [],
   "command": "character new",
   "created": [],
-  "nextStep": "zdecyduj, skąd bierze się wygląd: aimator character add dzielna-ewa ewa --source <plik> albo aimator character describe dzielna-ewa ewa",
+  "nextStep": "zdecyduj, skąd bierze się wygląd: aimator character design dzielna-ewa ewa --source <plik|katalog>, aimator character add dzielna-ewa ewa --source <plik> albo aimator character describe dzielna-ewa ewa",
   "problems": [],
   "ready": false,
   "reused": [

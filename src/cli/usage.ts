@@ -37,8 +37,9 @@ const FLAGS = `  --audio      music-and-effects | dialogue | narration | dialogu
 
 /** Why the cast is typed out rather than inferred from a screenplay. */
 const CAST_NOTE = `Obsada jest jawną decyzją: wymień każdą powracającą postać przez "character new".
-Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę,
-zdjęcia ("character add") albo opis w project.md ("character describe").`;
+Postać widziana raz to referencja etapu 5, nie postać. Każda ma własną podstawę:
+projekt postaci ("character design"), zdjęcia ("character add") albo opis
+w project.md ("character describe").`;
 
 /** What every command accepts, whichever stage it belongs to. */
 const GLOBAL = `Globalne:

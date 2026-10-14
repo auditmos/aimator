@@ -25,7 +25,10 @@ described before the session ends.
 ## The rows an entry closes
 
 Work down the list until every entry is something a renderer could act on. Photographs settle
-a character's face and body and nothing else, so with photographs skip that one row.
+a character's face and body and nothing else, so with photographs skip that one row. A
+character's design (its own images, already in the series' style) settles face, body and
+wardrobe, so with a design skip all three, and keep proportions: one figure is not a ratio
+against the rest of the cast.
 
 - **Figure proportions**, every character: head-to-body ratio and how far the figure departs
   from nature. Ask it on purpose, because people describe colour first and never get to it,

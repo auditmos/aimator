@@ -52,7 +52,15 @@ import {
  * one below to stage 2's.
  */
 export const CAST_USAGE = `  character new <id> <character-id> --name <nazwa> [--json]
-  character add <id> <character-id> --source <plik> [--source <plik>...] [--json]
+  character design <id> <character-id> --source <plik|katalog> [--source ...]
+                   [--replace] [--json]
+    Projekt postaci: jej własne obrazy, już w stylu serii, z kilku stron (do 7).
+    Etap postaci odwzorowuje go wiernie, a zdjęcia przenosi do stylu serii, więc
+    obrazy projektu i zdjęcia jednej postaci się nie mieszają. Katalog to obrazy
+    (PNG, JPEG, WebP) leżące wprost w nim, a obraz główny to pierwszy według
+    nazwy. --replace: podane obrazy stają się całą listą, kopie spoza niej znikają.
+  character add <id> <character-id> --source <plik|katalog> [--source ...]
+                [--replace] [--json]
   character describe <id> <character-id> [--json]
   character voice <id> <character-id> --language <kod> --voice-id <id głosu> [--json]
     Obsadza głos postaci w jednym języku: id głosu dostawcy, dosłownie, w
@@ -131,7 +139,15 @@ async function runCharacterNew(parsed: Parsed): Promise<Result<string>> {
     : result;
 }
 
-async function runCharacterAdd(parsed: Parsed): Promise<Result<string>> {
+/**
+ * `character add` and `character design`: one grammar, two kinds of image.
+ * Which kind the images are is the command a person typed, never a guess
+ * made from the files.
+ */
+async function runCharacterSources(
+  parsed: Parsed,
+  basis: "design" | "photographs"
+): Promise<Result<string>> {
   const scope = castScope(parsed);
   const sources = parsed.values.source;
 
@@ -143,14 +159,22 @@ async function runCharacterAdd(parsed: Parsed): Promise<Result<string>> {
   }
 
   const mode = modeOf(parsed);
-  const result = await addCharacterSources({ ...scope.data, mode, sourcePaths: sources });
+  const result = await addCharacterSources({
+    ...scope.data,
+    basis,
+    mode,
+    replace: parsed.values.replace === true,
+    sourcePaths: sources,
+  });
 
   return result.ok
     ? ok(
         answerStage0(
           answerFlag(parsed),
-          "character add",
-          `Materiały postaci "${scope.data.characterId}"`,
+          basis === "design" ? "character design" : "character add",
+          basis === "design"
+            ? `Projekt postaci "${scope.data.characterId}"`
+            : `Materiały postaci "${scope.data.characterId}"`,
           result.data,
           mode
         )
@@ -380,8 +404,17 @@ function renderVoiceDecision(decision: VoiceDecision, mode: "apply" | "dry-run")
 }
 
 const CHARACTER_OPTIONS = {
-  add: { json: { type: "boolean" }, source: { multiple: true, type: "string" } },
+  add: {
+    json: { type: "boolean" },
+    replace: { type: "boolean" },
+    source: { multiple: true, type: "string" },
+  },
   describe: { json: { type: "boolean" } },
+  design: {
+    json: { type: "boolean" },
+    replace: { type: "boolean" },
+    source: { multiple: true, type: "string" },
+  },
   generate: {
     artifact: { type: "string" },
     instruction: { type: "string" },
@@ -438,9 +471,11 @@ export async function runCharacter(argv: readonly string[]): Promise<Result<stri
     return await runCharacterGenerate(parsed.data);
   }
 
-  return action === "add"
-    ? await runCharacterAdd(parsed.data)
-    : await runCharacterDescribe(parsed.data);
+  if (action === "add" || action === "design") {
+    return await runCharacterSources(parsed.data, action === "add" ? "photographs" : "design");
+  }
+
+  return await runCharacterDescribe(parsed.data);
 }
 
 /** `--artifact` accepts the same words the stage file uses as keys. */

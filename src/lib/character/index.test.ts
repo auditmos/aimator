@@ -15,7 +15,7 @@ function prompt(overrides: Partial<Parameters<typeof buildPrompt>[0]> = {}): str
   const plan = referencePlan({
     artifact,
     basis,
-    photographs: overrides.references === undefined ? [] : [],
+    sources: overrides.references === undefined ? [] : [],
     track: "gpt-image",
   });
   return buildPrompt({
@@ -32,7 +32,7 @@ describe("referencePlan", () => {
     const plan = referencePlan({
       artifact: "card",
       basis: "description",
-      photographs: [],
+      sources: [],
       track: "seedream",
     });
     expect(plan.ok && plan.data).toEqual([]);
@@ -41,7 +41,7 @@ describe("referencePlan", () => {
     const plan = referencePlan({
       artifact: "front",
       basis: "photographs",
-      photographs: ["a.png", "b.png"],
+      sources: ["a.png", "b.png"],
       track: "gpt-image",
     });
     expect(plan.ok && plan.data.map((slot) => slot.name)).toEqual(["a.png", "card", "b.png"]);
@@ -50,7 +50,7 @@ describe("referencePlan", () => {
     const plan = referencePlan({
       artifact: "hero",
       basis: "description",
-      photographs: [],
+      sources: [],
       track: "gpt-image",
     });
     expect(plan.ok && plan.data.map((slot) => slot.name)).toEqual(["card", ...CHARACTER_VIEWS]);
@@ -66,13 +66,13 @@ describe("referencePlan", () => {
     const seedream = referencePlan({
       artifact: "hero",
       basis: "photographs",
-      photographs,
+      sources: photographs,
       track: "seedream",
     });
     const gptImage = referencePlan({
       artifact: "hero",
       basis: "photographs",
-      photographs,
+      sources: photographs,
       track: "gpt-image",
     });
     expect(seedream.ok && seedream.data).toHaveLength(10);
@@ -83,7 +83,7 @@ describe("referencePlan", () => {
     const plan = referencePlan({
       artifact: "card",
       basis: "photographs",
-      photographs,
+      sources: photographs,
       track: "seedream",
     });
     expect(plan.ok ? null : plan.error.message).toContain("10");
@@ -93,7 +93,7 @@ describe("referencePlan", () => {
       artifact: "hero",
       basis: "photographs",
       correcting: true,
-      photographs: ["a.png"],
+      sources: ["a.png"],
       track: "seedream",
     });
 
@@ -106,7 +106,7 @@ describe("referencePlan", () => {
       artifact: "card",
       basis: "photographs",
       correcting: true,
-      photographs: ["a.png", "b.png"],
+      sources: ["a.png", "b.png"],
       track: "gpt-image",
     });
     const text = buildPrompt({
@@ -121,6 +121,44 @@ describe("referencePlan", () => {
     expect(text).toContain("Image 1: previous:card, the image to correct");
     expect(text).toContain("Image 2: photograph a.png, the primary source");
     expect(text).toContain("Image 3: photograph b.png, supporting evidence");
+  });
+  it("should carry a design's images where photographs would go, as designs", () => {
+    const plan = referencePlan({
+      artifact: "front",
+      basis: "design",
+      sources: ["01-front.png", "02-profil.png"],
+      track: "gpt-image",
+    });
+    expect(plan.ok && plan.data).toEqual([
+      { kind: "design", name: "01-front.png" },
+      { kind: "card", name: "card" },
+      { kind: "design", name: "02-profil.png" },
+    ]);
+  });
+});
+describe("buildPrompt for a design", () => {
+  const plan = referencePlan({
+    artifact: "card",
+    basis: "design",
+    sources: ["01-front.png", "02-profil.png"],
+    track: "gpt-image",
+  });
+  const text = buildPrompt({
+    artifact: "card",
+    basis: "design",
+    name: "Miko",
+    references: plan.ok ? plan.data : [],
+    rules: RULES,
+  });
+
+  it("should number the design's images, the first one primary", () => {
+    expect(text).toContain("Image 1: design 01-front.png, the primary design");
+    expect(text).toContain("Image 2: design 02-profil.png, the same design from another angle");
+  });
+  it("should ask for the design reproduced, never call it a photograph", () => {
+    expect(text).toContain("SOURCE OF APPEARANCE, AN APPROVED DESIGN");
+    expect(text).toContain("Reproduce the design faithfully");
+    expect(text.toLowerCase()).not.toContain("photograph");
   });
 });
 describe("buildPrompt", () => {

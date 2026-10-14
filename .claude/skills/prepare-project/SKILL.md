@@ -35,7 +35,7 @@ user had answered it is the failure this stage exists to prevent. For a new proj
 1. the premise, and what a single episode tells relative to the others;
 2. the shared world, period, tone and audience;
 3. the protagonist's role, every recurring character, the source of each one's look
-   (**photographs** or **the description** in `project.md`, never a default), the Style Bible;
+   (**a design**, **photographs** or **the description** in `project.md`, never a default), the Style Bible;
 4. the aspect ratio, any opening composition, and what stays constant between scenes;
 5. any other binding creative constraint.
 
@@ -45,8 +45,8 @@ read [docs/slownik.md](../../../docs/slownik.md) and use its word, in conversati
 file. Before writing the Style Bible, read [its section](../../../docs/stages/00-przygotowanie.md#style-bible).
 **Never record a studio, film or artist name**: it reaches the image provider verbatim.
 
-<important if="a character's look comes from photographs">
-Record them with `character add`. Nobody has inspected them yet: never write that anyone did.
+<important if="a character's look comes from images, a design or photographs">
+Its own design (already in the series' style) is `character design`, photographs of a real person `character add`; the two never mix. Nobody has inspected them yet: never write that anyone did.
 </important>
 
 <important if="a character's look comes from the description">
@@ -85,7 +85,7 @@ narrator (`project voice`); each character who speaks, a voice in the film's lan
 ```sh
 aimator project init <project-id> --title "<tytuł>" --aspect-ratio 16:9
 aimator character new <project-id> <character-id> --name "<nazwa>"
-aimator character add <project-id> <character-id> --source <zdjęcie> [--source <zdjęcie>...]
+aimator character design|add <project-id> <character-id> --source <plik|katalog>... [--replace]
 aimator character describe <project-id> <character-id>
 aimator project style <project-id> --source <obraz.png>   # or --generated --count <n>, or --none
 aimator episode add <project-id> --source <NN-tytul.md>

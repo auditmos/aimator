@@ -14,6 +14,7 @@ import {
   readDigest,
   readJson,
   readSupplied,
+  removeFile,
   type StageFile,
   serialize,
   sha256Of,
@@ -192,6 +193,8 @@ export interface Stage0Report {
   readonly nextStep: string;
   readonly problems: readonly string[];
   readonly ready: boolean;
+  /** Copies a replacement took out of the workspace, workspace-relative; only images are ever replaced. */
+  readonly removed?: readonly string[];
   readonly reused: readonly string[];
 }
 
@@ -251,7 +254,14 @@ type SetSettingsInput = ProjectInput & {
   readonly episodeId: string;
   readonly settings: Partial<DraftSettings>;
 };
-type AddSourcesInput = CharacterInput & { readonly sourcePaths: readonly string[] };
+type AddSourcesInput = CharacterInput & {
+  /** What the images are: photographs of a real person, or the character's own design. */
+  readonly basis: Exclude<CharacterBasis, "description">;
+  /** The images given become the whole list; copies no longer named are removed. */
+  readonly replace?: boolean;
+  /** Files, or directories whose images straight inside are taken by name. */
+  readonly sourcePaths: readonly string[];
+};
 type SetStyleInput = ProjectInput & { readonly decision: StyleDecision };
 interface CheckInput {
   readonly projectId: string;
@@ -528,7 +538,7 @@ export async function addCharacter(input: AddCharacterInput): Promise<Result<Sta
         approved: false,
         changedSinceApproval: [],
         created: [],
-        nextStep: `zdecyduj, skąd bierze się wygląd: aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
+        nextStep: `zdecyduj, skąd bierze się wygląd: aimator character design ${input.projectId} ${input.characterId} --source <plik|katalog>, aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
         problems: lapsed
           ? [
               `akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ${input.projectId}`,
@@ -1160,6 +1170,33 @@ export async function setEpisodeSettings(input: SetSettingsInput): Promise<Resul
 }
 
 /**
+ * Why a character's images cannot become another kind, or null when they can.
+ * Photographs and a design are both images, and the basis says which all of
+ * them are: adding one kind to the other would make stage 2 reproduce a
+ * photograph or restyle a design. From a description, files left behind are
+ * declared again by whoever brings images back.
+ */
+function mixedImages(
+  characterId: string,
+  entry: CharacterEntry,
+  basis: CharacterBasis
+): string | null {
+  if (
+    basis === "description" ||
+    entry.basis === null ||
+    entry.basis === "description" ||
+    entry.basis === basis ||
+    entry.sources.length === 0
+  ) {
+    return null;
+  }
+
+  const held = entry.basis === "design" ? "obrazy projektu" : "zdjęcia";
+
+  return `postać "${characterId}" ma już ${held} (${entry.sources.length}), a obrazy projektu i zdjęcia się nie mieszają: etap postaci odwzorowuje projekt wiernie, a zdjęcie przenosi do stylu serii`;
+}
+
+/**
  * Rewriting a stage file resets its review to pending. Saying so out loud is
  * the difference between an approval that expired and one that vanished.
  */
@@ -1177,42 +1214,74 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
   }
 
   const { entry, file: current, paths, project } = resolved.data;
-  const recorded = [...entry.sources];
+  const replace = input.replace === true;
+  // A replacement is how one kind becomes the other: nothing of the old kind
+  // is left for the new one to mix with.
+  const mixed = replace ? null : mixedImages(input.characterId, entry, input.basis);
+
+  if (mixed !== null) {
+    return err(new InvalidInputError("basis", mixed));
+  }
+
+  const sourcePaths = await imagesIn(input.sourcePaths);
+
+  if (!sourcePaths.ok) {
+    return sourcePaths;
+  }
+
+  const recorded = replace ? [] : [...entry.sources];
   const ops: WriteOp[] = [];
   const created: string[] = [];
   const reused: string[] = [];
 
-  // Hash every photo first: de-duplication compares digests, so the decision
+  // Hash every image first: de-duplication compares digests, so the decision
   // for one file depends on the ones before it and must stay ordered.
-  const digests = await Promise.all(input.sourcePaths.map((path) => readSupplied(path)));
+  const digests = await Promise.all(sourcePaths.data.map((path) => readSupplied(path)));
 
-  for (const [index, sourcePath] of input.sourcePaths.entries()) {
+  for (const [index, sourcePath] of sourcePaths.data.entries()) {
     const digest = digests[index];
 
     if (digest === undefined || !digest.ok) {
       return digest ?? err(new InvalidInputError("source", `nie można odczytać ${sourcePath}`));
     }
 
-    const destination = join(paths.sources, basename(sourcePath));
+    const name = basename(sourcePath);
+    const destination = join(paths.sources, name);
     const path = toWorkspacePath(input.workspace.root, destination);
     const already = recorded.find((asset) => asset.sha256 === digest.data.sha256);
 
-    if (already === undefined) {
-      recorded.push({ originPath: sourcePath, path, sha256: digest.data.sha256 });
-      ops.push({ from: sourcePath, kind: "copy", to: destination });
-      created.push(path);
-    } else {
+    if (already !== undefined) {
       reused.push(already.path);
+      continue;
     }
+
+    // The copy would overwrite bytes a record still vouches for, leaving two
+    // records of one file and a digest that no longer describes it.
+    if (recorded.some((asset) => asset.path === path)) {
+      return err(
+        new InvalidInputError(
+          "source",
+          `postać "${input.characterId}" ma już plik ${name} z inną treścią; nową wersję wnosi --replace`
+        )
+      );
+    }
+
+    recorded.push({ originPath: sourcePath, path, sha256: digest.data.sha256 });
+    ops.push({ from: sourcePath, kind: "copy", to: destination });
+    created.push(path);
   }
 
-  // Supplying a photograph *is* the declaration that this character is built
-  // from photographs; it is never inferred from an empty directory.
+  const removed = entry.sources
+    .filter((old) => !recorded.some((asset) => asset.path === old.path))
+    .map((old) => old.path);
+
+  // Supplying an image *is* the declaration that this character is built from
+  // images of that kind; it is never inferred from an empty directory.
   const file: ProjectFile = {
     ...current,
     characters: {
       ...current.characters,
-      [input.characterId]: { ...entry, basis: "photographs", sources: recorded },
+      [input.characterId]: { ...entry, basis: input.basis, sources: recorded },
     },
   };
 
@@ -1224,7 +1293,7 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
 
   if (entry.basis === "description") {
     problems.push(
-      `podstawa postaci "${entry.name}" zmieniona z opisu na zdjęcia, opis jej wyglądu w project.md przestaje być wejściem etapu postaci`
+      `podstawa postaci "${entry.name}" zmieniona z opisu na ${input.basis === "design" ? "projekt postaci" : "zdjęcia"}, opis jej wyglądu w project.md przestaje być wejściem etapu postaci`
     );
   }
 
@@ -1234,18 +1303,73 @@ export async function addCharacterSources(input: AddSourcesInput): Promise<Resul
     );
   }
 
-  return written.ok
-    ? ok({
-        approved: false,
-        changedSinceApproval: [],
-        created,
-        nextStep:
-          "materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj",
-        problems,
-        ready: false,
-        reused,
-      })
-    : written;
+  if (!written.ok) {
+    return written;
+  }
+
+  // After project.json stops naming them, so a failure here leaves a stray
+  // copy behind rather than a record pointing at nothing.
+  if (input.mode === "apply") {
+    await Promise.all(removed.map((path) => removeFile(join(input.workspace.root, path))));
+  }
+
+  return ok({
+    approved: false,
+    changedSinceApproval: [],
+    created,
+    nextStep: "materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj",
+    problems,
+    ready: false,
+    removed,
+    reused,
+  });
+}
+
+/** What a directory of a character's images may hold, besides hidden files. */
+const IMAGE_FILE = /\.(?:jpe?g|png|webp)$/i;
+
+/**
+ * Every path as the files it names: a file as itself, a directory as the
+ * images straight inside it, by name. Anything else in a directory refuses
+ * the whole call rather than being left out, because a view that quietly
+ * stayed behind is the one nobody would notice missing.
+ */
+async function imagesIn(sourcePaths: readonly string[]): Promise<Result<readonly string[]>> {
+  const files: string[] = [];
+
+  for (const sourcePath of sourcePaths) {
+    // biome-ignore lint/performance/noAwaitInLoops: a handful of paths, kept in order
+    const listing = await listDirectory(sourcePath);
+
+    if (listing === null) {
+      files.push(sourcePath);
+      continue;
+    }
+
+    const visible = (name: string): boolean => !name.startsWith(".");
+    const images = listing.files.filter((name) => visible(name) && IMAGE_FILE.test(name));
+    const strays = [
+      ...listing.files.filter((name) => visible(name) && !IMAGE_FILE.test(name)),
+      ...listing.others.filter(visible).map((name) => `${name}/`),
+    ];
+
+    if (strays.length > 0) {
+      return err(
+        new InvalidInputError(
+          "source",
+          `katalog ${sourcePath} ma coś poza obrazami (PNG, JPEG, WebP): ${strays.join(", ")}; obrazy postaci leżą wprost w nim i nic więcej`
+        )
+      );
+    }
+
+    if (images.length === 0) {
+      return err(new InvalidInputError("source", `katalog ${sourcePath} nie ma żadnego obrazu`));
+    }
+
+    files.push(...images.map((name) => join(sourcePath, name)));
+  }
+
+  return ok(files);
 }
 
 /**
@@ -1262,13 +1386,19 @@ export async function setCharacterBasis(input: SetBasisInput): Promise<Result<St
 
   const { entry, file: current, project } = resolved.data;
 
-  if (input.basis === "photographs" && entry.sources.length === 0) {
+  if (input.basis !== "description" && entry.sources.length === 0) {
     return err(
       new InvalidInputError(
         "basis",
-        `podstawy "photographs" nie deklaruje się pustą ręką, dodaj zdjęcia przez: aimator character add ${input.projectId} ${input.characterId} --source <plik>`
+        `podstawy "${input.basis}" nie deklaruje się pustą ręką, dodaj ${input.basis === "design" ? "obrazy projektu" : "zdjęcia"} przez: aimator character ${input.basis === "design" ? "design" : "add"} ${input.projectId} ${input.characterId} --source <plik>`
       )
     );
+  }
+
+  const mixed = mixedImages(input.characterId, entry, input.basis);
+
+  if (mixed !== null) {
+    return err(new InvalidInputError("basis", mixed));
   }
 
   const file: ProjectFile = {
@@ -1903,11 +2033,11 @@ function checkDecisions(file: ProjectFile, problems: string[]): void {
   for (const [characterId, entry] of cast) {
     if (entry.basis === null) {
       problems.push(
-        `project.json: postać "${characterId}" nie ma ustalonej podstawy, zdecyduj, czy powstaje ze zdjęć (aimator character add ${file.id} ${characterId} --source <plik>) czy z opisu w project.md (aimator character describe ${file.id} ${characterId})`
+        `project.json: postać "${characterId}" nie ma ustalonej podstawy, zdecyduj, czy powstaje z projektu postaci (aimator character design ${file.id} ${characterId} --source <plik>), ze zdjęć (aimator character add ${file.id} ${characterId} --source <plik>) czy z opisu w project.md (aimator character describe ${file.id} ${characterId})`
       );
-    } else if (entry.basis === "photographs" && entry.sources.length === 0) {
+    } else if (entry.basis !== "description" && entry.sources.length === 0) {
       problems.push(
-        `project.json: postać "${characterId}" ma podstawę photographs, ale nie ma ani jednego zdjęcia, etap postaci nie miałby od czego zacząć`
+        `project.json: postać "${characterId}" ma podstawę ${entry.basis}, ale nie ma ani jednego ${entry.basis === "design" ? "obrazu projektu" : "zdjęcia"}, etap postaci nie miałby od czego zacząć`
       );
     }
   }
@@ -2074,15 +2204,15 @@ export async function readStage0Character(
   if (entry.basis === null) {
     return err(
       new NotReadyError([
-        `postać "${input.characterId}" nie ma ustalonej podstawy, aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
+        `postać "${input.characterId}" nie ma ustalonej podstawy, aimator character design ${input.projectId} ${input.characterId} --source <plik>, aimator character add ${input.projectId} ${input.characterId} --source <plik> albo aimator character describe ${input.projectId} ${input.characterId}`,
       ])
     );
   }
 
-  if (entry.basis === "photographs" && entry.sources.length === 0) {
+  if (entry.basis !== "description" && entry.sources.length === 0) {
     return err(
       new NotReadyError([
-        `postać "${input.characterId}" ma podstawę photographs, ale nie ma ani jednego zdjęcia`,
+        `postać "${input.characterId}" ma podstawę ${entry.basis}, ale nie ma ani jednego ${entry.basis === "design" ? "obrazu projektu" : "zdjęcia"}`,
       ])
     );
   }

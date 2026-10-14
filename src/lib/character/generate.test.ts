@@ -321,7 +321,7 @@ describe("generateCharacter provenance", () => {
     expect(stage.stage).toBe("character");
     expect(stage.artifacts.card.status).toBe("completed");
     expect(stage.artifacts.card.review.status).toBe("pending");
-    expect(stage.artifacts.card.producer.promptVersion).toBe(1);
+    expect(stage.artifacts.card.producer.promptVersion).toBe(2);
   });
 
   /**
@@ -857,6 +857,7 @@ describe("generateCharacter wire format", () => {
     const photo = join(root, "portret.png");
     await writeFile(photo, png(800, 600, 2));
     await addCharacterSources({
+      basis: "photographs",
       characterId: CHARACTER,
       mode: "apply",
       projectId: PROJECT,
@@ -880,6 +881,40 @@ describe("generateCharacter wire format", () => {
     // A form carries strings and nothing else, so here "1" is correct.
     expect((body as FormData).get("n")).toBe("1");
     expect((body as FormData).getAll("image[]")).toHaveLength(1);
+  });
+
+  it("should attach a design's images in name order and ask for the design reproduced", async () => {
+    await makeStage0();
+    const profile = join(root, "02-profil.png");
+    const front = join(root, "01-front.png");
+    await writeFile(profile, png(800, 600, 3));
+    await writeFile(front, png(800, 600, 4));
+    await addCharacterSources({
+      basis: "design",
+      characterId: CHARACTER,
+      mode: "apply",
+      projectId: PROJECT,
+      sourcePaths: [profile, front],
+      workspace,
+    });
+    await approveStage0({
+      mode: "apply",
+      note: "z projektem",
+      projectId: PROJECT,
+      reviewer: "tester",
+      workspace,
+    });
+
+    const call = recorder();
+    await generate({ fetch: call.fetch });
+    const body = call.calls[0]?.body as FormData;
+
+    expect(call.calls[0]?.url).toBe("https://api.openai.com/v1/images/edits");
+    expect(body.getAll("image[]")).toHaveLength(2);
+    expect(body.get("prompt")).toContain("Image 1: design 01-front.png, the primary design.");
+    expect(body.get("prompt")).toContain(
+      "Image 2: design 02-profil.png, the same design from another angle."
+    );
   });
 
   it("should send the seedream request as json with the references inline", async () => {

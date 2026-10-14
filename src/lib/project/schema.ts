@@ -30,11 +30,15 @@ export const sourceNatures = ["law-or-idea", "screenplay", "synopsis"] as const;
 /**
  * Where one character's appearance comes from. Recorded per character rather
  * than per project, because a series may legitimately build one lead from
- * photographs and the rest from the written rules. Recorded as a decision at
+ * photographs and the rest from the written rules. A design and photographs are
+ * both images and read differently: a photograph of a real person is carried
+ * into the series' medium, a design is already in it and is reproduced as it is,
+ * so what the images are is the basis rather than a property of each file.
+ * Recorded as a decision at
  * all because an empty `sources/` is otherwise ambiguous: "deliberately none"
  * and "not supplied yet" are different states and only one may pass stage 0.
  */
-const characterBases = ["description", "photographs"] as const;
+const characterBases = ["description", "design", "photographs"] as const;
 
 const audioSchema = z.enum(audioModes);
 const sourceNatureSchema = z.enum(sourceNatures);

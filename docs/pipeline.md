@@ -32,7 +32,7 @@ $AIMATOR_WORKSPACE/
     ├── style/seedream/               ┘ style.stage.json, style.lock, runs/, per tor
     ├── prepare.stage.json
     ├── characters/<character-id>/
-    │   ├── sources/                  zdjęcia użytkownika (etap 0)
+    │   ├── sources/                  obrazy projektu postaci albo zdjęcia (etap 0)
     │   ├── voices/<język>/           voice.json (obsada głosu), sample.wav, voice.stage.json,
     │   │                             voice.lock, runs/; jeden katalog na język
     │   ├── gpt-image/                card.png, views/, hero.png,
@@ -348,9 +348,9 @@ Obowiązują we wszystkich etapach.
 
 | Etap | Konsumuje | Produkuje | Bramka | Stan |
 |---|---|---|---|---|
-| 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, zdjęcia postaci, obrazy stylu | `project.md`, `project.json`, `style.json`, `style/sources/`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
+| 0 przygotowanie | pomysł użytkownika, plik źródłowy odcinka, obrazy projektu albo zdjęcia postaci, obrazy stylu | `project.md`, `project.json`, `style.json`, `style/sources/`, `source.md`, `episode.json`, `character/sources/` | `aimator check`, potem `aimator approve` | **zaimplementowany** |
 | 1 scenariusz | `project.json`, `project.md`, `source.md`, `episode.json` | `screenplay.md`, `screenplay.stage.json`, `runs/<runId>/` | zatwierdzony etap 0 przed wywołaniem; potem `aimator check`, `aimator approve … --stage screenplay` | **zaimplementowany** |
-| 2 postać | `project.json`, `project.md` i, przy podstawie `photographs`, `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
+| 2 postać | `project.json`, `project.md` i, przy podstawie `design` albo `photographs`, `characters/<id>/sources/` | `card.png` → 8 widoków → `hero.png`, `character.stage.json`, `runs/<runId>/`, per postać i per tor | zatwierdzony etap 0 przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
 | 3 lista ujęć | `project.json`, `project.md`, `episode.json`, zatwierdzony `screenplay.md` | `shot-list.md`, `shot-list.stage.json`, `runs/<runId>/` | zatwierdzony etap 1 przed wywołaniem; potem `aimator check`, `aimator approve … --stage shot-list` | **zaimplementowany** |
 | 4 pakiet promptów | `project.json`, `project.md`, `episode.json`, zatwierdzony `shot-list.md`, zatwierdzony `hero.png` **każdej postaci w kadrze, na obu torach** | `prompt-package.json`, `prompts/**`, `prompt-package.stage.json`, `runs/<runId>/` | zatwierdzony etap 3 i zatwierdzone hero przed wywołaniem; potem `aimator check`, `aimator approve … --stage prompt-package` | **zaimplementowany** |
 | 5 obrazy referencyjne | `project.json`, `project.md`, `style.json` i obrazy stylu, zatwierdzony `prompt-package.json` i `prompts/references/Rxx.md`, zatwierdzone zależności `dependsOn` **na tym torze** | `<tor>/references/Rxx.png`, `<tor>/references.stage.json`, `<tor>/runs/<runId>/` | decyzja o obrazach stylu, zatwierdzony etap 4 i zatwierdzone `dependsOn` przed wywołaniem; potem ocena każdego obrazu z osobna | **zaimplementowany** |
@@ -531,13 +531,25 @@ odcinkami, należy do obsady; twarz widziana raz to referencja etapu 5.
 Nazwa postaci nie jest ozdobą: to ona trafia do promptu etapu 2 i to jej model szuka
 w zasadach projektu.
 
-Każda postać ma **własną podstawę**, więc projekt może budować jedną z fotografii, a resztę
-z zapisanych zasad. Podstawa istnieje, bo puste `characters/<id>/sources/` nie odróżnia
-„świadomie bez zdjęć" od „jeszcze nie dodane". Przy `photographs` bramka blokuje, dopóki
-nie ma ani jednego zdjęcia tej postaci. Przy `description` jedynym wejściem etapu postaci
-jest opis wyglądu w `project.md`, i wtedy to on musi być konkretny, bo nic dalej go nie
-uzupełni. Dodanie zdjęcia przez `character add` samo w sobie jest deklaracją i przestawia
-podstawę tej postaci na `photographs`.
+Każda postać ma **własną podstawę**, więc projekt może budować jedną z jej projektu, drugą
+z fotografii, a resztę z zapisanych zasad. Podstawa istnieje, bo puste
+`characters/<id>/sources/` nie odróżnia „świadomie bez obrazów" od „jeszcze nie dodane".
+Przy `design` i `photographs` bramka blokuje, dopóki nie ma ani jednego obrazu tej
+postaci. Przy `description` jedynym wejściem etapu postaci jest opis wyglądu w
+`project.md`, i wtedy to on musi być konkretny, bo nic dalej go nie uzupełni. Dodanie
+obrazów przez `character design` albo `character add` samo w sobie jest deklaracją i
+przestawia podstawę tej postaci na `design` albo `photographs`.
+
+**Co obrazy są, mówi podstawa, nie plik.** Projekt postaci jest już w stylu serii, a
+zdjęcie trzeba do niego przenieść, więc etap 2 czyta je odwrotnie, i obrazy jednej postaci
+są jednego rodzaju: dodanie projektu do zdjęć albo zdjęć do projektu jest odmową. Lista
+obrazów tylko rośnie, z jednym wyjątkiem: `--replace` czyni podane obrazy całą listą i
+usuwa z `sources/` kopie, których `project.json` już nie wymienia, dopiero po zapisaniu
+`project.json`, więc przerwana zamiana zostawia najwyżej zbędną kopię, nigdy rekord bez
+pliku. Ten sam plik pod tą samą nazwą z inną treścią bez `--replace` jest odmową, bo rekord
+poświadcza stare bajty. Katalog podany jako `--source` to obrazy leżące wprost w nim,
+według nazwy; cokolwiek innego w nim, poza plikami ukrytymi, odrzuca całe polecenie, bo
+widok, który cicho został w katalogu, to ten, którego nikt nie zauważy.
 
 **Obrazy stylu to decyzja projektu w osobnym pliku, `style.json`.** Pole `basis` przyjmuje
 `supplied` (obrazy wniesione przez `project style <id> --source <plik.png>`, kopiowane do
@@ -704,7 +716,7 @@ w chwili uruchomienia.
 
 Pierwszy etap obrazowy i pierwszy, który rozgałęzia się na dwa tory modelowe. Konsumuje
 wyłącznie artefakty etapu 0 (proporcje i obsadę z `project.json`, zasady z `project.md`,
-a przy podstawie `photographs` zdjęcia z `characters/<id>/sources/`), i zapisuje hash
+a przy podstawie `design` albo `photographs` obrazy z `characters/<id>/sources/`), i zapisuje hash
 każdego z nich w chwili, gdy je czyta. **Nie zależy od etapu 1** i może biec równolegle.
 
 Jedno polecenie, `character generate <project-id> <character-id> --track <tor>`, produkuje
@@ -742,11 +754,16 @@ fotorealizm po produkcji, dla której te prompty pierwotnie powstały.
 
 **Rozróżnienie podstawy.** Przy `photographs` obraz 1 jest głównym źródłem tożsamości,
 kolejne zdjęcia to materiał pomocniczy na inne kąty, a przy sprzeczności wygrywa obraz 1.
-Przy `description` nie ma żadnej referencji: prompt mówi modelowi, że opis w zasadach jest
-jedynym wejściem, jakie ten etap dostanie, i że decyzje podjęte na karcie obowiązują
-wszystkie późniejsze obrazy.
+Prompt przenosi kształty do medium z zasad i zabrania pikseli, faktury i światła zdjęcia.
+Przy `design` obrazy są zatwierdzonym projektem już w tym medium: prompt każe odwzorować
+go wiernie, bez przerabiania, a ostrzeżenie przed przenoszeniem faktury i cieniowania,
+właściwe zdjęciom, tu by zakazało dokładnie tego, o co się prosi, więc go nie ma. Obraz
+główny to pierwszy według nazwy, a przy sprzeczności wygrywa on. Przy `description` nie ma
+żadnej referencji: prompt mówi modelowi, że opis w zasadach jest jedynym wejściem, jakie
+ten etap dostanie, i że decyzje podjęte na karcie obowiązują wszystkie późniejsze obrazy.
 
-**Plan referencji.** Karta: wszystkie zdjęcia albo nic. Widok: zdjęcie główne, karta,
+**Plan referencji.** Obrazy projektu stoją tam, gdzie zdjęcia. Karta: wszystkie zdjęcia
+albo nic. Widok: zdjęcie główne, karta,
 pozostałe zdjęcia. Hero: zdjęcie główne, karta, osiem widoków, pozostałe zdjęcia, przy czym
 tor seedream przyjmuje najwyżej dziesięć referencji, więc jego hero kończy się na widokach.
 To jest **zapisany krótszy plan**, nie ciche obcięcie dłuższego. Przekroczenie limitu przez

@@ -103,7 +103,7 @@ Próba na sucho: nic nie zapisano. Montaż ewa/01-burza, tor gpt-image
 Dalej: usuń powyższe przeszkody przed montażem"
 `;
 
-exports[`every command >   character add <id> <character-id> --source <plik> [--source <plik>...] [--json] 1`] = `
+exports[`every command >   character add <id> <character-id> --source <plik|katalog> [--source ...] 1`] = `
 "ok
 Próba na sucho: nic nie zapisano. Materiały postaci "ewa"
   + projects/ewa/characters/ewa/sources/ewa-2.png
@@ -119,6 +119,15 @@ Próba na sucho: nic nie zapisano. Postać "ewa" powstaje z opisu w project.md, 
   = projects/ewa/prepare.stage.json
   ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
 Dalej: opis wyglądu "Ewa" w project.md jest jedynym wejściem etapu postaci, musi być konkretny"
+`;
+
+exports[`every command >   character design <id> <character-id> --source <plik|katalog> [--source ...] 1`] = `
+"ok
+Próba na sucho: nic nie zapisano. Projekt postaci "ewa"
+  + projects/ewa/characters/ewa/sources/ewa-2.png
+  ! podstawa postaci "Ewa" zmieniona z opisu na projekt postaci, opis jej wyglądu w project.md przestaje być wejściem etapu postaci
+  ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
+Dalej: materiały postaci mają status pending, oceny dokonasz w etapie postaci, nie tutaj"
 `;
 
 exports[`every command >   character generate <id> <character-id> --track <gpt-image|seedream> 1`] = `
@@ -229,7 +238,7 @@ Próba na sucho: nic nie zapisano. Postać "Babcia" dopisana do obsady
   = projects/ewa/project.json
   = projects/ewa/prepare.stage.json
   ! akceptacja projektu wygasła, zatwierdź ponownie przez: aimator approve ewa
-Dalej: zdecyduj, skąd bierze się wygląd: aimator character add ewa babcia --source <plik> albo aimator character describe ewa babcia"
+Dalej: zdecyduj, skąd bierze się wygląd: aimator character design ewa babcia --source <plik|katalog>, aimator character add ewa babcia --source <plik> albo aimator character describe ewa babcia"
 `;
 
 exports[`every command >   character sample <id> <character-id> --language <kod> --text <zdanie> 1`] = `

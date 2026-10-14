@@ -329,7 +329,7 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     T,
     "--dry-run",
   ],
-  "  character add <id> <character-id> --source <plik> [--source <plik>...] [--json]": [
+  "  character add <id> <character-id> --source <plik|katalog> [--source ...]": [
     "character",
     "add",
     PROJECT,
@@ -343,6 +343,16 @@ const TABLE: Readonly<Record<string, readonly string[]>> = {
     "describe",
     PROJECT,
     "ewa",
+    "--dry-run",
+  ],
+  "  character design <id> <character-id> --source <plik|katalog> [--source ...]": [
+    "character",
+    "design",
+    PROJECT,
+    "ewa",
+    "--source",
+    "<scratch>/ewa-2.png",
+    "--replace",
     "--dry-run",
   ],
   "  character generate <id> <character-id> --track <gpt-image|seedream>": [

@@ -46,7 +46,8 @@ Jak te pojęcia składają się w opis rysunku, pokazuje [docs/styl.md](styl.md)
 | **sceneria** | setting | Miejsce, do którego seria wraca, razem z tym, co jest w nim stałe: paletą, światłem, sprzętami. |
 | **element powracający** | recurring element | Postać z obsady, rekwizyt albo sceneria: wszystko, co musi wyglądać tak samo w siódmym odcinku. Decyduje powtarzalność, nie rodzaj rzeczy. |
 | **lista powracająca** | running list | Lista elementów powracających prowadzona w trakcie rozmowy. Element trafia na nią w chwili, gdy padnie w odpowiedzi, a rozmowa nie kończy się, póki każdy wpis nie jest opisany. **Nazwanie to nie opisanie**: „ma swój przedmiot" to inwentarz, nie wygląd. |
-| **podstawa postaci** | character basis | Skąd etap postaci bierze wygląd: ze zdjęć (`photographs`) albo z opisu w `project.md` (`description`). W `project.json` jako `characterBasis`, bez wartości domyślnej. |
+| **podstawa postaci** | character basis | Skąd etap postaci bierze wygląd: z projektu postaci (`design`), ze zdjęć (`photographs`) albo z opisu w `project.md` (`description`). W `project.json` jako `characterBasis`, bez wartości domyślnej. |
+| **projekt postaci** | character design | Własne obrazy postaci, już w stylu serii, najlepiej z kilku stron. Etap postaci odwzorowuje go wiernie, a zdjęcie przenosi do stylu serii, więc obrazy jednej postaci są jednego rodzaju. |
 | **proporcje postaci** | figure proportions | Stosunek głowy do ciała i stopień deformacji sylwetki. W `project.md` wiersz „Proporcje i stylizacja postaci". |
 | **proporcje obrazu** | aspect ratio | Kształt kadru, na przykład `16:9`. W `project.json` jako `aspectRatio`. |
 

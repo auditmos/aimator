@@ -238,6 +238,10 @@ function basisOf(entry: CastEntry): string {
     return `ze zdjęć (${entry.sources.length})`;
   }
 
+  if (entry.basis === "design") {
+    return `z projektu postaci (${entry.sources.length})`;
+  }
+
   return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
 }
 

@@ -494,6 +494,10 @@ function renderStage0(headline: string, report: Stage0Report, mode: "apply" | "d
     lines.push(`  = ${path}`);
   }
 
+  for (const path of report.removed ?? []) {
+    lines.push(`  - ${path}`);
+  }
+
   for (const problem of report.problems) {
     lines.push(`  ! ${problem}`);
   }

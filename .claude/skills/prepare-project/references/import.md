@@ -57,7 +57,9 @@ A picture in the material shows what somebody drew or chose; it decides nothing.
 before you speak about it, and use it only where the user says so. Each one lies at
 `<root>/imports/<import-id>/images/I01.png`, under the id `show` gives it:
 
-- a character's look: `character add <project-id> <character-id> --source <picture>`, which
-  makes photographs that character's basis. A picture of several characters is a source for
-  each one only when the user says it is;
+- a character's look: `character design <project-id> <character-id> --source <picture>` when
+  the picture is that character's own design, `character add` when it is a photograph of a
+  real person. A picture of several characters is a source for none of them: stage 2 draws
+  the one character it is given from every image it gets, so ask for a picture per
+  character, or build that character from the description;
 - a style image: `project style <project-id> --source <picture>`, which takes PNG alone.

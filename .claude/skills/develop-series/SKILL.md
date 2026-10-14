@@ -39,8 +39,8 @@ is the user's own creative material, not a client's requirement. Guide, do not i
 1. **Premise and the episode rule:** what connects the episodes and what a single one tells.
 2. **World, period, tone, audience.**
 3. **Protagonist and look:** their role (participant, observer, narrator), the recurring
-   cast, how they look, the visual style. Ask early whether there are photographs of a real
-   person to build a character from; that answer decides how much is left to do here.
+   cast, how they look, the visual style. Ask early whether a character comes with images,
+   its own design or photographs of a real person; that answer decides how much is left here.
 4. **Aspect ratio, opening composition, continuity:** what must stay constant between scenes
    and episodes. The aspect ratio cannot change once images exist without invalidating them.
 5. **Any other binding constraint** they consider non-negotiable.
@@ -51,9 +51,10 @@ rather than recite its method, and answer a studio, film or artist name with a p
 decomposition from its "Zamiast → użyj" table, never with the name. Before naming a style or
 cast concept, read [docs/slownik.md](../../../docs/slownik.md) and use the word it gives.
 
-<important if="a character's look comes from photographs">
-The face arrives with the photographs; the rest of the running list still needs prose.
-Restate them as a decision, never as approved material: only stage 2 inspects them.
+<important if="a character's look comes from images, a design or photographs">
+A design brings face, body and wardrobe, photographs the face alone; the rest of the running
+list still needs prose. Restate them as a decision, never as approved material: only stage 2
+inspects them.
 </important>
 
 <important if="a character's look comes from a description">

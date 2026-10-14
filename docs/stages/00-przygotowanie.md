@@ -32,8 +32,11 @@ pnpm dev project init dzielna-ewa --title "Dzielna Ewa" --aspect-ratio 16:9
 pnpm dev project draft dzielna-ewa --import treatment --dry-run
 # wymień każdą powracającą postać, nie tylko główną
 pnpm dev character new dzielna-ewa ewa --name "Ewa"
+# projekt postaci: jej obrazy w stylu serii, z kilku stron, katalog albo pliki
+pnpm dev character design dzielna-ewa ewa --source ~/Projekty/ewa/
+# albo zdjęcia prawdziwej osoby, przenoszone do stylu serii:
 pnpm dev character add dzielna-ewa ewa --source ~/Zdjecia/portret.jpg
-# albo, jeśli zdjęć nie będzie i postać powstaje z opisu:
+# albo, jeśli obrazów nie będzie i postać powstaje z opisu:
 pnpm dev character describe dzielna-ewa ewa
 pnpm dev episode add dzielna-ewa --source '~/burza/01-burza.md'
 pnpm dev episode set dzielna-ewa 01-burza \
@@ -292,7 +295,7 @@ $AIMATOR_WORKSPACE/projects/dzielna-ewa/
 ├── style.json          decyzja o obrazach stylu: supplied albo none
 ├── prepare.stage.json  pochodzenie i ocena
 ├── style/sources/      obrazy stylu, skopiowane jako S01.png, S02.png… i zahashowane
-├── characters/ewa/sources/   zdjęcia tej postaci, skopiowane i zahashowane
+├── characters/ewa/sources/   obrazy projektu albo zdjęcia tej postaci, skopiowane i zahashowane
 ├── characters/ewa/voices/pl/
 │   ├── voice.json        id głosu w tym języku, dosłownie
 │   ├── sample.wav        kupiona próbka
@@ -320,13 +323,30 @@ domysł sprawiał, że seria opisująca dwie osoby produkowała jedną, a któr�
 model. Kryterium jest powracalność: postać, której tożsamość musi przetrwać między
 odcinkami, należy do obsady; twarz widziana raz to referencja [etapu 5](05-referencje.md).
 
-Każda postać ma **własną podstawę**, więc jedną możesz zbudować ze zdjęć, a resztę
-z opisu. Podstawa istnieje, bo pusty katalog na zdjęcia nie odróżnia „świadomie bez
-zdjęć" od „jeszcze nie dodałem". Przy `photographs` bramka blokuje, dopóki nie ma ani
-jednego zdjęcia tej postaci. Przy `description` **jedynym** wejściem etapu postaci jest
-opis jej wyglądu w `project.md`, i wtedy to on musi być konkretny, bo nic dalej go nie
-uzupełni. `character add` samo w sobie jest deklaracją i przestawia podstawę na
-`photographs`.
+Każda postać ma **własną podstawę**, więc jedną możesz zbudować z projektu, drugą ze
+zdjęć, a resztę z opisu. Podstawa istnieje, bo pusty katalog na obrazy nie odróżnia
+„świadomie bez obrazów" od „jeszcze nie dodałem". Są trzy:
+
+- **`design`, projekt postaci** (`character design`): jej własne obrazy, już w stylu
+  serii, najlepiej z kilku stron. Etap postaci odwzorowuje je wiernie, nie przerabia.
+  Obrazem głównym jest pierwszy według nazwy pliku, więc nazwij je `01-front.png`,
+  `02-profil.png` i tak dalej. Najwyżej 7, bo tyle mieści obraz całej postaci na torze
+  gpt-image obok karty i ośmiu widoków.
+- **`photographs`, zdjęcia** (`character add`): prawdziwa osoba, której kształty etap
+  postaci przenosi do stylu serii, bez pikseli zdjęcia.
+- **`description`, opis** (`character describe`): **jedynym** wejściem etapu postaci
+  jest opis jej wyglądu w `project.md`, i wtedy to on musi być konkretny, bo nic dalej
+  go nie uzupełni.
+
+Przy `design` i `photographs` bramka blokuje, dopóki nie ma ani jednego obrazu tej
+postaci. `character design` i `character add` same w sobie są deklaracją i przestawiają
+podstawę. Obrazy projektu i zdjęcia jednej postaci się nie mieszają, bo etap postaci
+czyta je odwrotnie: dodanie jednych do drugich jest odmową. `--source` przyjmuje plik
+albo katalog, a z katalogu bierze obrazy (PNG, JPEG, WebP) leżące wprost w nim; cokolwiek
+innego w nim, poza ukrytymi plikami, odrzuca całe polecenie. Nowa wersja pliku pod tą samą
+nazwą też jest odmową, bo rekord poświadcza stare bajty. Obie sprawy załatwia `--replace`:
+podane obrazy stają się całą listą, kopie spoza niej znikają z `sources/`, a tak zamienia
+się też zdjęcia na projekt.
 
 ## Style Bible
 
