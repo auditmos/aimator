@@ -73,7 +73,20 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   projektu, więc projekt bez odcinka też da się tu zatwierdzić, a nie tylko z terminala;
   zatwierdzenie przyjmuje projekt i każdy jego odcinek naraz, jak w terminalu, i ekran to
   mówi. Gdy `project.md` zmienił się po akceptacji, zasady są rozwinięte, a zdanie nad
-  przyciskiem mówi, że zgoda wygasła. Pod nimi, ciszej, odnośnik „Obsada i narrator”.
+  przyciskiem mówi, że zgoda wygasła. Pod nimi, ciszej, odnośniki „Zasady wspólne
+  (project.md)” i „Obsada i narrator”.
+- **Zasady wspólne** (`#/projekt/<id>/zasady`): na górze karta „Do uzupełnienia” z liczbą
+  wierszy ze znacznikiem `TODO(etap-0)`, zielona, gdy nie został żaden. Gdy jest import
+  z podziałem, karta ma przycisk „Zaproponuj odpowiedzi”: to darmowa próba na sucho szkicu,
+  po której blok płatny otwiera się na rachunku i „Kup”, jak „Narysuj ponownie” na etapach
+  obrazów; płaci się dopiero tam. Pod kartą cały
+  `project.md` tak, jak leży na dysku, z wyróżnionym każdym takim wierszem, bo to znacznik
+  liczy `check`, także w cytacie na górze. Niżej „Generowanie (płatne)”, czyli `project
+  draft <id> --import <import>` w tych samych dwóch krokach co każdy płatny etap, z wyborem
+  importu spośród tych, które mają podział (jedyny jest wybrany od razu, z kilku żaden).
+  Bez takiego importu ekran mówi, gdzie się go robi. Po zakupie pasek na dole prowadzi do
+  „Zasady (project.md)”. Szkic to propozycja: nic tu się nie zatwierdza, a wiersz
+  „Zatwierdzone przez użytkownika” zostaje człowiekowi.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
   zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc

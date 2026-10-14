@@ -23,6 +23,7 @@ import { Commands, plural, type ResultOffer, ResultOffers, RunDock, SettledStage
 import { NewEpisode, NewProject, PreparePanel, ProjectApproval } from "./prepare";
 import { PromptPackagePanel } from "./prompt-package";
 import { ReferencesPanel } from "./references";
+import { ProjectRules } from "./rules";
 import { ScreenplayPanel } from "./screenplay";
 import { ShotListPanel } from "./shot-list";
 import { MasterPanel, SoundDesignPanel } from "./sound-design";
@@ -106,6 +107,7 @@ type Route =
   | { readonly importId: string; readonly kind: "import" }
   | { readonly kind: "project"; readonly projectId: string }
   | { readonly kind: "cast"; readonly projectId: string }
+  | { readonly kind: "rules"; readonly projectId: string }
   | { readonly kind: "new-episode"; readonly projectId: string }
   | { readonly kind: "episodes"; readonly projectId: string }
   | {
@@ -143,6 +145,10 @@ function projectHref(projectId: string): string {
 
 function castHref(projectId: string): string {
   return `${projectHref(projectId)}/obsada`;
+}
+
+function rulesHref(projectId: string): string {
+  return `${projectHref(projectId)}/zasady`;
 }
 
 function newEpisodeHref(projectId: string): string {
@@ -206,6 +212,10 @@ function routeOf(hash: string): Route {
 
   if (third === "obsada") {
     return { kind: "cast", projectId };
+  }
+
+  if (third === "zasady") {
+    return { kind: "rules", projectId };
   }
 
   if (third === "nowy-odcinek") {
@@ -941,6 +951,24 @@ function ProjectScreens(props: {
     );
   }
 
+  if (route.kind === "rules") {
+    return (
+      <section aria-labelledby="rules-title">
+        <Back href={projectHref(project.id)} label={project.id} />
+        <h1 id="rules-title">Zasady wspólne</h1>
+        <Commands>
+          <ProjectRules
+            onRun={onRun}
+            projectId={project.id}
+            revision={listing}
+            run={run}
+            running={running}
+          />
+        </Commands>
+      </section>
+    );
+  }
+
   if (route.kind === "episode") {
     return project.episodes.includes(route.episodeId) ? (
       // Keyed by episode, so moving between two of them starts the second
@@ -980,9 +1008,11 @@ function ProjectScreens(props: {
           revision={listing}
           running={running}
         />
-        {/* Quieter than the two choices: the cast is set once and revisited
-            rarely, while an episode is what a visit is for. */}
+        {/* Quieter than the two choices: the rules and the cast are set once
+            and revisited rarely, while an episode is what a visit is for. */}
         <p className="home-aside">
+          <a href={rulesHref(project.id)}>Zasady wspólne (project.md)</a>
+          {" · "}
           <a href={castHref(project.id)}>Obsada i narrator</a>
         </p>
       </Choices>

@@ -424,6 +424,7 @@ ui/                    # The client: browser files where the browser files go
 ├── styles.css         # The portable website shell, one room over from site/
 ├── prepare.tsx        # Etap 0: new project, new episode, the episode's stage-0 panel
 ├── cast.tsx           # Etap 0 at the project level: the cast and the narrator
+├── rules.tsx          # Etap 0's project.md: the file, and its draft bought from an import
 ├── screenplay.tsx     # Etap 1
 ├── character.tsx      # Etap 0's cast and etap 2's images: one panel
 ├── shot-list.tsx      # Etap 3

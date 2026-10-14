@@ -417,6 +417,21 @@ h1 {
 .next-card-done {
   border-left-color: var(--color-success-text);
 }
+/* The whole rules file at once: it is read top to bottom, not scrolled in a box. */
+.artifact-text.rules-text {
+  max-height: none;
+}
+/* How many lines still carry the marker: the one number the rules screen is for. */
+.rules-count {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-warning-text);
+}
+/* A line of project.md still waiting for a person: the marker stage 0 counts. */
+.rules-open {
+  color: var(--color-warning-text);
+}
 /* On an import's page the card stands over the blocks rather than alone. */
 .stage-body > .next-card {
   margin-bottom: 1rem;

@@ -29,7 +29,7 @@ const WORD = /^[a-z][a-z-]*$/;
 /** Commands whose `generate` reaches no provider: stage 8 cuts locally. */
 const FREE = new Set(["assembly"]);
 /** The second word of every command that reaches a paid provider. */
-const PAID = new Set(["faces", "generate", "group", "lip-sync", "translate"]);
+const PAID = new Set(["draft", "faces", "generate", "group", "lip-sync", "translate"]);
 const NO_DRY_RUN = /dry-run/;
 const NO_RUN_ID = /identyfikator/;
 const USAGE_LINE = /^ {2}(\S+)(?: (\S+))?/;

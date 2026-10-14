@@ -1157,6 +1157,29 @@ export const INTENTS = {
     "--dry-run",
     "--json",
   ],
+  /**
+   * Stage 0: `project.md` drafted from an import's grouping, previewed: the
+   * parts as they would be sent, and a bill of one call. Bought through `buy`.
+   */
+  previewRulesDraft: (
+    one: Attempt &
+      ImportRef &
+      ProjectRef & {
+        readonly maxOutputTokens: string;
+        readonly model: string;
+      }
+  ): readonly string[] => [
+    "project",
+    "draft",
+    one.projectId,
+    "--import",
+    one.importId,
+    ...flag("--model", one.model),
+    ...flag("--max-output-tokens", one.maxOutputTokens),
+    ...attempt(one),
+    "--dry-run",
+    "--json",
+  ],
   /** Stage 1, previewed: the whole send, priced, with nothing sent. */
   previewScreenplay: (send: Send): readonly string[] => [
     "screenplay",
