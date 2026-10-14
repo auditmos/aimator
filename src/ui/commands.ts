@@ -1275,13 +1275,15 @@ export const INTENTS = {
     one.note,
   ],
   /**
-   * Stage 12, refused: the chosen clips' versions, and why.
+   * Stage 12, refused: the chosen clips' versions or a film, and why.
    *
    * No model reads the note: a lip-sync is a sound and a face, so the reason
    * is what the record says, and the way out is a new job or a new binding.
+   * The film whose mouths moved was accepted against a checklist, so a no
+   * about it may carry what it missed; a clip's version has none to miss.
    */
   rejectVersions: (
-    one: TrackRef & Refusal & { readonly artifacts: readonly string[] }
+    one: TrackRef & Failed & { readonly artifacts: readonly string[] }
   ): readonly string[] => [
     "reject",
     one.projectId,
@@ -1293,6 +1295,7 @@ export const INTENTS = {
     ...artifacts(one.artifacts),
     "--note",
     one.note,
+    ...failing(one.failed),
   ],
   /**
    * Stage 7, republished: the clip again, out of its own archive.

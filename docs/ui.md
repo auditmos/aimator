@@ -256,8 +256,9 @@ pół zdania. Dzięki stałej kolejności na każdym etapie wiadomo, gdzie szuka
    chowa „Zatwierdź”, bo lekarstwem na niego jest właśnie ponowne zatwierdzenie: blok mówi
    wtedy, który plik się zmienił i że zgoda wygasła, a przycisk zostaje. W etapach, które
    rysują (2, 5, 6 i 7), i w etapach 11 i 12 obok „Zatwierdź” stoi **„Odrzuć…”** (`reject`): otwiera pole na
-   powód, bez którego terminal odrzucenia nie przyjmie, a przy klatce otwarcia i samych
-   klatkach wejściowych także pola na niespełnione kryteria QC (`--fail`). Powód trafia do
+   powód, bez którego terminal odrzucenia nie przyjmie, a przy klatce otwarcia, samych
+   klatkach wejściowych i filmie w języku ust także pola na niespełnione kryteria QC
+   (`--fail`), każde z checklisty tego artefaktu. Powód trafia do
    oceny i na drabinę („odrzucone: …”). Odrzucenie niczego nie kupuje ani nie rysuje;
    odrzucone można nadal zatwierdzić. W etapie 12 odrzuca się też gotowy film
    (`--artifact en`), ze swojej karty; nowy film składa `versions final --regenerate`, ale

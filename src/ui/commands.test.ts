@@ -1147,7 +1147,7 @@ describe("the stage-12 commands", () => {
       "--artifact",
       "C01,C02",
     ]);
-    expect(INTENTS.rejectVersions(clips)).toEqual([
+    expect(INTENTS.rejectVersions({ ...clips, failed: [] })).toEqual([
       "reject",
       "dzielna-ewa",
       "01-burza",
@@ -1283,7 +1283,19 @@ describe("the stage-12 commands", () => {
       "animation,lip-sync",
     ]);
     expect(INTENTS.approveFilm({ ...film, artifact: "pl", checks: [] })).not.toContain("--checks");
-    expect(INTENTS.rejectVersions({ ...scope, artifacts: ["pl"] })).toContain("pl");
+    expect(INTENTS.rejectVersions({ ...scope, artifacts: ["pl"], failed: [] })).toContain("pl");
+  });
+
+  /** The film whose mouths moved is refused against its checklist, as a frame is. */
+  it("should name what a film in the language of the mouths missed", () => {
+    const refused = INTENTS.rejectVersions({
+      ...scope,
+      artifacts: ["en"],
+      failed: ["timing", "lip-sync"],
+      note: "usta spóźnione",
+    });
+
+    expect(refused.slice(-4)).toEqual(["--note", "usta spóźnione", "--fail", "timing,lip-sync"]);
   });
 
   it("should buy exactly the lip-sync it previewed", () => {

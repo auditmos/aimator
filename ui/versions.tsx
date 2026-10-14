@@ -546,7 +546,8 @@ function FilmCard(props: {
     [film.id, scope, ticked]
   );
   const rejection = useCallback(
-    (note: string) => INTENTS.rejectVersions({ ...scope, artifacts: [film.id], note }),
+    (note: string, failed: readonly string[]) =>
+      INTENTS.rejectVersions({ ...scope, artifacts: [film.id], failed, note }),
     [film.id, scope]
   );
 
@@ -595,7 +596,7 @@ function FilmCard(props: {
           <Reject
             again="Złożenie filmu nie czyta powodu: zostaje on w ocenie i na drabinie, a nowy film składa „Złóż film” z „Ponownym złożeniem”. Jeśli powód leży w kwestii albo w klipie, popraw najpierw je."
             argvOf={rejection}
-            criteria={[]}
+            criteria={film.checks}
             id={`film-${film.id}-reject`}
             onRun={onRun}
             run={run}
@@ -749,7 +750,7 @@ export function VersionsPanel(props: PanelProps): JSX.Element {
     [scope, selected]
   );
   const rejection = useCallback(
-    (note: string) => INTENTS.rejectVersions({ ...scope, artifacts: selected, note }),
+    (note: string) => INTENTS.rejectVersions({ ...scope, artifacts: selected, failed: [], note }),
     [scope, selected]
   );
   const preview = useMemo(
