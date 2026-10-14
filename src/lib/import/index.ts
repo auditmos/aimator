@@ -26,6 +26,7 @@ import {
   workspacePath,
 } from "../workspace.js";
 import { convertDocx, type DocxConversion } from "./docx.js";
+import { groupingOf } from "./group.js";
 import {
   ImportError,
   type ImportFile,
@@ -36,7 +37,7 @@ import {
   sectionsOf,
 } from "./material.js";
 
-export { groupImport } from "./group.js";
+export { type GroupReport, groupImport } from "./group.js";
 
 /**
  * An import: a document somebody brought, converted and waiting beside the
@@ -75,6 +76,8 @@ interface ImportImage {
 export interface ImportReport {
   /** What this call wrote, workspace-relative; empty when it only read. */
   readonly created: readonly string[];
+  /** The files `import group` wrote under `grouped/`, workspace-relative; empty before it ran. */
+  readonly grouped: readonly string[];
   readonly images: readonly ImportImage[];
   readonly importId: string;
   /** `material.md`, workspace-relative. */
@@ -149,6 +152,7 @@ export async function addImport(input: AddImportInput): Promise<Result<ImportRep
       sectionsOf(input.workspace, paths.data, file, conversion.data.markdown),
       {
         created: written.data.map((path) => toWorkspacePath(input.workspace.root, path)),
+        grouped: [],
         notices: [],
       }
     )
@@ -175,13 +179,19 @@ export async function showImport(input: ImportInput): Promise<Result<ImportRepor
     return stage;
   }
 
+  const grouping = await groupingOf(input.workspace, paths.data, stored.data.material);
+
   return ok(
     reportOf(input, paths.data, stored.data.file, stored.data.sections, {
       created: [],
-      notices: await drift(input.workspace, paths.data, stored.data.file, {
-        material: stored.data.material.sha256,
-        stage: stage.data,
-      }),
+      grouped: grouping.files,
+      notices: [
+        ...(await drift(input.workspace, paths.data, stored.data.file, {
+          material: stored.data.material.sha256,
+          stage: stage.data,
+        })),
+        ...grouping.notices,
+      ],
     })
   );
 }
@@ -262,19 +272,27 @@ function reportOf(
   paths: ImportPaths,
   file: ImportFile,
   sections: readonly MaterialSection[],
-  extra: { readonly created: readonly string[]; readonly notices: readonly string[] }
+  extra: {
+    readonly created: readonly string[];
+    readonly grouped: readonly string[];
+    readonly notices: readonly string[];
+  }
 ): ImportReport {
   const material = toWorkspacePath(input.workspace.root, paths.material);
 
   return {
     created: extra.created,
+    grouped: extra.grouped,
     images: file.images.map((image) => ({
       ...image,
       sections: sections.filter((section) => section.images.includes(image.id)).map(({ id }) => id),
     })),
     importId: input.importId,
     material,
-    nextStep: `przeczytaj ${material} i popraw, co konwersja oddała źle; projekt z tego materiału zakłada skill /prepare-project`,
+    nextStep:
+      extra.grouped.length === 0
+        ? `przeczytaj ${material} i popraw, co konwersja oddała źle, potem: aimator import group ${input.importId} --dry-run`
+        : `przeczytaj ${toWorkspacePath(input.workspace.root, paths.grouped)}/; projekt z tego materiału zakłada skill /prepare-project`,
     notices: [...file.omitted, ...extra.notices],
     originPath: file.originPath,
     sections: sections.map(({ text, ...section }) => section),

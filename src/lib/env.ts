@@ -71,6 +71,12 @@ export const env = createEnv({
     AIMATOR_IMAGE_MODEL_GPT_IMAGE: z.string().min(1).optional(),
     AIMATOR_IMAGE_MODEL_SEEDREAM: z.string().min(1).optional(),
     /**
+     * The text model `import group` asks where each section of an imported
+     * document belongs. Its own variable, like every paid call site: sorting
+     * somebody's treatment and writing a screenplay are two decisions.
+     */
+    AIMATOR_IMPORT_MODEL: z.string().min(1).optional(),
+    /**
      * The private R2 bucket a clip is lent from for one lip-sync job, when the
      * provider cannot take it by id. **Not the site's bucket**: the site's
      * worker serves whatever its bucket holds, so a clip lent there would be

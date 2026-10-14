@@ -85,7 +85,7 @@ interface GroupedFile {
   readonly sections: readonly string[];
 }
 
-interface GroupReport {
+export interface GroupReport {
   /** The note this attempt corrects by, and where it came from; `null` for a new grouping. */
   readonly correction: Correction | null;
   readonly created: readonly string[];
@@ -198,7 +198,7 @@ export async function groupImport(input: GroupInput): Promise<Result<GroupReport
     created: attempt.data.created,
     files: attempt.data.value,
     importId: input.importId,
-    nextStep: `przeczytaj ${toWorkspacePath(input.workspace.root, paths.data.grouped)}; projekt z tego materiału zakłada skill /prepare-project`,
+    nextStep: `przeczytaj ${toWorkspacePath(input.workspace.root, paths.data.grouped)}/; projekt z tego materiału zakłada skill /prepare-project`,
     paidCalls: 1,
     problems: [],
     prompt: null,
@@ -261,6 +261,39 @@ function stage(
     result: paths.grouped,
     stagePath: paths.groupedStage,
     what: "podział materiału",
+  };
+}
+
+/**
+ * What `show` says about a finished grouping: the files it wrote, and whether
+ * the material has moved on since, which leaves those files sorting text that
+ * `material.md` no longer holds.
+ */
+export async function groupingOf(
+  workspace: Workspace,
+  paths: ImportPaths,
+  material: { readonly sha256: string }
+): Promise<{ readonly files: readonly string[]; readonly notices: readonly string[] }> {
+  const file = await readJson(paths.groupedStage, stageFileSchema);
+  const record = file.ok ? file.data.artifacts[KEY] : undefined;
+
+  if (record === undefined || record.status !== "completed") {
+    return { files: [], notices: [] };
+  }
+
+  const materialPath = toWorkspacePath(workspace.root, paths.material);
+  const read = record.inputs.find(({ path }) => path === materialPath)?.sha256;
+
+  return {
+    files: record.outputs
+      .map(({ path }) => path)
+      .filter((path) => recordedUnder(workspace, paths.grouped, path)),
+    notices:
+      read === material.sha256
+        ? []
+        : [
+            `${materialPath} zmieniono po podziale; ${toWorkspacePath(workspace.root, paths.grouped)}/ dzieli poprzednią treść, nowy podział kupuje --regenerate`,
+          ],
   };
 }
 

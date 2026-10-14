@@ -1,6 +1,6 @@
 Usage: aimator <command>
 
-Import materiału (darmowy; przed etapem 0, nie zakłada projektu):
+Import materiału (przed etapem 0, nie zakłada projektu; płatne jest tylko group):
   import add <id> --source <plik.docx> [--json]
     Kopiuje dokument Worda do imports/<id>/ i zamienia go na material.md:
     nagłówki, akapity, pogrubienia, listy, tabele, a obrazy jako images/I01.png
@@ -8,10 +8,18 @@ Import materiału (darmowy; przed etapem 0, nie zakłada projektu):
     Fragment tekstu, którego konwerter nie umie umieścić (np. pole tekstowe,
     przypis), odrzuca cały import, zanim cokolwiek zapisze. Import się nie
     nadpisuje: nowa próba to nowy identyfikator.
+  import group <id> [--model <id>] [--max-output-tokens <n>] [--dry-run] [--json]
+               [--regenerate [--instruction <uwaga>]]
+               [--republish]   ← publikuje zapisaną odpowiedź, nic nie wysyła
+    Jedno płatne wywołanie modelu tekstowego (AIMATOR_IMPORT_MODEL): model mówi
+    tylko, dokąd idzie każda sekcja (seria, styl, postać, odcinek albo reszta),
+    a imports/<id>/grouped/** to te sekcje skopiowane dosłownie. Obraz idzie
+    z sekcją, w której stoi. Nikt podziału nie zatwierdza: to propozycja, którą
+    skill /prepare-project czyta razem z człowiekiem.
   import show <id> [--json]
     Sekcje T01… liczone z nagłówków obecnego material.md, więc ręczna poprawka
-    je przelicza, obrazy i sekcje, które je pokazują, oraz uwagi: co konwersja
-    pominęła i co zmieniono ręcznie. Niczego nie zapisuje.
+    je przelicza, obrazy i sekcje, które je pokazują, pliki podziału oraz
+    uwagi: co konwersja pominęła i co zmieniono ręcznie. Niczego nie zapisuje.
   import list [--json]
     Identyfikatory importów w katalogu roboczym. Niczego nie zapisuje.
 

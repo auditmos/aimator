@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { docx } from "../../test/fixture.js";
 import { sha256Of } from "../artifact/index.js";
 import { resolveWorkspace, type Workspace } from "../workspace.js";
-import { addImport, groupImport } from "./index.js";
+import { addImport, groupImport, showImport } from "./index.js";
 
 /**
  * Grouping: the one paid step of an import, through the module entry. The
@@ -363,6 +363,36 @@ describe("groupImport", () => {
 
       expect(bodies.join("")).not.toContain(SECRET);
     });
+  });
+
+  it("is reported by show: its files, the next step, and a material edited since", async () => {
+    const before = await showImport({ importId: "miko", workspace });
+
+    expect(before.ok ? before.data.nextStep : "").toBe(
+      "przeczytaj imports/miko/material.md i popraw, co konwersja oddała źle, potem: aimator import group miko --dry-run"
+    );
+
+    await group();
+    const shown = await showImport({ importId: "miko", workspace });
+
+    expect(shown.ok ? shown.data.grouped : []).toEqual([
+      "imports/miko/grouped/series.md",
+      "imports/miko/grouped/style.md",
+      "imports/miko/grouped/characters/miko.md",
+      "imports/miko/grouped/episodes/01-pola.md",
+      "imports/miko/grouped/episodes/02-sad.md",
+      "imports/miko/grouped/other.md",
+    ]);
+    expect(shown.ok ? shown.data.nextStep : "").toBe(
+      "przeczytaj imports/miko/grouped/; projekt z tego materiału zakłada skill /prepare-project"
+    );
+
+    await writeFile(join(root, "imports", "miko", "material.md"), `${MATERIAL}\nDopisek.\n`);
+    const edited = await showImport({ importId: "miko", workspace });
+
+    expect(edited.ok ? edited.data.notices : []).toContain(
+      "imports/miko/material.md zmieniono po podziale; imports/miko/grouped/ dzieli poprzednią treść, nowy podział kupuje --regenerate"
+    );
   });
 
   it("refuses an import that does not exist, naming the command that makes one", async () => {

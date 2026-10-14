@@ -24,12 +24,15 @@ pnpm dev reject <projekt> <odcinek> --stage <etap> --note "<powód>"   # „nie�
 ## Przed etapem 0: import materiału
 
 Gdy materiał już istnieje w Wordzie, darmowy import zamienia go na `material.md` i obrazy
-w `imports/<id>/`, niczego nie rozstrzygając i nie zakładając projektu:
+w `imports/<id>/`, niczego nie rozstrzygając i nie zakładając projektu. Płatny podział
+kopiuje jego sekcje do `grouped/` jako serię, styl, postacie i odcinki:
 
 ```bash
 pnpm dev import add <id> --source <plik.docx> --dry-run
 pnpm dev import add <id> --source <plik.docx>
-pnpm dev import show <id>                               # sekcje, obrazy, uwagi
+pnpm dev import show <id>                               # sekcje, obrazy, podział, uwagi
+pnpm dev import group <id> --dry-run                    # prompt i rachunek
+pnpm dev import group <id>                              # płatne: model tylko przydziela sekcje
 ```
 
 Szczegóły w [docs/import.md](docs/import.md).

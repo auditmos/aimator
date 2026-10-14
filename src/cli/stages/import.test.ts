@@ -108,12 +108,49 @@ describe("import show and list", () => {
   });
 
   it("refuses a subcommand it does not have", async () => {
-    expect(await cli("import", "group", "miko")).toEqual({
+    expect(await cli("import", "sort", "miko")).toEqual({
       ok: false,
-      text: "nieznane polecenie: import group",
+      text: "nieznane polecenie: import sort",
     });
     const bare = await run(["import"]);
 
     expect(bare.ok ? "" : bare.error.message).toBe("nieznane polecenie: import");
+  });
+});
+
+describe("import group", () => {
+  beforeEach(async () => {
+    await cli("import", "add", "miko", "--source", source);
+  });
+
+  it("prints the bill and the exact prompt as the module reports them, with --json", async () => {
+    const shown = await cli(
+      "import",
+      "group",
+      "miko",
+      "--model",
+      "gpt-test",
+      "--dry-run",
+      "--json"
+    );
+    const report = JSON.parse(shown.text);
+
+    expect(report.command).toBe("import group");
+    expect(report.paidCalls).toBe(1);
+    expect(report.prompt).toContain("<<< T01\n# Pola\n\n>>> T01");
+    expect(existsSync(join(root, "imports", "miko", "grouped"))).toBe(false);
+  });
+
+  it("refuses flags that contradict each other before anything is read", async () => {
+    expect(await cli("import", "group", "miko", "--regenerate", "--republish")).toEqual({
+      ok: false,
+      text: "--regenerate i --republish wykluczają się: pierwsze płaci za nową odpowiedź, drugie publikuje zapisaną",
+    });
+    expect((await cli("import", "group", "miko", "--instruction", "Krócej.")).text).toBe(
+      "--instruction poprawia opublikowaną wersję, a to nowa płatna próba: wymaga --regenerate"
+    );
+    expect((await cli("import", "group", "miko", "--model", "zły model")).text).toBe(
+      'niepoprawny identyfikator modelu "zły model"'
+    );
   });
 });
