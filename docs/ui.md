@@ -29,7 +29,8 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   nowego projektu. Formularz `import add` (identyfikator i ścieżka do `.docx` wklejona
   z Findera, z powodu opisanego niżej przy etapie 0), a pod nim importy z `import list
   --json`, czytane na nowo przy każdej zmianie w katalogu roboczym, każdy ze swoim stanem:
-  „niepodzielony” albo „podzielony, N plików · gotowy do etapu 0”. Gdy CLI powie „tak”,
+  „niepodzielony” albo „podzielony, N plików · gotowy do etapu 0”, a gotowy ma obok
+  przycisk „Załóż projekt”, ten sam, co na stronie importu. Gdy CLI powie „tak”,
   ekran przechodzi do importu; odmowa, na przykład zajęty identyfikator, zostaje w pasku
   na dole słowo w słowo.
 - **Strona importu** (`#/import/<id>`): to, co mówi `import show --json`, i nic więcej.

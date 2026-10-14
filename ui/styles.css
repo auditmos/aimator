@@ -252,6 +252,24 @@ h1 {
 .pick-id {
   font-family: var(--font-mono);
 }
+/* A row's next move beside its link; the list widens to make room for it. */
+.pick-list-wide {
+  max-width: 48rem;
+}
+.pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.pick-row > .pick-link {
+  flex: 1 1 20rem;
+}
+.pick-go {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  text-decoration: none;
+}
 .pick-meta {
   display: inline-flex;
   flex-wrap: wrap;

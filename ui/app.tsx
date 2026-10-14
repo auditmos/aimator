@@ -421,22 +421,34 @@ function Back(props: { readonly href: string; readonly label: string }): JSX.Ele
  *
  * A list rather than a dropdown, because a dropdown hides the answer behind a
  * click and the screen it stands on has nothing else to show.
+ *
+ * An item may carry its next move beside it, so a thing that is ready can be
+ * taken further without opening it first. Beside, not inside: a link inside a
+ * link is no markup a browser keeps.
  */
 function PickList(props: {
   readonly items: readonly {
+    readonly go?: { readonly href: string; readonly label: string };
     readonly href: string;
     readonly id: string;
     readonly meta?: ReactNode;
   }[];
 }): JSX.Element {
+  const wide = props.items.some((one) => one.go !== undefined);
+
   return (
-    <ul className="pick-list">
+    <ul className={wide ? "pick-list pick-list-wide" : "pick-list"}>
       {props.items.map((one) => (
-        <li key={one.id}>
+        <li className="pick-row" key={one.id}>
           <a className="pick-link" href={one.href}>
             <span className="pick-id">{one.id}</span>
             {one.meta === undefined ? null : <span className="pick-meta">{one.meta}</span>}
           </a>
+          {one.go === undefined ? null : (
+            <a className="action action-primary pick-go" href={one.go.href}>
+              {one.go.label}
+            </a>
+          )}
         </li>
       ))}
     </ul>
@@ -1015,6 +1027,9 @@ function Imports(props: {
       {imports === null || imports.length === 0 ? null : (
         <PickList
           items={imports.map(({ grouped, id }) => ({
+            ...(grouped === 0
+              ? {}
+              : { go: { href: newFromImportHref(id), label: "Załóż projekt" } }),
             href: importHref(id),
             id,
             meta:
