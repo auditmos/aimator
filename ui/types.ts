@@ -772,10 +772,10 @@ export interface ListedProject {
 
 /** One member of the cast, as `project show --json` prints it. */
 export interface CastEntry {
-  readonly basis: "description" | "photographs" | null;
+  readonly basis: "description" | "design" | "photographs" | null;
   readonly id: string;
   readonly name: string;
-  /** Workspace-relative paths of the photographs this character is drawn from. */
+  /** Workspace-relative paths of the design images or photographs it is drawn from. */
   readonly sources: readonly string[];
 }
 

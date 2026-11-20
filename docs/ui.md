@@ -100,21 +100,26 @@ listę projektów dostała komenda [`list`](pipeline.md), a nie klient.
   nie ma żadnej odpowiedzi, bo po szkicu każde ma już propozycję.
 - **Obsada i narrator** (`#/projekt/<id>/obsada`): trzy osobne sekcje, bo to trzy
   pytania. „Postacie”: każda postać z `project show --json` jako własna karta z podstawą,
-  zdjęciami i dwiema akcjami na niej samej (`character add`, `character describe`), więc
-  identyfikatora nie wpisuje się drugi raz; pod kartami „Z podziału importu”: każda postać,
+  obrazami i trzema akcjami na niej samej („Dodaj projekt postaci” to `character design`,
+  „Dodaj zdjęcie” to `character add`, „Buduj z opisu” to `character describe`), więc
+  identyfikatora nie wpisuje się drugi raz. Pole ścieżki przyjmuje plik albo katalog, a
+  „Zastąp obecne obrazy” dokłada `--replace`; po udanej komendzie pole się opróżnia, a pole
+  wyboru odznacza, żeby następne dodanie nie zastąpiło listy po cichu. Pod kartami „Z podziału importu”: każda postać,
   którą znalazł podział importu (`import show --json`), a której obsada jeszcze nie ma, z
   imieniem z jej pliku i własnym „Dodaj do obsady” (`character new`). Nic nie trafia do
   obsady hurtem, bo postać widziana raz to referencja etapu 5. Pole imienia pojawia się
   tylko przy postaci, której plik imienia już nie zapisuje. Niżej `character new` do
-  wpisania ręcznie. Zdjęcia stoją na
-  karcie jako miniatury, a nie ścieżki, bo podstawa ze zdjęć to decyzja o twarzy; każde
-  otwiera się na całe okno jak obraz w galeriach etapów. Resolver podaje je pod
-  `prepare/<nazwa pliku>?character=<id>`, pod nazwą, z jaką skopiował je `character add`;
+  wpisania ręcznie. Obrazy projektu i zdjęcia stoją na
+  karcie jako miniatury, a nie ścieżki, bo podstawa z obrazów to decyzja o wyglądzie; każdy
+  otwiera się na całe okno jak obraz w galeriach etapów. Stoją w kolejności, w jakiej
+  dołącza je etap 2 (według ścieżki), a pierwszy ma znak „główny”, bo to on wygrywa tam,
+  gdzie pozostałe się z nim nie zgadzają. Resolver podaje je pod
+  `prepare/<nazwa pliku>?character=<id>`, pod nazwą, z jaką skopiowała je komenda;
   nazwę, która jest ścieżką, odrzuca `workspace.ts`, a plik, którego przeglądarka nie
   pokaże (inny niż PNG, JPEG, WebP i GIF), dostaje 404 i na karcie zostaje jego nazwa. „Narrator”:
   obecny głos i `project voice`. „Sprawdzenie etapu 0”: `check --stage prepare`. Wynik
   komendy pokazuje się w pasku na dole okna, jak na każdym ekranie (patrz niżej). Pole,
-  którego komenda się udała (nowa postać, ścieżka zdjęcia, głos narratora), się opróżnia,
+  którego komenda się udała (nowa postać, ścieżka obrazów, głos narratora), się opróżnia,
   bo to, co trzymało, stoi już wyżej na liście; odmowa zostawia je tak, jak je wpisano.
   Są na poziomie projektu, bo mieszkają w `project.json` i powracają między
   odcinkami; świeży projekt ustawia je, zanim ma jakikolwiek odcinek. Lista czyta się na

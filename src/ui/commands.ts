@@ -40,6 +40,19 @@ interface CastRef extends ProjectRef {
 }
 
 /**
+ * Images one character is drawn from, by path: files or directories of them.
+ *
+ * Several `--source` flags rather than one comma-separated value, because
+ * that is what the command takes and a path may contain a comma. The paths
+ * travel exactly as typed: the archive records where each file came from.
+ */
+interface CharacterImages extends CastRef {
+  /** The images given become the whole list; the copies outside it go. */
+  readonly replace: boolean;
+  readonly sources: readonly string[];
+}
+
+/**
  * The five decisions an episode carries, plus the sixth stage 3 asks for.
  *
  * Every one of them is a string, including the two that are numbers, because
@@ -210,6 +223,16 @@ function attempt(one: Attempt): readonly string[] {
   return one.regenerate ? ["--regenerate", ...flag("--instruction", one.instruction)] : [];
 }
 
+/** Whose images, which paths, and `--replace` only when they are the whole list. */
+function images(one: CharacterImages): readonly string[] {
+  return [
+    one.projectId,
+    one.characterId,
+    ...one.sources.filter((path) => path !== "").flatMap((path) => ["--source", path]),
+    ...(one.replace ? ["--replace"] : []),
+  ];
+}
+
 /** The six decisions, in the order the usage text lists them. */
 function settings(one: Settings): readonly string[] {
   return [
@@ -231,7 +254,15 @@ function settings(one: Settings): readonly string[] {
  * it hands one object to every intent, so a new intent is checked against
  * `--help` the moment it exists rather than when somebody remembers to add it.
  */
-interface Everything extends Delivery, Failed, ImportRef, Judged, Levels, Send, Settings {
+interface Everything
+  extends CharacterImages,
+    Delivery,
+    Failed,
+    ImportRef,
+    Judged,
+    Levels,
+    Send,
+    Settings {
   readonly artifact: string;
   readonly artifacts: readonly string[];
   readonly aspectRatio: string;
@@ -249,7 +280,6 @@ interface Everything extends Delivery, Failed, ImportRef, Judged, Levels, Send, 
   readonly musicModel: string;
   readonly name: string;
   readonly source: string;
-  readonly sources: readonly string[];
   /** Stage 0: the whole of `project.md`, as the editor holds it. */
   readonly text: string;
   readonly title: string;
@@ -284,21 +314,11 @@ export const INTENTS = {
     "--name",
     one.name,
   ],
-  /**
-   * Stage 0: photographs this character is drawn from, by path.
-   *
-   * Several `--source` flags rather than one comma-separated value, because
-   * that is what the command takes and a path may contain a comma. The paths
-   * travel exactly as typed: the archive records where each file came from.
-   */
-  addCharacterSources: (
-    one: CastRef & { readonly sources: readonly string[] }
-  ): readonly string[] => [
+  /** Stage 0: photographs of a real person this character is drawn from. */
+  addCharacterSources: (one: CharacterImages): readonly string[] => [
     "character",
     "add",
-    one.projectId,
-    one.characterId,
-    ...one.sources.filter((path) => path !== "").flatMap((path) => ["--source", path]),
+    ...images(one),
   ],
   /** Stage 0: the episode, named by its own source file and nothing else. */
   addEpisode: (one: ProjectRef & Settings & { readonly source: string }): readonly string[] => [
@@ -836,6 +856,16 @@ export const INTENTS = {
     "describe",
     one.projectId,
     one.characterId,
+  ],
+  /**
+   * Stage 0: the character's own design, already in the series' style, which
+   * stage 2 reproduces rather than restyles. A separate command rather than a
+   * flag on `add`, because the two kinds never mix on one character.
+   */
+  designCharacter: (one: CharacterImages): readonly string[] => [
+    "character",
+    "design",
+    ...images(one),
   ],
   /**
    * Stage 9: how the narrator of this series reads, which is direction.

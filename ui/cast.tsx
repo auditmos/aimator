@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { INTENTS } from "../src/ui/commands.js";
 import { type ImportedCharacter, useImportedCharacters } from "./import";
 import { Action, artifactUrl, Field, Lightbox, type Picture, useOwnRun, Zoomable } from "./panel";
@@ -76,44 +76,63 @@ function basisOf(entry: CastEntry): string {
     return `ze zdjęć (${entry.sources.length})`;
   }
 
+  if (entry.basis === "design") {
+    return `z projektu postaci (${entry.sources.length})`;
+  }
+
   return entry.basis === "description" ? "z opisu w project.md" : "podstawa nierozstrzygnięta";
 }
 
 /**
- * The photographs a character is drawn from, as pictures rather than paths.
+ * The images a character is drawn from, as pictures rather than paths.
  *
- * A basis of photographs is a decision about a face, and a list of file names
- * asks a person to approve a face they cannot see. Each is served by the
- * resolver under the name `character add` kept, opens on the whole window
- * like every other picture here, and keeps its name underneath, which is also
- * what stands in for a photograph the browser cannot show.
+ * Either basis is a decision about a look, and a list of file names asks a
+ * person to approve a look they cannot see. Each is served by the resolver
+ * under the name the command kept, opens on the whole window like every other
+ * picture here, and keeps its name underneath, which is also what stands in
+ * for an image the browser cannot show.
+ *
+ * They are in the order stage 2 attaches them, by recorded path, and the first
+ * is marked: it is the primary one, the image that wins wherever the others
+ * disagree, so which file sorts first is a decision worth seeing.
  */
-function Photos(props: { readonly entry: CastEntry; readonly projectId: string }): JSX.Element {
+function Sources(props: { readonly entry: CastEntry; readonly projectId: string }): JSX.Element {
   const { entry, projectId } = props;
   const [shown, setShown] = useState<string | null>(null);
   const pictures = useMemo<readonly Picture[]>(
     () =>
-      entry.sources.map((path) => {
-        const name = path.split("/").at(-1) ?? path;
+      [...entry.sources]
+        .sort((left, right) => left.localeCompare(right))
+        .map((path) => {
+          const name = path.split("/").at(-1) ?? path;
 
-        return {
-          caption: entry.name,
-          id: name,
-          url: artifactUrl({ artifact: name, characterId: entry.id, projectId, stage: "prepare" }),
-        };
-      }),
+          return {
+            caption: entry.name,
+            id: name,
+            url: artifactUrl({
+              artifact: name,
+              characterId: entry.id,
+              projectId,
+              stage: "prepare",
+            }),
+          };
+        }),
     [entry, projectId]
   );
+  const primary = entry.basis === "design" ? "główny" : "główne";
 
   return (
     <>
       <ul className="cast-photos">
-        {pictures.map((picture) => (
+        {pictures.map((picture, index) => (
           <li key={picture.id}>
             <Zoomable id={picture.id} onShow={setShown}>
               <img alt={picture.id} height={112} loading="lazy" src={picture.url} width={112} />
             </Zoomable>
             <code title={picture.id}>{picture.id}</code>
+            {index === 0 && pictures.length > 1 ? (
+              <span className="cast-primary">{primary}</span>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -122,7 +141,7 @@ function Photos(props: { readonly entry: CastEntry; readonly projectId: string }
   );
 }
 
-/** One member of the cast: who they are, what they are drawn from, and the two ways to decide it. */
+/** One member of the cast: who they are, what they are drawn from, and the three ways to decide it. */
 function CharacterCard(props: {
   readonly entry: CastEntry;
   readonly onRun: (argv: readonly string[]) => void;
@@ -131,14 +150,30 @@ function CharacterCard(props: {
   readonly running: boolean;
 }): JSX.Element {
   const { entry, onRun, projectId, run, running } = props;
-  const [photo, setPhoto] = useState("");
-  const sources = useMemo(
-    () => INTENTS.addCharacterSources({ characterId: entry.id, projectId, sources: [photo] }),
-    [entry.id, photo, projectId]
+  const [path, setPath] = useState("");
+  const [replace, setReplace] = useState(false);
+  const images = useMemo(
+    () => ({ characterId: entry.id, projectId, replace, sources: [path] }),
+    [entry.id, path, projectId, replace]
   );
-  // Once copied in, the photograph is listed above the field, and the path
-  // left in it would only copy the same file again.
-  const addPhoto = useOwnRun({ onRun, run, running, succeeded: () => setPhoto("") });
+  const design = useMemo(() => INTENTS.designCharacter(images), [images]);
+  const photos = useMemo(() => INTENTS.addCharacterSources(images), [images]);
+  // Once copied in, the images are shown above the field, and the path left
+  // in it would only copy the same files again; a replacement left ticked
+  // would make the next addition one too.
+  const add = useOwnRun({
+    onRun,
+    run,
+    running,
+    succeeded: () => {
+      setPath("");
+      setReplace(false);
+    },
+  });
+  const changeReplace = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setReplace(event.target.checked),
+    []
+  );
   const describe = useMemo(
     () => INTENTS.describeCharacter({ characterId: entry.id, projectId }),
     [entry.id, projectId]
@@ -153,17 +188,27 @@ function CharacterCard(props: {
           {basisOf(entry)}
         </span>
       </header>
-      {entry.sources.length === 0 ? null : <Photos entry={entry} projectId={projectId} />}
+      {entry.sources.length === 0 ? null : <Sources entry={entry} projectId={projectId} />}
       <div className="send">
         <Field
-          id={`photo-${entry.id}`}
-          label="Ścieżka do zdjęcia"
-          onValue={setPhoto}
-          placeholder={`/Users/ktos/Zdjecia/${entry.id}.png`}
-          value={photo}
+          id={`images-${entry.id}`}
+          label="Ścieżka do pliku albo katalogu"
+          onValue={setPath}
+          placeholder={`/Users/ktos/Projekty/${entry.id}/`}
+          value={path}
         />
+        <label className="field-check" htmlFor={`replace-${entry.id}`}>
+          <input
+            checked={replace}
+            id={`replace-${entry.id}`}
+            onChange={changeReplace}
+            type="checkbox"
+          />
+          Zastąp obecne obrazy
+        </label>
       </div>
-      <Action argv={sources} disabled={running} label="Dodaj zdjęcie" onRun={addPhoto} />
+      <Action argv={design} disabled={running} label="Dodaj projekt postaci" onRun={add} />
+      <Action argv={photos} disabled={running} label="Dodaj zdjęcie" onRun={add} />
       <Action argv={describe} disabled={running} label="Buduj z opisu" onRun={onRun} />
     </article>
   );
@@ -240,7 +285,8 @@ function ImportedCast(props: {
       <h3>Z podziału importu</h3>
       <p className="actions-note">
         Do obsady trafia tylko postać, która wraca; widziana raz to referencja etapu 5. Imię jest
-        przepisane z pliku podziału. Podstawę, opis albo zdjęcia, wybierasz potem na karcie postaci.
+        przepisane z pliku podziału. Podstawę (projekt postaci, zdjęcia albo opis) wybierasz potem
+        na karcie postaci. Obraz kilku postaci naraz nie jest podstawą żadnej z nich.
       </p>
       {left.length === 0 ? (
         <p className="panel-empty">Każda postać z podziału jest już w obsadzie.</p>
@@ -379,8 +425,12 @@ export function ProjectCast(props: {
       <section aria-labelledby="cast-people" className="panel">
         <h2 id="cast-people">Postacie</h2>
         <p className="actions-note">
-          Każda powracająca postać, nie tylko główna. Każda potrzebuje podstawy: zdjęć albo opisu w{" "}
-          <code>project.md</code>.
+          Każda powracająca postać, nie tylko główna. Każda potrzebuje podstawy: projektu postaci
+          (własnych obrazów już w stylu serii, które etap postaci odwzorowuje wiernie), zdjęć
+          prawdziwej osoby (przenoszonych do stylu serii) albo opisu w <code>project.md</code>.
+          Projekt i zdjęcia jednej postaci się nie mieszają; „Zastąp obecne obrazy” zamienia całą
+          listę, także jeden rodzaj na drugi. Ścieżka może wskazać katalog: wchodzą obrazy PNG, JPEG
+          i WebP leżące wprost w nim, według nazwy, a pierwszy z nich jest główny.
         </p>
         {shown.kind === "loading" ? <p className="panel-empty">Czytam projekt…</p> : null}
         {overview !== null && overview.cast.length === 0 ? (

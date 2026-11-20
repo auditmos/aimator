@@ -75,6 +75,7 @@ const scope = {
   note: "Za ciemno, Ewa ma sześć palców.",
   projectId: "dzielna-ewa",
   regenerate: false,
+  replace: false,
   similarity: "0.8",
   source: "/Users/ktos/Filmy/01-Burza.md",
   sources: ["/Users/ktos/Zdjecia/ewa-1.png"],
@@ -93,6 +94,8 @@ const scope = {
 
 /** The same scope on a new paid attempt, which is where a note can travel. */
 const AGAIN = { ...scope, regenerate: true };
+/** The same scope with a character's images given as the whole list. */
+const REPLACING = { ...scope, replace: true };
 
 /**
  * Every argv this screen can build, the purchase included.
@@ -162,7 +165,11 @@ describe("the command dictionary", () => {
     const flags = new Set((await usage()).match(FLAG) ?? []);
     const unknown: string[] = [];
 
-    for (const [intent, argv] of [...everyIntent(), ...everyIntent(AGAIN)]) {
+    for (const [intent, argv] of [
+      ...everyIntent(),
+      ...everyIntent(AGAIN),
+      ...everyIntent(REPLACING),
+    ]) {
       for (const argument of argv) {
         if (argument.startsWith("--") && !flags.has(argument)) {
           unknown.push(`${intent}: ${argument}`);
@@ -306,6 +313,20 @@ describe("the stage-0 forms", () => {
       "--source",
       "/Zdjecia/ewa-2.png",
     ]);
+  });
+
+  it("should spell a design as its own command, and --replace only when the list is whole", () => {
+    expect(INTENTS.designCharacter({ ...scope, sources: ["/Projekty/ewa/"] })).toEqual([
+      "character",
+      "design",
+      "dzielna-ewa",
+      "ewa",
+      "--source",
+      "/Projekty/ewa/",
+    ]);
+    expect(INTENTS.designCharacter({ ...REPLACING, sources: ["/Projekty/ewa/"] }).at(-1)).toBe(
+      "--replace"
+    );
   });
 
   it("should name stage 0 when it asks about it, so the answer is stage 0 alone", () => {
